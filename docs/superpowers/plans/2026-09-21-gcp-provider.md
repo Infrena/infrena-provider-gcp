@@ -2819,6 +2819,7 @@ package gen
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"unicode"
 
@@ -2993,7 +2994,12 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// an opaque future failure into an attributable one.
 			if a.Output && a.Required {
 				a.Required = false
-				conflicts = append(conflicts, s.ID+"."+name)
+				// The generator's own stderr, not the plugin's: gen-gcp is a
+				// build-time tool, so this is a line a human reads in the
+				// regeneration output, next to the warnings file.
+				fmt.Fprintf(os.Stderr,
+					"gen: %s.%s is required per magic-modules but output-only per Discovery; treating it as output-only\n",
+					d.Name, name)
 			}
 			if topLevel && f.Type == "ResourceRef" && f.Resource != "" {
 				attr := f.Imports
