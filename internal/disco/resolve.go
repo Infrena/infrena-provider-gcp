@@ -2,9 +2,13 @@ package disco
 
 import "fmt"
 
-// maxRefDepth bounds $ref expansion. Discovery documents contain real cycles, so
-// a resolver without a bound hangs the generator rather than producing a bad
-// catalog — the worse of the two failures, because it has no error to read.
+// maxRefDepth bounds $ref expansion. Discovery documents contain real
+// cycles — of 25 infrastructure APIs checked on 2026-09-21, bigquery,
+// container and spanner each have one, container's being a direct
+// self-reference (OperationProgress -> OperationProgress). compute does
+// not, at revision 20260910. Without a bound the resolver recurses until
+// the stack gives out, which is worse than a bad catalog because there is
+// no error to read.
 //
 // 8 is deeper than any nesting the catalog actually exposes and shallow enough
 // that the truncated tail is always something opaque nobody configures by hand.

@@ -3,8 +3,10 @@ package disco
 import "testing"
 
 // TestResolveTerminatesOnACycle. Discovery documents contain genuine $ref cycles
-// (compute's Expr/Policy is one). An unbounded resolver hangs the generator, which
-// is why this test carries a timeout: a hang must be a failure, not a stuck suite.
+// (bigquery, container and spanner each have one; container's is a direct
+// self-reference, OperationProgress -> OperationProgress). An unbounded
+// resolver hangs the generator, which is why this test carries a timeout: a
+// hang must be a failure, not a stuck suite.
 func TestResolveTerminatesOnACycle(t *testing.T) {
 	d := load(t, "cyclic.json")
 	got, err := d.Resolve(d.Schemas["Node"])
