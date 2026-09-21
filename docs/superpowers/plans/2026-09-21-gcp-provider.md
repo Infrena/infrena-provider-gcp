@@ -23,7 +23,8 @@ together.
 
 - Module `github.com/infrena/infrena-provider-gcp`. Branch `gcp-provider`.
 - `go 1.27.0`; `require github.com/infrena/infrena v0.14.0`, **no `replace`**; local work through a
-  gitignored `go.work` (`go work init . ../infrena`).
+  gitignored `go.work` (`go work init . ../infrena`). **infrena is a PUBLIC repository as of
+  2026-09-20**, so the pinned build needs no credentials and no `GOPRIVATE`; `go.sum` is committed.
 - Plugin name `gcp`; binary `infrena-plugin-gcp`; every type prefixed `gcp.`.
 - `plugin.yaml`: `manifest: 2`, `protocol: [5]`, `infrena: ">= 0.14.0"`.
 - `Version` defaults to `"0.0.0-dev"`, stamped only by `-ldflags -X` at release, so a broken `-ldflags`
@@ -5411,11 +5412,12 @@ go test -count=1 ./...
 go test -tags e2e -count=1 -v ./e2e/
 go vet -tags e2e,live ./...
 gofmt -l .
-GOWORK=off GOPRIVATE='github.com/infrena/*' go test -count=1 ./...
+GOWORK=off go test -count=1 ./...
 ```
 
-All must pass. The last one is the pinned build CI blocks on and needs credentials for
-`github.com/infrena/infrena` (for example `gh auth setup-git`).
+All must pass. The last one is the pinned build CI blocks on: it ignores `go.work` and resolves the
+`require` from the module proxy. **infrena became a public repository on 2026-09-20**, so this needs no
+credentials and no `GOPRIVATE` setting.
 
 - [ ] **Step 5: Sabotage, confirm, restore**
 
@@ -5647,12 +5649,14 @@ mechanism invisible to the people it affects.
 
 - [ ] **Step 4: Write CI**
 
-`ci.yml`: a **blocking** job building pinned (`GOWORK=off GOPRIVATE='github.com/infrena/*'`), running
+`ci.yml`: a **blocking** job building pinned (`GOWORK=off`), running
 `go test -count=1 ./...`, `-race`, `go vet -tags e2e,live ./...`, `gofmt -l .`, the e2e suite, and
 `scripts/check-examples`; it greps stderr for `E2E SKIPPED:` and **fails if found**, because a silently
 skipped suite is worse than a failing one. A second, **non-blocking** job builds against infrena's
 `main` through a workspace, as early warning. `bump-infrena.yml` opens a PR when infrena tags a newer
-release. All use the `INFRENA_CHECKOUT_TOKEN` secret.
+release. **None of them needs a checkout token**: infrena went public on 2026-09-20, so the module
+resolves from the proxy like any other dependency. (The AWS provider repo still carries an
+`INFRENA_CHECKOUT_TOKEN` secret from when it was private — do not copy that across.)
 
 - [ ] **Step 5: Write `README.md`**
 
@@ -5692,7 +5696,7 @@ go test -count=1 ./...
 go test -tags e2e -count=1 ./e2e/
 go vet -tags e2e,live ./...
 gofmt -l .
-GOWORK=off GOPRIVATE='github.com/infrena/*' go test -count=1 ./...
+GOWORK=off go test -count=1 ./...
 scripts/check-examples
 scripts/measure-load
 scripts/release-check v0.1.0
