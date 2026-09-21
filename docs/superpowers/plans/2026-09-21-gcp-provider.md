@@ -1355,7 +1355,9 @@ git clone --depth 1 --filter=blob:none --sparse \
 git -C /tmp/mm sparse-checkout set mmv1/products
 git -C /tmp/mm rev-parse HEAD > gen/mmv1.lock
 rm -rf gen/mmv1 && mkdir -p gen/mmv1
-cp -r /tmp/mm/mmv1/products gen/mmv1/products
+# Copy ONLY the YAML. A literal `cp -r` also drags in BUILD.bazel and any other
+# non-YAML file upstream keeps beside the resources.
+(cd /tmp/mm/mmv1/products && find . -name '*.yaml' -exec install -D {} path/to/infrena-provider-gcp/gen/mmv1/products/{} \;)
 find gen/mmv1 -name '*.yaml' ! -name product.yaml | wc -l   # expect 942
 ```
 
@@ -1396,8 +1398,15 @@ func TestTheVendoredCorpusMatchesWhatThePlanMeasured(t *testing.T) {
 	if total < 900 {
 		t.Errorf("%d resources, expected about 942; did the vendor copy fail?", total)
 	}
-	if pct := 100 * float64(hooked) / float64(total); pct < 35 || pct > 55 {
-		t.Errorf("hooked share is %.0f%%, expected about 45%%; the tier split assumes this", pct)
+	// This band is a DRIFT DETECTOR for vendor bumps, NOT a regression guard for
+	// the wireHooks list. Proof it cannot be the latter: adding `constants` to
+	// wireHooks moves the aggregate to only 48.2%, which a 35-55% band admitted
+	// happily — TestOnlyWireAffectingHooksAreReported is what caught it. Tightened
+	// to 43-47 around the measured 45.3% (427/942) so a single-key change does
+	// show up here too.
+	if pct := 100 * float64(hooked) / float64(total); pct < 43 || pct > 47 {
+		t.Errorf("hooked share is %.1f%%, expected about 45.3%%; a vendor bump moving it "+
+			"this far is worth a human looking at the diff", pct)
 	}
 }
 ```
@@ -3114,7 +3123,10 @@ done
 
 rm -rf gen/mmv1
 mkdir -p gen/mmv1
-cp -r "$tmp/mm/mmv1/products" gen/mmv1/products
+# Copy ONLY the YAML files. A literal `cp -r` also vendors BUILD.bazel and
+# anything else upstream keeps beside the resources, which breaks the yaml-only
+# rule even though those files are Apache 2.0 like the rest of products/.
+(cd "$tmp/mm/mmv1/products" && find . -name '*.yaml' -exec install -D {} "$OLDPWD/gen/mmv1/products/{}" \;)
 echo "vendored magic-modules at $pin: $(find gen/mmv1 -name '*.yaml' ! -name product.yaml | wc -l) resources"
 ```
 
