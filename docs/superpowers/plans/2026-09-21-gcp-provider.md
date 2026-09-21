@@ -2978,6 +2978,23 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if f.Output {
 				a.Output = true
 			}
+			// Output WINS over Required, and the disagreement is reported.
+			//
+			// The two come from independent sources that do not cross-validate:
+			// Output is Discovery's readOnly/prose union, Required is
+			// magic-modules' `required`, which sometimes means "must appear in
+			// the request shape" for a field the server itself populates. If GCP
+			// sets a value, a user cannot be required to supply it.
+			//
+			// Left alone this produces Required+Computed, which schema.Validate
+			// refuses — so it would fail, but at catalog-generation time, as a
+			// generic error against some deep attribute with nothing pointing back
+			// to the source conflict. Clearing it here and naming the field turns
+			// an opaque future failure into an attributable one.
+			if a.Output && a.Required {
+				a.Required = false
+				conflicts = append(conflicts, s.ID+"."+name)
+			}
 			if topLevel && f.Type == "ResourceRef" && f.Resource != "" {
 				attr := f.Imports
 				if attr == "" {
