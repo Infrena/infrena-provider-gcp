@@ -61,7 +61,6 @@ type Method struct {
 	Request     *Ref                  `json:"request"`
 	Response    *Ref                  `json:"response"`
 	Parameters  map[string]*Parameter `json:"parameters"`
-	ScopedPath  string
 }
 
 // Resource is one node of the Discovery `resources` tree.

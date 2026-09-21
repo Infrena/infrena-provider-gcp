@@ -18,12 +18,18 @@
     "WidgetSpec": {
       "id": "WidgetSpec",
       "type": "object",
+      "description": "Generic spec container.",
       "properties": {"size": {"type": "integer", "format": "int64", "description": "How big."}}
     },
     "Operation": {
       "id": "Operation",
       "type": "object",
       "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}}
+    },
+    "Status": {
+      "id": "Status",
+      "type": "string",
+      "enum": ["ACTIVE", "INACTIVE"]
     }
   },
   "resources": {

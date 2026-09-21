@@ -1,6 +1,9 @@
 package disco
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // maxRefDepth bounds $ref expansion, counted in $ref hops, not structural
 // nesting. Nesting through plain `properties`, `items` and
@@ -23,7 +26,9 @@ const maxRefDepth = 8
 //
 // The copy matters: schemas are shared by pointer across every property that
 // refers to them, so expanding in place would corrupt the document for the next
-// caller.
+// caller. That includes the Enum and Required slices: a struct copy alone
+// keeps their backing arrays shared with the schema in d.Schemas, so they're
+// cloned explicitly rather than left to alias.
 func (d *Document) Resolve(s *Schema) (*Schema, error) {
 	out, _, err := d.resolve(s, 0)
 	return out, err
@@ -63,6 +68,8 @@ func (d *Document) resolve(s *Schema, depth int) (*Schema, int, error) {
 		// saying "[Output Only] the spec" must stay output-only even though the
 		// shared spec schema says nothing about it.
 		out := *resolved
+		out.Enum = slices.Clone(resolved.Enum)
+		out.Required = slices.Clone(resolved.Required)
 		if s.Description != "" {
 			out.Description = s.Description
 		}
@@ -73,6 +80,8 @@ func (d *Document) resolve(s *Schema, depth int) (*Schema, int, error) {
 	}
 
 	out := *s
+	out.Enum = slices.Clone(s.Enum)
+	out.Required = slices.Clone(s.Required)
 	truncated := 0
 	if s.Properties != nil {
 		out.Properties = make(map[string]*Schema, len(s.Properties))
