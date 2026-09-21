@@ -3,6 +3,7 @@ package gen
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -98,6 +99,13 @@ func snake(s string) string {
 
 // mmIndex flattens one magic-modules resource's fields by name, at every depth,
 // so a Discovery property can find its lifecycle flags wherever they live.
+//
+// First-seen wins on a name collision. BuildAttributes puts Parameters ahead of
+// Properties in the slice this walks, so a name declared in both (e.g. "name"
+// appearing as both a method parameter and a body property, with different
+// required/immutable flags) resolves to the Parameters entry. That is a real
+// precedence decision, not an accident of append order — see
+// TestParametersWinOverPropertiesOnNameCollision.
 func mmIndex(fields []*mmv1.Field) map[string]*mmv1.Field {
 	out := map[string]*mmv1.Field{}
 	var walk func(fs []*mmv1.Field)
@@ -127,9 +135,25 @@ func BuildAttributes(d *disco.Document, body *disco.Schema, mm *mmv1.Resource, a
 	}
 	var idx map[string]*mmv1.Field
 	if mm != nil {
+		// Parameters precede Properties: on a name collision (a field magic-modules
+		// declares as both a method parameter and a body property, such as "name"),
+		// the Parameters entry wins. See mmIndex's doc comment.
 		idx = mmIndex(append(append([]*mmv1.Field{}, mm.Parameters...), mm.Properties...))
 	}
-	return buildLevel(d, body, idx, aliases, true)
+	var conflicts []string
+	out, err := buildLevel(d, body, idx, aliases, true, &conflicts)
+	if err != nil {
+		return nil, err
+	}
+	// Sorted before being written: the walk that fills conflicts ranges over a Go
+	// map, so the order conflicts arrive in is randomized per run. Regeneration
+	// output is something a human diffs between runs to spot a real change; an
+	// unstable order would bury that change in reordering noise instead.
+	sort.Strings(conflicts)
+	for _, c := range conflicts {
+		fmt.Fprint(os.Stderr, c)
+	}
+	return out, nil
 }
 
 // buildLevel builds one level of attributes. topLevel is not cosmetic: infrena
@@ -137,7 +161,11 @@ func BuildAttributes(d *disco.Document, body *disco.Schema, mm *mmv1.Resource, a
 // attribute's is ever projected into a dependency), and the corpus carries 11
 // nested ResourceRef fields, so emitting them would make ValidateAll reject the
 // whole catalog rather than just those types.
-func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, aliases map[string]string, topLevel bool) (map[string]*catalog.Attr, error) {
+//
+// conflicts collects Output-vs-Required diagnostic lines as they're found;
+// BuildAttributes sorts and emits them after the whole walk finishes, rather
+// than each level printing as it goes.
+func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, aliases map[string]string, topLevel bool, conflicts *[]string) (map[string]*catalog.Attr, error) {
 	out := map[string]*catalog.Attr{}
 	for name, prop := range s.Properties {
 		key := name
@@ -150,10 +178,14 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			Output:      d.OutputOnly(prop),
 			Description: strings.TrimSpace(prop.Description),
 		}
-		if alias, ok := aliases[name]; ok && alias != "" {
+		alias, hasAlias := aliases[name]
+		if hasAlias && alias != "" {
 			a.Aliases = append(a.Aliases, alias)
 		}
-		if sn := snake(name); sn != name {
+		// Skip the generated form when it's identical to a curated alias already
+		// appended above: sizeGb curated as "size_gb" must not end up with
+		// "size_gb" listed twice.
+		if sn := snake(name); sn != name && sn != alias {
 			a.Aliases = append(a.Aliases, sn)
 		}
 		if f := idx[name]; f != nil {
@@ -178,11 +210,12 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if a.Output && a.Required {
 				a.Required = false
 				// The generator's own stderr, not the plugin's: gen-gcp is a
-				// build-time tool, so this is a line a human reads in the
-				// regeneration output, next to the warnings file.
-				fmt.Fprintf(os.Stderr,
+				// build-time tool, so this ends up as a line a human reads in the
+				// regeneration output, next to the warnings file. Collected here
+				// rather than printed immediately — see BuildAttributes for why.
+				*conflicts = append(*conflicts, fmt.Sprintf(
 					"gen: %s.%s is required per magic-modules but output-only per Discovery; treating it as output-only\n",
-					d.Name, name)
+					d.Name, name))
 			}
 			if topLevel && f.Type == "ResourceRef" && f.Resource != "" {
 				attr := f.Imports
@@ -202,7 +235,13 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// its keys would corrupt user data.
 			a.Opaque = true
 		case prop.Type == "object":
-			fields, err := buildLevel(d, prop, idx, nil, false)
+			// aliases is nil below, not merely omitted: Overlay.Aliases is
+			// map[type]map[attribute]alias, with no path notation, so a curated
+			// alias can only ever name a TOP-LEVEL attribute — the overlay has no
+			// way to address anything nested. Curated aliases are top-level only
+			// because of that, not by oversight. snake_case and the original
+			// spelling still apply at every depth (see TestNestedKeysGetTheSameSpellings).
+			fields, err := buildLevel(d, prop, idx, nil, false, conflicts)
 			if err != nil {
 				return nil, err
 			}
@@ -210,7 +249,9 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		case prop.Type == "array" && prop.Items != nil:
 			elem := &catalog.Attr{Canonical: name, Kind: KindOf(prop.Items)}
 			if prop.Items.Type == "object" && len(prop.Items.Properties) > 0 {
-				fields, err := buildLevel(d, prop.Items, idx, nil, false)
+				// Same nil-aliases reasoning as the object branch above: no path
+				// notation exists to curate an alias for an array element's field.
+				fields, err := buildLevel(d, prop.Items, idx, nil, false, conflicts)
 				if err != nil {
 					return nil, err
 				}
