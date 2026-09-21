@@ -1,6 +1,10 @@
 package gen
 
 import (
+	"io"
+	"os"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -201,6 +205,158 @@ func TestScopeComesFromTheURLTemplate(t *testing.T) {
 		if got := ScopeOf(url); got != want {
 			t.Errorf("ScopeOf(%s) = %v, want %v", url, got, want)
 		}
+	}
+}
+
+// TestConflictDiagnosticsAreEmittedInSortedOrder. The walk that finds
+// Output-vs-Required conflicts ranges over a Go map, so without sorting, the
+// order these lines print in is randomized per run — a human diffing
+// regeneration output between runs would see the diagnostics themselves
+// reorder for no reason, burying any real change. Ten conflicting properties
+// are used (not two or three) so an implementation that merely got lucky on
+// map order has a 1-in-3,628,800 chance of passing by accident.
+func TestConflictDiagnosticsAreEmittedInSortedOrder(t *testing.T) {
+	names := []string{"zeta", "yankee", "xray", "whiskey", "victor", "uniform", "tango", "sierra", "romeo", "quebec"}
+	props := map[string]*disco.Schema{}
+	var fields []*mmv1.Field
+	for _, n := range names {
+		props[n] = &disco.Schema{Type: "string", ReadOnly: true}
+		fields = append(fields, &mmv1.Field{Name: n, Required: true})
+	}
+	body := &disco.Schema{Type: "object", Properties: props}
+	mm := &mmv1.Resource{Name: "W", Properties: fields}
+	d := &disco.Document{Name: "tiny"}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := os.Stderr
+	os.Stderr = w
+	_, buildErr := BuildAttributes(d, body, mm, nil)
+	w.Close()
+	os.Stderr = orig
+	if buildErr != nil {
+		t.Fatal(buildErr)
+	}
+	captured, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimRight(string(captured), "\n"), "\n")
+	if len(lines) != len(names) {
+		t.Fatalf("got %d diagnostic lines, want %d: %q", len(lines), len(names), captured)
+	}
+	if !sort.StringsAreSorted(lines) {
+		t.Errorf("diagnostics not sorted:\n%s", captured)
+	}
+}
+
+// TestParametersWinOverPropertiesOnNameCollision. mmIndex flattens Parameters
+// ahead of Properties and keeps the first name it sees, so a field declared in
+// both (with different flags) must resolve to the Parameters entry. This is a
+// real precedence rule, not incidental: a fixture with matching flags in both
+// places would pass under either resolution order.
+func TestParametersWinOverPropertiesOnNameCollision(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"name": {Type: "string"},
+	}}
+	mm := &mmv1.Resource{
+		Name: "W",
+		Parameters: []*mmv1.Field{
+			{Name: "name", Required: true, Immutable: true},
+		},
+		Properties: []*mmv1.Field{
+			{Name: "name", Required: false, Immutable: false},
+		},
+	}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := attrs["name"]; !a.Required || !a.ForceNew {
+		t.Errorf("name: %+v — want the Parameters entry (required, forceNew) to win over Properties", a)
+	}
+}
+
+// TestACuratedAliasEqualToSnakeCaseIsNotDuplicated. When the curated alias and
+// the generated snake_case form are the same string, it must appear once, not
+// twice — a consumer treating len(Aliases) as "how many distinct spellings"
+// would otherwise be lied to.
+func TestACuratedAliasEqualToSnakeCaseIsNotDuplicated(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"sizeGb": {Type: "integer", Format: "int32"},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, &mmv1.Resource{Name: "W"},
+		map[string]string{"sizeGb": "size_gb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := attrs["sizeGb"].Aliases; len(got) != 1 || got[0] != "size_gb" {
+		t.Errorf("aliases = %v, want exactly [size_gb] with no duplicate", got)
+	}
+}
+
+// TestArrayOfPrimitivesGetsAScalarElem covers the Elem branch for an array
+// whose items are not objects: Elem must carry the item Kind and nothing
+// else — no Fields, no Opaque.
+func TestArrayOfPrimitivesGetsAScalarElem(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"tags": {Type: "array", Items: &disco.Schema{Type: "string"}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, &mmv1.Resource{Name: "W"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags := attrs["tags"]
+	if tags.Kind != value.KindList {
+		t.Fatalf("tags.Kind = %v, want KindList", tags.Kind)
+	}
+	if tags.Elem == nil || tags.Elem.Kind != value.KindString {
+		t.Fatalf("tags.Elem = %+v, want a scalar KindString elem", tags.Elem)
+	}
+	if tags.Elem.Fields != nil || tags.Elem.Opaque {
+		t.Errorf("a scalar element must not carry Fields or Opaque: %+v", tags.Elem)
+	}
+}
+
+// TestArrayOfObjectsKeepsItsNestedFieldsAndLifecycleFlags covers the other half
+// of the Elem branch: an array of declared objects must recurse into its
+// item schema exactly like a plain nested object does, including picking up
+// ForceNew from magic-modules for a field nested inside the array element. A
+// generator that special-cased array elements to skip the mm lookup would
+// still pass every other test in this file and still produce a type with a
+// silently mutable field GCP actually forbids changing.
+func TestArrayOfObjectsKeepsItsNestedFieldsAndLifecycleFlags(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"rules": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"port": {Type: "integer", Format: "int32"},
+			"mode": {Type: "string"},
+		}}},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "rules", Type: "Array", Properties: []*mmv1.Field{
+			{Name: "port", Type: "Integer", Immutable: true},
+			{Name: "mode", Type: "Enum"},
+		}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := attrs["rules"]
+	if rules.Elem == nil || rules.Elem.Fields == nil {
+		t.Fatal("rules.Elem is missing its nested Fields")
+	}
+	port, ok := rules.Elem.Fields["port"]
+	if !ok {
+		t.Fatal("nested port attribute missing from the array element")
+	}
+	if !port.ForceNew {
+		t.Errorf("nested port lost ForceNew reached through the array element: %+v", port)
+	}
+	if rules.Elem.Fields["mode"].ForceNew {
+		t.Error("nested mode gained a ForceNew it never had")
 	}
 }
 
