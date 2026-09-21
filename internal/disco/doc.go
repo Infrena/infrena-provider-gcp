@@ -86,8 +86,10 @@ func Parse(data []byte) (*Document, error) {
 //
 // It unions two signals because neither is sufficient on its own: compute
 // carries 1,520 `readOnly` flags but 2,202 `[Output Only]` prose markers
-// (measured 2026-09-21), and the modern APIs use the flag. Trusting either
-// alone marks settable properties read-only, or read-only ones settable.
+// (2,202 of 5,177 top-level schema properties match the marker as a
+// description prefix, against 1,520 carrying the flag, at compute revision
+// 20260910), and the modern APIs use the flag. Trusting either alone marks
+// settable properties read-only, or read-only ones settable.
 func (d *Document) OutputOnly(s *Schema) bool {
 	if s == nil {
 		return false
