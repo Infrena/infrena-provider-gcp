@@ -1,0 +1,58 @@
+{
+  "name": "tiny",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Widget": {
+      "id": "Widget",
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "The widget name."},
+        "selfLink": {"type": "string", "description": "[Output Only] Server-defined URL."},
+        "creationTimestamp": {"type": "string", "readOnly": true, "description": "When it was made."},
+        "spec": {"$ref": "WidgetSpec", "description": "The spec."},
+        "activeConfig": {"$ref": "WidgetSpec", "readOnly": true, "description": "Active spec, computed by the server."}
+      }
+    },
+    "WidgetSpec": {
+      "id": "WidgetSpec",
+      "type": "object",
+      "properties": {"size": {"type": "integer", "format": "int64", "description": "How big."}}
+    },
+    "Operation": {
+      "id": "Operation",
+      "type": "object",
+      "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}}
+    }
+  },
+  "resources": {
+    "projects": {
+      "resources": {
+        "widgets": {
+          "methods": {
+            "get": {
+              "id": "tiny.projects.widgets.get",
+              "path": "projects/{project}/widgets/{widget}",
+              "httpMethod": "GET",
+              "response": {"$ref": "Widget"}
+            },
+            "insert": {
+              "id": "tiny.projects.widgets.insert",
+              "path": "projects/{project}/widgets",
+              "httpMethod": "POST",
+              "request": {"$ref": "Widget"},
+              "response": {"$ref": "Operation"}
+            },
+            "delete": {
+              "id": "tiny.projects.widgets.delete",
+              "path": "projects/{project}/widgets/{widget}",
+              "httpMethod": "DELETE",
+              "response": {"$ref": "Operation"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
