@@ -1,0 +1,15 @@
+# plugin.yaml: what this plugin is, and what it works with.
+# Read at a release TAG, never at the default branch, which describes unreleased code.
+manifest: 2
+name: gcp
+version: 0.1.0
+# The protocol THIS RELEASE'S binary speaks: exactly the pluginproto.Version the infrena go.mod
+# requires. It changes in the same commit as that require.
+protocol: [5]
+platforms: [linux/amd64, linux/arm64, linux/arm, linux/386, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64]
+description: The GCP provider for infrena, serving resource types generated from Google's API Discovery documents.
+# The OLDEST infrena release this plugin works with, which is not the same number as go.mod's
+# require (that is the NEWEST host it is tested against). Protocol 5 is `max_concurrency` in the
+# handshake, and 0.14.0 is the oldest release that speaks it.
+infrena: ">= 0.14.0"
+source: https://github.com/infrena/infrena-provider-gcp
