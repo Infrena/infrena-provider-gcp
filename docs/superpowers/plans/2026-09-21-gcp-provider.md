@@ -1900,8 +1900,11 @@ Both restored." \
 ## Task 5: Type names, and the lock that keeps them
 
 **Files:**
-- Create: `internal/gen/names.go`, `gen/names.lock.json`
+- Create: `internal/gen/names.go`
 - Test: `internal/gen/names_test.go`
+- NOT created here: `gen/names.lock.json`. The generator writes it at Task 8, and `LoadLock` treats an
+  absent file as an empty lock precisely so the first run works. Committing an empty one here would be
+  a file with no content and no author.
 
 **Interfaces:**
 - Consumes: `disco.Collection`, `mmv1.Resource`.
