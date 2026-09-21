@@ -178,7 +178,9 @@ Every attribute accepts GCP's own property name in any case, its generated snake
 curated friendly alias where the overlay defines one. Plans, `infrena explain` and
 `import --generate` show the friendly alias when one exists, otherwise snake_case. A property whose
 name would collide with an infrena resource keyword shows as `type_value`, `provider_value` or
-`lifecycle_value`. Nested keys accept the same spellings as top level. `labels:` is always a map.
+`lifecycle_value`. Nested keys accept GCP's own spelling and the generated snake_case form, the same as
+top level; a CURATED alias is top-level only, because the overlay names an attribute as
+`aliases[<type>][<attribute>]` and has no notation for one at depth. `labels:` is always a map.
 
 Every settable property is `Optional`+`Computed`, per PLAN §14.1: an attribute left unset keeps
 whatever GCP assigns, and removing one from configuration after GCP has set it keeps GCP's current
