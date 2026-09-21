@@ -13,9 +13,12 @@ func TestTheVendoredCorpusMatchesWhatThePlanMeasured(t *testing.T) {
 	if _, err := os.Stat("../../gen/mmv1/products"); os.IsNotExist(err) {
 		t.Skip("gen/mmv1 not vendored")
 	}
-	byProduct, err := LoadDir("../../gen/mmv1/products")
+	byProduct, loadErrs, err := LoadDir("../../gen/mmv1/products")
 	if err != nil {
 		t.Fatalf("LoadDir: %v", err)
+	}
+	for _, le := range loadErrs {
+		t.Logf("unparseable: %v", le)
 	}
 	var total, hooked int
 	for _, rs := range byProduct {
@@ -26,8 +29,8 @@ func TestTheVendoredCorpusMatchesWhatThePlanMeasured(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("products=%d resources=%d hooked=%d (%.0f%%)",
-		len(byProduct), total, hooked, 100*float64(hooked)/float64(total))
+	t.Logf("products=%d resources=%d unparseable=%d hooked=%d (%.0f%%)",
+		len(byProduct), total, len(loadErrs), hooked, 100*float64(hooked)/float64(total))
 	if total < 900 {
 		t.Errorf("%d resources, expected about 942; did the vendor copy fail?", total)
 	}

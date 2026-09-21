@@ -6,9 +6,16 @@ import "slices"
 // is read back from it. Each is hand-written Go in the Terraform provider, so a
 // generated REST type that ignores one is wrong in a way no schema shows.
 //
-// Measured 2026-09-21 across 942 resources: 423 carry at least one of these.
-// Keys deliberately NOT here, because they emit Go that never touches a request
-// or response: constants (145), test_check_destroy (45), pre_read (34),
+// post_create_failure is included even though its name suggests error handling
+// rather than the wire: it can run delete_on_failure.go.tmpl, which issues a
+// DELETE when create fails. That collides directly with this provider's rule
+// that Create never errors once GCP has made something, so those resources
+// need a human ruling, not silent generation.
+//
+// Measured 2026-09-21 across 942 resources: ~426 carry at least one of these
+// (see internal/mmv1/corpus_test.go for the exact, reproducible count). Keys
+// deliberately NOT here, because they emit Go that never touches a request or
+// response: constants (145), test_check_destroy (45), pre_read (34),
 // post_read (21), post_import (19), extra_schema_entry (13), and every tgc_*
 // key. Moving a key into this list moves resources into tier 2, so do it only
 // with a reason written down.
@@ -20,6 +27,7 @@ var wireHooks = []string{
 	"decoder",
 	"encoder",
 	"post_create",
+	"post_create_failure",
 	"post_delete",
 	"post_update",
 	"pre_create",
