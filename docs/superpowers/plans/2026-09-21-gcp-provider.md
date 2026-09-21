@@ -399,9 +399,9 @@ floor to 0.13.0 fails the boundary test. Both restored." \
 **Interfaces:**
 - Consumes: nothing.
 - Produces:
-  - `type Document struct { Name, Version, BaseURL, RootURL, ServicePath string; Schemas map[string]*Schema; Resources map[string]*Resource }`
+  - `type Document struct { Name, Version, RootURL, ServicePath string; Schemas map[string]*Schema; Resources map[string]*Resource }` plus `func (d *Document) ResolvedBaseURL() string` (a METHOD joining RootURL+ServicePath, not a field — an earlier draft listed `BaseURL` as a field and that was wrong)
   - `type Schema struct { ID, Type, Format, Description, Ref string; ReadOnly bool; Properties map[string]*Schema; Items *Schema; AdditionalProperties *Schema; Enum []string; Required []string }`
-  - `type Method struct { ID, Path, HTTPMethod, Description string; Request, Response *Ref; Parameters map[string]*Parameter; ScopedPath string }`
+  - `type Method struct { ID, Path, HTTPMethod, Description string; Request, Response *Ref; Parameters map[string]*Parameter }`
   - `type Collection struct { Path []string; Methods map[string]*Method }`
   - `func Parse(data []byte) (*Document, error)`
   - `func (d *Document) Collections() []Collection`
@@ -794,6 +794,12 @@ func (d *Document) resolve(s *Schema, depth int) (*Schema, error) {
 		// treats as opaque and copies exactly.
 		return &Schema{Type: "object", Description: s.Description}, nil
 	}
+	// IMPORTANT: only a $ref HOP advances depth (see the d.resolve(target, depth+1)
+	// call below). Structural recursion into properties/items/additionalProperties
+	// passes depth THROUGH unchanged. Counting structural nesting conflates finite
+	// nesting with unbounded cycles: measured against the real compute document,
+	// advancing depth on every step truncates 2,686 legitimate non-cyclic subtrees
+	// and replaces real fields with an opaque object, silently and with no error.
 	if s.Ref != "" {
 		target, ok := d.Schemas[s.Ref]
 		if !ok {
@@ -820,7 +826,7 @@ func (d *Document) resolve(s *Schema, depth int) (*Schema, error) {
 	if s.Properties != nil {
 		out.Properties = make(map[string]*Schema, len(s.Properties))
 		for name, p := range s.Properties {
-			r, err := d.resolve(p, depth+1)
+			r, err := d.resolve(p, depth) // structural: depth unchanged
 			if err != nil {
 				return nil, err
 			}
@@ -828,14 +834,14 @@ func (d *Document) resolve(s *Schema, depth int) (*Schema, error) {
 		}
 	}
 	if s.Items != nil {
-		r, err := d.resolve(s.Items, depth+1)
+		r, err := d.resolve(s.Items, depth) // structural: depth unchanged
 		if err != nil {
 			return nil, err
 		}
 		out.Items = r
 	}
 	if s.AdditionalProperties != nil {
-		r, err := d.resolve(s.AdditionalProperties, depth+1)
+		r, err := d.resolve(s.AdditionalProperties, depth) // structural: depth unchanged
 		if err != nil {
 			return nil, err
 		}
@@ -2914,10 +2920,10 @@ func BuildAttributes(d *disco.Document, body *disco.Schema, mm *mmv1.Resource, a
 	if mm != nil {
 		idx = mmIndex(append(append([]*mmv1.Field{}, mm.Parameters...), mm.Properties...))
 	}
-	return buildLevel(d, body, idx, aliases, 0)
+	return buildLevel(d, body, idx, aliases)
 }
 
-func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, aliases map[string]string, depth int) (map[string]*catalog.Attr, error) {
+func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, aliases map[string]string) (map[string]*catalog.Attr, error) {
 	out := map[string]*catalog.Attr{}
 	for name, prop := range s.Properties {
 		key := name
@@ -2960,7 +2966,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// its keys would corrupt user data.
 			a.Opaque = true
 		case prop.Type == "object":
-			fields, err := buildLevel(d, prop, idx, nil, depth+1)
+			fields, err := buildLevel(d, prop, idx, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -2968,7 +2974,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		case prop.Type == "array" && prop.Items != nil:
 			elem := &catalog.Attr{Canonical: name, Kind: KindOf(prop.Items)}
 			if prop.Items.Type == "object" && len(prop.Items.Properties) > 0 {
-				fields, err := buildLevel(d, prop.Items, idx, nil, depth+1)
+				fields, err := buildLevel(d, prop.Items, idx, nil)
 				if err != nil {
 					return nil, err
 				}
