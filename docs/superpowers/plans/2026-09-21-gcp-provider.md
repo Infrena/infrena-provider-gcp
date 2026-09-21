@@ -1693,6 +1693,9 @@ type Type struct {
 	ImportFormat string `json:"import_format,omitempty"`
 	AssetType    string `json:"asset_type,omitempty"`
 	Scope        Scope  `json:"scope"`
+	// ReadVia is set from a tier-2 ruling for a type with no `get` method, e.g.
+	// "list_by_parent" for gcp.tagbinding. Empty means an ordinary read.
+	ReadVia string `json:"read_via,omitempty"`
 
 	Attributes map[string]*Attr `json:"attributes"`
 }
@@ -2202,7 +2205,9 @@ held by a withdrawn type. Both restored." \
 
 ---
 
-## Task 6: Tiers, the overlay, and the warnings file
+## Task 6: Tiers and the overlay
+
+(`gen/warnings.txt` is WRITTEN by Task 8's `WriteWarnings`; this task only decides what goes in it.)
 
 **Files:**
 - Create: `internal/gen/tier.go`, `internal/gen/overlay.go`, `gen/overlay.yaml`
@@ -2260,7 +2265,7 @@ func TestNoCreateMeansExcluded(t *testing.T) {
 }
 
 func TestAHookedTypeIsRefusedWithoutARuling(t *testing.T) {
-	mm := &mmv1.Resource{Name: "Widget", CustomCode: map[string]string{"encoder": "x.tmpl"}}
+	mm := &mmv1.Resource{Name: "Widget", CustomCode: customCode("encoder")}
 	d := Classify(col("get", "insert", "patch", "delete"), mm, nil)
 	if d.Tier != TierHooked {
 		t.Errorf("tier = %d, want 2", d.Tier)
@@ -2271,7 +2276,7 @@ func TestAHookedTypeIsRefusedWithoutARuling(t *testing.T) {
 }
 
 func TestARulingThatNamesEveryHookAdmitsTheType(t *testing.T) {
-	mm := &mmv1.Resource{Name: "Widget", CustomCode: map[string]string{"encoder": "x.tmpl"}}
+	mm := &mmv1.Resource{Name: "Widget", CustomCode: customCode("encoder")}
 	r := &Ruling{Hooks: []string{"encoder"}, Note: "inspected: sets a default the REST API also defaults"}
 	d := Classify(col("get", "insert", "patch", "delete"), mm, r)
 	if d.Tier != TierGeneric {
@@ -2283,9 +2288,7 @@ func TestARulingThatNamesEveryHookAdmitsTheType(t *testing.T) {
 // resource had one hook must not keep admitting it after upstream adds a second:
 // that is exactly how a vendor bump would silently ship an unreviewed type.
 func TestAStaleRulingIsRefused(t *testing.T) {
-	mm := &mmv1.Resource{Name: "Widget", CustomCode: map[string]string{
-		"encoder": "x.tmpl", "custom_import": "y.tmpl",
-	}}
+	mm := &mmv1.Resource{Name: "Widget", CustomCode: customCode("encoder", "custom_import")}
 	r := &Ruling{Hooks: []string{"encoder"}, Note: "written before custom_import existed"}
 	d := Classify(col("get", "insert", "patch", "delete"), mm, r)
 	if d.Tier != TierHooked {
@@ -2306,6 +2309,20 @@ func TestExcludeAndBetaAreExcluded(t *testing.T) {
 			t.Errorf("%+v: tier = %d, want 3", mm, d.Tier)
 		}
 	}
+}
+
+// customCode builds a CustomCode map from key names alone. The values are
+// template paths the code never reads — WireHooks tests key PRESENCE only — and
+// the field is map[string]yaml.Node because 21 real files carry a bool or a list
+// there, so a literal map[string]string will not compile.
+func customCode(keys ...string) map[string]yaml.Node {
+	m := make(map[string]yaml.Node, len(keys))
+	for _, k := range keys {
+		var n yaml.Node
+		n.SetString("templates/terraform/" + k + ".tmpl")
+		m[k] = n
+	}
+	return m
 }
 
 func contains(s, sub string) bool { return len(s) >= len(sub) && (func() bool {
@@ -3481,7 +3498,16 @@ The helpers `loadDocs`, `matchResource`, `singular`, `readPin` and `buildType` a
 file. `buildType` assembles a `catalog.Type` from `BuildAttributes`, `ScopeOf`, `AwaitOf` and the mm
 URL fields, resolving each `Attr.Ref.Type` through `refName` and dropping the reference when the target
 did not ship (an edge pointing at a type the catalog does not serve is a compile error in a file the
-user never wrote). `matchResource` matches a Discovery collection leaf to an mm resource by
+user never wrote).
+
+**`buildType` must also CONSUME the ruling, not merely have validated it.** A ruling that parses and
+then changes nothing is a comment with extra steps:
+- `ruling.AllForceNew` → mark every settable (non-`Output`) attribute `ForceNew`, at every depth. This
+  is what makes `gcp.tagbinding` honest: it has `create`, `delete` and `list` but no `patch`, so
+  nothing about it can be updated in place. Task 9's `TestTheTagBindingRulingTookEffect` asserts
+  exactly this, and without it that test fails.
+- `ruling.ReadVia` → record it on the `catalog.Type` (add a `ReadVia string` field) so the runtime knows
+  to read by listing the parent. Task 16 implements `readByListingParent` against it. `matchResource` matches a Discovery collection leaf to an mm resource by
 case-insensitive singular comparison (`widgets` ↔ `Widget`).
 
 - [ ] **Step 5: Write `cmd/gen-gcp/main.go`**
