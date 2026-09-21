@@ -92,14 +92,14 @@ func (e LoadError) Unwrap() error { return e.Err }
 // LoadDir reads every resource file under root, keyed by product directory.
 //
 // product.yaml is skipped: it describes the product, not a resource. A file
-// that fails to parse is named in the returned []LoadError rather than
-// silently skipped or allowed to abort the rest of the load. Collecting
+// that fails to read OR to parse is named in the returned []LoadError rather
+// than silently skipped or allowed to abort the rest of the load. Collecting
 // rather than aborting matters even beyond not hiding the failure: WalkDir
 // visits files in a fixed (alphabetical) order, so aborting on the first bad
 // file would silently skip every product that sorts after it — a far bigger,
 // and much less visible, loss than naming the one bad file and moving on. The
 // returned error is reserved for failures that mean the walk itself didn't
-// happen, such as an unreadable root directory.
+// happen at all, such as an unreadable root directory.
 func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 	out := map[string][]*Resource{}
 	var loadErrs []LoadError
@@ -115,7 +115,8 @@ func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 		}
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
-			return readErr
+			loadErrs = append(loadErrs, LoadError{Path: path, Err: readErr})
+			return nil
 		}
 		r, parseErr := ParseResource(data)
 		if parseErr != nil {

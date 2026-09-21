@@ -46,3 +46,51 @@ func TestLoadDirNamesBadFilesWithoutDroppingGoodOnes(t *testing.T) {
 		t.Errorf("loadErrs[0].Path = %q, want Bad.yaml", loadErrs[0].Path)
 	}
 }
+
+// TestLoadDirNamesUnreadableFilesWithoutAborting. A file that fails to READ,
+// not just to parse, must not abort the walk either: os.ReadFile erroring
+// used to propagate straight out of the WalkFunc, discarding everything
+// collected so far, which contradicted LoadDir's own doc comment.
+func TestLoadDirNamesUnreadableFilesWithoutAborting(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: permission bits don't block root's own reads")
+	}
+	dir := t.TempDir()
+	good := "name: Good\nbase_url: projects/{{project}}/goods\n"
+	if err := os.WriteFile(filepath.Join(dir, "Good.yaml"), []byte(good), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	unreadable := filepath.Join(dir, "Unreadable.yaml")
+	if err := os.WriteFile(unreadable, []byte("name: Unreadable\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	// t.TempDir's own cleanup needs to read the directory it removes; restore
+	// permissions so that cleanup doesn't itself fail.
+	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o644) })
+
+	byProduct, loadErrs, err := LoadDir(dir)
+	if err != nil {
+		t.Fatalf("LoadDir: %v", err)
+	}
+
+	product := filepath.Base(dir)
+	found := false
+	for _, r := range byProduct[product] {
+		if r.Name == "Good" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Good.yaml was not loaded; byProduct = %+v", byProduct)
+	}
+
+	if len(loadErrs) != 1 {
+		t.Fatalf("loadErrs = %+v, want exactly one", loadErrs)
+	}
+	if filepath.Base(loadErrs[0].Path) != "Unreadable.yaml" {
+		t.Errorf("loadErrs[0].Path = %q, want Unreadable.yaml", loadErrs[0].Path)
+	}
+}
