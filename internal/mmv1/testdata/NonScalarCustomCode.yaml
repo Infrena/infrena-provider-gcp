@@ -1,0 +1,16 @@
+# Copyright 2024 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+---
+name: NonScalarCustomCode
+description: A test resource whose custom_code values aren't all template paths.
+base_url: projects/{{project}}/nonscalars
+custom_code:
+  tgc_ignore_terraform_decoder: true
+  custom_identity:
+    - a
+    - b
+  encoder: templates/terraform/encoders/nonscalar.go.tmpl
+properties:
+  - name: name
+    type: String
+    required: true

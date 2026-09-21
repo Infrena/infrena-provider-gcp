@@ -1,0 +1,12 @@
+# Copyright 2024 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+---
+name: PostCreateFailure
+description: A test resource whose create can be rolled back.
+base_url: projects/{{project}}/postcreatefailures
+custom_code:
+  post_create_failure: templates/terraform/post_create_failure/delete_on_failure.go.tmpl
+properties:
+  - name: name
+    type: String
+    required: true

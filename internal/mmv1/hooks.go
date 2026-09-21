@@ -12,13 +12,13 @@ import "slices"
 // that Create never errors once GCP has made something, so those resources
 // need a human ruling, not silent generation.
 //
-// Measured 2026-09-21 across 942 resources: ~426 carry at least one of these
+// Measured 2026-09-21 across 942 resources: ~427 carry at least one of these
 // (see internal/mmv1/corpus_test.go for the exact, reproducible count). Keys
 // deliberately NOT here, because they emit Go that never touches a request or
-// response: constants (145), test_check_destroy (45), pre_read (34),
-// post_read (21), post_import (19), extra_schema_entry (13), and every tgc_*
-// key. Moving a key into this list moves resources into tier 2, so do it only
-// with a reason written down.
+// response: constants (145), test_constants (1), test_check_destroy (45),
+// pre_read (34), post_read (21), post_import (19), extra_schema_entry (13),
+// and every tgc_* key. Moving a key into this list moves resources into tier
+// 2, so do it only with a reason written down.
 var wireHooks = []string{
 	"custom_create",
 	"custom_delete",
