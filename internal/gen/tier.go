@@ -79,8 +79,8 @@ func Classify(col disco.Collection, mm *mmv1.Resource, ruling *Ruling) Decision 
 		// The ruling predates these hooks. Refusing is the point: this is the exact
 		// path by which a vendor bump would otherwise ship something unreviewed.
 		return Decision{TierHooked, fmt.Sprintf(
-			"ruling covers %v but the resource now also declares %v; re-inspect and extend the ruling",
-			ruling.Hooks, unruled)}
+			"ruling covers %s but the resource now also declares %s; re-inspect and extend the ruling",
+			strings.Join(ruling.Hooks, ", "), strings.Join(unruled, ", "))}
 	}
 	return Decision{TierGeneric, "ruled: " + ruling.Note}
 }
