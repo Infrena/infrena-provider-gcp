@@ -2126,41 +2126,44 @@ func Assign(cands []Candidate, lock *Lock) (map[Candidate]string, error) {
 	// mode it must not have. A caller that retried on the same in-memory lock, or
 	// called Save after a failed Assign, would make the partial state permanent —
 	// and the lock is the one file the rules forbid hand-editing to repair.
-	staged := make(map[string]string, len(fresh))
-
-	// held reports whether name is taken by someone other than c, consulting both
-	// the lock and what this call has staged so far.
-	held := func(name string, c Candidate) (string, bool) {
-		if holder, ok := taken[name]; ok && holder != c.key() {
-			return holder, true
-		}
-		return "", false
-	}
+	assigned := make(map[string]string, len(fresh))
 
 	for _, c := range fresh {
-		short := "gcp." + c.Resource
-		qualified := "gcp." + c.Service + "." + c.Resource
-		name := short
-		if wants[c.Resource] > 1 {
-			name = qualified
-		}
-		if _, clash := held(name, c); clash {
-			name = qualified
-		}
-		if holder, clash := held(name, c); clash {
-			return nil, fmt.Errorf("cannot name %s: both %s and %s are taken (by %s)",
-				c.key(), short, qualified, holder)
+		name, err := nameFor(c, wants, taken)
+		if err != nil {
+			return nil, err
 		}
 		out[c] = name
 		taken[name] = c.key()
-		staged[c.key()] = name
+		assigned[c.key()] = name
 	}
 
 	// Every candidate resolved. Commit.
-	for k, name := range staged {
-		lock.Names[k] = name
+	for k, n := range assigned {
+		lock.Names[k] = n
 	}
 	return out, nil
+}
+
+// nameFor picks one candidate's name: the short form, the qualified form if the
+// short one is ambiguous or taken, and an error if both are taken by someone
+// else. Extracted because the clash check is otherwise written twice, and
+// because Assign should read as "resolve everything, then commit".
+func nameFor(c Candidate, wants map[string]int, taken map[string]string) (string, error) {
+	short := "gcp." + c.Resource
+	qualified := "gcp." + c.Service + "." + c.Resource
+	name := short
+	if wants[c.Resource] > 1 {
+		name = qualified
+	}
+	if holder, clash := taken[name]; clash && holder != c.key() {
+		name = qualified
+	}
+	if holder, clash := taken[name]; clash && holder != c.key() {
+		return "", fmt.Errorf("cannot name %s: both %s and %s are taken (by %s)",
+			c.key(), short, qualified, holder)
+	}
+	return name, nil
 }
 ```
 
