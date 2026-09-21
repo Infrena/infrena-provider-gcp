@@ -1,6 +1,9 @@
 package disco
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 // TestResolveTerminatesOnACycle. Discovery documents contain genuine $ref cycles
 // (bigquery, container and spanner each have one; container's is a direct
@@ -35,5 +38,48 @@ func TestResolveTerminatesOnACycle(t *testing.T) {
 	}
 	if depth > maxRefDepth {
 		t.Errorf("expanded to depth %d, want at most %d", depth, maxRefDepth)
+	}
+}
+
+// TestResolveDoesNotTruncateStructuralNesting draws the distinction the bound
+// exists for: maxRefDepth counts $ref hops, not plain "properties" nesting.
+// A schema nested deeper than maxRefDepth through properties alone, with no
+// $ref anywhere, contradicts a resolver that truncates it — that resolver
+// would be treating finite structural nesting as if it were an unbounded
+// $ref cycle.
+func TestResolveDoesNotTruncateStructuralNesting(t *testing.T) {
+	d := load(t, "tiny.json") // only need a *Document to call the method on
+
+	const levels = maxRefDepth + 5 // deeper than the bound, on purpose
+	leaf := &Schema{Type: "string", Description: "leaf"}
+	root := leaf
+	for i := 0; i < levels; i++ {
+		root = &Schema{
+			Type:        "object",
+			Description: fmt.Sprintf("level %d", i),
+			Properties:  map[string]*Schema{"next": root},
+		}
+	}
+
+	got, err := d.Resolve(root)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	depth := 0
+	cur := got
+	for cur != nil {
+		next, ok := cur.Properties["next"]
+		if !ok {
+			break
+		}
+		cur = next
+		depth++
+	}
+	if depth != levels {
+		t.Fatalf("structural nesting truncated at depth %d, want %d (no $ref was involved, so the bound must not fire)", depth, levels)
+	}
+	if cur.Description != "leaf" {
+		t.Errorf("deepest node description = %q, want %q; nesting deeper than maxRefDepth replaced a real leaf with an opaque placeholder", cur.Description, "leaf")
 	}
 }
