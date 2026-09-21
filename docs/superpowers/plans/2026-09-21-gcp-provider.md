@@ -2120,6 +2120,23 @@ func Assign(cands []Candidate, lock *Lock) (map[Candidate]string, error) {
 		wants[c.Resource]++
 	}
 
+	// Assignments are staged here and committed to the lock only once EVERY
+	// candidate has resolved. The lock's whole promise is that a released name
+	// never moves; half-writing that promise on an error path is the one failure
+	// mode it must not have. A caller that retried on the same in-memory lock, or
+	// called Save after a failed Assign, would make the partial state permanent —
+	// and the lock is the one file the rules forbid hand-editing to repair.
+	staged := make(map[string]string, len(fresh))
+
+	// held reports whether name is taken by someone other than c, consulting both
+	// the lock and what this call has staged so far.
+	held := func(name string, c Candidate) (string, bool) {
+		if holder, ok := taken[name]; ok && holder != c.key() {
+			return holder, true
+		}
+		return "", false
+	}
+
 	for _, c := range fresh {
 		short := "gcp." + c.Resource
 		qualified := "gcp." + c.Service + "." + c.Resource
@@ -2127,16 +2144,21 @@ func Assign(cands []Candidate, lock *Lock) (map[Candidate]string, error) {
 		if wants[c.Resource] > 1 {
 			name = qualified
 		}
-		if holder, clash := taken[name]; clash && holder != c.key() {
+		if _, clash := held(name, c); clash {
 			name = qualified
 		}
-		if holder, clash := taken[name]; clash && holder != c.key() {
+		if holder, clash := held(name, c); clash {
 			return nil, fmt.Errorf("cannot name %s: both %s and %s are taken (by %s)",
 				c.key(), short, qualified, holder)
 		}
 		out[c] = name
 		taken[name] = c.key()
-		lock.Names[c.key()] = name
+		staged[c.key()] = name
+	}
+
+	// Every candidate resolved. Commit.
+	for k, name := range staged {
+		lock.Names[k] = name
 	}
 	return out, nil
 }
