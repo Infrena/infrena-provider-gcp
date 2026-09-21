@@ -33,7 +33,10 @@ func LoadLock(path string) (*Lock, error) {
 		return NewLock(), nil
 	}
 	if err != nil {
-		return nil, err
+		// Named, because an unreadable lock and an absent one are treated
+		// completely differently a line apart, and a bare "permission denied"
+		// with no path would not say which file was in question.
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	l := NewLock()
 	if err := json.Unmarshal(data, l); err != nil {
@@ -49,9 +52,12 @@ func LoadLock(path string) (*Lock, error) {
 func (l *Lock) Save(path string) error {
 	data, err := json.MarshalIndent(l, "", " ")
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", path, err)
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	return nil
 }
 
 // Assign names every candidate, honouring and extending the lock.
