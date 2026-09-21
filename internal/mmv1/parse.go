@@ -7,7 +7,6 @@
 package mmv1
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,56 +37,41 @@ type Async struct {
 
 // Resource is one magic-modules resource definition.
 type Resource struct {
-	Name         string            `yaml:"name"`
-	Description  string            `yaml:"description"`
-	BaseURL      string            `yaml:"base_url"`
-	CreateURL    string            `yaml:"create_url"`
-	UpdateURL    string            `yaml:"update_url"`
-	DeleteURL    string            `yaml:"delete_url"`
-	SelfLink     string            `yaml:"self_link"`
-	UpdateVerb   string            `yaml:"update_verb"`
-	UpdateMask   bool              `yaml:"update_mask"`
-	Exclude      bool              `yaml:"exclude"`
-	MinVersion   string            `yaml:"min_version"`
-	ImportFormat []string          `yaml:"import_format"`
-	Async        *Async            `yaml:"async"`
-	Parameters   []*Field          `yaml:"parameters"`
-	Properties   []*Field          `yaml:"properties"`
-	CustomCode   map[string]string `yaml:"custom_code"`
+	Name         string               `yaml:"name"`
+	Description  string               `yaml:"description"`
+	BaseURL      string               `yaml:"base_url"`
+	CreateURL    string               `yaml:"create_url"`
+	UpdateURL    string               `yaml:"update_url"`
+	DeleteURL    string               `yaml:"delete_url"`
+	SelfLink     string               `yaml:"self_link"`
+	UpdateVerb   string               `yaml:"update_verb"`
+	UpdateMask   bool                 `yaml:"update_mask"`
+	Exclude      bool                 `yaml:"exclude"`
+	MinVersion   string               `yaml:"min_version"`
+	ImportFormat []string             `yaml:"import_format"`
+	Async        *Async               `yaml:"async"`
+	Parameters   []*Field             `yaml:"parameters"`
+	Properties   []*Field             `yaml:"properties"`
+	CustomCode   map[string]yaml.Node `yaml:"custom_code"`
 
 	// Product is the directory the file was found in, filled by LoadDir.
 	Product string `yaml:"-"`
 }
 
 // ParseResource decodes one resource YAML file.
+//
+// CustomCode is decoded as map[string]yaml.Node rather than map[string]string:
+// most custom_code values are template paths, but some (tgc_ignore_terraform_decoder,
+// tgc_ignore_terraform_encoder) are booleans and others (custom_identity) are lists.
+// WireHooks only tests key presence, never a value, so the value's shape doesn't
+// matter to this package — but decoding it as a fixed scalar type would mean a
+// future list- or bool-valued key either breaks parsing or gets silently dropped.
+// A resource that IS wire-affecting must never disappear from the map because its
+// custom_code value doesn't fit an assumed shape.
 func ParseResource(data []byte) (*Resource, error) {
 	var r Resource
 	if err := yaml.Unmarshal(data, &r); err != nil {
-		var typeErr *yaml.TypeError
-		if !errors.As(err, &typeErr) {
-			return nil, fmt.Errorf("magic-modules resource: %w", err)
-		}
-		// custom_code occasionally carries a non-string value (e.g.
-		// custom_identity, a list of field names used for composite ids, on 4
-		// of 942 resources at time of writing). It is not a template path and
-		// not a wire hook, so map[string]string can't hold it and doesn't need
-		// to. yaml.v3 still resolves every other field correctly around a
-		// *yaml.TypeError; recover custom_code by re-decoding it leniently
-		// and keeping only the scalar entries, rather than discarding a
-		// resource that is otherwise perfectly readable.
-		var raw struct {
-			CustomCode map[string]yaml.Node `yaml:"custom_code"`
-		}
-		if rawErr := yaml.Unmarshal(data, &raw); rawErr != nil {
-			return nil, fmt.Errorf("magic-modules resource: %w", err)
-		}
-		cc := map[string]string{}
-		for k, v := range raw.CustomCode {
-			if v.Kind == yaml.ScalarNode {
-				cc[k] = v.Value
-			}
-		}
-		r.CustomCode = cc
+		return nil, fmt.Errorf("magic-modules resource: %w", err)
 	}
 	if r.Name == "" {
 		return nil, fmt.Errorf("magic-modules resource has no name")
@@ -95,16 +79,30 @@ func ParseResource(data []byte) (*Resource, error) {
 	return &r, nil
 }
 
+// LoadError names one file that failed to parse, and why.
+type LoadError struct {
+	Path string
+	Err  error
+}
+
+func (e LoadError) Error() string { return fmt.Sprintf("%s: %v", e.Path, e.Err) }
+
+func (e LoadError) Unwrap() error { return e.Err }
+
 // LoadDir reads every resource file under root, keyed by product directory.
 //
 // product.yaml is skipped: it describes the product, not a resource. A file
-// that still fails to parse after ParseResource's custom_code tolerance is
-// reported (as a named-path error, aborting the walk) rather than silently
-// skipped: a naive loader that swallows a parse error and moves on drops a
-// type from the catalog without saying so.
-
-func LoadDir(root string) (map[string][]*Resource, error) {
+// that fails to parse is named in the returned []LoadError rather than
+// silently skipped or allowed to abort the rest of the load. Collecting
+// rather than aborting matters even beyond not hiding the failure: WalkDir
+// visits files in a fixed (alphabetical) order, so aborting on the first bad
+// file would silently skip every product that sorts after it — a far bigger,
+// and much less visible, loss than naming the one bad file and moving on. The
+// returned error is reserved for failures that mean the walk itself didn't
+// happen, such as an unreadable root directory.
+func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 	out := map[string][]*Resource{}
+	var loadErrs []LoadError
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -121,14 +119,15 @@ func LoadDir(root string) (map[string][]*Resource, error) {
 		}
 		r, parseErr := ParseResource(data)
 		if parseErr != nil {
-			return fmt.Errorf("%s: %w", path, parseErr)
+			loadErrs = append(loadErrs, LoadError{Path: path, Err: parseErr})
+			return nil
 		}
 		r.Product = filepath.Base(filepath.Dir(path))
 		out[r.Product] = append(out[r.Product], r)
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return out, nil
+	return out, loadErrs, nil
 }
