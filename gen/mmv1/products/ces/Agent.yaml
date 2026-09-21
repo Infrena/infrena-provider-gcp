@@ -1,0 +1,657 @@
+# Copyright 2025 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+name: Agent
+description: Description
+base_url: projects/{{project}}/locations/{{location}}/apps/{{app}}/agents
+self_link: projects/{{project}}/locations/{{location}}/apps/{{app}}/agents/{{name}}
+create_url: projects/{{project}}/locations/{{location}}/apps/{{app}}/agents?agentId={{agent_id}}
+update_mask: true
+update_verb: PATCH
+import_format:
+  - projects/{{project}}/locations/{{location}}/apps/{{app}}/agents/{{name}}
+samples:
+  - name: ces_agent_basic
+    primary_resource_id: ces_agent_basic
+    steps:
+      - name: ces_agent_basic
+        resource_id_vars:
+          agent_display_name: my-agent
+          agent_id: agent-id
+          app_display_name: my-app
+          app_id: app-id
+          child_agent_id: child-agent-id
+          toolset_id: toolset-id
+  - name: ces_agent_remote_a2a_agent
+    primary_resource_id: ces_agent_remote_a2a_agent
+    steps:
+      - name: ces_agent_remote_a2a_agent
+        resource_id_vars:
+          agent_display_name: my-agent
+          agent_id: agent-id
+          app_display_name: my-app
+          app_id: app-id
+  - name: ces_agent_remote_dialogflow_agent
+    primary_resource_id: ces_agent_remote_dialogflow_agent
+    steps:
+      - name: ces_agent_remote_dialogflow_agent
+        resource_id_vars:
+          agent_display_name: my-agent
+          agent_id: agent-id
+          app_display_name: my-app
+          app_id: app-id
+  - name: ces_agent_remote_dialogflow_agent_interruption
+    primary_resource_id: ces_agent_remote_dialogflow_agent_interruption
+    steps:
+      - name: ces_agent_remote_dialogflow_agent_interruption
+        resource_id_vars:
+          agent_display_name: my-agent
+          agent_id: agent-id
+          app_display_name: my-app
+          app_id: app-id
+parameters:
+  - name: location
+    type: String
+    required: true
+    description: Resource ID segment making up resource `name`. It identifies the resource within its parent collection as described in https://google.aip.dev/122.
+    immutable: true
+    url_param_only: true
+  - name: app
+    type: String
+    required: true
+    description: Resource ID segment making up resource `name`. It identifies the resource within its parent collection as described in https://google.aip.dev/122.
+    immutable: true
+    url_param_only: true
+  - name: agentId
+    type: String
+    description: |-
+      The ID to use for the agent, which will become the final component of
+      the agent's resource name. If not provided, a unique ID will be
+      automatically assigned for the agent.
+    immutable: true
+    url_param_only: true
+properties:
+  - name: afterAgentCallbacks
+    type: Array
+    description: |-
+      The callbacks to execute after the agent is called.
+      The provided callbacks are executed sequentially in the exact order they
+      are given in the list. If a callback returns an overridden response,
+      execution stops and any remaining callbacks are skipped.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: description
+          type: String
+          description: Human-readable description of the callback.
+        - name: disabled
+          type: Boolean
+          description: |-
+            Whether the callback is disabled. Disabled callbacks are ignored by the
+            agent.
+        - name: pythonCode
+          type: String
+          required: true
+          description: The python code to execute for the callback.
+  - name: afterModelCallbacks
+    type: Array
+    description: |-
+      The callbacks to execute after the model is called. If there are multiple
+      calls to the model, the callback will be executed multiple times.
+      The provided callbacks are executed sequentially in the exact order they
+      are given in the list. If a callback returns an overridden response,
+      execution stops and any remaining callbacks are skipped.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: description
+          type: String
+          description: Human-readable description of the callback.
+        - name: disabled
+          type: Boolean
+          description: |-
+            Whether the callback is disabled. Disabled callbacks are ignored by the
+            agent.
+        - name: pythonCode
+          type: String
+          required: true
+          description: The python code to execute for the callback.
+  - name: afterToolCallbacks
+    type: Array
+    description: |-
+      The callbacks to execute after the tool is invoked. If there are multiple
+      tool invocations, the callback will be executed multiple times.
+      The provided callbacks are executed sequentially in the exact order they
+      are given in the list. If a callback returns an overridden response,
+      execution stops and any remaining callbacks are skipped.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: description
+          type: String
+          description: Human-readable description of the callback.
+        - name: disabled
+          type: Boolean
+          description: |-
+            Whether the callback is disabled. Disabled callbacks are ignored by the
+            agent.
+        - name: pythonCode
+          type: String
+          required: true
+          description: The python code to execute for the callback.
+  - name: beforeAgentCallbacks
+    type: Array
+    description: |-
+      The callbacks to execute before the agent is called.
+      The provided callbacks are executed sequentially in the exact order they
+      are given in the list. If a callback returns an overridden response,
+      execution stops and any remaining callbacks are skipped.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: description
+          type: String
+          description: Human-readable description of the callback.
+        - name: disabled
+          type: Boolean
+          description: |-
+            Whether the callback is disabled. Disabled callbacks are ignored by the
+            agent.
+        - name: pythonCode
+          type: String
+          required: true
+          description: The python code to execute for the callback.
+  - name: beforeModelCallbacks
+    type: Array
+    description: |-
+      The callbacks to execute before the model is called. If there are multiple
+      calls to the model, the callback will be executed multiple times.
+      The provided callbacks are executed sequentially in the exact order they
+      are given in the list. If a callback returns an overridden response,
+      execution stops and any remaining callbacks are skipped.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: description
+          type: String
+          description: Human-readable description of the callback.
+        - name: disabled
+          type: Boolean
+          description: |-
+            Whether the callback is disabled. Disabled callbacks are ignored by the
+            agent.
+        - name: pythonCode
+          type: String
+          required: true
+          description: The python code to execute for the callback.
+  - name: beforeToolCallbacks
+    type: Array
+    description: |-
+      The callbacks to execute before the tool is invoked. If there are multiple
+      tool invocations, the callback will be executed multiple times.
+      The provided callbacks are executed sequentially in the exact order they
+      are given in the list. If a callback returns an overridden response,
+      execution stops and any remaining callbacks are skipped.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: description
+          type: String
+          description: Human-readable description of the callback.
+        - name: disabled
+          type: Boolean
+          description: |-
+            Whether the callback is disabled. Disabled callbacks are ignored by the
+            agent.
+        - name: pythonCode
+          type: String
+          required: true
+          description: The python code to execute for the callback.
+  - name: childAgents
+    type: Array
+    description: |-
+      List of child agents in the agent tree.
+      Format: `projects/{project}/locations/{location}/apps/{app}/agents/{agent}`
+    item_type:
+      type: String
+  - name: createTime
+    type: String
+    description: Timestamp when the agent was created.
+    output: true
+  - name: description
+    type: String
+    description: Human-readable description of the agent.
+  - name: displayName
+    type: String
+    required: true
+    description: Display name of the agent.
+  - name: etag
+    type: String
+    description: |-
+      Etag used to ensure the object hasn't changed during a read-modify-write
+      operation. If the etag is empty, the update will overwrite any concurrent
+      changes.
+    output: true
+  - name: generatedSummary
+    type: String
+    description: |-
+      If the agent is generated by the LLM assistant, this field contains a
+      descriptive summary of the generation.
+    output: true
+  - name: guardrails
+    type: Array
+    description: |-
+      List of guardrails for the agent.
+      Format:
+      `projects/{project}/locations/{location}/apps/{app}/guardrails/{guardrail}`
+    item_type:
+      type: String
+  - name: instruction
+    type: String
+    description: Instructions for the LLM model to guide the agent's behavior.
+  - name: modelSettings
+    type: NestedObject
+    description: Model settings contains various configurations for the LLM model.
+    properties:
+      - name: model
+        type: String
+        description: |-
+          The LLM model that the agent should use.
+          If not set, the agent will inherit the model from its parent agent.
+      - name: temperature
+        type: Double
+        description: |-
+          If set, this temperature will be used for the LLM model. Temperature
+          controls the randomness of the model's responses. Lower temperatures
+          produce responses that are more predictable. Higher temperatures produce
+          responses that are more creative.
+  - name: name
+    type: String
+    description: |-
+      Identifier. The unique identifier of the agent.
+      Format: `projects/{project}/locations/{location}/apps/{app}/agents/{agent}`
+    output: true
+    custom_flatten: templates/terraform/custom_flatten/name_from_self_link.tmpl
+  - name: llmAgent
+    type: NestedObject
+    description: |-
+      Default agent type. The agent uses instructions and callbacks specified in
+      the agent to perform the task using a large language model.
+    allow_empty_object: true
+    send_empty_value: true
+    properties: []
+  - name: remoteA2aAgent
+    type: NestedObject
+    description: |-
+      The agent which will transfer execution to a remote
+      [A2A](https://github.com/a2aproject/A2A) agent.
+    properties:
+      - name: a2aConfig
+        type: NestedObject
+        required: true
+        description: The A2A connection configuration.
+        properties:
+          - name: agentCard
+            type: NestedObject
+            description: The full agent card defined inline.
+            properties:
+              - name: description
+                type: String
+                required: true
+                description: A description of the agent's domain of action/solution space.
+              - name: name
+                type: String
+                required: true
+                description: A human-readable name for the agent.
+              - name: skills
+                type: Array
+                required: true
+                description: |-
+                  Skills represent a unit of ability an agent can perform. This may
+                  somewhat abstract but represents a more focused set of actions that the
+                  agent is highly likely to succeed at.
+                item_type:
+                  type: NestedObject
+                  properties:
+                    - name: description
+                      type: String
+                      required: true
+                      description: A detailed description of the skill.
+                    - name: examples
+                      type: Array
+                      description: Example prompts or scenarios that this skill can handle.
+                      item_type:
+                        type: String
+                    - name: id
+                      type: String
+                      required: true
+                      description: A unique identifier for the agent's skill.
+                    - name: inputModes
+                      type: Array
+                      description: |-
+                        The set of supported input media types for this skill, overriding the
+                        agent's defaults.
+                      item_type:
+                        type: String
+                    - name: name
+                      type: String
+                      required: true
+                      description: A human-readable name for the skill.
+                    - name: outputModes
+                      type: Array
+                      description: |-
+                        The set of supported output media types for this skill, overriding the
+                        agent's defaults.
+                      item_type:
+                        type: String
+                    - name: tags
+                      type: Array
+                      required: true
+                      description: A set of keywords describing the skill's capabilities.
+                      item_type:
+                        type: String
+              - name: supportedInterfaces
+                type: Array
+                required: true
+                description: Ordered list of supported interfaces. The first entry is preferred.
+                item_type:
+                  type: NestedObject
+                  properties:
+                    - name: protocolBinding
+                      type: String
+                      required: true
+                      description: |-
+                        The protocol binding supported at this URL. The core ones officially
+                        supported are JSONRPC, GRPC and HTTP+JSON.
+                    - name: protocolVersion
+                      type: String
+                      required: true
+                      description: |-
+                        The version of the A2A protocol this interface exposes.
+                        Examples: "0.3", "1.0"
+                    - name: tenant
+                      type: String
+                      description: Tenant ID to be used in the request when calling the agent.
+                    - name: url
+                      type: String
+                      required: true
+                      description: |-
+                        The URL where this interface is available. Must be a valid absolute HTTPS
+                        URL in production.
+              - name: version
+                type: String
+                required: true
+                description: The version of the agent.
+          - name: agentRegistry
+            type: String
+            description: |-
+              Reference to the agent in the Agent Registry.
+              Format: `projects/{project}/locations/{location}/agents/{agent}`
+          - name: apiAuthentication
+            type: NestedObject
+            description: |-
+              Authentication configuration for calling the remote agent.
+              Optional if the registry reference already handles authentication.
+            properties:
+              - name: apiKeyConfig
+                type: NestedObject
+                description: Configurations for authentication with API key.
+                properties:
+                  - name: apiKeySecretVersion
+                    type: String
+                    required: true
+                    description: |-
+                      The name of the SecretManager secret version resource storing the API key.
+                      Format: `projects/{project}/secrets/{secret}/versions/{version}`
+                      Note: You should grant `roles/secretmanager.secretAccessor` role to the CES
+                      service agent
+                      `service-@gcp-sa-ces.iam.gserviceaccount.com`.
+                  - name: keyName
+                    type: String
+                    required: true
+                    description: |-
+                      The parameter name or the header name of the API key.
+                      E.g., If the API request is "https://example.com/act?X-Api-Key=", "X-Api-Key" would be the parameter name.
+                  - name: requestLocation
+                    type: String
+                    required: true
+                    description: |-
+                      Key location in the request.
+                      Possible values:
+                      HEADER
+                      QUERY_STRING
+              - name: bearerTokenConfig
+                type: NestedObject
+                description: Configurations for authentication with a bearer token.
+                properties:
+                  - name: token
+                    type: String
+                    required: true
+                    description: |-
+                      The bearer token.
+                      Must be in the format `$context.variables.<name_of_variable>`.
+              - name: oauthConfig
+                type: NestedObject
+                description: Configurations for authentication with OAuth.
+                properties:
+                  - name: clientId
+                    type: String
+                    required: true
+                    description: The client ID from the OAuth provider.
+                  - name: clientSecretVersion
+                    type: String
+                    required: true
+                    description: |-
+                      The name of the SecretManager secret version resource storing the
+                      client secret.
+                      Format: `projects/{project}/secrets/{secret}/versions/{version}`
+
+                      Note: You should grant `roles/secretmanager.secretAccessor` role to the CES
+                      service agent
+                      `service-@gcp-sa-ces.iam.gserviceaccount.com`.
+                  - name: oauthGrantType
+                    type: String
+                    required: true
+                    description: |-
+                      OAuth grant types.
+                      Possible values:
+                      CLIENT_CREDENTIAL
+                  - name: scopes
+                    type: Array
+                    description: The OAuth scopes to grant.
+                    item_type:
+                      type: String
+                  - name: tokenEndpoint
+                    type: String
+                    required: true
+                    description: The token endpoint in the OAuth provider to exchange for an access token.
+              - name: serviceAccountAuthConfig
+                type: NestedObject
+                description: Configurations for authentication using a custom service account.
+                properties:
+                  - name: scopes
+                    type: Array
+                    description: |-
+                      The OAuth scopes to grant. If not specified, the default scope
+                      `https://www.googleapis.com/auth/cloud-platform` is used.
+                    item_type:
+                      type: String
+                  - name: serviceAccount
+                    type: String
+                    required: true
+                    description: |-
+                      The email address of the service account used for authenticatation. CES
+                      uses this service account to exchange an access token and the access token
+                      is then sent in the `Authorization` header of the request.
+
+                      The service account must have the
+                      `roles/iam.serviceAccountTokenCreator` role granted to the
+                      CES service agent
+                      `service-@gcp-sa-ces.iam.gserviceaccount.com`.
+          - name: contextId
+            type: String
+            description: |-
+              If not empty, interactions with the remote A2A agent will use this context
+              ID. This context_id field can refer to a session variable like
+              `$context.variables.order_agent_session_id`.
+          - name: inputVariableMapping
+            type: KeyValuePairs
+            description: Mapping of input variable names of remote agent to GECX variable names.
+          - name: outputVariableMapping
+            type: KeyValuePairs
+            description: Mapping of output variable names of remote agent to GECX variable names.
+          - name: streamingEnabled
+            type: Boolean
+            description: Whether streaming is enabled for the remote agent.
+  - name: remoteDialogflowAgent
+    type: NestedObject
+    description: |-
+      The agent which will transfer execution to an existing remote
+      [Dialogflow](https://cloud.google.com/dialogflow/cx/docs/concept/console-conversational-agents)
+      agent flow. The corresponding Dialogflow agent will process subsequent user
+      queries until the session ends or flow ends and the control is transferred
+      back to the parent CES agent.
+    properties:
+      - name: agent
+        type: String
+        required: true
+        description: |-
+          The
+          [Dialogflow](https://cloud.google.com/dialogflow/cx/docs/concept/console-conversational-agents
+          agent resource name.
+          Format: `projects/{project}/locations/{location}/agents/{agent}`
+      - name: environmentId
+        type: String
+        description: |-
+          The environment ID of the Dialogflow agent be used for the agent
+          execution. If not specified, the draft environment will be used.
+      - name: flowId
+        type: String
+        required: true
+        description: The flow ID of the flow in the Dialogflow agent.
+      - name: inputVariableMapping
+        type: KeyValuePairs
+        description: |-
+          The mapping of the app variables names to the Dialogflow session
+          parameters names to be sent to the Dialogflow agent as input.
+      - name: languageCodeVariable
+        type: String
+        description: |-
+          The name of the variable that contains the language code to be used for
+          the Dialogflow session. If unspecified, the default language code of the
+          Dialogflow agent will be used.
+      - name: outputVariableMapping
+        type: KeyValuePairs
+        description: |-
+          The mapping of the Dialogflow session parameters names to the app
+          variables names to be sent back to the CES agent after the Dialogflow
+          agent execution ends.
+      - name: respectResponseInterruptionSettings
+        type: Boolean
+        description: 'Indicates whether to respect the message-level interruption settings configured in the Dialogflow agent. * If false: all response messages from the Dialogflow agent follow the app-level barge-in settings. * If true: only response messages with [`allow_playback_interruption`](https://docs.cloud.google.com/dialogflow/cx/docs/reference/rpc/google.cloud.dialogflow.cx.v3#text) set to true will be interruptable, all other messages follow the app-level barge-in settings.'
+  - name: tools
+    type: Array
+    description: |-
+      List of available tools for the agent.
+      Format: `projects/{project}/locations/{location}/apps/{app}/tools/{tool}`
+    item_type:
+      type: String
+  - name: toolsets
+    type: Array
+    description: List of toolsets for the agent.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: toolset
+          type: String
+          required: true
+          description: |-
+            The resource name of the toolset.
+            Format:
+            `projects/{project}/locations/{location}/apps/{app}/toolsets/{toolset}`
+        - name: toolIds
+          type: Array
+          description: The tools IDs to filter the toolset.
+          item_type:
+            type: String
+  - name: transferRules
+    type: Array
+    description: |-
+      List of transfer rules for the agent.
+      If multiple rules match, the first one in the list will be used.
+    item_type:
+      type: NestedObject
+      properties:
+        - name: childAgent
+          type: String
+          required: true
+          description: |-
+            The resource name of the child agent the rule applies to.
+            Format: `projects/{project}/locations/{location}/apps/{app}/agents/{agent}`
+        - name: deterministicTransfer
+          type: NestedObject
+          description: |-
+            Deterministic transfer rule. When the condition evaluates to true, the
+            transfer occurs.
+          properties:
+            - name: expressionCondition
+              type: NestedObject
+              description: |-
+                A rule that evaluates a session state condition. If the condition
+                evaluates to true, the transfer occurs.
+              properties:
+                - name: expression
+                  type: String
+                  required: true
+                  description: The string representation of cloud.api.Expression condition.
+            - name: pythonCodeCondition
+              type: NestedObject
+              description: |-
+                A rule that uses Python code block to evaluate the conditions. If the
+                condition evaluates to true, the transfer occurs.
+              properties:
+                - name: pythonCode
+                  type: String
+                  required: true
+                  description: |-
+                    The python code to execute. The function must be named
+                    `should_trigger_transfer_callback`.
+        - name: direction
+          type: Enum
+          required: true
+          description: |-
+            The direction of the transfer.
+          enum_values:
+            - PARENT_TO_CHILD
+            - CHILD_TO_PARENT
+        - name: disablePlannerTransfer
+          type: NestedObject
+          description: |-
+            A rule that prevents the planner from transferring to the target agent.
+          properties:
+            - name: expressionCondition
+              type: NestedObject
+              required: true
+              description: |-
+                If the condition evaluates to true, planner will not be allowed to
+                transfer to the target agent.
+              properties:
+                - name: expression
+                  type: String
+                  required: true
+                  description: The string representation of cloud.api.Expression condition.
+  - name: updateTime
+    type: String
+    description: Timestamp when the agent was last updated.
+    output: true

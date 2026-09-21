@@ -1,0 +1,13 @@
+# Copyright 2024 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+---
+name: Hooked
+description: A test resource with custom code.
+base_url: projects/{{project}}/hooked
+custom_code:
+  constants: templates/terraform/constants/hooked.tmpl
+  encoder: templates/terraform/encoders/hooked.go.tmpl
+properties:
+  - name: name
+    type: String
+    required: true
