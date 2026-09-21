@@ -105,6 +105,20 @@ func TestExcludeWinsEvenWhenHookedAndUnreadable(t *testing.T) {
 	}
 }
 
+// TestNilResourceIsTierGeneric covers a Discovery collection with no
+// magic-modules definition at all (mm == nil). That's deliberate and correct —
+// a type magic-modules has never heard of still ships, just without lifecycle
+// metadata — but nothing exercised the nil path before this.
+func TestNilResourceIsTierGeneric(t *testing.T) {
+	d := Classify(col("get", "list", "insert", "patch", "delete"), nil, nil)
+	if d.Tier != TierGeneric {
+		t.Errorf("tier = %d (%s), want 1: a Discovery-only type with no magic-modules resource still ships", d.Tier, d.Reason)
+	}
+	if d.Reason == "" {
+		t.Error("an admitted type with no reason is one nobody can audit")
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (func() bool {
 		for i := 0; i+len(sub) <= len(s); i++ {
