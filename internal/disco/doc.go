@@ -21,8 +21,8 @@ type Document struct {
 	Resources   map[string]*Resource `json:"resources"`
 }
 
-// BaseURL is where a method's path is joined onto.
-func (d *Document) BaseURL() string { return d.RootURL + d.ServicePath }
+// ResolvedBaseURL is where a method's path is joined onto.
+func (d *Document) ResolvedBaseURL() string { return d.RootURL + d.ServicePath }
 
 // Schema is one type, or one property of one type. Discovery reuses the same
 // shape for both, and so does this.
