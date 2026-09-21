@@ -1,0 +1,22 @@
+{
+  "name": "cyclic",
+  "version": "v1",
+  "rootUrl": "https://cyclic.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Node": {
+      "id": "Node",
+      "type": "object",
+      "properties": {
+        "label": {"type": "string"},
+        "child": {"$ref": "Branch"}
+      }
+    },
+    "Branch": {
+      "id": "Branch",
+      "type": "object",
+      "properties": {"node": {"$ref": "Node"}}
+    }
+  },
+  "resources": {}
+}
