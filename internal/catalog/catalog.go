@@ -116,10 +116,10 @@ func Encode(c *Catalog) ([]byte, error) {
 	enc := json.NewEncoder(zw)
 	enc.SetIndent("", " ")
 	if err := enc.Encode(c); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("catalog: %w", err)
 	}
 	if err := zw.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("catalog: %w", err)
 	}
 	return buf.Bytes(), nil
 }
