@@ -2945,10 +2945,15 @@ func BuildAttributes(d *disco.Document, body *disco.Schema, mm *mmv1.Resource, a
 	if mm != nil {
 		idx = mmIndex(append(append([]*mmv1.Field{}, mm.Parameters...), mm.Properties...))
 	}
-	return buildLevel(d, body, idx, aliases)
+	return buildLevel(d, body, idx, aliases, true)
 }
 
-func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, aliases map[string]string) (map[string]*catalog.Attr, error) {
+// buildLevel builds one level of attributes. topLevel is not cosmetic: infrena
+// REFUSES a nested References (pkg/schema/definition.go: only a top-level
+// attribute's is ever projected into a dependency), and the corpus carries 11
+// nested ResourceRef fields, so emitting them would make ValidateAll reject the
+// whole catalog rather than just those types.
+func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, aliases map[string]string, topLevel bool) (map[string]*catalog.Attr, error) {
 	out := map[string]*catalog.Attr{}
 	for name, prop := range s.Properties {
 		key := name
@@ -2973,7 +2978,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if f.Output {
 				a.Output = true
 			}
-			if f.Type == "ResourceRef" && f.Resource != "" {
+			if topLevel && f.Type == "ResourceRef" && f.Resource != "" {
 				attr := f.Imports
 				if attr == "" {
 					attr = "selfLink"
@@ -2991,7 +2996,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// its keys would corrupt user data.
 			a.Opaque = true
 		case prop.Type == "object":
-			fields, err := buildLevel(d, prop, idx, nil)
+			fields, err := buildLevel(d, prop, idx, nil, false)
 			if err != nil {
 				return nil, err
 			}
@@ -2999,7 +3004,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		case prop.Type == "array" && prop.Items != nil:
 			elem := &catalog.Attr{Canonical: name, Kind: KindOf(prop.Items)}
 			if prop.Items.Type == "object" && len(prop.Items.Properties) > 0 {
-				fields, err := buildLevel(d, prop.Items, idx, nil)
+				fields, err := buildLevel(d, prop.Items, idx, nil, false)
 				if err != nil {
 					return nil, err
 				}
