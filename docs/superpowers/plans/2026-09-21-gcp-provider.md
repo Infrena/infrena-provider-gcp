@@ -948,7 +948,8 @@ ref-with-flag case was added." \
   - `type Field struct { Name, Type, Description, Resource, ItemType string; Required, Immutable, Output bool; Properties []*Field }`
   - `type Async struct { Type string; Actions []string }`
   - `func ParseResource(data []byte) (*Resource, error)`
-  - `func LoadDir(root string) (map[string][]*Resource, error)` — keyed by product directory name
+  - `type LoadError struct { Path string; Err error }`
+  - `func LoadDir(root string) (map[string][]*Resource, []LoadError, error)` — resources keyed by product directory; per-file parse failures COLLECTED, never aborted on
   - `func (r *Resource) WireHooks() []string` — the sorted wire-affecting hook names, empty if none
 
 **Why the hook list is a named constant and not a guess.** Measured on 2026-09-21: 423 of 942 resources
@@ -1222,7 +1223,7 @@ type Resource struct {
 	Async       *Async   `yaml:"async"`
 	Parameters  []*Field `yaml:"parameters"`
 	Properties  []*Field `yaml:"properties"`
-	CustomCode  map[string]string `yaml:"custom_code"`
+	CustomCode  map[string]yaml.Node `yaml:"custom_code"`
 
 	// Product is the directory the file was found in, filled by LoadDir.
 	Product string `yaml:"-"`
@@ -1242,11 +1243,21 @@ func ParseResource(data []byte) (*Resource, error) {
 
 // LoadDir reads every resource file under root, keyed by product directory.
 //
-// product.yaml is skipped: it describes the product, not a resource. A file that
-// fails to parse is reported rather than skipped — 3 of 942 failed to parse with
-// a naive loader on 2026-09-21, and silently dropping them would silently drop
-// three types.
-func LoadDir(root string) (map[string][]*Resource, error) {
+// product.yaml is skipped: it describes the product, not a resource.
+//
+// A file that fails to parse is COLLECTED and returned, never skipped and never
+// fatal. Aborting the walk would fail a 942-file build on one bad file; skipping
+// silently would drop a type from the catalog. Task 8 routes these into
+// gen/warnings.txt.
+//
+// No file in the 2026-09-21 corpus actually fails here. An earlier draft of this
+// comment claimed 3 of 942 did; that was measured with Python's yaml.safe_load,
+// which refuses an unknown `!ruby/object:` tag. Go's yaml.v3 ignores the tag and
+// decodes the mapping beneath it, so all 942 parse — verified per-file, including
+// spanner/InstancePartition whose tagged custom_code still yields
+// [encoder pre_update]. The collection path stays because a vendor bump can
+// introduce a genuinely unparseable file at any time.
+func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 	out := map[string][]*Resource{}
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -1302,6 +1313,11 @@ var wireHooks = []string{
 	"decoder",
 	"encoder",
 	"post_create",
+	// post_create_failure points at delete_on_failure.go.tmpl in 2 of the 3
+	// resources that declare it: it issues a DELETE when create fails. That is
+	// wire-affecting, and it collides with this provider's rule that Create never
+	// errors once GCP has created something — so a human rules on those.
+	"post_create_failure",
 	"post_delete",
 	"post_update",
 	"pre_create",
@@ -3292,7 +3308,7 @@ func Build(in Inputs) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	byProduct, err := mmv1.LoadDir(in.MMV1Dir)
+	byProduct, loadErrs, err := mmv1.LoadDir(in.MMV1Dir)
 	if err != nil {
 		return nil, err
 	}
