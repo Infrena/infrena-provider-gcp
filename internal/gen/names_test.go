@@ -98,3 +98,43 @@ func TestTheLockRoundTripsThroughDisk(t *testing.T) {
 		t.Errorf("round trip lost the entry: %v", back.Names)
 	}
 }
+
+// TestAnUnresolvableClashLeavesTheLockUnchanged. The lock is append-only and its
+// entries are permanent, so a call that fails partway through a batch must not
+// leave a partial assignment behind -- there is no way to undo it later short of
+// hand-editing the file the rules say never to hand-edit.
+//
+// Forcing the error needs two candidates whose SHORT names are both already
+// taken by someone else, and whose QUALIFIED names then collide with each
+// other -- which only happens with a dot inside a service or resource
+// segment. That never occurs in the real GCP corpus, so it is constructed
+// synthetically here: "a.b"/"c" and "a"/"b.c" both qualify to "gcp.a.b.c".
+func TestAnUnresolvableClashLeavesTheLockUnchanged(t *testing.T) {
+	lock := NewLock()
+	lock.Names["x/c"] = "gcp.c"     // takes the short name "a.b"/"c" would want
+	lock.Names["y/b.c"] = "gcp.b.c" // takes the short name "a"/"b.c" would want
+	before := make(map[string]string, len(lock.Names))
+	for k, v := range lock.Names {
+		before[k] = v
+	}
+
+	cands := []Candidate{
+		{Service: "a.b", Resource: "c"}, // qualifies to gcp.a.b.c, sorts first
+		{Service: "a", Resource: "b.c"}, // also qualifies to gcp.a.b.c -- clash
+	}
+	if _, err := Assign(cands, lock); err == nil {
+		t.Fatal("expected an unresolvable clash error, got nil")
+	}
+
+	if len(lock.Names) != len(before) {
+		t.Fatalf("lock mutated on error: had %d entries, now has %d: %v", len(before), len(lock.Names), lock.Names)
+	}
+	for k, v := range before {
+		if lock.Names[k] != v {
+			t.Errorf("lock entry %s changed from %q to %q", k, v, lock.Names[k])
+		}
+	}
+	if _, ok := lock.Names["a.b/c"]; ok {
+		t.Errorf("the candidate resolved before the failing one leaked into the lock: %v", lock.Names)
+	}
+}

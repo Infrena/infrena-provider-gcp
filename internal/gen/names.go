@@ -87,23 +87,45 @@ func Assign(cands []Candidate, lock *Lock) (map[Candidate]string, error) {
 		wants[c.Resource]++
 	}
 
+	// Held until every fresh candidate resolves cleanly. The lock is append-only
+	// and permanent once written, so a call that fails partway through must
+	// leave it exactly as it found it -- nothing commits until the whole batch
+	// succeeds.
+	assigned := make(map[string]string, len(fresh)) // candidate key -> name
+
 	for _, c := range fresh {
-		short := "gcp." + c.Resource
-		qualified := "gcp." + c.Service + "." + c.Resource
-		name := short
-		if wants[c.Resource] > 1 {
-			name = qualified
-		}
-		if holder, clash := taken[name]; clash && holder != c.key() {
-			name = qualified
-		}
-		if holder, clash := taken[name]; clash && holder != c.key() {
-			return nil, fmt.Errorf("cannot name %s: both %s and %s are taken (by %s)",
-				c.key(), short, qualified, holder)
+		name, err := nameFor(c, wants, taken)
+		if err != nil {
+			return nil, err
 		}
 		out[c] = name
 		taken[name] = c.key()
-		lock.Names[c.key()] = name
+		assigned[c.key()] = name
+	}
+
+	for k, n := range assigned {
+		lock.Names[k] = n
 	}
 	return out, nil
+}
+
+// nameFor picks the short or qualified name for c, given how many OTHER fresh
+// candidates in this call want its resource segment, and which names are
+// already spoken for (by the lock or by a fresh candidate resolved earlier in
+// this same call).
+func nameFor(c Candidate, wants map[string]int, taken map[string]string) (string, error) {
+	short := "gcp." + c.Resource
+	qualified := "gcp." + c.Service + "." + c.Resource
+	name := short
+	if wants[c.Resource] > 1 {
+		name = qualified
+	}
+	if holder, clash := taken[name]; clash && holder != c.key() {
+		name = qualified
+	}
+	if holder, clash := taken[name]; clash && holder != c.key() {
+		return "", fmt.Errorf("cannot name %s: both %s and %s are taken (by %s)",
+			c.key(), short, qualified, holder)
+	}
+	return name, nil
 }
