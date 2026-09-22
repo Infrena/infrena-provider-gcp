@@ -49,8 +49,18 @@ func TestEveryTypeCarriesWhatTheRuntimeNeeds(t *testing.T) {
 		if ty.TimeoutSeconds <= 0 {
 			t.Errorf("%s has no timeout", ty.Name)
 		}
-		if ty.Await == AwaitComputeOperation && ty.OperationScope == "" {
-			t.Errorf("%s awaits a compute operation but names no operation scope", ty.Name)
+		// A type that awaits an operation must know HOW to poll it. Compute-style
+		// types need either a wait path or a poll path — 58 of the 65 publish a
+		// wait, and the other 7 (sqladmin, container) publish no wait method at
+		// all and must be polled with get. Longrunning types always need a poll
+		// path. An earlier version of this check asserted on OperationScope, a
+		// bare word that no longer exists precisely because every attempt to
+		// build a URL from it was wrong.
+		if ty.Await == AwaitComputeOperation && ty.OperationWaitPath == "" && ty.OperationPollPath == "" {
+			t.Errorf("%s awaits a compute operation but has neither a wait nor a poll path", ty.Name)
+		}
+		if ty.Await == AwaitLongRunning && ty.OperationPollPath == "" {
+			t.Errorf("%s awaits a long-running operation but has no poll path", ty.Name)
 		}
 	}
 }
