@@ -5154,6 +5154,21 @@ loop is a number nobody can tune with confidence later.
 `isNotFound` unwraps to `*APIError` and tests `Status == 404` or `Code == "NOT_FOUND"` — both occur, and
 matching on only one of them misses half the cases.
 
+**The URL helpers all need fallbacks, because magic-modules supplies these fields for only a minority
+of types.** Measured across the 233 generated types on 2026-09-22:
+
+| field | supplied | fallback |
+| --- | --- | --- |
+| `BaseURL` | 233 | — |
+| `SelfLink` | 233 | derived from the collection's own Discovery `get` path when mm omits it |
+| `CreateURL` | 72 | `BaseURL` (POST to the collection) |
+| `DeleteURL` | **5** | `SelfLink` |
+| `UpdateURL` | 9 | `SelfLink` |
+| `ImportFormat` | 233 | `SelfLink` when mm omits it — a provider ID IS the relative resource name |
+
+So `createURL` falls back to `BaseURL`, and `deleteURL` and `updateURL` both fall back to `SelfLink`.
+Only 5 types name a `DeleteURL` of their own; a helper that required one would fail on 228 types.
+
 - [ ] **Step 4: Sabotage, confirm, restore**
 
 Make `Create` return `(nil, err)` when the operation reports failure:
