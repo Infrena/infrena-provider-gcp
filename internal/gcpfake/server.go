@@ -86,6 +86,10 @@ type Server struct {
 
 	tagBindings map[string][]map[string]any
 
+	// onRequest holds a one-shot callback for the next request at a given
+	// path, consumed on use -- see OnRequest.
+	onRequest map[string]func()
+
 	// listFields overrides the array-valued field name a GET on a specific
 	// collection path uses in its list response, keyed by that exact
 	// collection path. See SetListField.
@@ -120,6 +124,7 @@ func New(t *testing.T) *Server {
 		lroOps:              map[string]*lroOp{},
 		computeOps:          map[string]*computeOp{},
 		createThenFail:      map[string]apiErrorSpec{},
+		onRequest:           map[string]func(){},
 		caiAssets:           map[string][]Asset{},
 		tagBindings:         map[string][]map[string]any{},
 		listFields:          map[string]string{},
@@ -236,6 +241,19 @@ func (s *Server) NotFoundTimes(path string, n int) {
 	s.notFoundRemaining[path] = n
 }
 
+// OnRequest arranges for fn to run once, synchronously, the next time a
+// request for the exact path arrives -- after the fake has recorded it (so
+// Requests() reflects it) but before it is answered. It exists to let a
+// test act at a precise moment in an in-flight call, such as cancelling the
+// context a client used to reach that request, from the goroutine handling
+// it, before the fake's own response is written. Consumed after one use,
+// the same shape as FailNext.
+func (s *Server) OnRequest(path string, fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onRequest[path] = fn
+}
+
 // Requests is every request the fake has received, in order, including ones
 // answered with an injected failure.
 func (s *Server) Requests() []Request {
@@ -262,10 +280,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 	failed := s.failNext
 	s.failNext = nil
+	fn := s.onRequest[r.URL.Path]
+	if fn != nil {
+		delete(s.onRequest, r.URL.Path)
+	}
 	s.mu.Unlock()
 	if failed != nil {
 		writeError(w, failed.Status, failed.Code, failed.Message)
 		return
+	}
+	if fn != nil {
+		fn()
 	}
 
 	switch {
