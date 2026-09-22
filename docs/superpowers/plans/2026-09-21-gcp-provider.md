@@ -6052,6 +6052,27 @@ swallowed 404 hides exactly the thing this path exists to surface.
 `assetType` through the catalog's asset-type index. A result whose asset type the catalog does not
 serve is skipped silently — that is not an error, it is a GCP resource this provider does not model.
 
+**An asset type does NOT map to one catalog type. Measured 2026-09-22: 27 of the 233 asset types are
+shared by two or more catalog types**, and they are exactly the scope and parent variants the Task 9
+naming work created:
+
+    compute.googleapis.com/Autoscaler          -> gcp.autoscaler (zonal), gcp.regionautoscaler (regional)
+    cloudresourcemanager.googleapis.com/CapabilityConfig
+                                               -> gcp.cloudresourcemanager.capabilityconfig,
+                                                  ...folder.capabilityconfig, ...organization.capabilityconfig
+    compute.googleapis.com/NetworkEndpointGroup -> 3 types
+
+So a flat `assetType -> type` map picks whichever candidate was indexed last and **mislabels the rest**
+— a zonal autoscaler reported as `gcp.regionautoscaler` generates configuration that cannot apply.
+
+Disambiguate by the resource's OWN NAME, which CAI returns in full:
+`//compute.googleapis.com/projects/p/zones/us-central1-a/autoscalers/x`. Match the name's path against
+each candidate's `BaseURL` template — the zonal candidate has `/zones/` where the regional one has
+`/regions/`, and the three `capabilityconfig` variants differ in their `{{parent}}` root. Where exactly
+one candidate's template shape matches, use it; where none or several do, **skip the result and warn**,
+naming the asset type and the candidates. Guessing here produces a resource labelled as the wrong type,
+which is worse than not reporting it: the user gets configuration that looks right and cannot work.
+
 **Naming a discovered resource is simpler here than on AWS.** GCP resources carry a real `name`, so
 there is no dependence on a `Name` tag and no sanitised-ID fallback: take the last segment of the
 relative resource name, prefixed with the type's last segment (`instance-web1`).
