@@ -117,7 +117,23 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 			if e, ok := op["error"].(map[string]any); ok {
 				return nil, operationError(ty, e)
 			}
-			return op, nil
+			// An operation is not the thing it created. compute publishes the
+			// created resource's own url in targetLink; the operation's
+			// selfLink names the OPERATION, and ProviderID prefers selfLink,
+			// so handing the operation back yielded an id addressing
+			// ".../operations/operation-1740..." for all 65 compute-style
+			// types -- and, for the 13 whose self_link ends in "{{name}}",
+			// the operation's own name merged over the caller's attributes
+			// on top of that.
+			if target, _ := op["targetLink"].(string); target != "" {
+				return map[string]any{"selfLink": target}, nil
+			}
+			// No targetLink: nothing here identifies the resource, so say
+			// nothing rather than something wrong. Create falls back to the
+			// caller's own attributes, which is exactly the right answer --
+			// the same (nil, nil) awaitLongRunning returns for a
+			// done-with-no-response operation.
+			return nil, nil
 		}
 		method, url, err := p.operationRequestURL(ty, op)
 		if err != nil {

@@ -2,7 +2,9 @@ package gcprov
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -128,7 +130,7 @@ func TestAComputeOperationIsPolledOnItsScope(t *testing.T) {
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpCompute)
-	s.SeedComputeOperation("op-1")
+	s.SeedComputeOperation("op-1", "/projects/p/zones/us-central1-a/instances/web1")
 	p := testProvider(t, s)
 
 	ty := &catalog.Type{
@@ -164,7 +166,7 @@ func TestANoWaitComputeOperationIsPolledWithGet(t *testing.T) {
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpCompute)
-	s.SeedComputeOperation("op-1")
+	s.SeedComputeOperation("op-1", "/v1/projects/p/instances/db1")
 	p := testProvider(t, s)
 
 	ty := &catalog.Type{
@@ -270,7 +272,7 @@ func TestAwaitDoesNotAbandonAComputeOperationInFlight(t *testing.T) {
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpCompute)
-	s.SeedComputeOperation("op-1")
+	s.SeedComputeOperation("op-1", "/projects/p/zones/us-central1-a/instances/web1")
 	p := testProvider(t, s)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -321,4 +323,157 @@ func TestOperationErrorRendersBothFailureShapes(t *testing.T) {
 	if !contains(compute.Error(), "Quota 'CPUS' exceeded.") {
 		t.Errorf("compute shape: GCP's message was dropped: %v", compute)
 	}
+}
+
+// computeTypeForID is the fixture the three tests below share: a compute-style
+// zonal type whose self_link ends in "{{name}}" (the shape 13 of the 65
+// compute-style types have) and whose path_prefix is the one the fake's own
+// urls carry, so reduceSelfLink has a real prefix to reduce a selfLink by.
+func computeTypeForID() *catalog.Type {
+	return &catalog.Type{
+		Name: "gcp.instance", Await: catalog.AwaitComputeOperation,
+		Scope: catalog.ScopeZonal, TimeoutSeconds: 30,
+		PathPrefix:        "compute/v1/",
+		SelfLink:          "projects/{{project}}/zones/{{zone}}/instances/{{name}}",
+		OperationWaitPath: "projects/{project}/zones/{zone}/operations/{operation}/wait",
+	}
+}
+
+// TestAComputeOperationYieldsTheResourceItCreatedNotItself. A compute
+// Operation carries BOTH selfLink (its own url) and targetLink (the created
+// resource's). ProviderID prefers selfLink, so returning the operation
+// unchanged gave all 65 compute-style types a provider id naming an
+// operation -- and every later Read, Delete and Import addressed that.
+//
+// The fake deliberately answers with a selfLink that differs from
+// targetLink; if it ever stops doing so this test passes vacuously, which is
+// how the original defect survived, so the two links are read off the fake's
+// own answer and asserted to differ before anything else is checked.
+func TestAComputeOperationYieldsTheResourceItCreatedNotItself(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	const target = "/compute/v1/projects/p/zones/us-central1-a/instances/web1"
+	s.SeedComputeOperation("op-1", target)
+	p := testProvider(t, s)
+
+	// The fake's own answer, first: an operation whose selfLink equals its
+	// targetLink (or is missing) makes everything below vacuous.
+	opBody := getJSON(t, s.URL()+"/compute/v1/projects/p/zones/us-central1-a/operations/op-1")
+	self, _ := opBody["selfLink"].(string)
+	targetLink, _ := opBody["targetLink"].(string)
+	if self == "" || targetLink == "" || self == targetLink {
+		t.Fatalf("the fake no longer distinguishes an operation from its target, so this test proves nothing: selfLink=%q targetLink=%q", self, targetLink)
+	}
+
+	ty := computeTypeForID()
+	awaited, err := p.await(context.Background(), ty,
+		map[string]any{"name": "op-1", "status": "RUNNING", "zone": "us-central1-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := awaited["selfLink"].(string); got != targetLink {
+		t.Errorf("await yielded selfLink %q, want the operation's targetLink %q", got, targetLink)
+	}
+
+	id, err := ProviderID(ty, awaited, attrs(map[string]string{
+		"project": "p", "zone": "us-central1-a", "name": "web1",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/p/zones/us-central1-a/instances/web1"; id != want {
+		t.Errorf("provider id = %q, want %q", id, want)
+	}
+	if contains(id, "/operations/") {
+		t.Errorf("the provider id names an operation, not the resource: %q", id)
+	}
+}
+
+// TestAComputeOperationsOwnNameNeverBecomesTheResources covers the second
+// way the old return was wrong, for the 13 compute-style types whose
+// self_link ends in "{{name}}": with no selfLink in the body, ProviderID
+// merges the body's own fields over the caller's attributes, so the
+// OPERATION's name ("operation-1740...") won and the id named a resource
+// that never existed. The operation here is already DONE, so await returns
+// on its first look and nothing is polled -- the merge is what is under
+// test, not the polling.
+func TestAComputeOperationsOwnNameNeverBecomesTheResources(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProvider(t, s)
+
+	ty := computeTypeForID()
+	const target = "https://compute.googleapis.com/compute/v1/projects/p/zones/us-central1-a/instances/web1"
+	awaited, err := p.await(context.Background(), ty, map[string]any{
+		"name": "operation-1740000000000", "status": "DONE", "targetLink": target,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := awaited["name"]; ok {
+		t.Errorf("the operation's own name is still in what await returned, where it merges over the caller's: %v", awaited)
+	}
+	id, err := ProviderID(ty, awaited, attrs(map[string]string{
+		"project": "p", "zone": "us-central1-a", "name": "web1",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/p/zones/us-central1-a/instances/web1"; id != want {
+		t.Errorf("provider id = %q, want %q -- the operation's name became the resource's", id, want)
+	}
+}
+
+// TestAComputeOperationWithNoTargetSaysNothingRatherThanSomethingWrong. An
+// operation carrying no targetLink names the created resource nowhere, so
+// await returns (nil, nil) -- the same shape awaitLongRunning already
+// returns for a done-with-no-response operation, and the one ProviderID
+// answers by expanding self_link against the caller's own attributes.
+func TestAComputeOperationWithNoTargetSaysNothingRatherThanSomethingWrong(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProvider(t, s)
+
+	ty := computeTypeForID()
+	awaited, err := p.await(context.Background(), ty, map[string]any{
+		"name": "operation-1740000000000", "status": "DONE",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if awaited != nil {
+		t.Fatalf("await invented an identity from an operation that names no resource: %v", awaited)
+	}
+	id, err := ProviderID(ty, awaited, attrs(map[string]string{
+		"project": "p", "zone": "us-central1-a", "name": "web1",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/p/zones/us-central1-a/instances/web1"; id != want {
+		t.Errorf("provider id = %q, want %q", id, want)
+	}
+}
+
+// getJSON reads one JSON body straight off the fake, for the one assertion a
+// test cannot make through the provider: what the fake itself answers.
+func getJSON(t *testing.T, url string) map[string]any {
+	t.Helper()
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s: %s", url, resp.Status)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	return body
 }

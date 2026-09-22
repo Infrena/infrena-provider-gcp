@@ -36,11 +36,21 @@ type lroOp struct {
 }
 
 // computeOp is one compute-style operation the fake is tracking.
+//
+// selfLink and targetLink are the two DIFFERENT urls a real compute
+// Operation always carries: selfLink is the operation's own url
+// (".../zones/z/operations/op-1"), targetLink the url of the resource the
+// operation modifies (".../zones/z/instances/web1"). The fake used to send
+// neither on a completed operation and only targetLink on a running one, and
+// that omission is exactly why no test could tell an operation apart from the
+// thing it created -- see computeOperationBody.
 type computeOp struct {
-	name     string
-	response map[string]any
-	errCode  string
-	errMsg   string
+	name       string
+	response   map[string]any
+	selfLink   string
+	targetLink string
+	errCode    string
+	errMsg     string
 }
 
 // grpcCodes maps google.rpc.Code's string names to their wire integers, so
@@ -96,10 +106,21 @@ func (s *Server) CompleteOperationWithError(name, code, message string) {
 // re-reads the resource), so unlike SeedOperation this takes no response
 // parameter. It completes on its first wait unless NeverCompleteOperations
 // was called first.
-func (s *Server) SeedComputeOperation(name string) {
+//
+// targetPath is the request path of the resource the operation modifies
+// (e.g. "/v1/projects/p/zones/z/instances/web1", the same shape Seed takes),
+// which the operation reports as its absolute targetLink -- the ONLY field
+// in its body that names the created resource. A real compute operation for
+// a mutation always has one; pass "" only to exercise what happens when it
+// does not.
+func (s *Server) SeedComputeOperation(name, targetPath string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.computeOps[name] = &computeOp{name: name}
+	s.computeOps[name] = &computeOp{
+		name:       name,
+		selfLink:   s.computeOpSelfLink(targetPath, name),
+		targetLink: s.absolute(targetPath),
+	}
 }
 
 // NeverCompleteOperations makes every operation — longrunning or compute
@@ -177,7 +198,11 @@ func (s *Server) newComputeOp(path string, result map[string]any, isDelete bool)
 	defer s.mu.Unlock()
 	s.opCounter++
 	name := fmt.Sprintf("op-%d", s.opCounter)
-	op := &computeOp{name: name}
+	op := &computeOp{
+		name:       name,
+		selfLink:   s.computeOpSelfLink(path, name),
+		targetLink: s.absolute(path),
+	}
 	if !isDelete {
 		op.response = cloneMap(result)
 	}
@@ -185,7 +210,40 @@ func (s *Server) newComputeOp(path string, result map[string]any, isDelete bool)
 		op.errCode, op.errMsg = spec.Code, spec.Message
 	}
 	s.computeOps[name] = op
-	return map[string]any{"name": name, "status": "RUNNING", "targetLink": path}
+	return map[string]any{
+		"name":   name,
+		"status": "RUNNING",
+		// The operation's OWN url, which real compute always sends alongside
+		// targetLink. The fake omitted it, and that omission is precisely why
+		// no test could catch a caller reading it as though it named the
+		// created resource.
+		"selfLink":   op.selfLink,
+		"targetLink": op.targetLink,
+	}
+}
+
+// computeOpSelfLink is the absolute url a compute operation publishes for
+// ITSELF. A compute operation lives in the same scope as the resource it
+// modifies -- a zonal instance's operation is
+// ".../zones/z/operations/op-1" -- so the scope is targetPath with its
+// collection and the resource's own name removed. An operation with no
+// target to take a scope from (a bare SeedComputeOperation) still gets a
+// url, just an unscoped one: what matters is that it EXISTS and differs
+// from targetLink.
+func (s *Server) computeOpSelfLink(targetPath, name string) string {
+	scope := parentOf(parentOf(targetPath))
+	return s.absolute(scope + "/operations/" + name)
+}
+
+// absolute turns a request path into the absolute url GCP would answer with.
+// A selfLink or targetLink is always absolute on the wire, and callers
+// reduce it back to a relative name themselves; a fake that answered with a
+// bare path would let a caller that never reduces anything pass.
+func (s *Server) absolute(path string) string {
+	if path == "" {
+		return ""
+	}
+	return s.srv.URL + path
 }
 
 // handleComputeWait answers the long-poll wait method for a compute-style
@@ -267,11 +325,22 @@ func (s *Server) computeOperationBody(name string, op *computeOp) map[string]any
 	s.mu.Lock()
 	never := s.neverComplete
 	s.mu.Unlock()
+	status := "DONE"
 	if never {
-		return map[string]any{"name": name, "status": "RUNNING"}
+		status = "RUNNING"
 	}
-	body := map[string]any{"name": name, "status": "DONE"}
-	if op.errCode != "" {
+	body := map[string]any{"name": name, "status": status}
+	// Both urls, at every status: a real compute operation carries them from
+	// the moment it is created, and a completed one that reported neither is
+	// what let this fake agree with a caller that mistook the operation for
+	// the resource.
+	if op.selfLink != "" {
+		body["selfLink"] = op.selfLink
+	}
+	if op.targetLink != "" {
+		body["targetLink"] = op.targetLink
+	}
+	if !never && op.errCode != "" {
 		body["error"] = map[string]any{"errors": []map[string]any{
 			{"code": op.errCode, "message": op.errMsg},
 		}}
