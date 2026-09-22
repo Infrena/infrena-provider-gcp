@@ -1,0 +1,90 @@
+{
+  "name": "tiny",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Widget": {
+      "id": "Widget",
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "The widget name."},
+        "selfLink": {"type": "string", "description": "[Output Only] Server-defined URL."},
+        "creationTimestamp": {"type": "string", "readOnly": true, "description": "When it was made."},
+        "spec": {"$ref": "WidgetSpec", "description": "The spec."},
+        "activeConfig": {"$ref": "WidgetSpec", "readOnly": true, "description": "Active spec, computed by the server."},
+        "network": {"type": "string", "description": "The network backing this widget."}
+      }
+    },
+    "WidgetSpec": {
+      "id": "WidgetSpec",
+      "type": "object",
+      "description": "Generic spec container.",
+      "properties": {"size": {"type": "integer", "format": "int64", "description": "How big."}}
+    },
+    "Hooked": {
+      "id": "Hooked",
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "The hooked name."}
+      }
+    },
+    "Operation": {
+      "id": "Operation",
+      "type": "object",
+      "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}}
+    }
+  },
+  "resources": {
+    "projects": {
+      "resources": {
+        "widgets": {
+          "methods": {
+            "get": {
+              "id": "tiny.projects.widgets.get",
+              "path": "projects/{project}/widgets/{widget}",
+              "httpMethod": "GET",
+              "response": {"$ref": "Widget"}
+            },
+            "insert": {
+              "id": "tiny.projects.widgets.insert",
+              "path": "projects/{project}/widgets",
+              "httpMethod": "POST",
+              "request": {"$ref": "Widget"},
+              "response": {"$ref": "Operation"}
+            },
+            "delete": {
+              "id": "tiny.projects.widgets.delete",
+              "path": "projects/{project}/widgets/{widget}",
+              "httpMethod": "DELETE",
+              "response": {"$ref": "Operation"}
+            }
+          }
+        },
+        "hookeds": {
+          "methods": {
+            "get": {
+              "id": "tiny.projects.hookeds.get",
+              "path": "projects/{project}/hookeds/{hooked}",
+              "httpMethod": "GET",
+              "response": {"$ref": "Hooked"}
+            },
+            "insert": {
+              "id": "tiny.projects.hookeds.insert",
+              "path": "projects/{project}/hookeds",
+              "httpMethod": "POST",
+              "request": {"$ref": "Hooked"},
+              "response": {"$ref": "Operation"}
+            },
+            "delete": {
+              "id": "tiny.projects.hookeds.delete",
+              "path": "projects/{project}/hookeds/{hooked}",
+              "httpMethod": "DELETE",
+              "response": {"$ref": "Operation"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

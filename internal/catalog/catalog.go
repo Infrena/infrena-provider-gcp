@@ -93,6 +93,11 @@ type Type struct {
 	OperationScope string    `json:"operation_scope,omitempty"`
 	TimeoutSeconds int       `json:"timeout_seconds"`
 
+	// ReadVia names how to read a type with no get method, e.g.
+	// "list_by_parent" — set only when a ruling's ReadVia says so (spec G6's
+	// tagBindings worked example). Task 16's readByListingParent consults it.
+	ReadVia string `json:"read_via,omitempty"`
+
 	ImportFormat string `json:"import_format,omitempty"`
 	AssetType    string `json:"asset_type,omitempty"`
 	Scope        Scope  `json:"scope"`

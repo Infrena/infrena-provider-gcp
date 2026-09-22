@@ -1,0 +1,12 @@
+# Copyright 2024 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+---
+name: Frozen
+description: A test resource with no update path at all, mirroring TagBinding.
+base_url: projects/{{project}}/frozens
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: value
+    type: String
