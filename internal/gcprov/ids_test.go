@@ -39,6 +39,25 @@ func TestAnAbsoluteSelfLinkBecomesARelativeName(t *testing.T) {
 	}
 }
 
+// TestReduceSelfLinkOnlyMatchesAtASegmentBoundary. An unanchored search for
+// self_link's literal prefix ("projects/" here) would happily match it
+// inside "myprojects/", a host-side path segment that merely contains it as
+// a substring, and reduce from the wrong offset. The real, anchored match
+// (preceded by "/") comes later in raw and must be the one used.
+func TestReduceSelfLinkOnlyMatchesAtASegmentBoundary(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.instance", Scope: catalog.ScopeZonal,
+		SelfLink: "projects/{{project}}/zones/{{zone}}/instances/{{name}}"}
+	got, err := ProviderID(ty, map[string]any{
+		"selfLink": "https://www.googleapis.com/myprojects/v1/projects/p/zones/us-central1-a/instances/web1",
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/p/zones/us-central1-a/instances/web1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // TestImportRefusesAnIDThatDoesNotMatchTheType, before any API call, so a
 // typo costs a message rather than a confusing 404.
 func TestImportRefusesAnIDThatDoesNotMatchTheType(t *testing.T) {
