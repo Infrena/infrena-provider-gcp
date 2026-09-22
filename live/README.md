@@ -237,7 +237,7 @@ findings and only one of them is an answer.
 
 ## What this suite found that no fake could
 
-Eight, and every one of them was invisible to the 1,400-odd tests that came
+Nine, and every one of them was invisible to the 1,400-odd tests that came
 before, because every one of them lives where this provider meets Google.
 
 **1. compute reports a quota throttle as 403, so none of them were retried.**
@@ -313,40 +313,87 @@ with `obtaining the base token: context canceled`, and an e2-micro was left
 running. `gcpplugin/credentials.go` warns about exactly this and this suite
 walked into it anyway. Fixed here; `newGoogle` builds on `context.Background()`.
 
-**8. The tag binding path still cannot be measured, and here is exactly why.**
-`roles/resourcemanager.tagAdmin` grants tag **key** and **value** admin. It
-does **not** grant `resourcemanager.hierarchyNodes.createTagBinding` or
-`listTagBindings` on the resource being tagged — those come from
-`roles/resourcemanager.tagUser`, held on the target. So seeding a tag key and
-value succeeds and the binding itself is refused:
+**8. `gcp.tagbinding` does not work at all, in either direction.** Measured
+2026-09-22 after `roles/resourcemanager.tagUser` was granted, which is what
+finally made the path reachable. Spec decision G6 requires this type at v1.0.
+**It is unusable, and not for the reason it was filed under.**
+
+*Create.* The binding is created, then the create is reported as failed:
 
 ```
-x create binding: gcp: The caller does not have permission (403 PERMISSION_DENIED)
+x create binding: gcp.tagbinding: operation has no name to poll
 ```
 
-`TestLiveTagBindingOnASeededTag` **skips** rather than fails, naming the grant,
-because reporting a missing IAM role as a bug in this provider is the one
-thing a live suite must never do. To close it:
+Cloud Resource Manager answers `tagBindings.create` with an operation that is
+**already finished and carries no name**, because there is nothing to poll.
+Captured verbatim:
+
+```json
+{"done": true,
+ "response": {"@type": "type.googleapis.com/google.cloud.resourcemanager.v3.TagBinding",
+   "name": "tagBindings/%2F%2Fcloudresourcemanager.googleapis.com%2Fprojects%2F123456789012/tagValues/281479230039359",
+   "parent": "//cloudresourcemanager.googleapis.com/projects/123456789012",
+   "tagValue": "tagValues/281479230039359"}}
+```
+
+`awaitLongRunning` reads `op["name"]` and errors on empty **before** it checks
+`done`, so it refuses an answer sitting in front of it. **This is a third
+orphan**: the binding is real, the host drops a failed create's result, and
+nothing tracks it. The fix is an ordering change — check `done` first — but it
+is in `await.go`, outside this task's file list.
+
+**Note what this means for the defect this was filed under.** The `ProviderID`
+mangling is *never reached* for a tag binding; the await fails first. It is
+confirmed for `gcp.tagkey` from a real 400
+(`Invalid CRM resource name: 'tagKeys/tagKeys%2F281480152414347'`), and the
+binding's own id shape is now known, but the mangling itself remains
+unobserved on this type.
+
+*Read.* Worse, and this is the part that makes the type unusable rather than
+merely broken. `gcp.tagbinding`'s `read_via` is `list_by_parent` — spec G6's
+worked ruling, and the only read path the type has, because
+cloudresourcemanager publishes no `get` for it. **That path cannot be reached
+either.** Adopting the binding by the id Google itself just gave us:
+
+```
+Error: could not import: gcp.tagbinding.tagBindings/%2F%2F...%2Fprojects%2F123456789012/tagValues/281479973987355:
+gcprov: "tagBindings/%2F%2F.../tagValues/281479973987355" has more segments than gcp.tagbinding's id shape
+```
+
+`ParseProviderID` refuses **before any API call**. The catalog's `self_link` is
+`tagBindings/{{name}}` — two slash-separated segments — and a real binding name
+has **four**: Google percent-escapes the parent's slashes into one segment and
+then appends `tagValues/<id>` as two more. So `readByListingParent` has never
+run against Google and cannot, for any real id.
+
+Two consequences worth stating plainly:
+
+- **`gcp.tagbinding` can neither be created nor imported today.** Every path
+  in and out of it fails before it does anything useful.
+- **`readByListingParent` is narrower than the type is, independently of the
+  above.** It builds its parent from `Settings.Project`, so it can only ever
+  list bindings on the configured *project*. A tag bound to a bucket or an
+  instance — both of which the API supports — would be created and then never
+  readable. That is a design limitation in a v1.0-mandated feature, not an
+  implementation slip.
+
+The suite still **skips** with the exact grant named when
+`roles/resourcemanager.tagUser` is missing, because a fresh project will hit
+that first and a missing IAM role must never be reported as a bug in this
+provider:
 
 ```bash
-gcloud projects add-iam-policy-binding example-project-1234 \
-  --member=serviceAccount:infrena-live@example-project-1234.iam.gserviceaccount.com \
-  --role=roles/resourcemanager.tagUser
+gcloud projects add-iam-policy-binding <project> \
+  --member=serviceAccount:<sa> --role=roles/resourcemanager.tagUser
 ```
 
-IAM in this project took over a minute to propagate, so retry before
-concluding anything is still wrong.
-
-**So what the real API does with a tag binding's id remains UNKNOWN.** It has
-only ever been seen through sabotage against our own fake. The defect is
-confirmed for `gcp.tagkey` from a real 400 (finding 3), and the binding is
-expected to be the same shape — but expected is not measured, and this file
-does not pretend otherwise.
-
-One more thing the attempt did establish: **`readByListingParent` can only
-ever list bindings on the configured PROJECT** — it builds the parent from
-`Settings.Project`. A tag bound to a bucket or an instance would be created
-and then never readable, so the read path is narrower than the type is.
+**9. A `quota_project` 403 now says what it actually is.** Finding 6 below cost
+an afternoon once; `client.go` now wraps that one 403 with the context the
+response cannot carry — that it is about the setting, not the permission it
+names, and that *removing* `quota_project` is usually the fix rather than
+granting another role. Wrapped with `%w`, so `ClassifyError` and `isNotFound`
+still reach the `*APIError`, and it only fires when a quota project is actually
+configured.
 
 ### What passes
 
