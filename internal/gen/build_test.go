@@ -1013,3 +1013,30 @@ func TestAliasWarningNamesARealWinnerEvenWhenTheWinnerIsAlsoDisambiguated(t *tes
 		t.Error("the zonal alias was not warned about at all")
 	}
 }
+
+// TestPathPrefixOfIsDerivedPerType. The prefix cannot be synthesized from the
+// API's version: measured across the 39 fetched APIs with an empty
+// servicePath, 41 of 2318 method paths do not begin with the bare version.
+// dns is the proof inside a single API -- "dns/v1/" for responsePolicies,
+// "v1/" for everything else -- so the prefix is read off that type's own
+// method path or it is wrong.
+func TestPathPrefixOfIsDerivedPerType(t *testing.T) {
+	for _, c := range []struct{ path, want string }{
+		{"v1/{+parent}/addressGroups", "v1/"},
+		{"dns/v1/projects/{project}/responsePolicies", "dns/v1/"},
+		{"v1beta1/{+name}", "v1beta1/"},
+		{"v3/{+name}", "v3/"},
+		// compute, storage and bigquery: the version is already in
+		// servicePath, so the method path has none and the prefix is empty.
+		{"projects/{project}/zones/{zone}/instances", ""},
+		{"b/{bucket}/o/{object}", ""},
+		// A custom verb on a bare version segment: "v3:fetchResourceSemantics"
+		// is one segment and is not a version, so nothing is taken.
+		{"v3:fetchResourceSemantics", ""},
+		{"", ""},
+	} {
+		if got := pathPrefixOf(c.path); got != c.want {
+			t.Errorf("pathPrefixOf(%q) = %q, want %q", c.path, got, c.want)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -445,6 +446,48 @@ func requestBodySchema(d *disco.Document, m *disco.Method) (*disco.Schema, error
 	return d.Resolve(raw)
 }
 
+// versionSegment matches an API version path segment: v1, v2, v1beta1, v3.
+var versionSegment = regexp.MustCompile(`^v[0-9][0-9a-zA-Z]*$`)
+
+// pathPrefixOf returns the leading segments of a Discovery method path that
+// precede the resource hierarchy -- everything up to and including the first
+// version segment, with a trailing "/".
+//
+// It is derived per TYPE, from that type's own method path, not once per API.
+// dns publishes "dns/v1/projects/..." for responsePolicies and "v1/..." for
+// its other collections, so an API-wide prefix would be wrong for one of them.
+//
+// Returns "" when the path has no version segment, which is the correct answer
+// for compute, storage and bigquery: their Discovery servicePath already
+// carries the version, so APIBaseURL is complete on its own.
+func pathPrefixOf(methodPath string) string {
+	segs := strings.Split(strings.TrimPrefix(methodPath, "/"), "/")
+	for i, s := range segs {
+		if versionSegment.MatchString(s) {
+			return strings.Join(segs[:i+1], "/") + "/"
+		}
+	}
+	return ""
+}
+
+// prefixMethodPath returns the method path PathPrefix is derived from: the
+// collection's own get, or -- for the types that publish none -- its list,
+// then its insert or create. Every one of those is a path Discovery joins
+// onto ResolvedBaseURL, so all four answer the same question, and the first
+// that exists is as good as any other.
+//
+// Taken from the type's OWN collection, never from the service: dns puts
+// "dns/v1/" in front of its responsePolicies methods and "v1/" in front of
+// the rest, so a prefix derived once per API would be wrong for one of them.
+func prefixMethodPath(col disco.Collection) string {
+	for _, name := range []string{"get", "list", "insert", "create"} {
+		if m := col.Methods[name]; m != nil && m.Path != "" {
+			return m.Path
+		}
+	}
+	return ""
+}
+
 // buildType assembles one catalog.Type: BuildAttributes for the shape,
 // ScopeOf and AwaitOf for how it's called, and the magic-modules URL fields
 // for where.
@@ -623,6 +666,30 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 
 	t.ListField = ListFieldOf(doc, col)
+
+	// The API version lives in exactly one field, and this is where it is put
+	// there. It has to run LAST, after every fallback above has settled:
+	// SelfLink and ImportFormat are each the end of a chain (magic-modules,
+	// then the Discovery `get` path, then SelfLink itself, then a query-string
+	// strip, then a list-shape fallback), and only the value that chain
+	// finally lands on is the one that has to be stripped.
+	//
+	// Stripping is conditional because the two sources disagree about the
+	// version: a Discovery method path carries it ("v1/{+parent}/addressGroups")
+	// while a magic-modules template is written relative to an already-
+	// versioned base and never does. TrimPrefix leaves the latter alone by
+	// itself, so one rule covers both.
+	//
+	// OperationPollPath and OperationWaitPath are deliberately left alone:
+	// both are taken verbatim from the API's own operations methods and are
+	// composed directly against APIBaseURL, never against PathPrefix.
+	t.PathPrefix = pathPrefixOf(prefixMethodPath(col))
+	if t.PathPrefix != "" {
+		for _, p := range []*string{&t.BaseURL, &t.CreateURL, &t.UpdateURL,
+			&t.DeleteURL, &t.SelfLink, &t.ImportFormat} {
+			*p = strings.TrimPrefix(*p, t.PathPrefix)
+		}
+	}
 
 	return t, nil
 }

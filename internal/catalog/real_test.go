@@ -1,9 +1,12 @@
 package catalog
 
 import (
-	"gopkg.in/yaml.v3"
 	"os"
+	"regexp"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/infrena/infrena/pkg/schema"
 )
@@ -166,6 +169,58 @@ func TestDiscoverDefaultNamesOnlyTypesWeServe(t *testing.T) {
 	for _, name := range overlay.DiscoverDefault {
 		if _, ok := c.Type(name); !ok {
 			t.Errorf("discover_default names %q, which the catalog does not serve", name)
+		}
+	}
+}
+
+// TestNoStoredTemplateCarriesAnAPIVersion. The absolute URL is APIBaseURL +
+// PathPrefix + expand(template), for every type, with no special cases. That
+// holds only if no stored template carries an API version segment of its own
+// -- otherwise the version is either doubled or (for the 72 types measured on
+// 2026-09-22) missing entirely, and every call 404s.
+//
+// OperationPollPath and OperationWaitPath are deliberately exempt: both are
+// taken verbatim from the API's own operations methods and composed directly
+// against APIBaseURL, which is correct for every type that has one.
+func TestNoStoredTemplateCarriesAnAPIVersion(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := regexp.MustCompile(`^v[0-9][0-9a-zA-Z]*$`)
+	leadsWithVersion := func(tmpl string) bool {
+		if tmpl == "" {
+			return false
+		}
+		return version.MatchString(strings.SplitN(strings.TrimPrefix(tmpl, "/"), "/", 2)[0])
+	}
+	for _, ty := range c.Types {
+		for label, tmpl := range map[string]string{
+			"base_url": ty.BaseURL, "self_link": ty.SelfLink,
+			"create_url": ty.CreateURL, "update_url": ty.UpdateURL,
+			"delete_url": ty.DeleteURL, "import_format": ty.ImportFormat,
+		} {
+			if leadsWithVersion(tmpl) {
+				t.Errorf("%s: %s starts with an API version (%q); the version belongs in PathPrefix",
+					ty.Name, label, tmpl)
+			}
+		}
+	}
+}
+
+// TestEveryTypeComposesAVersionedURL. A type whose composed URL carries no
+// version at all is one whose every call 404s. 72 of 233 were in this state
+// when the field was introduced.
+func TestEveryTypeComposesAVersionedURL(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := regexp.MustCompile(`(^|/)v[0-9][0-9a-zA-Z]*(/|$)`)
+	for _, ty := range c.Types {
+		composed := ty.APIBaseURL + ty.PathPrefix
+		if !version.MatchString(composed) {
+			t.Errorf("%s composes %q, which names no API version", ty.Name, composed)
 		}
 	}
 }

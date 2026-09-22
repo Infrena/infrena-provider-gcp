@@ -81,11 +81,27 @@ type Type struct {
 	TierReason string `json:"tier_reason,omitempty"`
 
 	APIBaseURL string `json:"api_base_url"`
-	BaseURL    string `json:"base_url"`
-	CreateURL  string `json:"create_url,omitempty"`
-	UpdateURL  string `json:"update_url,omitempty"`
-	DeleteURL  string `json:"delete_url,omitempty"`
-	SelfLink   string `json:"self_link,omitempty"`
+
+	// PathPrefix is whatever sits between APIBaseURL and the relative
+	// resource name -- "v1/" for networksecurity, "dns/v1/" for dns's
+	// responsePolicies, "" for compute, storage and bigquery (whose
+	// Discovery servicePath already carries the version).
+	//
+	// It exists because SelfLink cannot carry it. SelfLink is also the
+	// provider-id template, and a provider id must name the resource, not
+	// the API version that happened to serve it. Before this field existed
+	// the two jobs shared one string and 94 of 233 types leaked "v1/" into
+	// the ids users see, while the other 139 did not.
+	//
+	// The absolute URL for a resource is therefore always, with no special
+	// cases: APIBaseURL + PathPrefix + expand(template).
+	PathPrefix string `json:"path_prefix,omitempty"`
+
+	BaseURL   string `json:"base_url"`
+	CreateURL string `json:"create_url,omitempty"`
+	UpdateURL string `json:"update_url,omitempty"`
+	DeleteURL string `json:"delete_url,omitempty"`
+	SelfLink  string `json:"self_link,omitempty"`
 
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`

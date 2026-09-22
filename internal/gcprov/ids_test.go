@@ -26,8 +26,12 @@ func TestTheProviderIDIsTheRelativeResourceName(t *testing.T) {
 // absolute URL. Storing that as the provider ID would make the ID change if
 // Google ever changed the host, and would not match what import takes.
 func TestAnAbsoluteSelfLinkBecomesARelativeName(t *testing.T) {
+	// compute's real shape: the version is in APIBaseURL's own path
+	// ("compute/v1/") and PathPrefix is empty, and GCP answers the self link
+	// from www.googleapis.com rather than the host the catalog names.
 	ty := &catalog.Type{Name: "gcp.instance", Scope: catalog.ScopeZonal,
-		SelfLink: "projects/{{project}}/zones/{{zone}}/instances/{{name}}"}
+		APIBaseURL: "https://compute.googleapis.com/compute/v1/",
+		SelfLink:   "projects/{{project}}/zones/{{zone}}/instances/{{name}}"}
 	got, err := ProviderID(ty, map[string]any{
 		"selfLink": "https://www.googleapis.com/compute/v1/projects/p/zones/us-central1-a/instances/web1",
 	}, nil)
@@ -40,15 +44,17 @@ func TestAnAbsoluteSelfLinkBecomesARelativeName(t *testing.T) {
 }
 
 // TestReduceSelfLinkOnlyMatchesAtASegmentBoundary. An unanchored search for
-// self_link's literal prefix ("projects/" here) would happily match it
-// inside "myprojects/", a host-side path segment that merely contains it as
-// a substring, and reduce from the wrong offset. The real, anchored match
-// (preceded by "/") comes later in raw and must be the one used.
+// the api prefix ("v1/" here) would happily match it inside "apiv1/", a
+// host-side path segment that merely ends with it, and reduce from the wrong
+// offset -- leaving the version in the id. The real, anchored match (preceded
+// by "/") comes later in raw and must be the one used.
 func TestReduceSelfLinkOnlyMatchesAtASegmentBoundary(t *testing.T) {
 	ty := &catalog.Type{Name: "gcp.instance", Scope: catalog.ScopeZonal,
-		SelfLink: "projects/{{project}}/zones/{{zone}}/instances/{{name}}"}
+		APIBaseURL: "https://compute.googleapis.com/",
+		PathPrefix: "v1/",
+		SelfLink:   "projects/{{project}}/zones/{{zone}}/instances/{{name}}"}
 	got, err := ProviderID(ty, map[string]any{
-		"selfLink": "https://www.googleapis.com/myprojects/v1/projects/p/zones/us-central1-a/instances/web1",
+		"selfLink": "https://www.googleapis.com/apiv1/v1/projects/p/zones/us-central1-a/instances/web1",
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
