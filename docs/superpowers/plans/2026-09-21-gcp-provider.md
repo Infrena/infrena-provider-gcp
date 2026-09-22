@@ -6412,14 +6412,42 @@ func TestTheGuardRefusesTheWrongIdentity(t *testing.T) {
 
 - [ ] **Step 3: Write the live workflow test**
 
-`TestLiveWorkflow` creates, reads, updates, discovers, imports and deletes a small, cheap set — a
-custom-mode VPC network, one subnetwork, one firewall rule, one storage bucket and one tag key/value
-pair — with `t.Cleanup` deleting everything in reverse order **even when the test fails**. It asserts:
+`TestLiveWorkflow` creates, reads, updates, discovers, imports and deletes a small, cheap set, with
+`t.Cleanup` deleting everything in reverse order **even when the test fails**.
+
+**The resource set, corrected 2026-09-22 before the suite was written.** An earlier draft of this
+section named a custom-mode VPC network and a subnetwork. NEITHER SHIPS: compute's `Network` needs 4
+hook rulings and `Subnetwork` 1, so the tier gate holds both back, and a suite built on them cannot
+run at all. The same stale names had already reached `discover_default` and Task 17's host test.
+Verified against the generated catalog, the set is:
+
+| resource | type | why it is here | cost |
+|---|---|---|---|
+| storage bucket | `gcp.storage.bucket` | synchronous create, no operation | free |
+| tag key + value | `gcp.tagkey`, `gcp.tagvalue` | spec decision G6 requires them at v1.0 | free |
+| tag binding | `gcp.tagbinding` | the `read_via: list_by_parent` path, which has no `get` | free |
+| service account | `gcp.serviceaccount` | a `google.longrunning.Operation` await | free |
+| firewall rule | `gcp.firewall` | compute-style operation await | free |
+| e2-micro instance | `gcp.compute.instance` | **the compute await path against real GCP** | pennies |
+
+`gcp.firewall` has a REQUIRED `network` attribute and `gcp.network` does not ship, so the rule
+references the auto-created `default` network by its self link rather than managing it. Say so in
+`live/README.md`: the live suite depends on a resource the provider cannot manage, and that is a
+consequence of the tier gate, not an oversight.
+
+The e2-micro is here deliberately and James approved the cost. The compute-style operation await is
+the single path this project got wrong most often — the fake omitted `selfLink`, then the generator
+picked an unusable poll path, then `{+name}` was filled from a bare id — and every one of those was
+invisible to a test written against the fake. It is the one thing only a live call can settle.
+
+It asserts:
 
 - create then a clean re-plan (reconciliation against the real API, which the fake cannot prove)
 - an out-of-band label change shows as drift and is corrected
 - `discover` finds the resources **and marks the auto-created default network system-owned**
 - `import` of a created resource produces a state that plans clean
+- **the compute instance's operation is awaited to completion through the real `operations` API**,
+  and the provider id it yields names the instance, not the operation
 
 - [ ] **Step 4: Measure `Retry-After` (spec §5.6)**
 
