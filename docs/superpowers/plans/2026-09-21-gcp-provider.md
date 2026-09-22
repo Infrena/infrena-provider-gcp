@@ -3651,7 +3651,7 @@ restored." \
 
 **Files:**
 - Create: `internal/gcpplugin/config.go`, `internal/gcpplugin/credentials.go`, `scripts/measure-load`
-- Modify: `internal/gcpplugin/plugin.go` (`Definitions`, `MaxConcurrency`)
+- Modify: `internal/gcpplugin/plugin.go` (`Definitions` only — **`MaxConcurrency` belongs to Task 17**, whose value is derived from Task 14's quota measurement and is not available yet)
 - Regenerate: `internal/catalog/catalog.json.gz`, `gen/warnings.txt`, `gen/names.lock.json`
 - Test: `internal/gcpplugin/config_test.go`, `internal/catalog/real_test.go`
 
