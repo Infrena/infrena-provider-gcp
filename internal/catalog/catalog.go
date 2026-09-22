@@ -99,9 +99,19 @@ type Type struct {
 	// name is a path containing "/" and must not be escaped.
 	OperationPollPath string `json:"operation_poll_path,omitempty"`
 
-	Await          AwaitKind `json:"await"`
-	OperationScope string    `json:"operation_scope,omitempty"`
-	TimeoutSeconds int       `json:"timeout_seconds"`
+	Await AwaitKind `json:"await"`
+	// OperationScope is DEPRECATED and about to be removed: it is a bare word
+	// ("global"/"region"/"zone") derived from Scope with no independent source,
+	// and every attempt to build a wait URL from it was wrong. Kept only until
+	// await.go stops reading it.
+	OperationScope string `json:"operation_scope,omitempty"`
+
+	// OperationWaitPath is the API's own operations wait path for this type's
+	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
+	// EMPTY means the API publishes no wait method — container and sqladmin do
+	// not — and the operation must be polled with OperationPollPath instead.
+	OperationWaitPath string `json:"operation_wait_path,omitempty"`
+	TimeoutSeconds    int    `json:"timeout_seconds"`
 
 	// ReadVia names how to read a type with no get method, e.g.
 	// "list_by_parent" — set only when a ruling's ReadVia says so (spec G6's

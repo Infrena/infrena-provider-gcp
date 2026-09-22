@@ -550,10 +550,18 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// real GCP operation timings once the real corpus is generated (Task 9).
 	switch await {
 	case catalog.AwaitComputeOperation:
-		// AwaitOf never names an operation scope (it can't: that's an axis of
-		// the RESOURCE's own URL, not of the Operation schema it inspects), so
-		// it's read off the scope just computed above.
-		switch t.Scope {
+		// Store the paths the API PUBLISHES rather than building them from a
+		// scope word. Three earlier attempts at reconstruction were all wrong:
+		// the wire path's literal segment is "operations", never
+		// "zoneOperations" — that is only the Discovery COLLECTION name — and
+		// the scope segment is "global", "regions/{region}" or "zones/{zone}".
+		//
+		// Measured 2026-09-22 across the 65 compute-style types: compute (58)
+		// publishes a scope-specific wait; container (2) and sqladmin (5)
+		// publish NO wait method anywhere, so a wait call against them 404s and
+		// they must be polled with get instead. Both paths are recorded and the
+		// runtime picks whichever exists.
+		switch t.Scope { // deprecated, removed once await.go stops reading it
 		case catalog.ScopeGlobal:
 			t.OperationScope = "global"
 		case catalog.ScopeRegional:
@@ -561,6 +569,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		case catalog.ScopeZonal:
 			t.OperationScope = "zone"
 		}
+		t.OperationWaitPath = operationWaitPath(doc, t.Scope)
+		t.OperationPollPath = operationPollPath(doc)
 		t.TimeoutSeconds = 600
 	case catalog.AwaitLongRunning:
 		t.TimeoutSeconds = 1200
@@ -715,4 +725,28 @@ func operationPollPath(doc *disco.Document) string {
 	}
 	walk(doc.Resources)
 	return found
+}
+
+// operationWaitPath returns the API's own operations wait path for a scope, or
+// "" when the API publishes no wait method at all.
+//
+// Only compute does, among the services in this catalog. An empty return is a
+// real answer meaning "poll with get", not a failure.
+func operationWaitPath(doc *disco.Document, scope catalog.Scope) string {
+	coll := map[catalog.Scope]string{
+		catalog.ScopeGlobal:   "globalOperations",
+		catalog.ScopeRegional: "regionOperations",
+		catalog.ScopeZonal:    "zoneOperations",
+	}[scope]
+	if coll == "" {
+		return ""
+	}
+	r := doc.Resources[coll]
+	if r == nil {
+		return ""
+	}
+	if m := r.Methods["wait"]; m != nil {
+		return m.Path
+	}
+	return ""
 }
