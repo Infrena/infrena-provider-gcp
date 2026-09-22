@@ -53,3 +53,27 @@ func TestEveryAcceptedKeyIsRead(t *testing.T) {
 		t.Errorf("a key was read into the wrong field or not at all: %+v", in)
 	}
 }
+
+// TestANonStringListElementIsRefused is F3: list() used to silently coerce a
+// non-string element to "" (s, _ := it.Raw.(string)) rather than refuse it,
+// unlike the sibling str() path, which already checks Kind per field. A
+// discover_types entry that isn't a string then became an empty type name --
+// the same fail-closed principle as the unknown-key check: configuration
+// that cannot mean what it says must be refused, not silently reinterpreted.
+func TestANonStringListElementIsRefused(t *testing.T) {
+	_, err := ParseConfig(provider.Config{
+		Instance: "prod",
+		Values: map[string]value.Value{
+			"discover_types": value.List([]value.Value{
+				value.String("gcp.network", value.SourceExplicit),
+				value.Int(123, value.SourceExplicit),
+			}, value.SourceExplicit),
+		},
+	})
+	if err == nil {
+		t.Fatal("a non-string list element was accepted")
+	}
+	if !strings.Contains(err.Error(), "discover_types") || !strings.Contains(err.Error(), "1") {
+		t.Errorf("the error does not name the offending key and index: %v", err)
+	}
+}

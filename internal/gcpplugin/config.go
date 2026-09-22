@@ -76,7 +76,10 @@ func ParseConfig(cfg provider.Config) (*Instance, error) {
 		}
 		items, _ := v.Raw.([]value.Value)
 		out := make([]string, 0, len(items))
-		for _, it := range items {
+		for idx, it := range items {
+			if it.Kind != value.KindString {
+				return nil, fmt.Errorf("provider %q: %s[%d] must be a string, got %s", cfg.Instance, key, idx, it.Kind)
+			}
 			s, _ := it.Raw.(string)
 			out = append(out, s)
 		}

@@ -933,3 +933,83 @@ properties:
 		t.Error("the dropped zonal alias was not warned about")
 	}
 }
+
+// TestAliasWarningNamesARealWinnerEvenWhenTheWinnerIsAlsoDisambiguated is F2:
+// aliasLoser used to capture its winner's Candidate BY VALUE before
+// disambiguateByPath ran on the same group, so a winner that was ALSO a
+// survivor needing disambiguation (this fixture's shape: a legacy alias pair
+// PLUS a third, genuinely distinct resource sharing the same bare leaf) had
+// its Candidate mutated out from under the already-recorded warning. The
+// warning's lookup then missed and silently produced "legacy alias of  (...)"
+// -- a blank name in the one file the brief says to read, not skim.
+//
+// The fixture: projects.locations.somethingReal.widgets (current) and
+// projects.zones.somethingReal.widgets (legacy alias of it) both singularize
+// to "widget", as does otherthing.widgets -- an unrelated third resource.
+// otherthing forces disambiguation, which extends BOTH the alias winner's and
+// otherthing's Resource ("somethingreal.widget" / "otherthing.widget"), so
+// the alias winner's Candidate is a different value after resolution than
+// before it -- exactly the case a stale copy would miss.
+func TestAliasWarningNamesARealWinnerEvenWhenTheWinnerIsAlsoDisambiguated(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"mmv1/products/dup/product.yaml": "name: Dup\n",
+		"schemas/dup.json": `{
+  "name": "dup",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Widget": {"id": "Widget", "type": "object", "properties": {"name": {"type": "string"}}},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "projects": {"resources": {
+      "locations": {"resources": {"somethingReal": {"resources": {"widgets": {"methods": {
+        "get": {"id": "x.l.get", "path": "projects/{p}/locations/{l}/somethingReal/{s}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+        "insert": {"id": "x.l.insert", "path": "projects/{p}/locations/{l}/somethingReal/{s}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.l.delete", "path": "projects/{p}/locations/{l}/somethingReal/{s}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}}}}},
+      "zones": {"resources": {"somethingReal": {"resources": {"widgets": {"methods": {
+        "get": {"id": "x.z.get", "path": "projects/{p}/zones/{z}/somethingReal/{s}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+        "insert": {"id": "x.z.insert", "path": "projects/{p}/zones/{z}/somethingReal/{s}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.z.delete", "path": "projects/{p}/zones/{z}/somethingReal/{s}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}}}}}
+    }},
+    "otherthing": {"resources": {"widgets": {"methods": {
+      "get": {"id": "x.o.get", "path": "otherthing/{o}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+      "insert": {"id": "x.o.insert", "path": "otherthing/{o}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "x.o.delete", "path": "otherthing/{o}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}}}
+  }
+}`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"gcp.dup.somethingreal.widget", "gcp.dup.otherthing.widget"} {
+		if _, ok := res.Catalog.Type(name); !ok {
+			var got []string
+			for _, ty := range res.Catalog.Types {
+				got = append(got, ty.Name)
+			}
+			t.Errorf("%s missing; catalog has %v", name, got)
+		}
+	}
+	var found bool
+	for _, w := range res.Warnings {
+		if !strings.Contains(w.Reason, "legacy alias of") {
+			continue
+		}
+		found = true
+		if strings.Contains(w.Reason, "legacy alias of  (") || strings.Contains(w.Reason, "legacy alias of (") {
+			t.Errorf("warning names a blank winner: %q", w.Reason)
+		}
+		if !strings.Contains(w.Reason, "gcp.dup.somethingreal.widget") {
+			t.Errorf("warning does not name the real (post-disambiguation) winner: %q", w.Reason)
+		}
+	}
+	if !found {
+		t.Error("the zonal alias was not warned about at all")
+	}
+}
