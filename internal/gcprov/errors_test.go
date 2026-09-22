@@ -191,3 +191,120 @@ func TestClassifyErrorStillDefaultsUnrecognisedToNotSafeToRetry(t *testing.T) {
 		t.Errorf("ClassifyError(plain error) = %v, want NotSafeToRetry", got)
 	}
 }
+
+// The bodies below are VERBATIM from the live suite's throttle measurement
+// against project example-project-1234 on 2026-09-22 (live/README.md),
+// trimmed only of the Help link. They are fixtures copied from Google, not
+// fixtures invented here, which is the difference between testing what the
+// API does and testing what somebody assumed it does.
+const (
+	// cloudresourcemanager, and the shape the tables already handled: 429
+	// with a google.rpc status.
+	liveCRMThrottle = `{"error":{"code":429,"message":"Quota exceeded for quota metric ` +
+		`'Project V3 get requests' and limit 'Project V3 get requests per minute' of service ` +
+		`'cloudresourcemanager.googleapis.com' for consumer 'project_number:123456789012'.",` +
+		`"status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo",` +
+		`"reason":"RATE_LIMIT_EXCEEDED","domain":"googleapis.com"}]}}`
+
+	// compute, and the shape that was classified wrong: 403, no status at
+	// all, and the cause only in the legacy errors[] and in ErrorInfo.
+	liveComputeThrottle = `{"error":{"code":403,"message":"Quota exceeded for quota metric ` +
+		`'Read requests' and limit 'Read requests per minute per region' of service ` +
+		`'compute.googleapis.com' for consumer 'project_number:123456789012'.",` +
+		`"errors":[{"message":"Quota exceeded for quota metric 'Read requests'",` +
+		`"domain":"usageLimits","reason":"rateLimitExceeded"}],` +
+		`"details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo",` +
+		`"reason":"RATE_LIMIT_EXCEEDED","domain":"googleapis.com"}]}}`
+
+	// A REAL 403, for the other half of the claim. Also verbatim: this is
+	// what the live service account got from storage before its quota
+	// project was removed.
+	liveRealPermissionDenied = `{"error":{"code":403,"message":"infrena-live@example-project-1234` +
+		`.iam.gserviceaccount.com does not have serviceusage.services.use access to the Google ` +
+		`Cloud project.","status":"PERMISSION_DENIED","details":[{"@type":` +
+		`"type.googleapis.com/google.rpc.ErrorInfo","reason":"USER_PROJECT_DENIED",` +
+		`"domain":"googleapis.com"}]}}`
+)
+
+// TestAComputeQuotaThrottleIsRetryable is the defect the live suite found.
+//
+// compute answers a quota throttle with 403 and NO error.status, so Code is
+// empty and 403 is not a retryable HTTP status -- every compute throttle was
+// classified NotSafeToRetry, which reports a transient quota blip to the
+// user as a permanent failure on the API this provider calls most. 3,219 of
+// these arrived in sixty seconds during the measurement, so it is not a
+// corner case.
+func TestAComputeQuotaThrottleIsRetryable(t *testing.T) {
+	ae := decodeAPIError(testResponse(http.StatusForbidden, nil), []byte(liveComputeThrottle))
+	if ae.Code != "" {
+		t.Errorf("Code = %q; this body really does carry no error.status, and a test that "+
+			"passes because one was invented is testing the fixture", ae.Code)
+	}
+	if ae.Reason != "RATE_LIMIT_EXCEEDED" {
+		t.Errorf("Reason = %q, want RATE_LIMIT_EXCEEDED from the ErrorInfo detail", ae.Reason)
+	}
+	if got := ClassifyError(ae); got != provider.SafeToRetry {
+		t.Errorf("ClassifyError = %v, want SafeToRetry", got)
+	}
+}
+
+// TestALegacyRateLimitReasonIsRetryableWithoutErrorInfo. The older Discovery
+// APIs answer with errors[].reason and no details at all, so the modern
+// signal alone would still miss them.
+func TestALegacyRateLimitReasonIsRetryableWithoutErrorInfo(t *testing.T) {
+	const legacyOnly = `{"error":{"code":403,"message":"Quota exceeded",` +
+		`"errors":[{"domain":"usageLimits","reason":"rateLimitExceeded"}]}}`
+	ae := decodeAPIError(testResponse(http.StatusForbidden, nil), []byte(legacyOnly))
+	if ae.Reason != "rateLimitExceeded" {
+		t.Errorf("Reason = %q, want the legacy errors[].reason", ae.Reason)
+	}
+	if got := ClassifyError(ae); got != provider.SafeToRetry {
+		t.Errorf("ClassifyError = %v, want SafeToRetry", got)
+	}
+}
+
+// TestARealPermissionDenialIsStillNotRetryable is the half that makes the
+// one above safe. If a 403 were retried on its status, a misconfigured
+// service account would produce a retry storm against an error that cannot
+// improve -- so the reason has to be doing the work, not the status.
+func TestARealPermissionDenialIsStillNotRetryable(t *testing.T) {
+	ae := decodeAPIError(testResponse(http.StatusForbidden, nil), []byte(liveRealPermissionDenied))
+	if ae.Reason != "USER_PROJECT_DENIED" {
+		t.Errorf("Reason = %q", ae.Reason)
+	}
+	if got := ClassifyError(ae); got != provider.NotSafeToRetry {
+		t.Errorf("ClassifyError = %v, want NotSafeToRetry: a permission denial cannot be retried "+
+			"into succeeding", got)
+	}
+}
+
+// TestACloudResourceManagerThrottleIsRetryable pins the shape that already
+// worked, so a change to the reason path cannot quietly break the code path.
+func TestACloudResourceManagerThrottleIsRetryable(t *testing.T) {
+	ae := decodeAPIError(testResponse(http.StatusTooManyRequests, nil), []byte(liveCRMThrottle))
+	if ae.Code != "RESOURCE_EXHAUSTED" {
+		t.Errorf("Code = %q", ae.Code)
+	}
+	if got := ClassifyError(ae); got != provider.SafeToRetry {
+		t.Errorf("ClassifyError = %v, want SafeToRetry", got)
+	}
+}
+
+// TestNeitherLiveThrottleCarriedARetryAfterHeader records the measurement
+// itself, so the decision to KEEP APIError.RetryAfter is testable rather
+// than only written down.
+//
+// It is NOT a claim that GCP never sends the header: two of the twenty-five
+// APIs this provider calls were throttled, and storage could not be
+// throttled at all. See live/README.md for what would close the question.
+func TestNeitherLiveThrottleCarriedARetryAfterHeader(t *testing.T) {
+	for name, body := range map[string]string{
+		"cloudresourcemanager": liveCRMThrottle,
+		"compute":              liveComputeThrottle,
+	} {
+		ae := decodeAPIError(testResponse(http.StatusTooManyRequests, nil), []byte(body))
+		if ae.RetryAfter != 0 {
+			t.Errorf("%s: RetryAfter = %v; the live responses carried no such header", name, ae.RetryAfter)
+		}
+	}
+}
