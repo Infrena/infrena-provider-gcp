@@ -11,6 +11,7 @@ import (
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
 	"github.com/infrena/infrena-provider-gcp/internal/gcptest"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 func TestASynchronousMutationIsNotPolled(t *testing.T) {
@@ -478,4 +479,44 @@ func getJSON(t *testing.T, url string) map[string]any {
 		t.Fatal(err)
 	}
 	return body
+}
+
+// TestEveryOperationTemplateExpandsFromWhatTheRuntimeSupplies. An operation
+// template is useless if operationRequestURL cannot fill its placeholders.
+// container publishes two operations collections -- one taking {+name}, one
+// taking {projectId}/{operationId} -- and the generator used to pick between
+// them by map order, so gcp.container.cluster shipped a path needing
+// "projectId", which nothing supplies. Every GKE cluster mutation failed at
+// the polling step.
+//
+// The attrs below must stay in sync with operationRequestURL's own map. If
+// that gains a placeholder, add it here; if this test starts failing because
+// a new type needs something else, the fix is in the generator's choice of
+// path, not in loosening this test.
+func TestEveryOperationTemplateExpandsFromWhatTheRuntimeSupplies(t *testing.T) {
+	c, err := catalog.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs := map[string]value.Value{
+		"operation": value.String("op-1", value.SourceProvider),
+		"name":      value.String("op-1", value.SourceProvider),
+		"project":   value.String("p", value.SourceProvider),
+		"zone":      value.String("z", value.SourceProvider),
+		"region":    value.String("r", value.SourceProvider),
+	}
+	for _, ty := range c.Types {
+		tmpl := ty.OperationWaitPath
+		label := "operation_wait_path"
+		if tmpl == "" {
+			tmpl, label = ty.OperationPollPath, "operation_poll_path"
+		}
+		if tmpl == "" {
+			continue
+		}
+		if _, err := ExpandURL(tmpl, attrs); err != nil {
+			t.Errorf("%s %s=%q cannot be expanded by the runtime: %v",
+				ty.Name, label, tmpl, err)
+		}
+	}
 }
