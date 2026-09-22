@@ -2,7 +2,9 @@ package gcprov
 
 import (
 	"context"
+	"encoding/json"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
 	"github.com/infrena/infrena-provider-gcp/internal/gcptest"
 	"github.com/infrena/infrena/pkg/resource"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 // widgetCatalogAwaitingLongRunning is
@@ -663,4 +666,350 @@ func captureStderr(t *testing.T, f func()) string {
 		t.Fatal(err)
 	}
 	return string(out)
+}
+
+// syncCatalogFor returns the REAL catalog's entry for name, plus a one-type
+// catalog holding it with Await forced to AwaitNone.
+//
+// The real entry, because the whole subject of Task 14a is an attribute the
+// GENERATOR renamed, and widgetType() has none -- inventing a fixture with a
+// renamed attribute would test the fixture, not the corpus. Await forced,
+// because gcpfake answers a mutation with the resource itself by default
+// (OpSync) and these tests are about what is IN the body, not about how the
+// operation completes; the same trick widgetCatalogAwaitingLongRunning plays
+// in the other direction.
+func syncCatalogFor(t *testing.T, name string) (*catalog.Type, *catalog.Catalog) {
+	t.Helper()
+	real, ok := mustCatalog(t).Type(name)
+	if !ok {
+		t.Fatalf("the catalog no longer ships %s", name)
+	}
+	cp := *real
+	cp.Await = catalog.AwaitNone
+	return &cp, &catalog.Catalog{Types: []*catalog.Type{&cp}}
+}
+
+// requireRenamedAt fails unless the type still declares schemaKey as a
+// rename of wireName, so a regeneration that stops renaming turns these
+// tests into a loud failure rather than a quiet pass over nothing.
+func requireRenamedAt(t *testing.T, ty *catalog.Type, schemaKey, wireName string) {
+	t.Helper()
+	a, ok := ty.Attributes[schemaKey]
+	if !ok {
+		t.Fatalf("%s no longer declares %q, so this test is not exercising a rename", ty.Name, schemaKey)
+	}
+	if a.Canonical != wireName {
+		t.Fatalf("%s.%s is now canonical %q, not %q; this test is not exercising a rename",
+			ty.Name, schemaKey, a.Canonical, wireName)
+	}
+}
+
+// TestACreateSendsTheWireNameNotTheSchemaName. requestBody used to do
+// body[name] = toRaw(v) with name the SCHEMA key, so a create sent
+// {"type_value": "SIDECAR_PROXY"} where GCP asks for {"type":
+// "SIDECAR_PROXY"}. gcp.endpointpolicy is the sharp end of that: its
+// type_value is REQUIRED, one of the 7 required renames in the corpus, so
+// the API was being asked to create a resource without a field it demands.
+func TestACreateSendsTheWireNameNotTheSchemaName(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.endpointpolicy")
+	requireRenamedAt(t, ty, "type_value", "type")
+	if !ty.Attributes["type_value"].Required {
+		t.Fatalf("%s.type_value is no longer Required; this test exists for a REQUIRED rename", ty.Name)
+	}
+	p := testProviderWithCatalog(t, s, c)
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type: ty.Name,
+		Attrs: attrsMixed(map[string]any{
+			"project":         "p",
+			"name":            "ep1",
+			"type_value":      "SIDECAR_PROXY",
+			"endpointMatcher": map[string]any{"metadataLabelMatcher": map[string]any{}},
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Create returned (nil, nil), which orphans the resource it just made")
+	}
+
+	var posts int
+	for _, r := range s.Requests() {
+		if r.Method != http.MethodPost {
+			continue
+		}
+		posts++
+		var body map[string]any
+		if err := json.Unmarshal(r.Body, &body); err != nil {
+			t.Fatalf("the create body is not JSON: %v", err)
+		}
+		if _, leaked := body["type_value"]; leaked {
+			t.Errorf("the create sent the SCHEMA name; GCP has no such field: %v", body)
+		}
+		if body["type"] != "SIDECAR_PROXY" {
+			t.Errorf("the create body = %v, want the wire name %q carrying the value", body, "type")
+		}
+	}
+	if posts != 1 {
+		t.Fatalf("expected exactly one POST, saw %d", posts)
+	}
+}
+
+// TestAReadKeysStateBySchemaName. stateFrom used to do attrs[k] =
+// fromRaw(raw) with k straight off the response body, so state held "type"
+// while configuration held "type_value". The host diffs those two maps, so
+// every plan reported a change to a field nobody had touched, forever.
+func TestAReadKeysStateBySchemaName(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.endpointpolicy")
+	requireRenamedAt(t, ty, "type_value", "type")
+	// GCP's own spelling, which is the only spelling a response ever carries.
+	s.Seed("/v1/projects/p/locations/global/endpointPolicies/ep1", map[string]any{
+		"type":        "SIDECAR_PROXY",
+		"description": "the one being read",
+	})
+	p := testProviderWithCatalog(t, s, c)
+
+	st, err := p.Read(context.Background(), &resource.ResourceState{
+		Type: ty.Name, ProviderID: "projects/p/locations/global/endpointPolicies/ep1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Read reported absence for a resource the fake is holding")
+	}
+	if _, leaked := st.Attributes["type"]; leaked {
+		t.Errorf("state is keyed by the WIRE name, which configuration can never match: %v", st.Attributes)
+	}
+	got, ok := st.Attributes["type_value"].AsString()
+	if !ok || got != "SIDECAR_PROXY" {
+		t.Errorf("state[type_value] = %#v, want the value the body carried under %q",
+			st.Attributes["type_value"], "type")
+	}
+}
+
+// TestAReadKeysAListElementBySchemaNameToo is the same claim one level in,
+// on the shape two thirds of the corpus's renames actually have. gcp.router
+// is one of the three updatable types (with gcp.grpcroute and
+// gcp.responsepolicyrule) whose ONLY renamed attribute lives inside a list,
+// so a translation that recursed into Fields but not Elem would leave this
+// exactly as broken as it was while passing every top-level test above.
+func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.router")
+	nats, ok := ty.Attributes["nats"]
+	if !ok || nats.Elem == nil {
+		t.Fatalf("%s no longer declares nats as a list", ty.Name)
+	}
+	requireRenamedAt(t, &catalog.Type{Name: ty.Name + ".nats[]", Attributes: nats.Elem.Fields},
+		"type_value", "type")
+
+	// "router", not "name": gcp.router's self_link captures its own id under
+	// the API's own placeholder name ("projects/{project}/regions/{region}/routers/{router}").
+	id, err := ProviderID(ty, nil, attrs(map[string]string{"project": "p", "region": "r", "router": "rt1"}))
+	if err != nil {
+		t.Fatalf("building the id to seed at: %v", err)
+	}
+	s.Seed("/"+ty.PathPrefix+id, map[string]any{
+		"name": "rt1",
+		"nats": []any{map[string]any{"name": "nat-1", "type": "PUBLIC"}},
+	})
+	p := testProviderWithCatalog(t, s, c)
+
+	st, err := p.Read(context.Background(), &resource.ResourceState{Type: ty.Name, ProviderID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Read reported absence for a resource the fake is holding")
+	}
+	list, ok := st.Attributes["nats"].Raw.([]value.Value)
+	if !ok || len(list) != 1 {
+		t.Fatalf("state[nats] = %#v, want a one-element list", st.Attributes["nats"])
+	}
+	fields, ok := list[0].Raw.(map[string]value.Value)
+	if !ok {
+		t.Fatalf("state[nats][0] = %#v, want an object", list[0])
+	}
+	if _, leaked := fields["type"]; leaked {
+		t.Errorf("a list element in state is keyed by the WIRE name: %#v", fields)
+	}
+	if got, ok := fields["type_value"].AsString(); !ok || got != "PUBLIC" {
+		t.Errorf("state[nats][0] = %#v, want %q carrying the value", fields, "type_value")
+	}
+}
+
+// TestACreateSendsWireNamesBelowTheTopLevelToo. requestBody translating only
+// its own top-level keys passes every other create test in this file and
+// still sends "type_value" inside every nested object and list element it
+// writes -- which for 263 of the corpus's 306 renamed attributes is the only
+// place they ever appear.
+//
+// gcp.regionsecuritypolicy carries both halves at once: a renamed attribute
+// at the top level, and another two levels down inside a list
+// (rules[].redirectOptions.type_value), so one create exercises the whole
+// descent.
+func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.regionsecuritypolicy")
+	requireRenamedAt(t, ty, "type_value", "type")
+	redirect := ty.Attributes["rules"].Elem.Fields["redirectOptions"]
+	if a, ok := redirect.Fields["type_value"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s no longer renames rules[].redirectOptions.type; this test is not "+
+			"exercising a nested rename", ty.Name)
+	}
+	p := testProviderWithCatalog(t, s, c)
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type: ty.Name,
+		Attrs: attrsMixed(map[string]any{
+			"project":    "p",
+			"region":     "r",
+			"name":       "sp1",
+			"type_value": "CLOUD_ARMOR",
+			"rules": []any{map[string]any{
+				"priority":        int64(1000),
+				"redirectOptions": map[string]any{"type_value": "GOOGLE_RECAPTCHA"},
+			}},
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Create returned (nil, nil), which orphans the resource it just made")
+	}
+
+	var posted map[string]any
+	for _, r := range s.Requests() {
+		if r.Method != http.MethodPost {
+			continue
+		}
+		if err := json.Unmarshal(r.Body, &posted); err != nil {
+			t.Fatalf("the create body is not JSON: %v", err)
+		}
+	}
+	if posted == nil {
+		t.Fatal("no create was sent")
+	}
+	if _, leaked := posted["type_value"]; leaked {
+		t.Errorf("the create sent the schema name at the top level: %v", posted)
+	}
+	rules, ok := posted["rules"].([]any)
+	if !ok || len(rules) != 1 {
+		t.Fatalf("the create body's rules = %#v, want a one-element list", posted["rules"])
+	}
+	rule, ok := rules[0].(map[string]any)
+	if !ok {
+		t.Fatalf("the create body's rules[0] = %#v, want an object", rules[0])
+	}
+	opts, ok := rule["redirectOptions"].(map[string]any)
+	if !ok {
+		t.Fatalf("the create body's rules[0].redirectOptions = %#v, want an object", rule["redirectOptions"])
+	}
+	if _, leaked := opts["type_value"]; leaked {
+		t.Errorf("the create sent the schema name inside a list element; GCP has no such "+
+			"field: %#v", opts)
+	}
+	if opts["type"] != "GOOGLE_RECAPTCHA" {
+		t.Errorf("the create body's rules[0].redirectOptions = %#v, want the wire name %q",
+			opts, "type")
+	}
+}
+
+// TestAnIDsOwnSegmentsAreKeyedBySchemaNameToo. stateFrom merges TWO sources
+// into one state map: the response body, and the attributes ParseProviderID
+// recovered from the provider id. The second is keyed by self_link's own
+// PLACEHOLDER names, and a placeholder is spelled in whichever namespace the
+// template's source wrote it in.
+//
+// gcp.resourcerecordset is the one type in the corpus where those differ:
+// its self_link came from Cloud DNS's own Discovery path, so it captures
+// "{type}" while configuration supplies "type_value". Left untranslated, the
+// id's own segment puts "type" into the very same state map the body puts
+// "type_value" into, and the host diffs configuration against both.
+func TestAnIDsOwnSegmentsAreKeyedBySchemaNameToo(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.resourcerecordset")
+	requireRenamedAt(t, ty, "type_value", "type")
+	if !contains(ty.SelfLink, "{type}") {
+		t.Fatalf("this test exists for a self_link capturing a renamed attribute; got %q", ty.SelfLink)
+	}
+	const id = "projects/p/managedZones/z/rrsets/www.example.com./A"
+	// Deliberately WITHOUT "type" in the body: Cloud DNS does echo it, but
+	// this test is about the half that comes from the id, and a body carrying
+	// it too would mask a failure to translate the id's own segment.
+	s.Seed("/dns/v1/"+id, map[string]any{"ttl": float64(300), "rrdatas": []any{"10.0.0.1"}})
+	p := testProviderWithCatalog(t, s, c)
+
+	st, err := p.Read(context.Background(), &resource.ResourceState{Type: ty.Name, ProviderID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Read reported absence for a resource the fake is holding")
+	}
+	if _, leaked := st.Attributes["type"]; leaked {
+		t.Errorf("the id's own segment reached state under the WIRE name: %v", st.Attributes)
+	}
+	if got, ok := st.Attributes["type_value"].AsString(); !ok || got != "A" {
+		t.Errorf("state[type_value] = %#v, want the segment the id carries under %q",
+			st.Attributes["type_value"], "type")
+	}
+}
+
+// TestTheBestEffortStateIsKeyedBySchemaNameToo. bestEffortState is the one
+// path that builds state WITHOUT going through stateFrom: the
+// eventual-consistency window where GCP has confirmed the create but the
+// readback still 404s, and the orphan rule says report what we know rather
+// than error. It merges desired's own attributes (schema-keyed) with the
+// awaited response body (wire-keyed), so the same translation has to happen
+// here or that window produces a state holding both spellings of the same
+// attribute.
+func TestTheBestEffortStateIsKeyedBySchemaNameToo(t *testing.T) {
+	gcptest.Isolate(t)
+	withJitterForTest(t, func(int64) int64 { return 0 })
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.endpointpolicy")
+	requireRenamedAt(t, ty, "type_value", "type")
+	// Never readable, so Create falls through to bestEffortState rather than
+	// to stateFrom -- the same mechanism
+	// TestCreateTrustsTheAwaitWhenTheReadbackNeverSeesIt uses.
+	s.NotFoundTimes("/v1/projects/p/locations/global/endpointPolicies/ep1", 1<<30)
+	p := testProviderWithCatalog(t, s, c)
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type: ty.Name,
+		Attrs: attrsMixed(map[string]any{
+			"project": "p", "name": "ep1", "type_value": "SIDECAR_PROXY",
+		}),
+	})
+	if err != nil {
+		t.Fatalf("Create errored for a resource GCP confirmed creating: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if _, leaked := st.Attributes["type"]; leaked {
+		t.Errorf("the awaited body reached state under the WIRE name, alongside the schema "+
+			"name desire supplied: %v", st.Attributes)
+	}
+	if got, ok := st.Attributes["type_value"].AsString(); !ok || got != "SIDECAR_PROXY" {
+		t.Errorf("state[type_value] = %#v, want the value the create was given",
+			st.Attributes["type_value"])
+	}
 }

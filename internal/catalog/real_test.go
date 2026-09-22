@@ -3,6 +3,7 @@ package catalog
 import (
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -280,4 +281,127 @@ func TestNoShippedTypeReadsAnotherCollectionThanItCreatesIn(t *testing.T) {
 	if compared < 100 {
 		t.Errorf("only %d types had two comparable templates; 144 did on 2026-09-22, so this test is no longer asserting what it says", compared)
 	}
+}
+
+// eachAttributeLevel calls fn once for every map of declared attributes in
+// the catalog -- a Type's own Attributes, every Attr's Fields, and every
+// LIST ELEMENT's Fields, reached through Elem.
+//
+// Through Elem deliberately. A walk that follows only Fields sees 43 of the
+// corpus's 306 renamed attributes and reports gcp.grpcroute,
+// gcp.responsepolicyrule and gcp.router -- three updatable types -- as
+// having none at all.
+func eachAttributeLevel(c *Catalog, fn func(where string, level map[string]*Attr)) {
+	var walk func(where string, level map[string]*Attr)
+	walk = func(where string, level map[string]*Attr) {
+		fn(where, level)
+		for key, a := range level {
+			if len(a.Fields) > 0 {
+				walk(where+"."+key, a.Fields)
+			}
+			if a.Elem != nil && len(a.Elem.Fields) > 0 {
+				walk(where+"."+key+"[]", a.Elem.Fields)
+			}
+		}
+	}
+	for _, ty := range c.Types {
+		walk(ty.Name, ty.Attributes)
+	}
+}
+
+// TestTheCatalogStillRenamesAttributes. The generator renames a property
+// whose name collides with something reserved -- "type" becomes
+// "type_value", "provider" becomes "provider_value", "lifecycle" becomes
+// "lifecycle_value" -- and internal/gcprov/names.go exists solely to
+// translate between that schema name and the wire name GCP actually uses.
+//
+// If a regeneration ever changes that strategy, every one of those
+// translation tests would still pass while testing nothing, because each of
+// them iterates a set the generator controls. This is the one place that
+// asserts the set is not empty, and it reports its size so a change of
+// strategy is visible in the failure rather than inferred from a later bug.
+//
+// Measured 2026-09-22: 306 renamed attributes across 56 of 233 types, 7 of
+// them Required, at depths up to 9; 263 of the 306 sit inside a list. The
+// floors are well below those so that ordinary drift in Google's own
+// Discovery documents does not trip them.
+func TestTheCatalogStillRenamesAttributes(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, required, inList := 0, 0, 0
+	eachAttributeLevel(c, func(where string, level map[string]*Attr) {
+		for key, a := range level {
+			if a.Canonical == key {
+				continue
+			}
+			total++
+			if a.Required {
+				required++
+			}
+			if strings.Contains(where, "[]") {
+				inList++
+			}
+		}
+	})
+	t.Logf("renamed attributes: %d total, %d required, %d inside a list", total, required, inList)
+	if total < 200 {
+		t.Errorf("only %d attributes are renamed; 306 were measured on 2026-09-22, so the "+
+			"generator's renaming strategy has changed and internal/gcprov/names.go and its "+
+			"tests need revisiting", total)
+	}
+	if required == 0 {
+		t.Errorf("no RENAMED attribute is Required any more (7 were); a create that sends the "+
+			"wrong name for one of these is the difference between a rejected request and a "+
+			"cosmetic diff, and %d renames remain", total)
+	}
+	if inList == 0 {
+		t.Errorf("no renamed attribute is inside a list any more (263 of 306 were); " +
+			"names.go recurses through Elem specifically for those, and that recursion is now " +
+			"untested by the corpus")
+	}
+}
+
+// TestNoLevelRenamesTwoAttributesOntoOneWireName is the invariant
+// internal/gcprov's toSchema depends on to be a function at all: within one
+// level of declared attributes, the wire name identifies the schema name
+// uniquely.
+//
+// Two ways it could stop doing so, and both are checked. Two schema keys
+// could carry the same Canonical, or a renamed key's Canonical could also be
+// a sibling's own key -- "type_value" meaning "type" alongside a real
+// attribute called "type". Either makes a response field ambiguous.
+//
+// It is pinned here rather than resolved with a tiebreak in toSchema,
+// because a tiebreak would let a regenerated catalog silently pick one of
+// two meanings for a field a user set; a failure at generation time is the
+// cheaper place to find out. Both measured as zero on 2026-09-22.
+func TestNoLevelRenamesTwoAttributesOntoOneWireName(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eachAttributeLevel(c, func(where string, level map[string]*Attr) {
+		byWire := map[string][]string{}
+		for key, a := range level {
+			byWire[a.Canonical] = append(byWire[a.Canonical], key)
+		}
+		for wire, keys := range byWire {
+			if len(keys) > 1 {
+				sort.Strings(keys)
+				t.Errorf("%s: %v all have the wire name %q, so a response field named %q "+
+					"cannot be keyed back to one attribute", where, keys, wire, wire)
+			}
+		}
+		for key, a := range level {
+			if a.Canonical == key {
+				continue
+			}
+			if _, clash := level[a.Canonical]; clash {
+				t.Errorf("%s: %q has the wire name %q, which is also a sibling's own key; "+
+					"a response field named %q is ambiguous", where, key, a.Canonical, a.Canonical)
+			}
+		}
+	})
 }

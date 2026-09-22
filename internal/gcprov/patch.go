@@ -22,6 +22,17 @@ import (
 // is enforced by the API rather than by anything we write, which is a better
 // place for it.
 //
+// BOTH MAPS ARE KEYED BY SCHEMA NAME, and the mask and body it emits are
+// keyed by wire name. That asymmetry is the whole of Task 14a: desired comes
+// from configuration and current comes from stateFrom, which (since Task
+// 14a) translates a response body back into schema names, so looking current
+// up by the same key desired uses is correct. It was not before: state held
+// "type" while desire held "type_value", the lookup returned a zero
+// value.Value whose Known is false, Value.Equal compares Kind before Raw so
+// it equalled nothing, and the field was masked on every single update --
+// including on the ForceNew ones, where an updateMask naming an immutable
+// field is likely rejected outright.
+//
 // current is the REFRESHED observation the host handed Update, not the last
 // state persisted to disk. There is deliberately no extra read here --
 // infrena >= 0.7.1 passes the observation from immediately before planning,
@@ -41,9 +52,11 @@ func BuildMask(ty *catalog.Type, current, desired map[string]value.Value) (map[s
 			// GCP owns it. A mask naming a read-only field fails the whole
 			// request, not just that field.
 			continue
-		case inURL[name]:
+		case inURL[name] || inURL[a.Canonical]:
 			// The url already says it: project, region/zone/location, name,
-			// and every type-specific id segment. See urlIdentifying.
+			// and every type-specific id segment. See urlIdentifying. Either
+			// spelling counts, because a url template names a placeholder in
+			// whichever namespace its own source wrote it in.
 			continue
 		}
 		want, inDesired := desired[name]
@@ -78,7 +91,12 @@ func BuildMask(ty *catalog.Type, current, desired map[string]value.Value) (map[s
 			}
 			continue
 		}
-		body[a.Canonical] = toRaw(want)
+		// wireValue, not toRaw. A value masked WHOLE -- a list, or a map the
+		// catalog declares no Fields for -- still has names inside it, and
+		// toRaw copies the schema spelling straight onto the wire. That is
+		// how gcp.router's "nats" ends up carrying {"type_value": ...} in a
+		// patch body: the mask entry is right and the object under it is not.
+		body[a.Canonical] = wireValue(a, want)
 		mask = append(mask, a.Canonical)
 	}
 	return body, mask
@@ -124,16 +142,30 @@ func buildNested(a *catalog.Attr, path string, have, want value.Value) (map[stri
 			}
 			continue
 		}
-		sub[f.Canonical] = toRaw(w)
+		// wireValue for the same reason BuildMask uses it: a nested list or
+		// an undeclared-shape map carries its own names, and this is the
+		// only place they would otherwise be written in the schema spelling.
+		sub[f.Canonical] = wireValue(f, w)
 		mask = append(mask, child)
 	}
 	return sub, mask
 }
 
 // urlIdentifying is the set of attribute names this type's own item url
-// consumes -- self_link's placeholders, plus update_url's when the catalog
-// names one. They are excluded from the patch entirely, for the same reason
-// requestBody excludes them from a create's body: the url already said it.
+// consumes -- self_link's placeholders, plus update_url's and base_url's.
+// They are excluded from the patch entirely, for the same reason requestBody
+// excludes them from a create's body: the url already said it.
+//
+// base_url is in that union because the url Update actually builds is
+// itemURL(ty, ty.UpdateURL, ...), and itemURL may expand update_url, or
+// self_link, or BASE_URL plus the id's own last segment, depending on
+// collectionMatchesSelfLink -- which compares normalised SHAPE, so two
+// templates may legally spell the same segment with different placeholder
+// names and the union of two of the three would miss one. Measured over all
+// 86 updatable types on 2026-09-22, base_url names ZERO declared attributes
+// that self_link and update_url do not already name, so this changes nothing
+// today; it is here so that a regenerated catalog in which one diverges
+// cannot silently start asking GCP to patch an id segment.
 //
 // It is derived from the type's own templates rather than from a fixed
 // project/region/zone/location list, because the id segments are not
@@ -156,8 +188,10 @@ func buildNested(a *catalog.Attr, path string, have, want value.Value) (map[stri
 // inequality there is a representation difference, not a change.
 func urlIdentifying(ty *catalog.Type) map[string]bool {
 	names := placeholderNames(ty.SelfLink)
-	for n := range placeholderNames(ty.UpdateURL) {
-		names[n] = true
+	for _, tmpl := range []string{ty.UpdateURL, ty.BaseURL} {
+		for n := range placeholderNames(tmpl) {
+			names[n] = true
+		}
 	}
 	return names
 }

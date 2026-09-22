@@ -41,7 +41,14 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 		}
 		merged[k] = fromRaw(raw)
 	}
-	rel, err := ExpandURL(ty.SelfLink, merged)
+	// Offer every renamed attribute under its wire name too. self_link's
+	// placeholders are written in whichever namespace their source used, and
+	// gcp.resourcerecordset's ("...rrsets/{name}/{type}") came from the API's
+	// own Discovery path, so it asks for "type" while attrs holds
+	// "type_value". Without this, the fallback createdID leans on when an
+	// operation's target cannot be reduced fails for that type, turning a
+	// successful create into an error the host drops. See wireAliases.
+	rel, err := ExpandURL(ty.SelfLink, wireAliases(ty.Attributes, merged))
 	if err != nil {
 		return "", fmt.Errorf("gcprov: %s: computing the provider id: %w", ty.Name, err)
 	}
