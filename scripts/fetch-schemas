@@ -13,18 +13,38 @@ curl -fsS "https://discovery.googleapis.com/discovery/v1/apis" -o schemas/_direc
 
 # Only the APIs the catalog covers. The full directory is 314 preferred APIs and
 # most of them (AdSense, AdMob, Blogger) are not infrastructure.
+#
+# Each API's VERSION is pinned explicitly rather than taken from the
+# directory's own "preferred" flag. "preferred" is Google's own opinion of
+# which version client libraries should default to, not "the version whose
+# resources match what our catalog wants" -- for `iam` it points at v2, the
+# narrow Deny-Policies API, while v1 (ServiceAccount, Role) is the one this
+# catalog actually needs and is not marked preferred at all. Trusting the flag
+# here silently generates from the wrong API surface with no error anywhere.
 apis=$(python3 - <<'PY'
-import json
+import json, sys
 d=json.load(open('schemas/_directory.json'))
-want={'compute','storage','container','sqladmin','iam','cloudresourcemanager','dns','run',
- 'pubsub','redis','cloudkms','secretmanager','artifactregistry','bigquery','certificatemanager',
- 'cloudfunctions','spanner','file','vpcaccess','networkservices','networksecurity','alloydb',
- 'cloudscheduler','cloudtasks','eventarc','workflows','memcache','apigateway','composer',
- 'dataproc','bigtableadmin','firestore','monitoring','logging','servicenetworking','cloudbuild',
- 'clouddeploy','binaryauthorization','accesscontextmanager','cloudasset','osconfig','notebooks'}
+pins={'compute':'v1','storage':'v1','container':'v1','sqladmin':'v1','iam':'v1',
+ 'cloudresourcemanager':'v3','dns':'v1','run':'v2','pubsub':'v1','redis':'v1',
+ 'cloudkms':'v1','secretmanager':'v1','artifactregistry':'v1','bigquery':'v2',
+ 'certificatemanager':'v1','cloudfunctions':'v2','spanner':'v1','file':'v1',
+ 'vpcaccess':'v1','networkservices':'v1','networksecurity':'v1','alloydb':'v1',
+ 'cloudscheduler':'v1','cloudtasks':'v2','eventarc':'v1','workflows':'v1',
+ 'memcache':'v1','apigateway':'v1','composer':'v1','dataproc':'v1',
+ 'bigtableadmin':'v2','firestore':'v1','monitoring':'v3','logging':'v2',
+ 'servicenetworking':'v1','cloudbuild':'v2','clouddeploy':'v1',
+ 'binaryauthorization':'v1','accesscontextmanager':'v1','cloudasset':'v1',
+ 'osconfig':'v2','notebooks':'v2'}
+byname={}
 for i in d['items']:
-    if i.get('preferred') and i['name'] in want:
-        print(i['name'], i['version'], i['discoveryRestUrl'])
+    if i['name'] in pins:
+        byname.setdefault(i['name'], {})[i['version']] = i['discoveryRestUrl']
+missing = [f"{name}:{version}" for name, version in pins.items() if version not in byname.get(name, {})]
+if missing:
+    print("pinned API version not in the Discovery directory: " + ", ".join(missing), file=sys.stderr)
+    sys.exit(1)
+for name, version in sorted(pins.items()):
+    print(name, version, byname[name][version])
 PY
 )
 

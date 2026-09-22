@@ -1,0 +1,126 @@
+package catalog
+
+import (
+	"testing"
+
+	"github.com/infrena/infrena/pkg/schema"
+)
+
+// TestTheRealCatalogIsOneInfrenaAccepts runs infrena's own validator over every
+// generated definition. A catalog that fails here is one the host refuses at load,
+// and the failure would otherwise surface as an unexplained plugin error.
+//
+// The floor is 200, not a round guess: the real catalog measured 233 types on
+// 2026-09-22, against the 41-API want-list in scripts/fetch-schemas and the
+// rulings in gen/overlay.yaml as they stood that day (see the Task 9 report
+// for the full breakdown). 200 is comfortably below that — enough to catch
+// "a whole API stopped fetching" or "the naming pass broke", not so close to
+// 233 that ordinary week-to-week drift in Google's own Discovery documents
+// trips it. It is NOT the ~500 an earlier draft of the spec guessed before
+// anything had been generated against the real corpus; that guess is wrong
+// and is being corrected separately.
+func TestTheRealCatalogIsOneInfrenaAccepts(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Types) < 200 {
+		t.Fatalf("catalog has %d types; measured 233 on 2026-09-22, so anything below 200 means something broke", len(c.Types))
+	}
+	if err := schema.ValidateAll(c.Definitions()); err != nil {
+		t.Fatalf("infrena refuses the generated catalog: %v", err)
+	}
+}
+
+// TestEveryTypeCarriesWhatTheRuntimeNeeds. A type with no base URL, no await
+// decision or no scope is one the runtime cannot serve, and shipping it means
+// an error at apply rather than at generation.
+func TestEveryTypeCarriesWhatTheRuntimeNeeds(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ty := range c.Types {
+		if ty.APIBaseURL == "" || ty.BaseURL == "" {
+			t.Errorf("%s has no URL to call: api=%q base=%q", ty.Name, ty.APIBaseURL, ty.BaseURL)
+		}
+		if ty.TimeoutSeconds <= 0 {
+			t.Errorf("%s has no timeout", ty.Name)
+		}
+		if ty.Await == AwaitComputeOperation && ty.OperationScope == "" {
+			t.Errorf("%s awaits a compute operation but names no operation scope", ty.Name)
+		}
+	}
+}
+
+// TestAKnownMagicModulesTypeCarriesAnImportFormat. Nothing in
+// TestEveryTypeCarriesWhatTheRuntimeNeeds above checks ImportFormat: it is
+// legitimately empty for most types (only magic-modules resources that
+// declare import_format have one at all, and Capabilities.Import is derived
+// FROM it, so a build.go regression that always leaves it empty is
+// internally consistent and passes schema.ValidateAll too — Task 9's own
+// sabotage step confirmed this the hard way). gcp.storage.bucket is a fixed
+// point: it is magic-modules-backed and its import_format is '{{name}}', so
+// this fails if buildType ever again stops copying it over.
+func TestAKnownMagicModulesTypeCarriesAnImportFormat(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := c.Type("gcp.storage.bucket")
+	if !ok {
+		t.Fatal("gcp.storage.bucket missing; pick a different fixed point if this type is ever renamed")
+	}
+	if ty.ImportFormat == "" {
+		t.Error("gcp.storage.bucket has no import_format, but magic-modules gives it one")
+	}
+}
+
+// TestEveryReferencePointsAtATypeWeServe. A dangling edge would make
+// `import --generate` write a ${ref} to a type the catalog has never heard of,
+// producing a compile error in a file the user never wrote.
+func TestEveryReferencePointsAtATypeWeServe(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var walk func(tyName string, attrs map[string]*Attr)
+	walk = func(tyName string, attrs map[string]*Attr) {
+		for name, a := range attrs {
+			if a.Ref != nil {
+				if _, ok := c.Type(a.Ref.Type); !ok {
+					t.Errorf("%s.%s references %q, which is not in the catalog", tyName, name, a.Ref.Type)
+				}
+			}
+			walk(tyName, a.Fields)
+		}
+	}
+	for _, ty := range c.Types {
+		walk(ty.Name, ty.Attributes)
+	}
+}
+
+// TestTheTagBindingRulingTookEffect — G6's worked example, end to end.
+func TestTheTagBindingRulingTookEffect(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"gcp.tagkey", "gcp.tagvalue", "gcp.tagbinding"} {
+		if _, ok := c.Type(n); !ok {
+			t.Errorf("%s missing; decision G6 requires all three at v1.0", n)
+		}
+	}
+	tb, _ := c.Type("gcp.tagbinding")
+	if tb == nil {
+		return
+	}
+	for name, a := range tb.Attributes {
+		if a.Output {
+			continue
+		}
+		if !a.ForceNew {
+			t.Errorf("gcp.tagbinding.%s is not ForceNew, but the type has no patch method", name)
+		}
+	}
+}

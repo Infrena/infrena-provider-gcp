@@ -38,20 +38,40 @@ type Result struct {
 	Warnings []Warning
 }
 
+// pending is one type that passed tiering and is on its way to being built,
+// carried between Build's passes. Package level (not local to Build) so the
+// within-service collision resolution below can operate on it directly.
+type pending struct {
+	doc  *disco.Document
+	col  disco.Collection
+	mm   *mmv1.Resource
+	cand Candidate
+	dec  Decision
+	// rawName is the mm resource name, or (when there is no mm resource) the
+	// Discovery collection leaf — the spelling a human reading warnings.txt
+	// would recognize, as opposed to cand.Resource, which is lowercased and
+	// singularized purely for name assignment. Computed once here so a build
+	// failure in pass three names the SAME thing a tier refusal in this same
+	// loop would have (see F3: they used to disagree — "Hooked" from a tier
+	// refusal, "widget" from a build failure — over a file whose whole job is
+	// answering "why is this type unsupported").
+	rawName string
+}
+
 // Build runs the whole generation pass: tier first, over the whole corpus;
 // then name every surviving type at once, so uniqueness is judged over the
 // whole corpus rather than per API; only then build types, because a
 // reference edge cannot be written until its target has a name.
 func Build(in Inputs) (*Result, error) {
-	overlay, err := LoadOverlay(in.OverlayPath)
+	byProduct, loadErrs, err := mmv1.LoadDir(in.MMV1Dir)
+	if err != nil {
+		return nil, err
+	}
+	overlay, err := LoadOverlay(in.OverlayPath, in.MMV1Dir)
 	if err != nil {
 		return nil, err
 	}
 	lock, err := LoadLock(in.LockPath)
-	if err != nil {
-		return nil, err
-	}
-	byProduct, loadErrs, err := mmv1.LoadDir(in.MMV1Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -62,23 +82,6 @@ func Build(in Inputs) (*Result, error) {
 	}
 
 	// Pass one: decide what ships, and collect naming candidates.
-	type pending struct {
-		doc  *disco.Document
-		col  disco.Collection
-		mm   *mmv1.Resource
-		cand Candidate
-		dec  Decision
-		// rawName is the mm resource name, or (when there is no mm resource)
-		// the Discovery collection leaf — the spelling a human reading
-		// warnings.txt would recognize, as opposed to cand.Resource, which is
-		// lowercased and singularized purely for name assignment. Computed
-		// once here so a build failure in pass three names the SAME thing a
-		// tier refusal in this same loop would have (see F3: they used to
-		// disagree — "Hooked" from a tier refusal, "widget" from a build
-		// failure — over a file whose whole job is answering "why is this
-		// type unsupported").
-		rawName string
-	}
 	var shipping []pending
 	var warnings []Warning
 
@@ -96,6 +99,14 @@ func Build(in Inputs) (*Result, error) {
 
 	for _, d := range docs {
 		mms := byProduct[d.Name]
+		// mmv1 product directory names routinely diverge from the Discovery
+		// API name (TagBinding lives under products/tags, not
+		// products/cloudresourcemanager) — see Overlay.ProductAliases. Every
+		// aliased directory's resources are searched too, so matchResource can
+		// find them by name exactly as if they lived under d.Name itself.
+		for _, alias := range overlay.ProductAliases[d.Name] {
+			mms = append(mms, byProduct[alias]...)
+		}
 		for _, col := range d.Collections() {
 			leaf := col.Path[len(col.Path)-1]
 			mm := matchResource(mms, leaf)
@@ -112,9 +123,28 @@ func Build(in Inputs) (*Result, error) {
 				warnings = append(warnings, Warning{d.Name, rawName, dec.Tier, dec.Reason})
 				continue
 			}
-			shipping = append(shipping, pending{d, col, mm, Candidate{d.Name, strings.ToLower(singular(leaf))}, dec, rawName})
+			cand := Candidate{Service: d.Name, Resource: strings.ToLower(singular(leaf)), Scope: scopeSegment(col.Path)}
+			shipping = append(shipping, pending{d, col, mm, cand, dec, rawName})
 		}
 	}
+
+	// Pass one and a half: within each service, resolve candidates that still
+	// share a resource segment. Two shapes, resolved differently:
+	//
+	//   - a legacy alias: the SAME resource reached through an older URL
+	//     (container's projects.zones.clusters alongside the modern
+	//     projects.locations.clusters; logging's bare sinks alongside
+	//     projects.sinks). Keep the richer path, drop the other -- warned,
+	//     never silently.
+	//   - genuinely different resources that merely share a bare leaf after
+	//     singularizing it (iam's projects.serviceAccounts.keys and
+	//     projects.locations.workloadIdentityPools.providers.keys are
+	//     unrelated). Both ship, disambiguated by walking their path leftward
+	//     one segment at a time until their names no longer collide.
+	//
+	// Scoped candidates (organization/folder/billingaccount, from Scope above)
+	// never enter this: they already have distinct identities.
+	shipping, aliasLosers := resolveWithinServiceCollisions(shipping)
 
 	// Pass two: name everything at once, so uniqueness is decided over the whole
 	// corpus rather than per API.
@@ -128,6 +158,18 @@ func Build(in Inputs) (*Result, error) {
 	}
 	if err := lock.Save(in.LockPath); err != nil {
 		return nil, err
+	}
+
+	// The alias losers' warning can only be written now that the winner it
+	// names actually has a name.
+	for _, al := range aliasLosers {
+		warnings = append(warnings, Warning{
+			Service:  al.doc.Name,
+			Resource: al.rawName,
+			Tier:     TierGeneric,
+			Reason: fmt.Sprintf("legacy alias of %s (%s)", names[al.winnerCand],
+				strings.Join(al.winnerCol, ".")),
+		})
 	}
 
 	// Pass three: build each type, now that every candidate has a name.
@@ -158,6 +200,19 @@ func Build(in Inputs) (*Result, error) {
 		t.TierReason = p.dec.Reason
 		succeeded = append(succeeded, built{p, t})
 		c.Types = append(c.Types, t)
+	}
+
+	// Generator-level invariant: the naming pass (Assign, above) is supposed to
+	// make every type's name unique, but nothing had ever checked that it
+	// actually did -- Candidate collapsing four genuinely different Discovery
+	// collections (an org's, a folder's, a billing account's and a project's
+	// own logging buckets, say) into one map key went undetected for exactly
+	// that reason until it was caught by hand against the real corpus. Checked
+	// HERE, not left for schema.ValidateAll downstream: that would report it as
+	// "the catalog infrena refuses," which is true but sends whoever sees it
+	// looking in the wrong package for why.
+	if err := checkNamesAreUnique(c.Types); err != nil {
+		return nil, err
 	}
 
 	// Pass four: resolve references, now that c.Types names exactly what
@@ -210,14 +265,40 @@ func Build(in Inputs) (*Result, error) {
 	return &Result{Catalog: c, Warnings: warnings}, nil
 }
 
+// checkNamesAreUnique fails loudly, naming every offender, if the naming pass
+// let two types through with the same name. Every duplicate is reported in
+// one error rather than the first one found, because a naming bug that
+// produces one collision usually produces several, and a person fixing this
+// wants the whole list before touching anything.
+func checkNamesAreUnique(types []*catalog.Type) error {
+	count := map[string]int{}
+	for _, t := range types {
+		count[t.Name]++
+	}
+	var dups []string
+	for name, n := range count {
+		if n > 1 {
+			dups = append(dups, fmt.Sprintf("%s (x%d)", name, n))
+		}
+	}
+	if len(dups) == 0 {
+		return nil
+	}
+	sort.Strings(dups)
+	return fmt.Errorf("gen: the naming pass assigned one name to more than one type, which should be "+
+		"impossible: %s", strings.Join(dups, ", "))
+}
+
 // WriteWarnings records every type that did not ship, plus every dropped
 // reference on a type that DID ship. Never silently dropped (spec §4.1).
 func WriteWarnings(path string, ws []Warning) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Types this catalog does not serve, and why.\n")
 	fmt.Fprintf(&b, "# GENERATED by cmd/gen-gcp. Do not hand-edit.\n#\n")
-	fmt.Fprintf(&b, "# tier 1 here means the TYPE shipped fine; one reference on it was\n")
-	fmt.Fprintf(&b, "# dropped because its target name was ambiguous across products.\n")
+	fmt.Fprintf(&b, "# tier 1 here means something ELSE shipped fine, not this exact entry: either\n")
+	fmt.Fprintf(&b, "# a reference on some other type was dropped because its target name was\n")
+	fmt.Fprintf(&b, "# ambiguous across products, or this collection was a legacy alias -- an\n")
+	fmt.Fprintf(&b, "# older URL for the SAME resource another (named) collection already serves.\n")
 	fmt.Fprintf(&b, "# tier 2 needs a ruling in gen/overlay.yaml naming every hook.\n")
 	fmt.Fprintf(&b, "# tier 3 is not representable at all.\n\n")
 	for _, w := range ws {
@@ -292,6 +373,38 @@ func singular(s string) string {
 		return s[:len(s)-1]
 	default:
 		return s
+	}
+}
+
+// scopeSegment identifies a Candidate.Scope from a Discovery collection's
+// full path: "organization", "folder" or "billingaccount" when the
+// collection is reached through that resource hierarchy root, "" for a
+// project-scoped collection (col.Path[0] == "projects") or one reached
+// through anything else.
+//
+// It is deliberately narrow. GCP has other axes along which the same leaf
+// name recurs under one product WITHOUT being a different resource -- e.g.
+// container's projects.zones.clusters is a legacy alias for
+// projects.locations.clusters, not a second Cluster type -- and folding
+// those into Scope too would rename every ordinary projects.zones.* and
+// projects.regions.* type across the whole corpus (compute alone has dozens)
+// on the strength of a resemblance to the three cases this actually needs to
+// solve. The three below are it; the generator-level uniqueness check in
+// Build catches anything scopeSegment doesn't, loudly, rather than silently
+// merging it the way the pre-fix Candidate did.
+func scopeSegment(path []string) string {
+	if len(path) == 0 {
+		return ""
+	}
+	switch path[0] {
+	case "organizations":
+		return "organization"
+	case "folders":
+		return "folder"
+	case "billingAccounts":
+		return "billingaccount"
+	default:
+		return ""
 	}
 }
 

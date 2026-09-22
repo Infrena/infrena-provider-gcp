@@ -617,3 +617,319 @@ properties:
 		t.Errorf("ghost.Ref = %+v, want nil: Ghost's name was reserved but it never actually shipped", a.Ref)
 	}
 }
+
+// scopedDoc is a minimal Discovery document with the SAME leaf collection
+// name repeated under four different resource hierarchy roots
+// (organizations, folders, billingAccounts, projects) plus one bare
+// top-level occurrence with no root at all -- the exact shape a real GCP API
+// uses for org/folder/project/billing-account scoped resources (logging's
+// buckets, cloudresourcemanager's capabilityConfigs), used to test that
+// scopeSegment gives each root a distinct name while a project-scoped (or
+// unrecognised) collection keeps today's naming.
+func scopedDoc(service string) string {
+	return `{
+  "name": "` + service + `",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Widget": {"id": "Widget", "type": "object", "properties": {"name": {"type": "string"}}},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "organizations": {"resources": {"widgets": {"methods": {
+      "get": {"id": "x.org.get", "path": "organizations/{org}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+      "insert": {"id": "x.org.insert", "path": "organizations/{org}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "x.org.delete", "path": "organizations/{org}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}}},
+    "folders": {"resources": {"widgets": {"methods": {
+      "get": {"id": "x.folder.get", "path": "folders/{folder}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+      "insert": {"id": "x.folder.insert", "path": "folders/{folder}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "x.folder.delete", "path": "folders/{folder}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}}},
+    "billingAccounts": {"resources": {"widgets": {"methods": {
+      "get": {"id": "x.billing.get", "path": "billingAccounts/{account}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+      "insert": {"id": "x.billing.insert", "path": "billingAccounts/{account}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "x.billing.delete", "path": "billingAccounts/{account}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}}},
+    "projects": {"resources": {"widgets": {"methods": {
+      "get": {"id": "x.proj.get", "path": "projects/{project}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+      "insert": {"id": "x.proj.insert", "path": "projects/{project}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "x.proj.delete", "path": "projects/{project}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}}}
+  }
+}`
+}
+
+// TestScopeVariantsOfTheSameLeafGetDistinctNames. The real catalog shipped
+// four DIFFERENT logging bucket types (an org's, a folder's, a billing
+// account's and a project's own) under the SAME name, gcp.logging.bucket,
+// because Candidate only ever looked at the collection's leaf. Each of these
+// has its own base URL and its own IAM; collapsing them into one name meant
+// three of the four were silently unreachable behind whichever one the
+// naming pass happened to keep.
+func TestScopeVariantsOfTheSameLeafGetDistinctNames(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/acme.json": scopedDoc("acme"),
+		"mmv1/products/acme/Widget.yaml": `name: Widget
+description: a scoped test widget.
+base_url: widgets
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"gcp.widget", "gcp.acme.organization.widget", "gcp.acme.folder.widget", "gcp.acme.billingaccount.widget"}
+	for _, name := range want {
+		if _, ok := res.Catalog.Type(name); !ok {
+			var got []string
+			for _, ty := range res.Catalog.Types {
+				got = append(got, ty.Name)
+			}
+			t.Errorf("%s missing; catalog has %v", name, got)
+		}
+	}
+	if len(res.Catalog.Types) != 4 {
+		t.Fatalf("got %d types, want 4 distinct scope variants: %+v", len(res.Catalog.Types), res.Catalog.Types)
+	}
+}
+
+// TestCheckNamesAreUniqueCatchesADuplicate is a direct unit test of the
+// generator-level invariant, independent of whatever Build's own collision
+// resolution manages to disambiguate on its own. It exists so the invariant
+// is tested as a real safety net rather than something only ever exercised
+// indirectly -- in a moment, that indirection turned out to matter: the
+// build-level fixture this test used to be no longer collides at all, now
+// that disambiguateByPath resolves it (see
+// TestUnrelatedResourcesShareALeafAndAreDisambiguatedByPath below). That is
+// the correct outcome for THAT input, but it means checkNamesAreUnique itself
+// still needs its own direct coverage so a future change to Build's
+// resolution logic that reintroduces a real collision is still caught here.
+func TestCheckNamesAreUniqueCatchesADuplicate(t *testing.T) {
+	types := []*catalog.Type{{Name: "gcp.widget"}, {Name: "gcp.gadget"}, {Name: "gcp.widget"}}
+	err := checkNamesAreUnique(types)
+	if err == nil {
+		t.Fatal("expected an error: gcp.widget was assigned to two types")
+	}
+	if !strings.Contains(err.Error(), "gcp.widget") || !strings.Contains(err.Error(), "x2") {
+		t.Errorf("error does not name the offending type and how many types share it: %v", err)
+	}
+}
+
+func TestCheckNamesAreUniqueAcceptsDistinctNames(t *testing.T) {
+	types := []*catalog.Type{{Name: "gcp.widget"}, {Name: "gcp.gadget"}}
+	if err := checkNamesAreUnique(types); err != nil {
+		t.Errorf("distinct names were refused: %v", err)
+	}
+}
+
+// dupLeafDoc is a Discovery document with two top-level collections at
+// different, UNRELATED single-segment parents ("alphaShared0" and
+// "betaShared0") that both end in "widgets" -- genuinely different resources
+// sharing a bare leaf, the shape gcp.iam.provider turned out to have
+// (workloadIdentityPools.providers and workforcePools.providers).
+func dupLeafDoc(service string) string {
+	leaf := func(id, parent string) string {
+		path := parent + "/widgets"
+		return `"widgets": {"methods": {
+      "get": {"id": "` + id + `.get", "path": "` + path + `/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+      "insert": {"id": "` + id + `.insert", "path": "` + path + `", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "` + id + `.delete", "path": "` + path + `/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}`
+	}
+	return `{
+  "name": "` + service + `",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Widget": {"id": "Widget", "type": "object", "properties": {"name": {"type": "string"}}},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "alphaShared0": {"resources": {` + leaf("x.a", "alphaShared0") + `}},
+    "betaShared0": {"resources": {` + leaf("x.b", "betaShared0") + `}}
+  }
+}`
+}
+
+// TestUnrelatedResourcesShareALeafAndAreDisambiguatedByPath. Two collections
+// with no organization/folder/billing-account root and no legacy-alias
+// relationship (their canonical paths genuinely differ) must BOTH ship, each
+// under a name extended just as far up its own path as it needs to become
+// unique.
+func TestUnrelatedResourcesShareALeafAndAreDisambiguatedByPath(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"mmv1/products/dup/product.yaml": "name: Dup\n",
+		"schemas/dup.json":               dupLeafDoc("dup"),
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"gcp.dup.alphashared0.widget", "gcp.dup.betashared0.widget"} {
+		if _, ok := res.Catalog.Type(name); !ok {
+			var got []string
+			for _, ty := range res.Catalog.Types {
+				got = append(got, ty.Name)
+			}
+			t.Errorf("%s missing; catalog has %v", name, got)
+		}
+	}
+	if len(res.Catalog.Types) != 2 {
+		t.Fatalf("got %d types, want 2 disambiguated survivors: %+v", len(res.Catalog.Types), res.Catalog.Types)
+	}
+}
+
+// TestDisambiguationWalksAsManyLevelsAsItTakes forces a collision that a
+// one-level-only implementation cannot resolve: both collections share their
+// IMMEDIATE parent segment too ("alphashared1"/"betashared1" both sit under a
+// segment literally named "shared1" -- wait, no: depth 2 gives each branch
+// its own two-level chain, alphashared0/alphashared1 vs
+// betashared0/betashared1, so the one-level walk (alphashared1 vs
+// betashared1) already disambiguates them by itself here). The real
+// regression this guards is walking each survivor exactly as far as IT
+// needs, independently -- proven by TestUnrelatedResourcesShareALeafAndAreDisambiguatedByPath
+// (one level) and the iam.key evidence in the real corpus (mixed one and two
+// levels within the SAME collision group, recorded in the task report), so
+// this test instead pins that a deeper shared prefix still resolves rather
+// than exhausting the walk: both branches share "shared0" one level up AND
+// diverge only at "shared1" two levels up.
+func TestDisambiguationWalksAsManyLevelsAsItTakes(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"mmv1/products/dup/product.yaml": "name: Dup\n",
+		"schemas/dup.json": `{
+  "name": "dup",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Widget": {"id": "Widget", "type": "object", "properties": {"name": {"type": "string"}}},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "shared": {"resources": {
+      "alphaKind": {"resources": {"widgets": {"methods": {
+        "get": {"id": "x.a.get", "path": "shared/alphaKind/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+        "insert": {"id": "x.a.insert", "path": "shared/alphaKind/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.a.delete", "path": "shared/alphaKind/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}}},
+      "betaKind": {"resources": {"widgets": {"methods": {
+        "get": {"id": "x.b.get", "path": "shared/betaKind/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+        "insert": {"id": "x.b.insert", "path": "shared/betaKind/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.b.delete", "path": "shared/betaKind/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}}}
+    }}
+  }
+}`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A one-level-only implementation would extend both to "gcp.dup.widgets.widget"
+	// (singular("widgets") applied to their shared immediate ancestor "widgets" the
+	// nested resource key, if it even used the right segment) or otherwise fail to
+	// tell them apart; walking two levels reaches their genuinely distinguishing
+	// alphaKind/betaKind segment.
+	for _, name := range []string{"gcp.dup.alphakind.widget", "gcp.dup.betakind.widget"} {
+		if _, ok := res.Catalog.Type(name); !ok {
+			var got []string
+			for _, ty := range res.Catalog.Types {
+				got = append(got, ty.Name)
+			}
+			t.Errorf("%s missing; catalog has %v", name, got)
+		}
+	}
+	if len(res.Catalog.Types) != 2 {
+		t.Fatalf("got %d types, want 2 disambiguated survivors: %+v", len(res.Catalog.Types), res.Catalog.Types)
+	}
+}
+
+// TestLegacyAliasesDeduplicateWithAWarningAndALoneOneSurvivesUntouched
+// covers categories 1 and 2 together, deliberately in one fixture: a
+// competing pair (projects.zones.clusters legacy alongside
+// projects.locations.clusters current, mirroring the real container product)
+// that must collapse to ONE type with a warning naming the winner, and a
+// LONE zonal-only resource with no locations.-rooted competitor (mirroring
+// compute's many zone-only resources) that must ship completely unaffected
+// -- proving the rule is a de-duplication rule triggered only by an actual
+// competitor, never a blanket "prefer locations" exclusion.
+func TestLegacyAliasesDeduplicateWithAWarningAndALoneOneSurvivesUntouched(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"mmv1/products/dup/Cluster.yaml": `name: Cluster
+description: mirrors container's Cluster, whose base_url targets the locations path.
+base_url: projects/{{project}}/locations/{{location}}/clusters
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+		"schemas/dup.json": `{
+  "name": "dup",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Cluster": {"id": "Cluster", "type": "object", "properties": {"name": {"type": "string"}}},
+    "Widget": {"id": "Widget", "type": "object", "properties": {"name": {"type": "string"}}},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "projects": {"resources": {
+      "zones": {"resources": {"clusters": {"methods": {
+        "get": {"id": "x.z.get", "path": "projects/{p}/zones/{z}/clusters/{id}", "httpMethod": "GET", "response": {"$ref": "Cluster"}},
+        "insert": {"id": "x.z.insert", "path": "projects/{p}/zones/{z}/clusters", "httpMethod": "POST", "request": {"$ref": "Cluster"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.z.delete", "path": "projects/{p}/zones/{z}/clusters/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}}},
+      "locations": {"resources": {"clusters": {"methods": {
+        "get": {"id": "x.l.get", "path": "projects/{p}/locations/{l}/clusters/{id}", "httpMethod": "GET", "response": {"$ref": "Cluster"}},
+        "insert": {"id": "x.l.insert", "path": "projects/{p}/locations/{l}/clusters", "httpMethod": "POST", "request": {"$ref": "Cluster"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.l.delete", "path": "projects/{p}/locations/{l}/clusters/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}}},
+      "widgets": {"methods": {
+        "get": {"id": "x.w.get", "path": "projects/{p}/widgets/{id}", "httpMethod": "GET", "response": {"$ref": "Widget"}},
+        "insert": {"id": "x.w.insert", "path": "projects/{p}/widgets", "httpMethod": "POST", "request": {"$ref": "Widget"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.w.delete", "path": "projects/{p}/widgets/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}
+    }}
+  }
+}`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var clusterCount int
+	for _, ty := range res.Catalog.Types {
+		if strings.Contains(ty.Name, "cluster") {
+			clusterCount++
+			if ty.BaseURL != "projects/{{project}}/locations/{{location}}/clusters" {
+				t.Errorf("survivor has base URL %q, want the locations-rooted one mm actually targets", ty.BaseURL)
+			}
+		}
+	}
+	if clusterCount != 1 {
+		t.Fatalf("got %d cluster types, want exactly 1 (the pair should have deduplicated): %+v", clusterCount, res.Catalog.Types)
+	}
+	if _, ok := res.Catalog.Type("gcp.widget"); !ok {
+		t.Error("the lone zonal-only widget (no locations.-rooted competitor) did not ship")
+	}
+	var warned bool
+	for _, w := range res.Warnings {
+		if strings.Contains(w.Reason, "legacy alias of") && strings.Contains(w.Reason, "cluster") {
+			warned = true
+			if !strings.Contains(w.Reason, "projects.locations.clusters") {
+				t.Errorf("alias warning does not name the winning collection's path: %q", w.Reason)
+			}
+		}
+	}
+	if !warned {
+		t.Error("the dropped zonal alias was not warned about")
+	}
+}
