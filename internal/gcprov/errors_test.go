@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -55,9 +56,20 @@ func TestStatusAloneIsNotEnoughFor409(t *testing.T) {
 	}
 }
 
+// testResponse builds a minimal *http.Response for decodeAPIError, which
+// reads only Status/StatusCode and Header -- the body is passed separately,
+// matching how Client.doOnce already has to read it (to bound its size)
+// before it knows whether the response was an error at all.
+func testResponse(status int, h http.Header) *http.Response {
+	if h == nil {
+		h = http.Header{}
+	}
+	return &http.Response{StatusCode: status, Header: h}
+}
+
 func TestDecodeAPIErrorParsesTheEnvelope(t *testing.T) {
 	body := []byte(`{"error": {"code": 409, "message": "already there", "status": "ALREADY_EXISTS"}}`)
-	ae := decodeAPIError(http.StatusConflict, body, http.Header{})
+	ae := decodeAPIError(testResponse(http.StatusConflict, nil), body)
 	if ae.Status != http.StatusConflict {
 		t.Errorf("Status = %d, want %d", ae.Status, http.StatusConflict)
 	}
@@ -74,7 +86,7 @@ func TestDecodeAPIErrorParsesTheEnvelope(t *testing.T) {
 // must still produce an APIError -- the status code alone is still useful --
 // rather than losing the failure to a JSON decode error.
 func TestDecodeAPIErrorSurvivesANonGCPBody(t *testing.T) {
-	ae := decodeAPIError(http.StatusBadGateway, []byte("<html>502 Bad Gateway</html>"), http.Header{})
+	ae := decodeAPIError(testResponse(http.StatusBadGateway, nil), []byte("<html>502 Bad Gateway</html>"))
 	if ae.Status != http.StatusBadGateway {
 		t.Errorf("Status = %d", ae.Status)
 	}
@@ -86,17 +98,31 @@ func TestDecodeAPIErrorSurvivesANonGCPBody(t *testing.T) {
 	}
 }
 
+// TestDecodeAPIErrorSurvivesAnEmptyBody. A truncated or bodiless error
+// response (a dropped connection, a HEAD-like answer) must still produce a
+// usable APIError carrying the status, never a nil error masking a real
+// failure.
+func TestDecodeAPIErrorSurvivesAnEmptyBody(t *testing.T) {
+	ae := decodeAPIError(testResponse(http.StatusServiceUnavailable, nil), nil)
+	if ae == nil {
+		t.Fatal("decodeAPIError returned nil for an empty body")
+	}
+	if ae.Status != http.StatusServiceUnavailable {
+		t.Errorf("Status = %d", ae.Status)
+	}
+}
+
 func TestDecodeAPIErrorCapturesRetryAfterInSeconds(t *testing.T) {
 	h := http.Header{}
 	h.Set("Retry-After", "30")
-	ae := decodeAPIError(http.StatusServiceUnavailable, []byte(`{}`), h)
+	ae := decodeAPIError(testResponse(http.StatusServiceUnavailable, h), []byte(`{}`))
 	if ae.RetryAfter != 30*time.Second {
 		t.Errorf("RetryAfter = %v, want 30s", ae.RetryAfter)
 	}
 }
 
 func TestDecodeAPIErrorWithNoRetryAfterHeaderLeavesItZero(t *testing.T) {
-	ae := decodeAPIError(http.StatusServiceUnavailable, []byte(`{}`), http.Header{})
+	ae := decodeAPIError(testResponse(http.StatusServiceUnavailable, nil), []byte(`{}`))
 	if ae.RetryAfter != 0 {
 		t.Errorf("RetryAfter = %v, want 0: no header was present", ae.RetryAfter)
 	}
@@ -106,5 +132,15 @@ func TestAPIErrorMessageNamesTheCodeAndStatus(t *testing.T) {
 	err := &APIError{Status: 409, Code: "ABORTED", Message: "conflict"}
 	if !contains(err.Error(), "409") || !contains(err.Error(), "ABORTED") || !contains(err.Error(), "conflict") {
 		t.Errorf("Error() = %q, missing status, code or message", err.Error())
+	}
+}
+
+// TestClassifyErrorSeesThroughAWrappedError. Wrapping with fmt.Errorf("%w")
+// is normal practice everywhere else in this codebase and must not silently
+// degrade a retryable *APIError to NotSafeToRetry.
+func TestClassifyErrorSeesThroughAWrappedError(t *testing.T) {
+	wrapped := fmt.Errorf("gcp: creating the widget: %w", &APIError{Status: 503, Code: "UNAVAILABLE"})
+	if got := ClassifyError(wrapped); got != provider.SafeToRetry {
+		t.Errorf("ClassifyError(wrapped) = %v, want SafeToRetry", got)
 	}
 }

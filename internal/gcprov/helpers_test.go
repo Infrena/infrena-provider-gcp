@@ -208,10 +208,12 @@ func testProviderWithCatalog(t *testing.T, s *gcpfake.Server, c *catalog.Catalog
 	t.Helper()
 	base := s.URL() + "/"
 	return &Provider{
-		client:           NewClient(staticToken(), base, ClientOptions{}),
-		catalog:          pointCatalogAt(c, base),
-		project:          "p",
-		region:           "r",
-		discoverProjects: []string{"p"},
+		client:  NewClient(staticToken(), base, ClientOptions{}),
+		catalog: pointCatalogAt(c, base),
+		settings: Settings{
+			Project:          "p",
+			Region:           "r",
+			DiscoverProjects: []string{"p"},
+		},
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/oauth2"
 
@@ -210,6 +211,35 @@ func TestDoErrorNeverMentionsTheToken(t *testing.T) {
 	}
 	if contains(err.Error(), "Authorization") {
 		t.Errorf("the error mentions the Authorization header: %v", err)
+	}
+}
+
+func TestNewClientDefaultsTheTimeoutWhenHTTPClientIsUnset(t *testing.T) {
+	gcptest.Isolate(t)
+	c := NewClient(staticToken(), "https://example.invalid/", ClientOptions{})
+	if c.httpClient.Timeout != defaultTimeout {
+		t.Errorf("Timeout = %v, want defaultTimeout (%v): a client with no timeout at all wedges the plugin on a hung endpoint", c.httpClient.Timeout, defaultTimeout)
+	}
+}
+
+// TestNewClientWrapsACallerSuppliedHTTPClientRatherThanReplacingIt. A caller
+// injecting its own HTTPClient (a shorter timeout for a test, a custom
+// transport) must still get oauth2 auth attached, and its own Timeout must
+// be kept rather than silently overridden.
+func TestNewClientWrapsACallerSuppliedHTTPClientRatherThanReplacingIt(t *testing.T) {
+	gcptest.Isolate(t)
+	custom := &http.Client{Timeout: 3 * time.Second}
+	c := NewClient(staticToken(), "https://example.invalid/", ClientOptions{HTTPClient: custom})
+	if c.httpClient.Timeout != 3*time.Second {
+		t.Errorf("Timeout = %v, want the caller's own 3s", c.httpClient.Timeout)
+	}
+	if _, ok := c.httpClient.Transport.(*oauth2.Transport); !ok {
+		t.Errorf("Transport = %T, want it wrapped with oauth2.Transport so auth is still attached", c.httpClient.Transport)
+	}
+	// The caller's own *http.Client must not be mutated -- NewClient must copy
+	// it, not reach into the value the caller still holds a reference to.
+	if custom.Transport != nil {
+		t.Error("NewClient mutated the caller's own http.Client in place")
 	}
 }
 
