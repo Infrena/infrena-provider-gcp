@@ -87,3 +87,28 @@ func TestTheFakeRecordsWhatWasSent(t *testing.T) {
 		t.Errorf("path not recorded: %q", reqs[0].Path)
 	}
 }
+
+// TestTrimVersionPrefixOnlyStripsAnActualVersion. trimVersionPrefix used to
+// discard whatever segment came first, version or not: for a bare
+// "/operations/op-1" poll path (no version prefix at all -- the shape a
+// longrunning operation's own bare name produces, task-12), it silently
+// discarded "operations" and returned "op-1", which is not a registered
+// operation name, and the poll 404s. Every fixture through Task 10 happened
+// to poll a "/v1/..." path, so the bug was invisible to the shapes the suite
+// exercised until Task 12's await tests hit a bare-name poll directly.
+func TestTrimVersionPrefixOnlyStripsAnActualVersion(t *testing.T) {
+	cases := []struct {
+		path string
+		want string
+	}{
+		{"/v1/operations/abc", "operations/abc"},
+		{"/operations/abc", "operations/abc"},
+		{"/v1beta1/projects/p/widgets", "projects/p/widgets"},
+		{"/v2/projects/p/locations/l/operations/op-1", "projects/p/locations/l/operations/op-1"},
+	}
+	for _, c := range cases {
+		if got := trimVersionPrefix(c.path); got != c.want {
+			t.Errorf("trimVersionPrefix(%q) = %q, want %q", c.path, got, c.want)
+		}
+	}
+}
