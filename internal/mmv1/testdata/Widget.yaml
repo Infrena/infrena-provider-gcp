@@ -6,6 +6,8 @@ description: A test widget.
 base_url: projects/{{project}}/locations/{{region}}/widgets
 create_url: projects/{{project}}/locations/{{region}}/widgets?widgetId={{name}}
 self_link: projects/{{project}}/locations/{{region}}/widgets/{{name}}
+delete_url: projects/{{project}}/locations/{{region}}/widgets/{{name}}?force=true
+min_version: ga
 update_mask: true
 update_verb: PATCH
 import_format:
