@@ -85,7 +85,10 @@ The idiomatic clients are heavier still, gRPC-based, and their resource shapes d
 Discovery schema the catalog is generated from.
 
 **G5. v1.0 ships tier-1 types, plus only those tier-2 types carrying an explicit written
-ruling.** See §4. Roughly 500 reviewed types rather than ~900 unreviewed ones. "Mature and ready to
+ruling.** See §4. 233 reviewed types rather than ~900 unreviewed ones. (This
+sentence first guessed "roughly 500", written before anything had been generated against the real
+corpus. The generator measured 233 on 2026-09-22; the gap is mostly tier-2 resources held back on
+unruled hooks, which is the gate working as G5 intends, not types going missing.) "Mature and ready to
 use" has to mean every type in the catalog is one the generator, or a recorded human decision, can
 vouch for. At v1.0 the ruled exceptions are exactly the short list G6 forces; everything else
 tier-2 waits.
