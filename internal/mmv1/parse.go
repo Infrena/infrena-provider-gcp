@@ -14,16 +14,21 @@ import (
 
 // Field is one parameter or property, at any depth.
 type Field struct {
-	Name        string   `yaml:"name"`
-	Type        string   `yaml:"type"`
-	Description string   `yaml:"description"`
-	Required    bool     `yaml:"required"`
-	Immutable   bool     `yaml:"immutable"`
-	Output      bool     `yaml:"output"`
-	Resource    string   `yaml:"resource"`   // ResourceRef target
-	Imports     string   `yaml:"imports"`    // which of the target's fields the ref carries
-	ItemType    any      `yaml:"item_type"`  // string, or a nested mapping for Array of objects
-	Properties  []*Field `yaml:"properties"` // NestedObject and Array-of-NestedObject
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
+	Required    bool   `yaml:"required"`
+	Immutable   bool   `yaml:"immutable"`
+	Output      bool   `yaml:"output"`
+	Resource    string `yaml:"resource"` // ResourceRef target
+	Imports     string `yaml:"imports"`  // which of the target's fields the ref carries
+	// IsSet marks a list GCP treats as a SET: it may return the elements in a
+	// different order than they were sent. Task 15 reorders those to match the
+	// reference; reordering an ordered list would silently rewrite user intent,
+	// so this flag is what keeps the two apart. 216 fields in the corpus carry it.
+	IsSet      bool     `yaml:"is_set"`
+	ItemType   any      `yaml:"item_type"`  // string, or a nested mapping for Array of objects
+	Properties []*Field `yaml:"properties"` // NestedObject and Array-of-NestedObject
 }
 
 // Async describes how a mutation completes.
