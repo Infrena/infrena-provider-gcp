@@ -102,6 +102,14 @@ type Type struct {
 	AssetType    string `json:"asset_type,omitempty"`
 	Scope        Scope  `json:"scope"`
 
+	// ListField is the array-valued property this type's List response
+	// carries its results under. There is no universal name across GCP's own
+	// APIs to assume instead: a sample of 532 List methods across 25 APIs
+	// found 209 distinct field names, and "items" (compute's convention)
+	// covers only 24% of them. Empty when the generator found no List method
+	// or no usable array property to name.
+	ListField string `json:"list_field,omitempty"`
+
 	Attributes map[string]*Attr `json:"attributes"`
 }
 

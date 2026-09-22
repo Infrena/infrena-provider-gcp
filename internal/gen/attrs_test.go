@@ -194,6 +194,91 @@ func TestAwaitIsChosenFromTheOperationShape(t *testing.T) {
 	}
 }
 
+// TestListFieldPrefersTheRealArrayOverUnreachable is the case that broke a
+// naive "first array property" heuristic during review: alloydb's
+// operations.list response schema carries both "operations" (the real
+// results) and "unreachable" (locations a partial-failure list call could
+// not reach). "auditConfigs" is a decoy third array that sorts alphabetically
+// before both real candidates, so a naive "first array in sorted order"
+// implementation cannot pass this by coincidentally landing on "operations"
+// the way it would if "unreachable" were the only decoy (sorting after
+// "operations" on its own) — the real property must be found by matching the
+// collection's own leaf or by skipping the blocklist, not by luck of sort
+// order.
+func TestListFieldPrefersTheRealArrayOverUnreachable(t *testing.T) {
+	doc := &disco.Document{Name: "alloydb", Schemas: map[string]*disco.Schema{
+		"ListOperationsResponse": {Type: "object", Properties: map[string]*disco.Schema{
+			"auditConfigs":  {Type: "array", Items: &disco.Schema{Type: "object"}},
+			"unreachable":   {Type: "array", Items: &disco.Schema{Type: "string"}},
+			"operations":    {Type: "array", Items: &disco.Schema{Type: "object"}},
+			"nextPageToken": {Type: "string"},
+		}},
+	}}
+	col := disco.Collection{
+		Path: []string{"projects", "locations", "operations"},
+		Methods: map[string]*disco.Method{
+			"list": {Response: &disco.Ref{Ref: "ListOperationsResponse"}},
+		},
+	}
+	if got := ListFieldOf(doc, col); got != "operations" {
+		t.Errorf("ListFieldOf = %q, want %q (unreachable must lose to the real collection array)", got, "operations")
+	}
+}
+
+// TestListFieldMatchesTheCollectionLeafOverAnyOtherArray. logging's
+// buckets.list response names its result "buckets", not "items" — matching
+// the collection's own leaf must win even when another, earlier-sorted array
+// property exists.
+func TestListFieldMatchesTheCollectionLeafOverAnyOtherArray(t *testing.T) {
+	doc := &disco.Document{Name: "logging", Schemas: map[string]*disco.Schema{
+		"ListBucketsResponse": {Type: "object", Properties: map[string]*disco.Schema{
+			"buckets":       {Type: "array", Items: &disco.Schema{Type: "object"}},
+			"auditConfigs":  {Type: "array", Items: &disco.Schema{Type: "object"}},
+			"nextPageToken": {Type: "string"},
+		}},
+	}}
+	col := disco.Collection{
+		Path: []string{"projects", "locations", "buckets"},
+		Methods: map[string]*disco.Method{
+			"list": {Response: &disco.Ref{Ref: "ListBucketsResponse"}},
+		},
+	}
+	if got := ListFieldOf(doc, col); got != "buckets" {
+		t.Errorf("ListFieldOf = %q, want %q", got, "buckets")
+	}
+}
+
+// TestListFieldFallsBackToTheFirstNonBlocklistedArrayWhenNoNameMatches
+// covers a collection whose result array's name has nothing to do with the
+// collection's own leaf (e.g. a custom method's response), so the fallback —
+// not the leaf match — is what has to find it.
+func TestListFieldFallsBackToTheFirstNonBlocklistedArrayWhenNoNameMatches(t *testing.T) {
+	doc := &disco.Document{Name: "tiny", Schemas: map[string]*disco.Schema{
+		"ListWidgetsResponse": {Type: "object", Properties: map[string]*disco.Schema{
+			"warnings":      {Type: "array", Items: &disco.Schema{Type: "object"}},
+			"results":       {Type: "array", Items: &disco.Schema{Type: "object"}},
+			"nextPageToken": {Type: "string"},
+		}},
+	}}
+	col := disco.Collection{
+		Path: []string{"projects", "widgets"},
+		Methods: map[string]*disco.Method{
+			"list": {Response: &disco.Ref{Ref: "ListWidgetsResponse"}},
+		},
+	}
+	if got := ListFieldOf(doc, col); got != "results" {
+		t.Errorf("ListFieldOf = %q, want %q (warnings must be skipped)", got, "results")
+	}
+}
+
+func TestListFieldIsEmptyWithoutAListMethod(t *testing.T) {
+	doc := &disco.Document{Name: "tiny", Schemas: map[string]*disco.Schema{}}
+	col := disco.Collection{Path: []string{"projects", "widgets"}, Methods: map[string]*disco.Method{}}
+	if got := ListFieldOf(doc, col); got != "" {
+		t.Errorf("ListFieldOf = %q, want empty when there is no list method", got)
+	}
+}
+
 func TestScopeComesFromTheURLTemplate(t *testing.T) {
 	cases := map[string]catalog.Scope{
 		"projects/{{project}}/global/networks":                catalog.ScopeGlobal,

@@ -81,6 +81,75 @@ func AwaitOf(d *disco.Document, m *disco.Method) (catalog.AwaitKind, string) {
 	return catalog.AwaitNone, ""
 }
 
+// listFieldBlocklist names array-valued list-response properties that are
+// never the collection's own results: pagination/diagnostic scaffolding a
+// Discovery document commonly carries alongside the real result array — e.g.
+// alloydb's operations.list response has both "operations" and
+// "unreachable" (the locations a partial-failure list call could not reach).
+// A naive "first array property" picks "unreachable" there, which is wrong.
+var listFieldBlocklist = map[string]bool{
+	"unreachable": true, "unreachables": true, "warnings": true, "warning": true,
+}
+
+// ListFieldOf finds the array-valued property col's List method's response
+// carries its results under.
+//
+// There is no universal name across the corpus to assume: a sample of 532
+// List methods across 25 APIs found 209 distinct field names, and "items"
+// (compute's convention) covers only 24% of them — logging's buckets.list
+// uses "buckets", cloudasset's savedQueries.list uses "savedQueries". So
+// this inspects col's own List response schema instead of guessing.
+//
+// Preference order: the array property whose name matches the collection's
+// own leaf (col.Path's last segment, singular or plural, case-insensitively)
+// — e.g. "widgets" for a collection at .../widgets — because that is what
+// names the actual result in the overwhelming majority of the corpus;
+// failing that, the first array property (in sorted order, for determinism)
+// that isn't a known non-result field (listFieldBlocklist); failing that,
+// "", meaning nothing here can name it and the caller must decide what to do
+// without one.
+func ListFieldOf(d *disco.Document, col disco.Collection) string {
+	m := col.Methods["list"]
+	if m == nil || m.Response == nil || m.Response.Ref == "" {
+		return ""
+	}
+	raw, ok := d.Schemas[m.Response.Ref]
+	if !ok {
+		return ""
+	}
+	resolved, err := d.Resolve(raw)
+	if err != nil || resolved == nil {
+		return ""
+	}
+
+	var names []string
+	for name, p := range resolved.Properties {
+		if p != nil && p.Type == "array" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	leaf := ""
+	if len(col.Path) > 0 {
+		leaf = col.Path[len(col.Path)-1]
+	}
+	wantPlural := strings.ToLower(leaf)
+	wantSingular := strings.ToLower(singular(leaf))
+	for _, name := range names {
+		lower := strings.ToLower(name)
+		if lower == wantPlural || lower == wantSingular {
+			return name
+		}
+	}
+	for _, name := range names {
+		if !listFieldBlocklist[strings.ToLower(name)] {
+			return name
+		}
+	}
+	return ""
+}
+
 // snake converts GCP's lowerCamelCase to snake_case.
 func snake(s string) string {
 	var b strings.Builder
