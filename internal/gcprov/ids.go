@@ -57,6 +57,16 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 // is found inside raw, and everything from there on is the relative name --
 // whatever precedes it (host, api name, version segment) is exactly the
 // part a hostname change would alter, which is why it is never stored.
+//
+// The match must fall at a path-segment boundary (raw's own start, or right
+// after a "/") -- an unanchored search would happily match prefix in the
+// middle of some other word (a host or version segment that merely contains
+// it as a substring) and return a bogus relative name built from the wrong
+// offset. Anchored occurrences are searched from the END of raw, not the
+// first one found: the resource's own name is always the tail of its self
+// link, and a name can legitimately repeat a hierarchy keyword used earlier
+// in the path -- the last anchored match is the one that actually starts the
+// relative name.
 func reduceSelfLink(ty *catalog.Type, raw string) (string, error) {
 	prefix := ty.SelfLink
 	if i := strings.IndexByte(prefix, '{'); i >= 0 {
@@ -65,11 +75,29 @@ func reduceSelfLink(ty *catalog.Type, raw string) (string, error) {
 	if prefix == "" {
 		return "", fmt.Errorf("gcprov: %s: self_link has no literal prefix to find %q by", ty.Name, raw)
 	}
-	i := strings.Index(raw, prefix)
+	i := lastAnchoredIndex(raw, prefix)
 	if i < 0 {
 		return "", fmt.Errorf("gcprov: %s: %q does not look like one of this type's self links (no %q)", ty.Name, raw, prefix)
 	}
 	return raw[i:], nil
+}
+
+// lastAnchoredIndex returns the index of the last occurrence of prefix in
+// raw that starts at raw's own beginning or is immediately preceded by "/"
+// -- i.e. at a path-segment boundary -- or -1 if none does. See
+// reduceSelfLink for why the match must be anchored and why the LAST one,
+// not the first, is the one that matters.
+func lastAnchoredIndex(raw, prefix string) int {
+	for end := len(raw); ; {
+		i := strings.LastIndex(raw[:end], prefix)
+		if i < 0 {
+			return -1
+		}
+		if i == 0 || raw[i-1] == '/' {
+			return i
+		}
+		end = i
+	}
 }
 
 // ParseProviderID recovers the attributes a provider id's own hierarchy
