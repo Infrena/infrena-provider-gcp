@@ -336,7 +336,7 @@ type Settings struct {
 	DiscoverProjects []string
 
 	// AssetInventoryBaseURL is where Cloud Asset Inventory lives. Empty means
-	// cloudAssetBaseURL, the real endpoint, which is what every configured
+	// CloudAssetBaseURL, the real endpoint, which is what every configured
 	// instance uses.
 	//
 	// It is a field rather than a constant because CAI is the one API this

@@ -39,7 +39,14 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		return nil, fmt.Errorf("gcp: unknown type %q", desired.Type)
 	}
 	collTmpl := createTemplate(ty)
-	reqURL, err := p.expandedURL(ty, collTmpl, desired.Attrs)
+	// The instance's project (and region or zone) filled in, because almost no
+	// type declares them as attributes and the create url needs them -- see
+	// withScope. Only the URL and the IDENTITY are built from these: the
+	// request body is built from desired.Attrs alone, since a scope axis the
+	// url does not name would otherwise be sent as a body field the API has
+	// never heard of.
+	scoped := p.withScope(desired.Attrs)
+	reqURL, err := p.expandedURL(ty, collTmpl, scoped)
 	if err != nil {
 		return nil, err // nothing sent yet: an ordinary error is safe here
 	}
@@ -63,7 +70,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		fmt.Fprintf(os.Stderr, "gcp: %s: create reported a failure, reading back what exists: %v\n",
 			desired.Type, awaitErr)
 	}
-	st, readErr := p.readAfterCreate(ctx, ty, desired.Attrs, awaited)
+	st, readErr := p.readAfterCreate(ctx, ty, desired.Attrs, scoped, awaited)
 	switch {
 	case st != nil:
 		return st, nil
@@ -82,7 +89,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		// rest.
 		fmt.Fprintf(os.Stderr, "gcp: %s: created, but not yet readable; reporting the awaited identity\n",
 			desired.Type)
-		return p.bestEffortState(ty, desired, awaited)
+		return p.bestEffortState(ty, desired, scoped, awaited)
 	default:
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
 			desired.Type, readErr)
@@ -100,8 +107,8 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 // no other way to know it went through that exact path. Attributes are best
 // effort, not authoritative -- the next ordinary Read fills in whatever
 // awaited did not carry.
-func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredResource, awaited map[string]any) (*resource.ResourceState, error) {
-	id, err := p.createdID(ty, awaited, desired.Attrs)
+func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredResource, scoped map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
+	id, err := p.createdID(ty, awaited, scoped)
 	if err != nil {
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
 			desired.Type, err)
@@ -272,8 +279,13 @@ func pathPart(tmpl string) string {
 // (which itself tolerates GCP's eventual consistency). Returning (nil, err)
 // only when the resource genuinely is not there is what lets Create tell
 // "created, then the operation failed" apart from "never created at all".
-func (p *Provider) readAfterCreate(ctx context.Context, ty *catalog.Type, desiredAttrs map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
-	id, err := p.createdID(ty, awaited, desiredAttrs)
+// scopedAttrs is desiredAttrs with the instance's scope filled in (withScope);
+// it is used for the IDENTITY only. desiredAttrs -- without the scope -- is
+// what travels into the readback as the state to reconcile against, because
+// that state is handed back to the host, and the host refuses an attribute
+// its own schema does not declare.
+func (p *Provider) readAfterCreate(ctx context.Context, ty *catalog.Type, desiredAttrs, scopedAttrs map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
+	id, err := p.createdID(ty, awaited, scopedAttrs)
 	if err != nil {
 		return nil, err
 	}
@@ -399,9 +411,10 @@ func (p *Provider) stateFrom(ty *catalog.Type, current *resource.ResourceState, 
 	// gcp.resourcerecordset ("...rrsets/{name}/{type}") is the wire spelling.
 	// Left untranslated it would put "type" into the same state map the body
 	// puts "type_value" into, and the host would diff configuration against
-	// both.
-	for k, v := range idAttrs {
-		attrs[toSchema(ty.Attributes, k)] = v
+	// both. And only the ones this type declares reach state at all -- see
+	// declaredIDAttrs, which is what stops the host refusing this result.
+	for k, v := range declaredIDAttrs(ty.Attributes, idAttrs) {
+		attrs[k] = v
 	}
 	// RECONCILED AGAINST WHAT THIS RESOURCE IS GOING TO BE COMPARED WITH.
 	// GCP answers with more than it was sent -- server-set keys inside nested
