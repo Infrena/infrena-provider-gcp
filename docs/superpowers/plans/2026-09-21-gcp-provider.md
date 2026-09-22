@@ -4340,9 +4340,15 @@ present, plus a per-(project, API) token-bucket limiter. **GCP quota is per-API 
 a different shape from AWS's per-account throttling, and because the client is ours rather than an
 SDK's this is code we own and must test.
 
-`client.go` holds the `http.Client`, the token source and the limiter, and caches clients by
-`(credential fingerprint, project)`. **The cache is what gives the limiter a life longer than one
-request — do not "simplify" it away.** `Do` marshals the body, sets `X-Goog-User-Project` when a quota
+`client.go` holds the `http.Client`, the token source and the limiter, and caches **limiters** by
+`(project, api)`. **That cache is what gives a limiter a life longer than one request** — a limiter
+built per call measures nothing, since a token bucket's whole purpose is carrying rate information
+between calls. Do not "simplify" it away.
+
+An earlier draft here also called for caching whole `*Client`s by `(credential fingerprint, project)`.
+There is no caller for that: `gcpplugin.New()` constructs one client per instance and holds it. Build
+the limiter cache only. (Task 11's implementer raised this; building an unused cache is the same dead
+weight `ScopedPath` and `buildLevel`'s `depth` had to be removed for.) `Do` marshals the body, sets `X-Goog-User-Project` when a quota
 project is configured, retries per classification, and **never logs a token, an Authorization header or
 a request body**.
 
@@ -4738,7 +4744,15 @@ message leaves the user nothing to act on. All three restored." \
 **Interfaces:**
 - Consumes: `Client`, `await`, `catalog.Type`.
 - Produces:
-  - `type Provider struct { ... }`, `func NewProvider(in *gcpplugin.Instance, c *catalog.Catalog, cl *Client) *Provider`, satisfying `provider.Provider`
+  - `type Settings struct { Project, Region, Zone string; DiscoverTypes, DiscoverProjects []string }` —
+    gcprov's OWN view of an instance's configuration
+  - `func NewProvider(s Settings, c *catalog.Catalog, cl *Client) *Provider`, satisfying `provider.Provider`
+  - **`NewProvider` must NOT take `*gcpplugin.Instance`.** Decision P2 is that `gcpplugin` imports
+    `gcprov` and never the reverse; Task 17 has `gcpplugin.New()` call `gcprov.NewProvider`, so a
+    `gcpplugin` parameter here is a compile-breaking import cycle. `gcpplugin` converts its `Instance`
+    into a `gcprov.Settings` at the call site. (Found by Task 11's implementer before Task 13 started.)
+  - `Provider` is DECLARED in `client.go` by Task 11, because `helpers_test.go` needs it to compile.
+    Task 13 ADDS methods and `NewProvider` to that same type — do not redeclare it.
   - `func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Value) (string, error)`
   - `func ParseProviderID(ty *catalog.Type, id string) (map[string]value.Value, error)`
 
@@ -5738,7 +5752,10 @@ func (pl *Plugin) New(cfg provider.Config) (provider.Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gcp: provider %q: %w", cfg.Instance, err)
 	}
-	return gcprov.NewProvider(in, c, gcprov.NewClient(ts, "", gcprov.ClientOptions{
+	return gcprov.NewProvider(gcprov.Settings{
+		Project: in.Project, Region: in.Region, Zone: in.Zone,
+		DiscoverTypes: in.DiscoverTypes, DiscoverProjects: in.DiscoverProjects,
+	}, c, gcprov.NewClient(ts, "", gcprov.ClientOptions{
 		QuotaProject: in.QuotaProject,
 	})), nil
 }
