@@ -67,9 +67,20 @@ product_aliases:
 # a cost measure — Cloud Asset Inventory returns a whole project in a few calls —
 # it is only the fallback path's list, used when CAI is unavailable.
 discover_default:
-  - gcp.network
-  - gcp.subnetwork
+  # EVERY NAME HERE MUST EXIST IN THE GENERATED CATALOG. The earlier list named
+  # gcp.network and gcp.subnetwork, which do not exist at all (compute's Network
+  # and Subnetwork are tier-2 on unruled hooks), plus gcp.instance and gcp.bucket,
+  # which ship as gcp.compute.instance and gcp.storage.bucket. Nothing read this
+  # list until Task 16's fallback discovery, so nothing noticed for nine tasks.
+  # TestDiscoverDefaultNamesOnlyTypesWeServe now fails if it rots again.
+  #
+  # Deliberately absent: a VPC network and a subnet, the two things anyone would
+  # most expect to discover. They cannot be listed because they are not served.
+  # This list should gain them the moment compute/Network and compute/Subnetwork
+  # get rulings.
+  - gcp.compute.instance
   - gcp.firewall
-  - gcp.instance
-  - gcp.bucket
+  - gcp.router
+  - gcp.storage.bucket
   - gcp.serviceaccount
+  - gcp.container.cluster
