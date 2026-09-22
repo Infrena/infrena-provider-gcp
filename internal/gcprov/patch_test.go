@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -463,4 +464,222 @@ func requestOf(t *testing.T, s *gcpfake.Server, method, path string) gcpfake.Req
 		t.Fatalf("%d %s requests to %s, want exactly 1 (all: %v)", len(found), method, path, s.Requests())
 	}
 	return found[0]
+}
+
+// TestAnUpdateOfARenamedAttributeMasksNothingWhenNothingChanged is the third
+// face of Task 14a's one defect, end to end and deliberately not from a
+// hand-built current: the state it diffs against comes out of the real Read
+// path, because the bug was the disagreement BETWEEN stateFrom's keys and
+// BuildMask's lookup, and a fixture that keys current by hand assumes away
+// the very thing under test.
+//
+// Before the fix, state held "type" while configuration held "type_value",
+// so current["type_value"] was the zero value.Value. Value.Equal compares
+// Known and Kind before Raw, so a zero Value equals nothing at all, and
+// gcp.endpointpolicy's required type was masked and re-sent on EVERY update
+// of every endpoint policy, forever.
+func TestAnUpdateOfARenamedAttributeMasksNothingWhenNothingChanged(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, c := syncCatalogFor(t, "gcp.endpointpolicy")
+	requireRenamedAt(t, ty, "type_value", "type")
+	if !ty.UpdateMask {
+		t.Fatalf("%s no longer takes an updateMask; this test is about what that mask names", ty.Name)
+	}
+	const id = "projects/p/locations/global/endpointPolicies/ep1"
+	s.Seed("/v1/"+id, map[string]any{"type": "SIDECAR_PROXY", "description": "unchanged"})
+	p := testProviderWithCatalog(t, s, c)
+
+	current, err := p.Read(context.Background(), &resource.ResourceState{Type: ty.Name, ProviderID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current == nil {
+		t.Fatal("Read reported absence for a resource the fake is holding")
+	}
+
+	st, err := p.Update(context.Background(), current, &resource.DesiredResource{
+		Type: ty.Name,
+		Attrs: attrsMixed(map[string]any{
+			"project":     "p",
+			"name":        "ep1",
+			"type_value":  "SIDECAR_PROXY",
+			"description": "unchanged",
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Update returned (nil, nil) for a no-op, which the host treats as a contract violation")
+	}
+	for _, r := range s.Requests() {
+		if r.Method == http.MethodPatch {
+			t.Errorf("an update that changed nothing still patched: %s %s?%s", r.Method, r.Path, r.Query.Encode())
+		}
+	}
+
+	// And the mask itself, so a failure says which field rather than only
+	// that something was sent.
+	if _, mask := BuildMask(ty, current.Attributes, attrsMixed(map[string]any{
+		"project": "p", "name": "ep1", "type_value": "SIDECAR_PROXY", "description": "unchanged",
+	})); len(mask) != 0 {
+		t.Errorf("mask = %v, want empty: nothing changed", mask)
+	}
+}
+
+// TestAMaskedListCarriesWireNamesInsideIt. A list is masked WHOLE -- GCP
+// replaces it outright, so buildNested never walks into one -- and the
+// object inside it was written with toRaw, which copies the schema spelling
+// straight onto the wire. gcp.router is one of the three updatable types
+// whose only renamed attribute lives inside a list, so this is the exact
+// case a Fields-only translation leaves broken while every top-level test
+// passes.
+func TestAMaskedListCarriesWireNamesInsideIt(t *testing.T) {
+	ty, ok := mustCatalog(t).Type("gcp.router")
+	if !ok {
+		t.Fatal("the catalog no longer ships gcp.router")
+	}
+	nats, ok := ty.Attributes["nats"]
+	if !ok || nats.Elem == nil {
+		t.Fatalf("%s no longer declares nats as a list", ty.Name)
+	}
+	if a, ok := nats.Elem.Fields["type_value"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s.nats[].type_value is no longer a rename; this test is not exercising one", ty.Name)
+	}
+
+	nat := func(t string) value.Value {
+		return value.List([]value.Value{
+			mapValue(map[string]any{"name": "nat-1", "type_value": t}),
+		}, value.SourceExplicit)
+	}
+	body, mask := BuildMask(ty,
+		map[string]value.Value{"nats": nat("PUBLIC")},
+		map[string]value.Value{"nats": nat("PRIVATE")})
+
+	if len(mask) != 1 || mask[0] != "nats" {
+		t.Fatalf("mask = %v, want [nats]", mask)
+	}
+	items, ok := body["nats"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("body[nats] = %#v, want a one-element list", body["nats"])
+	}
+	elem, ok := items[0].(map[string]any)
+	if !ok {
+		t.Fatalf("body[nats][0] = %#v, want an object", items[0])
+	}
+	if _, leaked := elem["type_value"]; leaked {
+		t.Errorf("the patch body carries the SCHEMA name inside a masked list: %#v", elem)
+	}
+	if elem["type"] != "PRIVATE" {
+		t.Errorf("body[nats][0] = %#v, want the wire name %q carrying the new value", elem, "type")
+	}
+}
+
+// TestANestedPatchBodyCarriesWireNamesInsideIt is the same claim as
+// TestAMaskedListCarriesWireNamesInsideIt for the OTHER place a patch body
+// is written: buildNested's own leaf assignment, reached only once the mask
+// has already descended through two levels of declared Fields.
+//
+// gcp.regionsecuritypolicy's
+// adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].type_value
+// is map, map, list, list, field -- four levels down, through two lists, and
+// every one of them settable. Nothing shallower exercises the case where the
+// mask path is right and the object hanging off it is written in the wrong
+// namespace.
+func TestANestedPatchBodyCarriesWireNamesInsideIt(t *testing.T) {
+	ty, ok := mustCatalog(t).Type("gcp.regionsecuritypolicy")
+	if !ok {
+		t.Fatal("the catalog no longer ships gcp.regionsecuritypolicy")
+	}
+	l7 := ty.Attributes["adaptiveProtectionConfig"].Fields["layer7DdosDefenseConfig"]
+	granular := l7.Fields["thresholdConfigs"].Elem.Fields["trafficGranularityConfigs"]
+	if a, ok := granular.Elem.Fields["type_value"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s no longer renames trafficGranularityConfigs[].type; this test is not "+
+			"exercising a rename", ty.Name)
+	}
+
+	config := func(v string) value.Value {
+		return mapValue(map[string]any{
+			"layer7DdosDefenseConfig": map[string]any{
+				"thresholdConfigs": []any{map[string]any{
+					"name": "tc-1",
+					"trafficGranularityConfigs": []any{
+						map[string]any{"type_value": "HTTP_HEADER_HOST", "value": v},
+					},
+				}},
+			},
+		})
+	}
+	body, mask := BuildMask(ty,
+		map[string]value.Value{"adaptiveProtectionConfig": config("old.example.com")},
+		map[string]value.Value{"adaptiveProtectionConfig": config("new.example.com")})
+
+	want := "adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs"
+	if len(mask) != 1 || mask[0] != want {
+		t.Fatalf("mask = %v, want [%s]", mask, want)
+	}
+
+	// Walk the body down to the renamed leaf, failing at whichever level
+	// stopped translating rather than only at the bottom.
+	apc, ok := body["adaptiveProtectionConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("body[adaptiveProtectionConfig] = %#v, want an object", body["adaptiveProtectionConfig"])
+	}
+	defense, ok := apc["layer7DdosDefenseConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("body ... layer7DdosDefenseConfig = %#v, want an object", apc["layer7DdosDefenseConfig"])
+	}
+	thresholds, ok := defense["thresholdConfigs"].([]any)
+	if !ok || len(thresholds) != 1 {
+		t.Fatalf("body ... thresholdConfigs = %#v, want a one-element list", defense["thresholdConfigs"])
+	}
+	threshold, ok := thresholds[0].(map[string]any)
+	if !ok {
+		t.Fatalf("body ... thresholdConfigs[0] = %#v, want an object", thresholds[0])
+	}
+	granulars, ok := threshold["trafficGranularityConfigs"].([]any)
+	if !ok || len(granulars) != 1 {
+		t.Fatalf("body ... trafficGranularityConfigs = %#v, want a one-element list",
+			threshold["trafficGranularityConfigs"])
+	}
+	leaf, ok := granulars[0].(map[string]any)
+	if !ok {
+		t.Fatalf("body ... trafficGranularityConfigs[0] = %#v, want an object", granulars[0])
+	}
+	if _, leaked := leaf["type_value"]; leaked {
+		t.Errorf("the schema name reached the wire four levels down a patch body: %#v", leaf)
+	}
+	if leaf["type"] != "HTTP_HEADER_HOST" {
+		t.Errorf("body ... trafficGranularityConfigs[0] = %#v, want the wire name %q", leaf, "type")
+	}
+}
+
+// TestUrlIdentifyingUnionsAllThreeTemplates. The url Update actually builds
+// is itemURL(ty, ty.UpdateURL, ...), which may expand update_url, or
+// self_link, or BASE_URL plus the id's own last segment, depending on
+// collectionMatchesSelfLink -- and that compares normalised SHAPE, so two
+// templates may legally spell the same segment with different placeholder
+// names. Unioning only two of the three would miss one.
+//
+// Measured over all 86 updatable types on 2026-09-22, base_url names ZERO
+// declared attributes that self_link and update_url do not already name, so
+// no end-to-end test can observe this: it is latent, and this asserts the
+// function's contract directly rather than leaving the third template's
+// inclusion resting on a comment.
+func TestUrlIdentifyingUnionsAllThreeTemplates(t *testing.T) {
+	ty := &catalog.Type{
+		Name:      "gcp.divergent",
+		BaseURL:   "projects/{{project}}/regions/{{region}}/things",
+		SelfLink:  "projects/{{project}}/locations/{{location}}/things/{{name}}",
+		UpdateURL: "projects/{{project}}/locations/{{location}}/things/{{thingId}}",
+	}
+	got := urlIdentifying(ty)
+	for _, want := range []string{"project", "region", "location", "name", "thingId"} {
+		if !got[want] {
+			t.Errorf("urlIdentifying omits %q, so a patch could name a segment the url already "+
+				"carries: %v", want, got)
+		}
+	}
 }
