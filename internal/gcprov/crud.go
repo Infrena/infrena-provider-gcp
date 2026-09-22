@@ -75,10 +75,52 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		// not happen, so the error is the truth and returning it orphans
 		// nothing.
 		return nil, awaitErr
+	case readErr == nil:
+		// The await succeeded (awaitErr == nil, ruled out above) and the
+		// readback simply found nothing (Read's own "believed absent" is
+		// (nil, nil), never a non-nil readErr) -- the readback lost the race
+		// with eventual consistency, not proof the create failed. Erroring
+		// here would orphan a resource GCP already confirmed exists, so
+		// trust the await instead and let the next refresh reconcile the
+		// rest.
+		fmt.Fprintf(os.Stderr, "gcp: %s: created, but not yet readable; reporting the awaited identity\n",
+			desired.Type)
+		return p.bestEffortState(ty, desired, awaited)
 	default:
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
 			desired.Type, readErr)
 	}
+}
+
+// bestEffortState builds a *resource.ResourceState from what Create already
+// knows -- desired's own attributes plus the awaited response body -- for
+// the one case where a full readback isn't available even though GCP
+// confirmed the create: the eventual-consistency window in which the
+// readback GET still 404s. It exists so that case has state to return
+// instead of an error (which would orphan a resource that exists): the
+// provider id is the same one readAfterCreate already computed from awaited,
+// recomputed here rather than threaded through because bestEffortState has
+// no other way to know it went through that exact path. Attributes are best
+// effort, not authoritative -- the next ordinary Read fills in whatever
+// awaited did not carry.
+func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredResource, awaited map[string]any) (*resource.ResourceState, error) {
+	id, err := ProviderID(ty, awaited, desired.Attrs)
+	if err != nil {
+		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
+			desired.Type, err)
+	}
+	attrs := make(map[string]value.Value, len(desired.Attrs)+len(awaited))
+	for k, v := range desired.Attrs {
+		attrs[k] = v
+	}
+	for k, raw := range awaited {
+		attrs[k] = fromRaw(raw)
+	}
+	return &resource.ResourceState{
+		Type:       ty.Name,
+		ProviderID: id,
+		Attributes: attrs,
+	}, nil
 }
 
 // readAfterCreate resolves the just-created resource's identity -- preferring
@@ -92,6 +134,14 @@ func (p *Provider) readAfterCreate(ctx context.Context, ty *catalog.Type, desire
 	if err != nil {
 		return nil, err
 	}
+
+	// The create already succeeded; the same rule that makes await
+	// uncancelable (await.go) applies to reading it back. Abandoning here
+	// leaves a resource that exists and is tracked nowhere.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx),
+		time.Duration(ty.TimeoutSeconds)*time.Second)
+	defer cancel()
+
 	return p.Read(ctx, &resource.ResourceState{Type: ty.Name, ProviderID: id})
 }
 

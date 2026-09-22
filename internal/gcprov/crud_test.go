@@ -3,6 +3,7 @@ package gcprov
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
@@ -78,6 +79,81 @@ func TestCreateReportsStateWhenTheResourceExistsDespiteAFailure(t *testing.T) {
 	}
 	if st == nil || st.ProviderID == "" {
 		t.Fatal("Create returned no state for a resource that exists")
+	}
+}
+
+// TestCreateStillReturnsStateWhenTheCallerCancelsDuringReadback. Once the
+// POST has succeeded, a resource is real and tracked nowhere if Create
+// errors out -- the same rule await.go already enforces for the operation
+// wait must also hold for readAfterCreate's own GET. OnRequest fires while
+// that GET is in flight (the fake has received it but not yet answered) and
+// cancels the CALLER's context there; a short sleep afterward gives the
+// client's transport a moment to notice and abort a still-cancelable ctx
+// before the fake's response is written, so a pre-fix regression (the
+// readback using the caller's own cancelable ctx) reproduces reliably
+// instead of racing the response across the loopback connection.
+func TestCreateStillReturnsStateWhenTheCallerCancelsDuringReadback(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProviderWithCatalog(t, s, widgetCatalog())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.OnRequest("/v1/projects/p/locations/r/widgets/one", func() {
+		cancel()
+		time.Sleep(20 * time.Millisecond)
+	})
+
+	st, err := p.Create(ctx, &resource.DesiredResource{
+		Type:  "gcp.widget",
+		Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one"}),
+	})
+	if err != nil {
+		t.Fatalf("Create errored because the CALLER cancelled after the create already "+
+			"succeeded, which orphans a resource that exists: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that was created")
+	}
+}
+
+// TestCreateTrustsTheAwaitWhenTheReadbackNeverSeesIt. GCP confirmed the
+// create (the POST succeeded and the await, trivially for AwaitNone,
+// reports the mutation's own response), but the readback GET keeps 404ing
+// -- eventual consistency, not proof the create failed. Read gives up after
+// notFoundPatience and reports "believed absent" as (nil, nil); Create must
+// not turn that into an error, and must not produce the literal "%!w(<nil>)"
+// artifact fmt.Errorf's "%w" leaves behind when wrapping a nil error.
+//
+// Zero jitter (withJitterForTest) removes backoff between retries so this
+// test's own overhead stays minimal; notFoundPatience itself is a package
+// constant this test cannot shorten, so its real wall-clock cost is close to
+// notFoundPatience's own ~4s.
+func TestCreateTrustsTheAwaitWhenTheReadbackNeverSeesIt(t *testing.T) {
+	gcptest.Isolate(t)
+	withJitterForTest(t, func(int64) int64 { return 0 })
+	s := gcpfake.New(t)
+	defer s.Close()
+	// Large enough that the count never runs out before notFoundPatience's
+	// deadline does, however many zero-backoff retries fit in that window.
+	s.NotFoundTimes("/v1/projects/p/locations/r/widgets/one", 1<<30)
+	p := testProviderWithCatalog(t, s, widgetCatalog())
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.widget",
+		Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one"}),
+	})
+	if err != nil {
+		if contains(err.Error(), "%!w") {
+			t.Fatalf("error carries the nil-%%w artifact from wrapping a nil readErr: %v", err)
+		}
+		t.Fatalf("Create errored for a resource GCP confirmed creating: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one the awaited body implies", st.ProviderID)
 	}
 }
 
