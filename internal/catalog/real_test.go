@@ -1,6 +1,8 @@
 package catalog
 
 import (
+	"gopkg.in/yaml.v3"
+	"os"
 	"testing"
 
 	"github.com/infrena/infrena/pkg/schema"
@@ -121,6 +123,39 @@ func TestTheTagBindingRulingTookEffect(t *testing.T) {
 		}
 		if !a.ForceNew {
 			t.Errorf("gcp.tagbinding.%s is not ForceNew, but the type has no patch method", name)
+		}
+	}
+}
+
+// TestDiscoverDefaultNamesOnlyTypesWeServe stops the overlay's fallback list
+// rotting against the catalog.
+//
+// It listed gcp.network and gcp.subnetwork, which do not exist at all, and
+// gcp.instance and gcp.bucket, which ship under qualified names. Nothing
+// noticed for nine tasks because nothing read the list until Task 16's fallback
+// discovery — at which point it would have scanned names no type has and
+// reported an empty project rather than a broken list.
+func TestDiscoverDefaultNamesOnlyTypesWeServe(t *testing.T) {
+	data, err := os.ReadFile("../../gen/overlay.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var overlay struct {
+		DiscoverDefault []string `yaml:"discover_default"`
+	}
+	if err := yaml.Unmarshal(data, &overlay); err != nil {
+		t.Fatal(err)
+	}
+	if len(overlay.DiscoverDefault) == 0 {
+		t.Fatal("discover_default is empty, so the fallback path would scan nothing")
+	}
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range overlay.DiscoverDefault {
+		if _, ok := c.Type(name); !ok {
+			t.Errorf("discover_default names %q, which the catalog does not serve", name)
 		}
 	}
 }
