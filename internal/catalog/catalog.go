@@ -89,6 +89,16 @@ type Type struct {
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`
 
+	// OperationPollPath is the template for polling a long-running operation,
+	// taken VERBATIM from the API's own operations.get method path — e.g.
+	// "v1/{+name}". It is stored rather than reconstructed because every
+	// Discovery document publishes it and a reconstruction could drift from
+	// what the API actually accepts: all 97 longrunning types in the corpus
+	// have one (v1/{+name} 72, v2/{+name} 17, v3/{+name} 8), so there is
+	// nothing to guess. The {+name} form is reserved expansion — the operation
+	// name is a path containing "/" and must not be escaped.
+	OperationPollPath string `json:"operation_poll_path,omitempty"`
+
 	Await          AwaitKind `json:"await"`
 	OperationScope string    `json:"operation_scope,omitempty"`
 	TimeoutSeconds int       `json:"timeout_seconds"`
