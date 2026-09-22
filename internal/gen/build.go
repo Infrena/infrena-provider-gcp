@@ -110,7 +110,7 @@ func Build(in Inputs) (*Result, error) {
 		}
 		for _, col := range d.Collections() {
 			leaf := col.Path[len(col.Path)-1]
-			mm := matchResource(mms, leaf)
+			mm := matchResource(mms, leaf, createPathOf(col))
 			rawName := leaf
 			if mm != nil {
 				rawName = mm.Name
@@ -350,14 +350,111 @@ func loadDocs(dir string) ([]*disco.Document, error) {
 // leaf name against the resource's own name (widgets <-> Widget). It returns
 // nil when nothing matches: not every Discovery collection has a
 // magic-modules counterpart, and that alone is not a reason to exclude it.
-func matchResource(mms []*mmv1.Resource, leaf string) *mmv1.Resource {
+// matchResource finds the magic-modules resource that describes one Discovery
+// collection: the one whose NAME matches the collection's singularized leaf,
+// but only when its own base_url names the SAME collection the Discovery
+// document's create method posts to.
+//
+// A name match alone is not enough, and the one type in the corpus where it
+// disagrees is the reason this check exists. compute's Discovery collection
+// "vpnGateways" is HA VPN; magic-modules' resource named "VpnGateway" is the
+// CLASSIC gateway ("kind: compute#targetVpnGateway", base_url
+// ".../targetVpnGateways"), and HA VPN lives under the name "HaVpnGateway",
+// which matches no Discovery leaf. Pairing on the name alone gave
+// gcp.vpngateway magic-modules' base_url (targetVpnGateways) and Discovery's
+// get path (vpnGateways): a type that created one resource and read another,
+// so every create orphaned.
+//
+// So: take the name match when its collection agrees, or when there is
+// nothing to compare (no base_url, or one whose last segment is a
+// placeholder). When it disagrees, look for the resource in this product that
+// names the right collection -- which is how HaVpnGateway is found -- and if
+// exactly one does, that is the match.
+//
+// When nothing better is found the name match is still returned, unchanged
+// from what this always did, and the type is left to the gate in buildType,
+// which refuses to ship a type whose id template is not inside the collection
+// its create posts to. Dropping the mm instead would be worse than the defect:
+// a magic-modules resource is also what says a type has wire hooks, so
+// unpairing one ships as generic-safe something the tier gate had refused
+// (measured: binaryauthorization/Policy, refused for an unruled pre_delete
+// hook, shipped the moment its pairing was discarded).
+//
+// The collection search runs ONLY to replace a rejected name match, never to
+// find a match where there was none. Letting it run for every unmatched
+// collection pairs types the generator has always built from Discovery alone
+// with a magic-modules resource that merely posts to the same collection:
+// measured over the corpus, that moved 21 types out of the catalog and pulled
+// a new one in. None of that is this defect.
+//
+// The comparison is between the two WIRE paths, magic-modules' base_url and
+// the Discovery create method's path, never between base_url and the
+// collection's NAME: storage's bucket collection is named "buckets" but posts
+// to "b", and a name comparison would unpair it.
+func matchResource(mms []*mmv1.Resource, leaf, createPath string) *mmv1.Resource {
 	want := strings.ToLower(singular(leaf))
+	var byName *mmv1.Resource
 	for _, mm := range mms {
 		if strings.ToLower(mm.Name) == want {
-			return mm
+			byName = mm
+			break
 		}
 	}
-	return nil
+	if byName == nil {
+		return nil
+	}
+	wantColl := collectionLeaf(createPath)
+	mmColl := collectionLeaf(byName.CreateURL)
+	if mmColl == "" {
+		mmColl = collectionLeaf(byName.BaseURL)
+	}
+	if mmColl == "" || wantColl == "" || mmColl == wantColl {
+		return byName
+	}
+	var byCollection []*mmv1.Resource
+	for _, mm := range mms {
+		if collectionLeaf(mm.BaseURL) == wantColl {
+			byCollection = append(byCollection, mm)
+		}
+	}
+	if len(byCollection) == 1 {
+		return byCollection[0]
+	}
+	return byName
+}
+
+// createPathOf is the path the Discovery document's own create method posts
+// to, or "" when the collection publishes none (such a collection cannot
+// ship anyway -- Classify refuses it).
+func createPathOf(col disco.Collection) string {
+	m := col.Methods["insert"]
+	if m == nil {
+		m = col.Methods["create"]
+	}
+	if m == nil {
+		return ""
+	}
+	return m.Path
+}
+
+// collectionLeaf is the last literal path segment of a url template, with any
+// query string dropped -- the collection a POST to it creates in. It returns
+// "" when there is nothing to compare: an empty template, or one whose last
+// segment is a placeholder rather than a literal (magic-modules writes
+// "{{parent}}/things", and a few templates end in a capture outright).
+func collectionLeaf(tmpl string) string {
+	if i := strings.IndexByte(tmpl, '?'); i >= 0 {
+		tmpl = tmpl[:i]
+	}
+	tmpl = strings.TrimSuffix(tmpl, "/")
+	if tmpl == "" {
+		return ""
+	}
+	last := tmpl[strings.LastIndex(tmpl, "/")+1:]
+	if strings.ContainsAny(last, "{}") {
+		return ""
+	}
+	return last
 }
 
 // singular strips the plural off a Discovery collection leaf. It only ever
@@ -700,7 +797,77 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		}
 	}
 
+	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
+		return nil, err
+	}
+
 	return t, nil
+}
+
+// checkSelfLinkIsInsideTheCreateCollection refuses a type whose id template
+// names a resource that its own create could not have made.
+//
+// self_link IS the provider-id template, and base_url (or create_url) is
+// where a create POSTs. If the first is not the second plus the rest of a
+// resource name, then the type creates one thing and reads another, and every
+// create orphans: the resource exists under the url the POST went to, and the
+// id that gets stored -- and that a later Read, Update and Delete address --
+// names something else entirely. gcp.vpngateway was exactly this, posting to
+// compute's targetVpnGateways (classic VPN) while its id named vpnGateways
+// (HA VPN), because a magic-modules base_url was paired with a Discovery get
+// path from a different collection. That pairing is now fixed in
+// matchResource; this is the gate that means no future one can ship silently.
+//
+// It is the tier gate's own principle applied to the templates: a type the
+// generator cannot vouch for does not ship. The type is refused with both
+// templates named, which Build records in gen/warnings.txt like any other
+// refusal.
+//
+// Only comparable templates are judged. A template with a reserved "{+x}"
+// capture swallows any number of segments, so nothing can be concluded from
+// it either way -- 88 of the 233 shipped types are in that position, and the
+// runtime checks those the only way they can be checked, against the expanded
+// values at create time (outsideCreatedCollection, internal/gcprov/crud.go).
+// Everything else must be the collection itself (gcp.bigquery.table's
+// base_url is the item's own path) or something under it (142 types are the
+// collection plus one segment; gcp.resourcerecordset is two deeper, its own
+// API's shape).
+func checkSelfLinkIsInsideTheCreateCollection(t *catalog.Type) error {
+	coll := t.CreateURL
+	if coll == "" {
+		coll = t.BaseURL
+	}
+	if i := strings.IndexByte(coll, '?'); i >= 0 {
+		coll = coll[:i]
+	}
+	coll = strings.TrimSuffix(coll, "/")
+	if coll == "" || t.SelfLink == "" {
+		return nil
+	}
+	if strings.Contains(coll, "{+") || strings.Contains(t.SelfLink, "{+") {
+		return nil
+	}
+	self, want := normalizeTemplateShape(t.SelfLink), normalizeTemplateShape(coll)
+	if self == want || strings.HasPrefix(self, want+"/") {
+		return nil
+	}
+	return fmt.Errorf("self_link %q is not inside %q, the collection its create posts to, "+
+		"so it would name a resource this type never creates", t.SelfLink, coll)
+}
+
+// placeholderShapeRE matches one whole placeholder in either spelling a url
+// template uses here, "{{x}}" or "{x}" (the reserved "{+x}" form never
+// reaches it -- see checkSelfLinkIsInsideTheCreateCollection).
+var placeholderShapeRE = regexp.MustCompile(`\{\{[^{}]+\}\}|\{[^{}]+\}`)
+
+// normalizeTemplateShape collapses every placeholder to one token, so two
+// templates that name the same path but spell a placeholder differently --
+// magic-modules' "{{project}}" against a Discovery path's "{project}", which
+// is the usual case when one template comes from each source -- compare on
+// shape alone. (The runtime has the same function for the same reason, in
+// internal/gcprov/crud.go; neither package imports the other.)
+func normalizeTemplateShape(tmpl string) string {
+	return placeholderShapeRE.ReplaceAllString(tmpl, "\x00")
 }
 
 // resolveRefs substitutes each Attr.Ref's magic-modules target for its
