@@ -414,3 +414,94 @@ func TestCreateSurvivesAnUnreducibleTargetWhenTheReadbackNeverSeesIt(t *testing.
 		t.Errorf("provider id = %q, want the one the caller's attributes imply", st.ProviderID)
 	}
 }
+
+// TestReadSurvivesAResponseItCannotReduce. stateFrom recomputes the provider
+// id from a get's own response body so a rename GCP made underneath this
+// resource is picked up -- but we asked GCP for THIS resource BY ID and it
+// answered 200, so the resource exists at current's id whether or not the
+// body's own selfLink happens to reduce against this type's api prefix. A
+// selfLink under a version segment the prefix cannot reduce (the realistic
+// case: "v1beta1/..." against a type whose path_prefix is "v1/", the same
+// shape TestCreateSurvivesAnOperationTargetItCannotReduce covers for an
+// operation's targetLink) must not turn a successful get into an error --
+// and this must hold for a plain Read, not only one reached through Create,
+// since the recompute is unconditional in stateFrom.
+func TestReadSurvivesAResponseItCannotReduce(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	const unreducible = "https://widgets.googleapis.com/v1beta1/projects/p/locations/r/widgets/one"
+	s.Seed("/v1/projects/p/locations/r/widgets/one", map[string]any{
+		"name":     "one",
+		"selfLink": unreducible,
+	})
+	p := testProviderWithCatalog(t, s, widgetCatalog())
+
+	st, err := p.Read(context.Background(), &resource.ResourceState{
+		Type: "gcp.widget", ProviderID: "projects/p/locations/r/widgets/one",
+	})
+	if err != nil {
+		t.Fatalf("Read errored for a resource that answered 200: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Read reported absence for a resource that answered 200")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one this resource was read at", st.ProviderID)
+	}
+
+	// Non-vacuity: if the body's own selfLink ever reduces after all,
+	// nothing above is being tested.
+	if _, err := ProviderID(widgetType(), map[string]any{"selfLink": unreducible}, nil); err == nil {
+		t.Fatal("the selfLink is reducible after all, so this test proves nothing")
+	}
+}
+
+// TestCreateSurvivesAReadbackItCannotReduce is the orphan path stateFrom's
+// fix closes: unlike TestCreateSurvivesAnOperationTargetItCannotReduce (an
+// unreducible target inside the AWAITED operation, before any GET happens),
+// here createdID succeeds cleanly and readAfterCreate's own GET -- the
+// ordinary readback every Create does -- comes back with a selfLink this
+// type's api prefix cannot reduce. That GET already answered 200 for a
+// resource GCP just created; erroring out of stateFrom at that point is
+// exactly the orphan the fix rules out.
+func TestCreateSurvivesAReadbackItCannotReduce(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	if widgetType().PathPrefix != "v1/" {
+		t.Fatalf("this test needs a type whose path_prefix cannot reduce a v1beta1 url; got %q", widgetType().PathPrefix)
+	}
+	p := testProviderWithCatalog(t, s, widgetCatalog())
+
+	// The create's own POST lands on the collection path; only the readback
+	// GET that follows hits the item path, so seeding an unreducible
+	// selfLink here the moment that GET arrives -- overwriting what the
+	// create itself just stored -- puts it on the readback alone.
+	itemPath := "/v1/projects/p/locations/r/widgets/one"
+	const unreducible = "https://widgets.googleapis.com/v1beta1/projects/p/locations/r/widgets/one"
+	s.OnRequest(itemPath, func() {
+		s.Seed(itemPath, map[string]any{"name": "one", "selfLink": unreducible})
+	})
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.widget",
+		Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one", "sizeGb": int64(10)}),
+	})
+	if err != nil {
+		t.Fatalf("Create errored for a resource GCP already made, which orphans it: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one this create was given", st.ProviderID)
+	}
+
+	// Non-vacuity: confirm the readback the provider actually saw is the
+	// unreducible one seeded above, not whatever the create itself stored.
+	got, ok := s.Get(itemPath)
+	if !ok || got["selfLink"] != unreducible {
+		t.Fatalf("the readback never saw the unreducible selfLink, so this test proves nothing: %v", got)
+	}
+}
