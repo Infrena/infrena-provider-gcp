@@ -18,11 +18,31 @@ const (
 	backoffCap  = 30 * time.Second
 )
 
-// jitter is the randomness source backoffDelay draws from, swappable so a
-// test can assert the resulting schedule deterministically rather than only
-// "it returned something in range". Production leaves it as rand.Int63n,
-// which since Go 1.20 draws from an automatically-seeded global source.
-var jitter = rand.Int63n
+// jitterMu guards jitterFn: it is swapped by plain assignment from test code
+// (backoff_test.go's withJitterForTest), and without a lock that is
+// unsynchronized global mutable state shared with every production
+// backoffDelay call. Nothing in this package calls t.Parallel() today, so an
+// unguarded swap is latent rather than active -- but the moment a parallel
+// test lands, a swap racing a concurrent Do would surface under -race as
+// something that looks like flakiness rather than like this.
+var jitterMu sync.Mutex
+
+// jitterFn is the randomness source backoffDelay draws from, swappable
+// (under jitterMu) so a test can assert the resulting schedule
+// deterministically rather than only "it returned something in range".
+// Production leaves it as rand.Int63n, which since Go 1.20 draws from an
+// automatically-seeded global source.
+var jitterFn = rand.Int63n
+
+// jitter reads jitterFn under lock and calls it. A function, not a direct
+// read of jitterFn, so every call -- including a concurrent one -- observes
+// either the old source or the new one, never a torn read of the func value.
+func jitter(n int64) int64 {
+	jitterMu.Lock()
+	f := jitterFn
+	jitterMu.Unlock()
+	return f(n)
+}
 
 // backoffDelay returns how long to wait before retry attempt n (0-based: the
 // wait before the FIRST retry is backoffDelay(0, 0)).

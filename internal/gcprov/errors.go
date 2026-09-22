@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -121,27 +124,58 @@ var retryableStatus = map[int]bool{
 //
 // The switch tries Code first and Status second, per the task-11 brief: a
 // Code this function does not recognise (e.g. "INTERNAL") still gets a
-// verdict from Status, but an error that is not an *APIError at all, or
-// whose Code AND Status both go unrecognised, is NotSafeToRetry -- the least
-// safe kind, and the correct default for something nobody has classified.
+// verdict from Status. errors.As, not a type assertion: a caller wrapping the
+// failure with fmt.Errorf("...: %w", err) -- normal, expected practice
+// everywhere else in this codebase -- must still classify correctly. A bare
+// type assertion would silently degrade every wrapped *APIError to
+// NotSafeToRetry.
 //
-// errors.As, not a type assertion: a caller wrapping the failure with
-// fmt.Errorf("...: %w", err) -- normal, expected practice everywhere else in
-// this codebase -- must still classify correctly. A bare type assertion would
-// silently degrade every wrapped *APIError to NotSafeToRetry.
+// A transport-level failure -- no *APIError anywhere in the chain, but a
+// net.Error, a *url.Error (net/http.Client.Do wraps every RoundTrip failure
+// in one), or io.ErrUnexpectedEOF -- is ConditionallyRetryable, not
+// NotSafeToRetry. This is exactly what the three-valued Retryability exists
+// for: a connection reset or a dropped TLS session may have happened before
+// or after GCP actually acted on the request, and there is no way to tell
+// from the error alone. Classifying it NotSafeToRetry fails an apply a
+// single retry would have completed; classifying it SafeToRetry risks a
+// duplicate create. ConditionallyRetryable is the honest answer, and the
+// core already knows what to do with it: retry reads and updates, never
+// retry creates or deletes.
+//
+// Anything still unrecognised after both checks -- not an *APIError, not a
+// transport failure -- is NotSafeToRetry, the least safe kind and the
+// correct default for something nobody has classified.
 func ClassifyError(err error) provider.Retryability {
 	var ae *APIError
-	if !errors.As(err, &ae) {
+	if errors.As(err, &ae) {
+		if retryableCodes[ae.Code] {
+			return provider.SafeToRetry
+		}
+		if notRetryableCodes[ae.Code] {
+			return provider.NotSafeToRetry
+		}
+		if retryableStatus[ae.Status] {
+			return provider.SafeToRetry
+		}
 		return provider.NotSafeToRetry
 	}
-	if retryableCodes[ae.Code] {
-		return provider.SafeToRetry
-	}
-	if notRetryableCodes[ae.Code] {
-		return provider.NotSafeToRetry
-	}
-	if retryableStatus[ae.Status] {
-		return provider.SafeToRetry
+	if isTransportError(err) {
+		return provider.ConditionallyRetryable
 	}
 	return provider.NotSafeToRetry
+}
+
+// isTransportError reports whether err is (or wraps) a failure below the
+// HTTP-response level: the request never got a response to classify by
+// status or code at all.
+func isTransportError(err error) bool {
+	var ne net.Error
+	if errors.As(err, &ne) {
+		return true
+	}
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return true
+	}
+	return errors.Is(err, io.ErrUnexpectedEOF)
 }
