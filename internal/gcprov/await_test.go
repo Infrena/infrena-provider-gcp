@@ -31,16 +31,28 @@ func TestASynchronousMutationIsNotPolled(t *testing.T) {
 	}
 }
 
+// TestALongRunningOperationIsPolledUntilDone seeds the operation with
+// SeedOperation rather than handing await a hand-built map the fake has
+// never heard of -- gcpfake's handleGetOperation 404s an unknown name, same
+// as it always has for longrunning (it never auto-vivified the way
+// handleComputeWait used to), and rightly so: a test asserting against an
+// operation that exists nowhere is a bug in the test. The name is a
+// realistic full relative resource name, not the bare "operations/op-N"
+// shape the fake's own newLongRunningOp mints, since SeedOperation lets the
+// caller choose it.
 func TestALongRunningOperationIsPolledUntilDone(t *testing.T) {
-	t.Skip("awaitLongRunning is stubbed pending catalog.Type.Version -- see task-12-report.md")
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpLongRunning)
+	s.SeedOperation("projects/p/locations/r/operations/op-1", map[string]any{"name": "widgets/one", "sizeGb": float64(10)})
 	p := testProvider(t, s)
 
-	ty := &catalog.Type{Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30}
-	op := map[string]any{"name": "operations/abc", "done": false}
+	ty := &catalog.Type{
+		Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30,
+		OperationPollPath: "v1/{+name}",
+	}
+	op := map[string]any{"name": "projects/p/locations/r/operations/op-1", "done": false}
 	got, err := p.await(context.Background(), ty, op)
 	if err != nil {
 		t.Fatal(err)
@@ -51,13 +63,25 @@ func TestALongRunningOperationIsPolledUntilDone(t *testing.T) {
 	if len(s.Requests()) == 0 {
 		t.Error("the operation was never polled")
 	}
+	// Specifically that OperationPollPath's "v1/" was actually expanded in --
+	// not just that some request landed on the seeded name, which
+	// gcpfake's own leniency about a missing version prefix (trimVersionPrefix)
+	// would let a bare, unexpanded name pass too.
+	var polledExpanded bool
+	for _, r := range s.Requests() {
+		if contains(r.Path, "/v1/projects/p/locations/r/operations/op-1") {
+			polledExpanded = true
+		}
+	}
+	if !polledExpanded {
+		t.Errorf("OperationPollPath was not expanded into the poll url: %+v", s.Requests())
+	}
 }
 
 // TestAFailedOperationReportsGCPsMessage. An operation that completes with
 // an error is not an await failure, it is a GCP failure, and the message is
 // the only thing the user can act on.
 func TestAFailedOperationReportsGCPsMessage(t *testing.T) {
-	t.Skip("awaitLongRunning is stubbed pending catalog.Type.Version -- see task-12-report.md")
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
@@ -65,7 +89,10 @@ func TestAFailedOperationReportsGCPsMessage(t *testing.T) {
 	s.CompleteOperationWithError("operations/bad", "INVALID_ARGUMENT", "Disk size must be at least 10 GB.")
 	p := testProvider(t, s)
 
-	ty := &catalog.Type{Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30}
+	ty := &catalog.Type{
+		Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30,
+		OperationPollPath: "v1/{+name}",
+	}
 	_, err := p.await(context.Background(), ty, map[string]any{"name": "operations/bad", "done": false})
 	if err == nil {
 		t.Fatal("a failed operation was reported as success")
@@ -85,11 +112,21 @@ func TestAFailedOperationReportsGCPsMessage(t *testing.T) {
 // had operationWaitURL use ty.OperationScope verbatim -- that version
 // passes this test by coincidence while 404ing against every real
 // compute-style type, since none of them carry the full collection name.
+//
+// The operation is seeded with SeedComputeOperation rather than handed to
+// await as a hand-built map the fake has never heard of: the fake used to
+// auto-vivify an unknown compute operation as one that completes
+// successfully, but that is inference from the shape of a request rather
+// than the test saying what exists -- exactly what this package's declared
+// collections (server.go) already rejected for ordinary resources. A test
+// asserting against an operation that does not exist anywhere is a bug in
+// the test, not a reason to make the fake more lenient.
 func TestAComputeOperationIsPolledOnItsScope(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpCompute)
+	s.SeedComputeOperation("op-1")
 	p := testProvider(t, s)
 
 	ty := &catalog.Type{
@@ -117,20 +154,21 @@ func TestAComputeOperationIsPolledOnItsScope(t *testing.T) {
 // abandoning it leaves a resource that exists and is tracked nowhere. The
 // await runs under context.WithoutCancel for exactly that reason.
 func TestAwaitDoesNotAbandonAMutationInFlight(t *testing.T) {
-	t.Skip("awaitLongRunning is stubbed pending catalog.Type.Version -- see task-12-report.md; " +
-		"the same property is covered against the compute path by " +
-		"TestAwaitDoesNotAbandonAComputeOperationInFlight below in the meantime")
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpLongRunning)
+	s.SeedOperation("projects/p/locations/r/operations/op-1", map[string]any{"name": "widgets/one", "sizeGb": float64(10)})
 	p := testProvider(t, s)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already cancelled before await is called
 
-	ty := &catalog.Type{Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30}
-	got, err := p.await(ctx, ty, map[string]any{"name": "operations/abc", "done": false})
+	ty := &catalog.Type{
+		Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30,
+		OperationPollPath: "v1/{+name}",
+	}
+	got, err := p.await(ctx, ty, map[string]any{"name": "projects/p/locations/r/operations/op-1", "done": false})
 	if errors.Is(err, context.Canceled) {
 		t.Fatal("await abandoned an operation in flight on a cancelled context")
 	}
@@ -142,18 +180,30 @@ func TestAwaitDoesNotAbandonAMutationInFlight(t *testing.T) {
 	}
 }
 
+// TestAwaitStopsAtTheTypesTimeout. Earlier versions of this test (before the
+// operation was seeded) "passed" vacuously: the unregistered operation
+// 404'd on the very first poll, so err != nil and the elapsed check were
+// both trivially satisfied without the timeout loop ever running. Seeding
+// the operation first, so the poll actually succeeds and reports
+// unfinished, combined with NeverCompleteOperations, is what makes the
+// context deadline genuinely the thing under test -- confirmed by sabotage:
+// dropping NeverCompleteOperations (or the timeout wrapping in await
+// itself) makes this test fail rather than pass for the wrong reason.
 func TestAwaitStopsAtTheTypesTimeout(t *testing.T) {
-	t.Skip("awaitLongRunning is stubbed pending catalog.Type.Version -- see task-12-report.md")
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpLongRunning)
+	s.SeedOperation("projects/p/locations/r/operations/op-1", nil)
 	s.NeverCompleteOperations()
 	p := testProvider(t, s)
 
-	ty := &catalog.Type{Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 1}
+	ty := &catalog.Type{
+		Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 1,
+		OperationPollPath: "v1/{+name}",
+	}
 	start := time.Now()
-	_, err := p.await(context.Background(), ty, map[string]any{"name": "operations/abc", "done": false})
+	_, err := p.await(context.Background(), ty, map[string]any{"name": "projects/p/locations/r/operations/op-1", "done": false})
 	if err == nil {
 		t.Fatal("an operation that never completes was reported as success")
 	}
@@ -164,18 +214,20 @@ func TestAwaitStopsAtTheTypesTimeout(t *testing.T) {
 
 // TestAwaitDoesNotAbandonAComputeOperationInFlight covers, against the
 // compute path, the same property TestAwaitDoesNotAbandonAMutationInFlight
-// covers against the (currently stubbed, see above) longrunning path: once a
-// mutation is sent, abandoning it leaves a resource that exists and is
-// tracked nowhere. The context.WithoutCancel wrapping this guards is done
-// once in await() itself, before either strategy is dispatched to, so this
-// exercises the exact same code as the longrunning version of this test --
-// it is not a weaker substitute, just a different strategy's operation
-// shape.
+// covers against the longrunning path: once a mutation is sent, abandoning
+// it leaves a resource that exists and is tracked nowhere. The
+// context.WithoutCancel wrapping this guards is done once in await() itself,
+// before either strategy is dispatched to, so this exercises the exact same
+// code as the longrunning version of this test -- it is not a weaker
+// substitute, just a different strategy's operation shape. Kept alongside
+// the longrunning version rather than removed now that both run, since it
+// costs nothing and pins the property to both operation shapes independently.
 func TestAwaitDoesNotAbandonAComputeOperationInFlight(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
 	s.SetOperationStyle(gcpfake.OpCompute)
+	s.SeedComputeOperation("op-1")
 	p := testProvider(t, s)
 
 	ctx, cancel := context.WithCancel(context.Background())
