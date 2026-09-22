@@ -326,9 +326,11 @@ func TestOperationErrorRendersBothFailureShapes(t *testing.T) {
 }
 
 // computeTypeForID is the fixture the three tests below share: a compute-style
-// zonal type whose self_link ends in "{{name}}" (the shape 13 of the 65
-// compute-style types have) and whose path_prefix is the one the fake's own
-// urls carry, so reduceSelfLink has a real prefix to reduce a selfLink by.
+// zonal type whose self_link ENDS in "{{name}}" (the shape 12 of the 65
+// compute-style types have; 13 CONTAIN a name placeholder somewhere, but
+// ending in one is what the merge below turns on) and whose path_prefix is
+// the one the fake's own urls carry, so reduceSelfLink has a real prefix to
+// reduce a selfLink by.
 func computeTypeForID() *catalog.Type {
 	return &catalog.Type{
 		Name: "gcp.instance", Await: catalog.AwaitComputeOperation,
@@ -392,7 +394,7 @@ func TestAComputeOperationYieldsTheResourceItCreatedNotItself(t *testing.T) {
 }
 
 // TestAComputeOperationsOwnNameNeverBecomesTheResources covers the second
-// way the old return was wrong, for the 13 compute-style types whose
+// way the old return was wrong, for the 12 compute-style types whose
 // self_link ends in "{{name}}": with no selfLink in the body, ProviderID
 // merges the body's own fields over the caller's attributes, so the
 // OPERATION's name ("operation-1740...") won and the id named a resource
