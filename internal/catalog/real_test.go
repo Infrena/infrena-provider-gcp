@@ -405,3 +405,65 @@ func TestNoLevelRenamesTwoAttributesOntoOneWireName(t *testing.T) {
 		}
 	})
 }
+
+// TestTheCatalogStillMarksUnorderedLists. GCP returns a set-typed list in
+// whatever order it likes, and internal/gcprov/reconcile.go reorders exactly
+// the lists this flag marks -- so if a regeneration stopped setting it, every
+// reconciliation test would still pass while reordering nothing, and the
+// provider would go back to proposing a reordering forever for resources
+// nobody touched.
+//
+// Measured 2026-09-22, following Fields AND Elem: 42 attributes across 22 of
+// the 233 types, one of them inside a list
+// (gcp.router's bgpPeers[].advertisedIpRanges). A walk that followed Fields
+// alone would report 41 and miss that one.
+//
+// gcp.firewall's allowed and denied are named explicitly because they are the
+// two that only arrived once mmIndex started indexing magic-modules' api_name
+// as well as its name: magic-modules calls them "allow"/"deny" with
+// api_name allowed/denied, so a lookup by Discovery's own property name found
+// nothing and the is_set flag behind them was dropped on the floor.
+func TestTheCatalogStillMarksUnorderedLists(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, inList := 0, 0
+	eachAttributeLevel(c, func(where string, level map[string]*Attr) {
+		for _, a := range level {
+			if !a.Unordered {
+				continue
+			}
+			total++
+			if strings.Contains(where, "[]") {
+				inList++
+			}
+		}
+	})
+	t.Logf("unordered lists: %d attributes, %d inside a list", total, inList)
+	if total < 30 {
+		t.Errorf("only %d attributes are marked Unordered; 42 were measured on 2026-09-22 "+
+			"across 22 types, so the is_set propagation in internal/gen/attrs.go has "+
+			"regressed and reconciliation is reordering nothing", total)
+	}
+	if inList == 0 {
+		t.Error("no unordered list is itself inside a list any more (one was: " +
+			"gcp.router's bgpPeers[].advertisedIpRanges); reconcile.go recurses through " +
+			"Elem for exactly that, and the corpus no longer covers it")
+	}
+	fw, ok := c.Type("gcp.firewall")
+	if !ok {
+		t.Fatal("the catalog no longer ships gcp.firewall")
+	}
+	for _, name := range []string{"allowed", "denied", "sourceRanges"} {
+		a, ok := fw.Attributes[name]
+		if !ok {
+			t.Errorf("gcp.firewall no longer declares %q", name)
+			continue
+		}
+		if !a.Unordered {
+			t.Errorf("gcp.firewall.%s is not marked Unordered; magic-modules says is_set, and "+
+				"for allowed/denied that only reaches the attribute through its api_name", name)
+		}
+	}
+}
