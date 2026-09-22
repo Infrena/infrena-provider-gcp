@@ -540,6 +540,25 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	if t.ImportFormat == "" {
 		t.ImportFormat = t.SelfLink
 	}
+
+	// SelfLink must address ONE resource. Two of the 233 types get a
+	// magic-modules value that does not: gcp.storage.bucket's carries a query
+	// string ("b/{{name}}?projection=full") and gcp.tagbinding's is a LIST url
+	// ("tagBindings/?parent={{parent}}&pageSize=300"). Read, Delete and Import
+	// all build from SelfLink, so both would address the wrong thing.
+	//
+	// Strip the query string; if what remains is not item-shaped (it ends in
+	// "/", meaning nothing named the resource), fall back to the first
+	// ImportFormat line, which by definition IS an item ID shape. That turns
+	// tagbinding's into "tagBindings/{{name}}".
+	if i := strings.IndexByte(t.SelfLink, '?'); i >= 0 {
+		t.SelfLink = t.SelfLink[:i]
+	}
+	if strings.HasSuffix(t.SelfLink, "/") || t.SelfLink == "" {
+		if first, _, _ := strings.Cut(t.ImportFormat, "\n"); first != "" {
+			t.SelfLink = first
+		}
+	}
 	if t.BaseURL == "" {
 		// No magic-modules definition, or one with no base_url: fall back to
 		// the create method's own path, which for a REST-style insert is the
