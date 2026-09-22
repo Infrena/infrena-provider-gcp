@@ -6647,3 +6647,313 @@ implemented there**, not invented later.
 `widgetCatalog`, `widgetType`, `attrs`, `attrsMixed`, `mapValue`, `listValue`, `contains`,
 `staticToken` — are written once in `internal/gcprov/helpers_test.go` during Task 11 and used by every
 later task in that package.
+
+---
+
+### Task 13a: One rule for composing a URL
+
+**Why this exists.** Found during Task 13's review, by measuring rather than
+reading. 72 of the 233 types compose a URL with no API version segment
+anywhere in it. Every call for those types -- create, read, update, delete --
+would go to a versionless URL and 404. Nothing in the suite catches it because
+`internal/gcpfake` serves whatever path it is handed, so the fake and the
+production code share the same wrong assumption. Only a live call would have
+found it, and the live suite (Task 18) is out of the current scope. It would
+have shipped.
+
+**Root cause.** `buildType` takes `t.SelfLink = mm.SelfLink` when magic-modules
+supplies one, and falls back to the Discovery `get` method's path otherwise
+(`internal/gen/build.go:507` and `:528-530`). Those two sources put the version
+in different places:
+
+- Discovery method paths for an API whose `servicePath` is empty carry the
+  version themselves: `v1/{+parent}/addressGroups`.
+- magic-modules templates are written relative to an already-versioned base and
+  carry no version: `{{parent}}/locations/{{location}}/addressGroups`.
+
+39 of the 42 fetched APIs have an empty `servicePath` (only compute, storage
+and bigquery have one), so the catalog ended up split down the middle:
+
+| field | set | leads with a version segment |
+|---|---|---|
+| `BaseURL` | 233 | 90 |
+| `SelfLink` | 233 | 94 |
+| `CreateURL` | 72 | 0 |
+| `UpdateURL` | 9 | 0 |
+| `DeleteURL` | 5 | 0 |
+| `OperationPollPath` | 104 | 104 |
+| `OperationWaitPath` | 58 | 0 |
+| `ImportFormat` | 233 | 90 |
+
+`stripLeadingVersion` in `crud.go:312` is a patch over the symptom at the
+collection-matching level. It does not fix composition.
+
+**The second defect this exposes.** `SelfLink` is doing two incompatible jobs.
+It is the wire path template AND the provider-id template. The wire path needs
+the version prefix; a provider id must not have one. Today 94 types put `v1/`
+inside the ids users see and 139 do not. The fix must separate the two jobs, not
+just add the missing prefix.
+
+**Do not synthesize the prefix from the version.** The obvious shortcut --
+`APIBaseURL = RootURL + Version + "/"` when `servicePath` is empty -- is wrong.
+Measured across the empty-`servicePath` APIs, 41 of 2318 method paths do not
+begin with the bare version: `dns` uses `dns/v1/projects/...` for its
+responsePolicies collection while its other collections use `v1/...`, and
+`cloudresourcemanager` has a custom verb at `v3:fetchResourceSemantics`. The
+prefix therefore varies WITHIN a single API and must be derived per type from
+that type's own method path.
+
+**Files:**
+- Modify: `internal/catalog/catalog.go` (new field)
+- Modify: `internal/gen/build.go` (derive it; strip templates)
+- Modify: `internal/gcprov/crud.go`, `internal/gcprov/await.go`, `internal/gcprov/ids.go`
+- Test: `internal/catalog/real_test.go`, `internal/gen/build_test.go`, `internal/gcprov/crud_test.go`
+
+**Interfaces:**
+- Produces: `catalog.Type.PathPrefix string` -- the segments between
+  `APIBaseURL` and the relative resource name. Consumed by Tasks 14-17 wherever
+  a URL is built.
+
+- [ ] **Step 1: Add the field**
+
+In `internal/catalog/catalog.go`, inside `type Type struct`, after `APIBaseURL`:
+
+```go
+	// PathPrefix is whatever sits between APIBaseURL and the relative
+	// resource name -- "v1/" for networksecurity, "dns/v1/" for dns's
+	// responsePolicies, "" for compute, storage and bigquery (whose
+	// Discovery servicePath already carries the version).
+	//
+	// It exists because SelfLink cannot carry it. SelfLink is also the
+	// provider-id template, and a provider id must name the resource, not
+	// the API version that happened to serve it. Before this field existed
+	// the two jobs shared one string and 94 of 233 types leaked "v1/" into
+	// the ids users see, while the other 139 did not.
+	//
+	// The absolute URL for a resource is therefore always, with no special
+	// cases: APIBaseURL + PathPrefix + expand(template).
+	PathPrefix string `json:"path_prefix,omitempty"`
+```
+
+- [ ] **Step 2: Write the failing invariant test**
+
+In `internal/catalog/real_test.go`:
+
+```go
+// TestOneRuleComposesEveryURL. The absolute URL is APIBaseURL + PathPrefix +
+// expand(template), for every type, with no special cases. That holds only if
+// no stored template carries an API version segment of its own -- otherwise
+// the version is either doubled or (for the 72 types measured on 2026-09-22)
+// missing entirely, and every call 404s.
+//
+// OperationPollPath is deliberately exempt: it is taken verbatim from the
+// API's own operations.get method path and composed directly against
+// APIBaseURL, which is correct for all 104 types that have one.
+func TestNoStoredTemplateCarriesAnAPIVersion(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := regexp.MustCompile(`^v[0-9][0-9a-zA-Z]*$`)
+	leadsWithVersion := func(tmpl string) bool {
+		if tmpl == "" {
+			return false
+		}
+		return version.MatchString(strings.SplitN(strings.TrimPrefix(tmpl, "/"), "/", 2)[0])
+	}
+	for _, ty := range c.Types {
+		for label, tmpl := range map[string]string{
+			"base_url": ty.BaseURL, "self_link": ty.SelfLink,
+			"create_url": ty.CreateURL, "update_url": ty.UpdateURL,
+			"delete_url": ty.DeleteURL, "import_format": ty.ImportFormat,
+		} {
+			if leadsWithVersion(tmpl) {
+				t.Errorf("%s: %s starts with an API version (%q); the version belongs in PathPrefix",
+					ty.Name, label, tmpl)
+			}
+		}
+	}
+}
+
+// TestEveryTypeCanBuildAnAbsoluteURL. A type whose composed URL carries no
+// version at all is one whose every call 404s. 72 of 233 were in this state
+// when the field was introduced.
+func TestEveryTypeComposesAVersionedURL(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := regexp.MustCompile(`(^|/)v[0-9][0-9a-zA-Z]*(/|$)`)
+	for _, ty := range c.Types {
+		composed := ty.APIBaseURL + ty.PathPrefix
+		if !version.MatchString(composed) {
+			t.Errorf("%s composes %q, which names no API version", ty.Name, composed)
+		}
+	}
+}
+```
+
+- [ ] **Step 3: Run them and watch them fail**
+
+Run: `go test ./internal/catalog/ -run 'TestNoStoredTemplateCarriesAnAPIVersion|TestEveryTypeComposesAVersionedURL' -v`
+Expected: the first reports roughly 90-94 types per template field; the second
+reports 72. Record the real counts in the commit body -- if they differ
+materially from these, say so rather than adjusting the numbers silently.
+
+- [ ] **Step 4: Derive the prefix in the generator**
+
+In `internal/gen/build.go`, add:
+
+```go
+// versionSegment matches an API version path segment: v1, v2, v1beta1, v3.
+var versionSegment = regexp.MustCompile(`^v[0-9][0-9a-zA-Z]*$`)
+
+// pathPrefixOf returns the leading segments of a Discovery method path that
+// precede the resource hierarchy -- everything up to and including the first
+// version segment, with a trailing "/".
+//
+// It is derived per TYPE, from that type's own method path, not once per API.
+// dns publishes "dns/v1/projects/..." for responsePolicies and "v1/..." for
+// its other collections, so an API-wide prefix would be wrong for one of them.
+//
+// Returns "" when the path has no version segment, which is the correct answer
+// for compute, storage and bigquery: their Discovery servicePath already
+// carries the version, so APIBaseURL is complete on its own.
+func pathPrefixOf(methodPath string) string {
+	segs := strings.Split(strings.TrimPrefix(methodPath, "/"), "/")
+	for i, s := range segs {
+		if versionSegment.MatchString(s) {
+			return strings.Join(segs[:i+1], "/") + "/"
+		}
+	}
+	return ""
+}
+```
+
+Set it in `buildType`, from the type's own `get` method where there is one,
+falling back in order to `list`, then `insert`/`create`. Use the same
+collection the existing SelfLink fallback uses. If no method is available at
+all, leave it empty and let Step 2's second test catch it.
+
+- [ ] **Step 5: Strip the prefix from every template the generator stores**
+
+After the prefix is known, strip it from `BaseURL`, `CreateURL`, `UpdateURL`,
+`DeleteURL`, `SelfLink` and `ImportFormat` -- but only where the template
+actually starts with it, since the magic-modules-sourced ones never will:
+
+```go
+	t.PathPrefix = pathPrefixOf(methodPath)
+	if t.PathPrefix != "" {
+		for _, p := range []*string{&t.BaseURL, &t.CreateURL, &t.UpdateURL,
+			&t.DeleteURL, &t.SelfLink, &t.ImportFormat} {
+			*p = strings.TrimPrefix(*p, t.PathPrefix)
+		}
+	}
+```
+
+Leave `OperationPollPath` and `OperationWaitPath` untouched. Poll paths are
+composed directly against `APIBaseURL` and are already correct for all 104
+types; wait paths are compute-only and carry no version.
+
+- [ ] **Step 6: Regenerate and re-run Step 2's tests**
+
+Run the generator, then
+`go test ./internal/catalog/ -run 'TestNoStoredTemplateCarriesAnAPIVersion|TestEveryTypeComposesAVersionedURL' -v`
+Expected: PASS. The catalog must still hold 233 types -- if the count moved,
+stop and report; nothing in this task should add or drop a type.
+
+- [ ] **Step 7: Compose with the prefix at runtime**
+
+In `internal/gcprov/`, every place that builds `ty.APIBaseURL + rel` becomes
+`ty.APIBaseURL + ty.PathPrefix + rel`. The sites are `crud.go:232`, `:268`,
+`:273`, `:281` and `await.go:195`. `await.go:92` (`ty.APIBaseURL+pollPath`)
+stays as it is -- poll paths keep their own version.
+
+Add one helper rather than repeating the concatenation:
+
+```go
+// absURL joins a relative, already-expanded resource path onto the API base.
+// The version lives in PathPrefix, never in the template (see
+// catalog.Type.PathPrefix).
+func absURL(ty *catalog.Type, rel string) string {
+	return ty.APIBaseURL + ty.PathPrefix + rel
+}
+```
+
+- [ ] **Step 8: Delete `stripLeadingVersion`**
+
+With the invariant holding, no stored template begins with a version, so
+`stripLeadingVersion` (`crud.go:312`) and its two uses in
+`collectionMatchesSelfLink` (`crud.go:352`) are dead. Delete the function and
+call the templates directly. The Step 2 test is what now guarantees this.
+
+- [ ] **Step 9: Fix `reduceSelfLink` to use the prefix**
+
+`reduceSelfLink` (`ids.go:60`) finds `ty.SelfLink`'s literal text before its
+first placeholder inside the absolute URL. 16 types have a `self_link` that
+STARTS with a placeholder (`{{parent}}/locations/...`), so the literal prefix is
+empty and the function returns an error unconditionally. Two of those --
+`gcp.networksecurity.addressgroup` and `gcp.networksecurity.organization.addressgroup` --
+also declare a `selfLink` attribute, so `ProviderID` hard-errors on every
+create, and per the orphan rule that error orphans the resource.
+
+Rewrite it to reduce by the API base instead of by the template's literal text:
+strip everything up to and including `PathPrefix`, tolerating a host that
+differs from `APIBaseURL` (GCP answers compute selfLinks from
+`www.googleapis.com` while the catalog names `compute.googleapis.com`). Match
+on the path portion after the host, not on the whole URL. Keep the
+segment-boundary anchoring added in Task 13's fix round 1. Where the prefix
+genuinely is not present, keep returning an error naming the type and the URL.
+
+- [ ] **Step 10: Test the two types that were hard-failing**
+
+In `internal/gcprov/crud_test.go`:
+
+```go
+// TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder. 16 types have a
+// self_link beginning with {{parent}}, leaving reduceSelfLink no literal text
+// to search for. Two of them also return a selfLink in their bodies, so before
+// PathPrefix existed ProviderID failed on every create -- and per the orphan
+// rule, an error after a successful create orphans the resource.
+func TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder(t *testing.T) {
+	// gcp.networksecurity.addressgroup: self_link is
+	// "{{parent}}/locations/{{location}}/addressGroups/{{name}}",
+	// APIBaseURL "https://networksecurity.googleapis.com/", PathPrefix "v1/".
+	// A body selfLink of
+	// "https://networksecurity.googleapis.com/v1/projects/p/locations/us-central1/addressGroups/ag"
+	// must reduce to
+	// "projects/p/locations/us-central1/addressGroups/ag" -- no host, no "v1/".
+}
+```
+
+Write it against the real catalog entry, not a hand-built type, so it fails if
+the generator stops emitting the prefix. Assert the id contains neither the
+host nor `v1/`.
+
+- [ ] **Step 11: Full suite**
+
+Run: `go build ./... && go test ./...`
+Expected: PASS. Every existing gcprov test still passes -- if one now fails
+because it asserted a URL that was missing its version, the test was encoding
+the bug; fix the test and say which ones in the report.
+
+- [ ] **Step 12: Sabotage**
+
+Four sabotages, each leaving the code compiling:
+1. Make `pathPrefixOf` always return `""` -- Step 2's second test must fail.
+2. Remove the `TrimPrefix` loop in Step 5 -- Step 2's first test must fail.
+3. Make `absURL` drop `ty.PathPrefix` -- a gcprov URL assertion must fail.
+4. Restore `reduceSelfLink`'s literal-prefix search -- Step 10's test must fail.
+
+Restore by re-applying, never by `git checkout --`. Record each sabotage and
+the exact assertion that caught it in the commit body.
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add internal/catalog/catalog.go internal/catalog/real_test.go \
+        internal/gen/build.go internal/gen/build_test.go \
+        internal/gcprov/crud.go internal/gcprov/await.go internal/gcprov/ids.go \
+        internal/gcprov/crud_test.go catalog.json.gz
+git commit -m "Put the api version in one place"
+```
