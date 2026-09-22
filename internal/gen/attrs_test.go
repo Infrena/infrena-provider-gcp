@@ -198,13 +198,17 @@ func TestAwaitIsChosenFromTheOperationShape(t *testing.T) {
 // naive "first array property" heuristic during review: alloydb's
 // operations.list response schema carries both "operations" (the real
 // results) and "unreachable" (locations a partial-failure list call could
-// not reach). "auditConfigs" is a decoy third array that sorts alphabetically
-// before both real candidates, so a naive "first array in sorted order"
-// implementation cannot pass this by coincidentally landing on "operations"
-// the way it would if "unreachable" were the only decoy (sorting after
-// "operations" on its own) — the real property must be found by matching the
-// collection's own leaf or by skipping the blocklist, not by luck of sort
-// order.
+// not reach). This exercises the LEAF-MATCH branch, not the blocklist: the
+// collection's own leaf is "operations", which is also the real property's
+// name, so that's what wins here — "unreachable" (and the decoy
+// "auditConfigs" below) never reach the blocklist check at all. The
+// blocklist-skip branch has its own test,
+// TestListFieldFallsBackToTheFirstNonBlocklistedArrayWhenNoNameMatches,
+// where no property name matches the leaf. "auditConfigs" is a decoy third
+// array that sorts alphabetically before both real candidates, so a naive
+// "first array in sorted order" implementation cannot pass this by
+// coincidentally landing on "operations" the way it would if "unreachable"
+// were the only decoy (sorting after "operations" on its own).
 func TestListFieldPrefersTheRealArrayOverUnreachable(t *testing.T) {
 	doc := &disco.Document{Name: "alloydb", Schemas: map[string]*disco.Schema{
 		"ListOperationsResponse": {Type: "object", Properties: map[string]*disco.Schema{

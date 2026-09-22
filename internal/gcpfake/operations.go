@@ -160,6 +160,15 @@ func (s *Server) newComputeOp(path string, result map[string]any, isDelete bool)
 // auto-vivified as one that completes successfully on this call, because the
 // fake's job is to answer the wait, not to insist the operation was born
 // through its own POST handler.
+//
+// CAVEAT — this is deliberately more permissive than the real API: real GCP
+// 404s a wait on an operation name it never issued. This fake does not,
+// because it has no way to tell "a test built this operation by hand on
+// purpose" apart from "a client bug is waiting on the wrong name" — the
+// former is a real, supported use of this fake (see await_test.go's compute
+// test), so it wins. A client bug that waits on a wrong or stale operation
+// name gets a false success here rather than the real API's 404; do not read
+// this fake's leniency here as full fidelity to that failure mode.
 func (s *Server) handleComputeWait(w http.ResponseWriter, r *http.Request) {
 	m := waitPathRE.FindStringSubmatch(r.URL.Path)
 	if m == nil {

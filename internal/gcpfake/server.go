@@ -90,21 +90,40 @@ type Server struct {
 	// collection path uses in its list response, keyed by that exact
 	// collection path. See SetListField.
 	listFields map[string]string
+
+	// declaredCollections is the set of paths a GET at them means "list", as
+	// opposed to "get one resource" (404 if absent). Path shape alone cannot
+	// tell them apart: a bare scope literal like "global" and a resource id
+	// are both just opaque path segments, and GCP's own URL templates are not
+	// uniform about how many literal segments come before the first
+	// variable one — "projects/{project}/global/firewalls" has an unpaired
+	// literal, and a handful of types (Cloud Resource Manager's v3 folders
+	// among them) embed their own version segment inside their own template
+	// on top of the one every request already carries. An earlier version of
+	// this fake tried to infer list-vs-get from segment parity and was wrong
+	// for about a fifth of the real catalog, silently: a GET of a real,
+	// existing resource landed on the list branch and came back 200 with
+	// nothing in it. So this is declared, never inferred from the URL:
+	// Seed and a create both declare their own collection automatically (see
+	// those methods), and DeclareCollection is there for a collection a test
+	// wants to exist with nothing seeded in it at all.
+	declaredCollections map[string]bool
 }
 
 // New starts the fake. The caller must Close it.
 func New(t *testing.T) *Server {
 	t.Helper()
 	s := &Server{
-		t:                 t,
-		resources:         map[string]map[string]any{},
-		notFoundRemaining: map[string]int{},
-		lroOps:            map[string]*lroOp{},
-		computeOps:        map[string]*computeOp{},
-		createThenFail:    map[string]apiErrorSpec{},
-		caiAssets:         map[string][]Asset{},
-		tagBindings:       map[string][]map[string]any{},
-		listFields:        map[string]string{},
+		t:                   t,
+		resources:           map[string]map[string]any{},
+		notFoundRemaining:   map[string]int{},
+		lroOps:              map[string]*lroOp{},
+		computeOps:          map[string]*computeOp{},
+		createThenFail:      map[string]apiErrorSpec{},
+		caiAssets:           map[string][]Asset{},
+		tagBindings:         map[string][]map[string]any{},
+		listFields:          map[string]string{},
+		declaredCollections: map[string]bool{},
 	}
 	s.srv = httptest.NewServer(s)
 	return s
@@ -118,11 +137,39 @@ func (s *Server) Close() { s.srv.Close() }
 
 // Seed puts a resource directly at path, bypassing create. path is the full
 // request path a GET for it would use, e.g.
-// "/v1/projects/p/locations/r/widgets/one".
+// "/v1/projects/p/locations/r/widgets/one". This also declares path's
+// parent (".../widgets") a collection, so a GET of it lists — a test never
+// has to declare a collection by hand just because it seeded something in
+// it.
 func (s *Server) Seed(path string, body map[string]any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.resources[path] = cloneMap(body)
+	if parent := parentOf(path); parent != "" {
+		s.declaredCollections[parent] = true
+	}
+}
+
+// DeclareCollection marks path as a collection whose GET lists (200,
+// possibly with nothing in it), without seeding anything there. Seed and a
+// create both declare their own collection automatically; this is for a
+// collection a test wants to exist with nothing in it at all — exactly the
+// case a discover fallback hits for most types when it scans a project:
+// genuinely nothing there, which must come back as an empty list, not a 404.
+func (s *Server) DeclareCollection(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.declaredCollections[path] = true
+}
+
+// parentOf returns path with its last "/"-separated segment removed, or ""
+// if path has no parent to speak of.
+func parentOf(path string) string {
+	i := strings.LastIndex(path, "/")
+	if i <= 0 {
+		return ""
+	}
+	return path[:i]
 }
 
 // Get reads a resource back by the same path Seed or a client's create would
@@ -245,22 +292,33 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleGet answers a GET, first deciding whether the path names a
-// collection (a list call, however many — zero included — resources it
-// currently holds) or a specific resource (a get call, which 404s if
-// nothing is there). See isCollectionPath for how that's decided: GCP's own
-// URL templates alternate a literal collection segment with a variable id
-// segment starting from a literal, so the two cases are never actually
-// ambiguous from the path alone, and the fake does not need history (what
-// was previously created or seeded) to tell them apart. This matters
-// specifically because Task 16's discovery fallback scans every type across
-// a project and will genuinely find nothing for most of them — those must
-// list empty (200), not 404, or the fallback cannot tell "nothing here" from
-// "this API doesn't exist."
+// handleGet answers a GET, first checking whether path was DECLARED a
+// collection (Seed, a create, or DeclareCollection — never inferred from the
+// URL's own shape). A declared path lists, however many — zero included —
+// resources it currently holds; anything else is a get of one specific
+// resource, 404 if absent.
+//
+// This used to be inferred from path shape (odd vs even segment count,
+// assuming GCP's URL templates always alternate a literal collection segment
+// with a variable id segment). That assumption is false for about a fifth of
+// the real catalog: "projects/{project}/global/firewalls" has an unpaired
+// literal ("global"), and a handful of types (Cloud Resource Manager's v3
+// folders among them) embed their own version segment inside their own
+// template on top of the one every request already carries. Both failures
+// were silent, and the second is the dangerous one: a get of a real,
+// existing resource landing on the list branch comes back 200 with nothing
+// in it — a successful empty read for something that was seeded moments
+// earlier. Declaring rather than inferring is what a fake honestly can know:
+// it requires the test to say what exists, rather than guessing from a URL
+// whose real templates it does not have access to.
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	if isCollectionPath(path) {
+	s.mu.Lock()
+	declared := s.declaredCollections[path]
+	s.mu.Unlock()
+
+	if declared {
 		items := s.collectionItems(path)
 		field := s.listFieldFor(path)
 		page, next := paginate(items, r.URL.Query())
@@ -289,25 +347,6 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, body)
-}
-
-// isCollectionPath decides list-vs-get from path shape alone, no history
-// needed: every GCP REST URL template this catalog uses alternates a
-// literal collection segment with a variable id segment, always starting
-// with a literal ("projects/{project}/locations/{location}/widgets" or
-// "projects/{project}/locations/{location}/widgets/{id}"). Stripping the
-// version prefix, a list call therefore always lands on an ODD number of
-// remaining segments (ending on a literal) and a get call on an EVEN number
-// (ending on the id). This holds regardless of how many resources are
-// currently stored at or under the path, which is exactly the property
-// needed to answer "list of an empty collection" and "get of a specific
-// absent resource" differently.
-func isCollectionPath(path string) bool {
-	rel := trimVersionPrefix(path)
-	if rel == "" {
-		return false
-	}
-	return len(strings.Split(rel, "/"))%2 == 1
 }
 
 // collectionItems finds every resource stored directly under path (one path
@@ -345,11 +384,16 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "no id in the request's query parameters or body")
 		return
 	}
-	path := strings.TrimSuffix(r.URL.Path, "/") + "/" + id
+	collection := strings.TrimSuffix(r.URL.Path, "/")
+	path := collection + "/" + id
 	stored := cloneMap(body)
 
 	s.mu.Lock()
 	s.resources[path] = stored
+	// The URL a create POSTed to is, by definition, a collection — declaring
+	// it means a subsequent list of it (even one that finds only what this
+	// call just made) never has to be told that by hand.
+	s.declaredCollections[collection] = true
 	s.mu.Unlock()
 
 	s.respondMutation(w, path, stored, false)
