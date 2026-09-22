@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/infrena/infrena/pkg/schema"
@@ -256,5 +257,36 @@ func TestEveryAttrFieldSurvivesEncoding(t *testing.T) {
 	}
 	if e := ty.Attributes["backends"].Elem; e == nil || e.Fields["port"] == nil || !e.Fields["port"].ForceNew {
 		t.Errorf("Elem's nested fields or their flags lost: %+v", e)
+	}
+}
+
+// TestImportDescriptionRendersEveryAcceptedShape. magic-modules newline-joins
+// more than one accepted import id shape for 11 of the 233 real types (e.g.
+// gcp.bigquery.table: its full relative name, then "{{table_id}}" alone).
+// ParseProviderID (internal/gcprov) tries each line as its own template; a
+// human reading `infrena explain` needs to see every one of them too, not a
+// Description with a raw newline sitting in the middle of it.
+func TestImportDescriptionRendersEveryAcceptedShape(t *testing.T) {
+	c := &Catalog{Types: []*Type{{
+		Name:         "gcp.bigquery.table",
+		SelfLink:     "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		ImportFormat: "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}\n{{table_id}}",
+		Attributes:   map[string]*Attr{},
+	}}}
+	defs := c.Definitions()
+	if len(defs) != 1 {
+		t.Fatalf("got %d definitions, want 1", len(defs))
+	}
+	desc := defs[0].ImportID.Description
+	if strings.Contains(desc, "\n") {
+		t.Errorf("description still has a raw newline in it: %q", desc)
+	}
+	for _, want := range []string{
+		"projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		"{{table_id}}",
+	} {
+		if !strings.Contains(desc, want) {
+			t.Errorf("description %q is missing accepted shape %q", desc, want)
+		}
 	}
 }

@@ -78,8 +78,54 @@ func reduceSelfLink(ty *catalog.Type, raw string) (string, error) {
 // BEFORE any API call: an id for the wrong type, or one with no hierarchy at
 // all, costs a message naming the problem rather than a confusing 404 from a
 // url built out of nonsense.
+//
+// self_link is tried first -- the canonical shape ProviderID itself always
+// produces, and so what a stored ResourceState's ProviderID always is for
+// Read/Delete/Update. Import, though, takes whatever a user typed, and
+// magic-modules supplies more than one accepted shape for 11 of the 233 real
+// types, newline-joined in ImportFormat (e.g. gcp.bigquery.table accepts
+// both its full relative name and the short "{{table_id}}" alone) --
+// legitimate shorthand a user may reasonably type, not a typo. Each
+// additional ImportFormat line is tried in turn, in the order magic-modules
+// listed them, so a valid shorthand id parses instead of being refused for
+// not matching the one canonical form.
 func ParseProviderID(ty *catalog.Type, id string) (map[string]value.Value, error) {
-	tmplSegs := strings.Split(ty.SelfLink, "/")
+	var firstErr error
+	for _, tmpl := range importTemplates(ty) {
+		attrs, err := parseAgainstTemplate(ty, tmpl, id)
+		if err == nil {
+			return attrs, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return nil, firstErr
+}
+
+// importTemplates lists every id shape ParseProviderID accepts for ty:
+// self_link first, then each of ImportFormat's own newline-joined lines that
+// is not identical to self_link (magic-modules typically repeats it as the
+// first line; skipped here so it is tried only once).
+func importTemplates(ty *catalog.Type) []string {
+	templates := []string{ty.SelfLink}
+	for _, line := range strings.Split(ty.ImportFormat, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == ty.SelfLink {
+			continue
+		}
+		templates = append(templates, line)
+	}
+	return templates
+}
+
+// parseAgainstTemplate matches id against tmpl segment by segment, the way
+// url templates are built (ExpandURL's own "{{x}}"/"{x}"/reserved "{+x}"
+// forms): a literal segment must match exactly, a plain placeholder captures
+// one segment, and a reserved one captures the rest of the path (and must be
+// tmpl's own last segment).
+func parseAgainstTemplate(ty *catalog.Type, tmpl, id string) (map[string]value.Value, error) {
+	tmplSegs := strings.Split(tmpl, "/")
 	idSegs := strings.Split(id, "/")
 
 	out := make(map[string]value.Value, len(tmplSegs))
@@ -99,8 +145,8 @@ func ParseProviderID(ty *catalog.Type, id string) (map[string]value.Value, error
 
 		if reserved {
 			if i != len(tmplSegs)-1 {
-				return nil, fmt.Errorf("gcprov: %s: self_link's reserved placeholder %q must be its last segment",
-					ty.Name, seg)
+				return nil, fmt.Errorf("gcprov: %s: id template %q's reserved placeholder %q must be its last segment",
+					ty.Name, tmpl, seg)
 			}
 			if j >= len(idSegs) {
 				return nil, fmt.Errorf("gcprov: %q is too short for %s", id, ty.Name)
