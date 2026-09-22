@@ -795,8 +795,37 @@ func forceNewAttr(a *catalog.Attr) {
 	}
 }
 
-// operationPollPath finds the API's own operations.get method path, e.g.
-// "v1/{+name}".
+// runtimeOperationPlaceholders is the set of placeholder names the runtime
+// can fill when it expands an operation template. It must stay in step with
+// the attrs map operationRequestURL builds in internal/gcprov/await.go: that
+// function is the only caller that expands these paths, so a placeholder it
+// does not supply cannot be filled by anything, and a template naming one is
+// dead on arrival.
+var runtimeOperationPlaceholders = map[string]bool{
+	"operation": true,
+	"name":      true,
+	"project":   true,
+	"zone":      true,
+	"region":    true,
+}
+
+// operationPollPath returns the API's own operations.get path.
+//
+// It collects every candidate and chooses, rather than taking the first one a
+// map walk happens to reach. Map iteration is unordered, and container
+// publishes two operations collections -- projects.locations.operations
+// ("v1/{+name}") and projects.zones.operations
+// ("v1/projects/{projectId}/zones/{zone}/operations/{operationId}"). Taking
+// whichever came first made the generator produce four different catalogs
+// across twelve runs, and half the time it chose a path the runtime cannot
+// expand at all: operationRequestURL supplies operation/name/project/zone/
+// region and nothing supplies projectId or operationId, so every GKE cluster
+// mutation failed at the polling step.
+//
+// The rule: prefer a template whose placeholders the runtime can actually
+// fill, and among those prefer the reserved-expansion "{+name}" form, which
+// is the shape every modern GCP API publishes. Ties break on the sorted path
+// string so the result never depends on map order.
 //
 // Measured across the corpus on 2026-09-22: every one of the 97 longrunning
 // types' APIs publishes one, in three shapes — v1/{+name} (72), v2/{+name}
@@ -804,24 +833,93 @@ func forceNewAttr(a *catalog.Attr) {
 // upstream, not that this API never had one, and the caller should treat it as
 // a type that cannot be awaited rather than guessing a path.
 func operationPollPath(doc *disco.Document) string {
-	var found string
+	var found []string
 	var walk func(res map[string]*disco.Resource)
 	walk = func(res map[string]*disco.Resource) {
-		for name, r := range res {
-			if found != "" {
-				return
-			}
+		for _, name := range sortedKeys(res) {
+			r := res[name]
 			if name == "operations" {
 				if m := r.Methods["get"]; m != nil && m.Path != "" {
-					found = m.Path
-					return
+					found = append(found, m.Path)
 				}
 			}
 			walk(r.Resources)
 		}
 	}
 	walk(doc.Resources)
-	return found
+	if len(found) == 0 {
+		return ""
+	}
+	sort.Strings(found)
+
+	// Rank: an expandable "{+name}" path beats any other expandable one, and
+	// an expandable path of any shape beats one the runtime would choke on.
+	// Only if every candidate is unexpandable do we return one anyway -- the
+	// generator has nothing better to offer, and await.go reports the missing
+	// placeholder by name at the point it matters.
+	best, bestRank := "", -1
+	for _, path := range found {
+		rank := 0
+		if runtimeCanExpand(path) {
+			rank = 1
+			if strings.Contains(path, "{+name}") {
+				rank = 2
+			}
+		}
+		if rank > bestRank {
+			best, bestRank = path, rank
+		}
+	}
+	return best
+}
+
+// runtimeCanExpand reports whether every placeholder in a Discovery method
+// path is one runtimeOperationPlaceholders names.
+func runtimeCanExpand(path string) bool {
+	for _, name := range pathPlaceholders(path) {
+		if !runtimeOperationPlaceholders[name] {
+			return false
+		}
+	}
+	return true
+}
+
+// pathPlaceholders returns the placeholder names in a url template, in the
+// order they appear, stripping RFC 6570's reserved-expansion "+" the same way
+// gcprov.ExpandURL does. Discovery writes single braces; the double-brace
+// magic-modules spelling is accepted too so the two can never disagree about
+// what a template needs.
+func pathPlaceholders(tmpl string) []string {
+	var names []string
+	for i := 0; i < len(tmpl); {
+		if tmpl[i] != '{' {
+			i++
+			continue
+		}
+		openLen, closeSeq := 1, "}"
+		if i+1 < len(tmpl) && tmpl[i+1] == '{' {
+			openLen, closeSeq = 2, "}}"
+		}
+		rel := strings.Index(tmpl[i+openLen:], closeSeq)
+		if rel == -1 {
+			break
+		}
+		content := strings.TrimSpace(tmpl[i+openLen : i+openLen+rel])
+		names = append(names, strings.TrimPrefix(content, "+"))
+		i += openLen + rel + len(closeSeq)
+	}
+	return names
+}
+
+// sortedKeys returns m's keys in sorted order, so a walk over it reaches the
+// same entries in the same order on every run.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // operationWaitPath returns the API's own operations wait path for a scope, or
