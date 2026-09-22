@@ -453,9 +453,18 @@ var versionSegment = regexp.MustCompile(`^v[0-9][0-9a-zA-Z]*$`)
 // precede the resource hierarchy -- everything up to and including the first
 // version segment, with a trailing "/".
 //
-// It is derived per TYPE, from that type's own method path, not once per API.
-// dns publishes "dns/v1/projects/..." for responsePolicies and "v1/..." for
-// its other collections, so an API-wide prefix would be wrong for one of them.
+// It is derived per TYPE, from that type's own method path, rather than once
+// per API. Nothing in the pinned corpus REQUIRES that -- every method in every
+// one of the 505 method-bearing collections yields the same prefix as its
+// siblings, verified across all 43 Discovery documents -- so a per-API prefix
+// would give the same answer today. Per-type is kept because it cannot go
+// wrong if that ever stops being true, and because the prefix genuinely does
+// vary BETWEEN APIs in a way no rule predicts: dns puts "dns/v1/" in front of
+// every one of its 40 methods while networksecurity uses a bare "v1/".
+//
+// (An earlier version of this comment claimed dns mixed "dns/v1/" and "v1/"
+// within the one API. It does not; all 40 dns methods use "dns/v1/". The
+// claim came from the plan and was wrong there too.)
 //
 // Returns "" when the path has no version segment, which is the correct answer
 // for compute, storage and bigquery: their Discovery servicePath already
@@ -476,9 +485,9 @@ func pathPrefixOf(methodPath string) string {
 // onto ResolvedBaseURL, so all four answer the same question, and the first
 // that exists is as good as any other.
 //
-// Taken from the type's OWN collection, never from the service: dns puts
-// "dns/v1/" in front of its responsePolicies methods and "v1/" in front of
-// the rest, so a prefix derived once per API would be wrong for one of them.
+// Taken from the type's OWN collection rather than from the service. In the
+// pinned corpus every collection in an API agrees, so this is belt-and-braces
+// rather than a fix for a known conflict -- see pathPrefixOf.
 func prefixMethodPath(col disco.Collection) string {
 	for _, name := range []string{"get", "list", "insert", "create"} {
 		if m := col.Methods[name]; m != nil && m.Path != "" {
