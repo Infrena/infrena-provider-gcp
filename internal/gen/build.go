@@ -513,6 +513,23 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	} else {
 		t.Description = strings.TrimSpace(body.Description)
 	}
+
+	// SelfLink is how Read, Update, Delete and Import address ONE resource, so a
+	// type without it cannot be managed at all. magic-modules supplies it for
+	// only 90 of the 233 types; for the other 143 the Discovery document
+	// publishes the same thing as the collection's own `get` method path, and
+	// every one of those 143 has one (a type with no `get` cannot reach tier 1
+	// without a read_via ruling, so this is true by construction rather than by
+	// luck).
+	//
+	// Taken from the type's OWN collection, not from the service: two
+	// collections in one API have different get paths, and picking any of them
+	// would address the wrong resource.
+	if t.SelfLink == "" {
+		if get := col.Methods["get"]; get != nil {
+			t.SelfLink = get.Path
+		}
+	}
 	if t.BaseURL == "" {
 		// No magic-modules definition, or one with no base_url: fall back to
 		// the create method's own path, which for a REST-style insert is the
