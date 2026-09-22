@@ -115,7 +115,13 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 	// would produce a state holding both spellings of the same attribute --
 	// the same defect stateFrom exists to avoid, on the one path that
 	// bypasses stateFrom entirely.
-	for k, v := range schemaAttrs(ty.Attributes, awaited) {
+	//
+	// Reconciled against what this create ASKED for, for the same reason
+	// stateFrom reconciles against the state it was read at: an operation
+	// body carries the same server-added nested keys, reordered sets and
+	// whole-number floats a get does, and this state is what the next plan
+	// diffs configuration against.
+	for k, v := range ReconcileAttrs(ty.Attributes, desired.Attrs, schemaAttrs(ty.Attributes, awaited)) {
 		attrs[k] = v
 	}
 	return &resource.ResourceState{
@@ -279,7 +285,13 @@ func (p *Provider) readAfterCreate(ctx context.Context, ty *catalog.Type, desire
 		time.Duration(ty.TimeoutSeconds)*time.Second)
 	defer cancel()
 
-	return p.Read(ctx, &resource.ResourceState{Type: ty.Name, ProviderID: id})
+	// The attributes this create asked for travel with the readback, as the
+	// reference reconciliation expresses GCP's answer in. Without them a
+	// created resource's first state records whatever order GCP returned a
+	// set in, the plan right after the apply proposes reordering it, and the
+	// patch that follows changes nothing -- a plan that never converges, from
+	// the one read that has no previous state to reconcile against.
+	return p.Read(ctx, &resource.ResourceState{Type: ty.Name, ProviderID: id, Attributes: desiredAttrs})
 }
 
 // Read returns the current state, or (nil, nil) when the resource is gone.
@@ -370,7 +382,16 @@ func (p *Provider) stateFrom(ty *catalog.Type, current *resource.ResourceState, 
 	for k, v := range idAttrs {
 		attrs[toSchema(ty.Attributes, k)] = v
 	}
-	for k, v := range schemaAttrs(ty.Attributes, body) {
+	// RECONCILED AGAINST WHAT THIS RESOURCE IS GOING TO BE COMPARED WITH.
+	// GCP answers with more than it was sent -- server-set keys inside nested
+	// objects, a set in a different order, a whole number where a float was
+	// declared -- and every one of those reads as drift against configuration
+	// that has not changed. current.Attributes is what the host holds for
+	// this resource (the desired attributes, on the readback after a create
+	// or a patch; the last observation, on a refresh), so it is the order and
+	// the shape the answer has to be expressed in for value.Equal to mean "no
+	// drift". See reconcile.go.
+	for k, v := range ReconcileAttrs(ty.Attributes, current.Attributes, schemaAttrs(ty.Attributes, body)) {
 		attrs[k] = v
 	}
 	return &resource.ResourceState{
