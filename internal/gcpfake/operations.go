@@ -58,6 +58,24 @@ func grpcCode(status string) int {
 	return grpcCodes["UNKNOWN"]
 }
 
+// SeedOperation registers a longrunning operation by name with the response
+// it will complete with, without requiring a preceding create -- the
+// longrunning mirror of Seed. A test may use a realistic full relative name
+// (e.g. "projects/p/locations/l/operations/op-1"), not only the bare
+// "operations/op-N" shape the fake's own newLongRunningOp mints: a fake
+// requiring the test to say what exists, rather than a routing heuristic
+// guessing it from the polled url's shape, is honest about what a fake can
+// know (the same principle server.go's declared-collections doc comment
+// states for ordinary resources). It completes on its first poll unless
+// NeverCompleteOperations was called first, in which case it stays
+// unfinished forever -- combine the two to exercise a genuine timeout rather
+// than a poll that merely 404s.
+func (s *Server) SeedOperation(name string, response map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lroOps[name] = &lroOp{name: name, response: cloneMap(response)}
+}
+
 // CompleteOperationWithError registers a longrunning operation by name,
 // without requiring a preceding create, so a test can poll it directly. It
 // completes with GCP's error shape on its first poll (or never, if
@@ -66,6 +84,19 @@ func (s *Server) CompleteOperationWithError(name, code, message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lroOps[name] = &lroOp{name: name, errCode: code, errMsg: message}
+}
+
+// SeedComputeOperation registers a compute-style operation by name, without
+// requiring a preceding create -- the compute mirror of SeedOperation. A
+// completed compute operation's own body never carries a "response" (unlike
+// longrunning, compute reports completion by status alone; the caller
+// re-reads the resource), so unlike SeedOperation this takes no response
+// parameter. It completes on its first wait unless NeverCompleteOperations
+// was called first.
+func (s *Server) SeedComputeOperation(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.computeOps[name] = &computeOp{name: name}
 }
 
 // NeverCompleteOperations makes every operation — longrunning or compute
@@ -155,20 +186,19 @@ func (s *Server) newComputeOp(path string, result map[string]any, isDelete bool)
 }
 
 // handleComputeWait answers the long-poll wait method for a compute-style
-// operation. An operation the fake never created via a mutation (a test may
-// hand-build one, the way await_test.go's compute test does) is
-// auto-vivified as one that completes successfully on this call, because the
-// fake's job is to answer the wait, not to insist the operation was born
-// through its own POST handler.
-//
-// CAVEAT — this is deliberately more permissive than the real API: real GCP
-// 404s a wait on an operation name it never issued. This fake does not,
-// because it has no way to tell "a test built this operation by hand on
-// purpose" apart from "a client bug is waiting on the wrong name" — the
-// former is a real, supported use of this fake (see await_test.go's compute
-// test), so it wins. A client bug that waits on a wrong or stale operation
-// name gets a false success here rather than the real API's 404; do not read
-// this fake's leniency here as full fidelity to that failure mode.
+// operation: unfinished forever under NeverCompleteOperations, otherwise
+// done on this very call. An operation name the fake has never seen -- not
+// created via a mutation, not registered with SeedComputeOperation -- 404s,
+// the same as handleGetOperation does for an unknown longrunning name. An
+// earlier version of this auto-vivified any unknown name as one that
+// completes successfully, on the reasoning that the fake's job is to answer
+// the wait, not to insist the operation was born through its own POST
+// handler. That reasoning does not survive contact with this package's own
+// declared-collections principle (server.go): inferring "this operation
+// exists" from the shape of a request the fake happens to receive is exactly
+// the kind of URL-shape guessing that principle rules out, and it meant a
+// client polling a wrong or stale operation name got a false success here
+// instead of the real API's 404.
 func (s *Server) handleComputeWait(w http.ResponseWriter, r *http.Request) {
 	m := waitPathRE.FindStringSubmatch(r.URL.Path)
 	if m == nil {
@@ -179,12 +209,12 @@ func (s *Server) handleComputeWait(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	op, ok := s.computeOps[opName]
-	if !ok {
-		op = &computeOp{name: opName}
-		s.computeOps[opName] = op
-	}
 	never := s.neverComplete
 	s.mu.Unlock()
+	if !ok {
+		writeNotFound(w, opName)
+		return
+	}
 
 	if never {
 		writeJSON(w, http.StatusOK, map[string]any{"name": opName, "status": "RUNNING"})

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 // await blocks until a mutation has actually taken effect, and returns the
@@ -45,27 +46,54 @@ func (p *Provider) await(ctx context.Context, ty *catalog.Type, resp map[string]
 
 // awaitLongRunning polls a google.longrunning.Operation by name until `done`.
 //
-// NOT YET IMPLEMENTED -- deliberately stubbed. The shape is
-// {"name": "...", "done": false} becoming either {"done": true,
-// "response": {...}} or {"done": true, "error": {...}}, and the poll target
-// is GCP's own convention <APIBaseURL><version>/<name> (verified against
-// redis's operations.get, path "v1/{+name}"). catalog.Type currently has no
-// Version field to supply that segment: counted across the 97 real
-// AwaitLongRunning types, 58 record no API version anywhere in the catalog
-// and the other 39 carry one only inside base_url, never in api_base_url --
-// so building the poll url from api_base_url+name alone, as an earlier draft
-// of this function did, is not "incomplete for a few edge cases", it is
-// wrong for all 97. That earlier draft passed every test in this file
-// anyway, because every fixture here uses an empty or hand-built
-// APIBaseURL, which sidesteps the missing segment entirely -- exactly the
-// "passes the synthetic test, 404s for real" trap this task has hit twice
-// already (OperationScope, trimVersionPrefix). Left stubbed rather than
-// shipped half-right: Task 8/9 is adding catalog.Type.Version and
-// regenerating the catalog; this function is completed against
-// ty.APIBaseURL+ty.Version+"/"+name in a follow-up commit. See
-// task-12-report.md.
+// The shape is {"name": "...", "done": false} becoming either
+// {"done": true, "response": {...}} or {"done": true, "error": {...}}. The
+// poll target is ty.OperationPollPath (e.g. "v1/{+name}") expanded against
+// the operation's own name -- the exact url the operation's own API
+// publishes for it (its Discovery document's operations.get method path),
+// taken verbatim rather than reconstructed from APIBaseURL plus a guessed
+// version segment: 58 of the 97 real AwaitLongRunning types record no API
+// version anywhere else in the catalog, so a reconstruction would have been
+// wrong for most of them (see task-12-report.md). "{+name}" is RFC 6570
+// reserved expansion -- an operation name is a path containing "/" -- which
+// ExpandURL (Task 11) already handles unescaped.
 func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op map[string]any) (map[string]any, error) {
-	return nil, fmt.Errorf("%s: awaitLongRunning is not yet implemented (pending catalog.Type.Version)", ty.Name)
+	name, _ := op["name"].(string)
+	if name == "" {
+		return nil, fmt.Errorf("%s: operation has no name to poll", ty.Name)
+	}
+	if ty.OperationPollPath == "" {
+		return nil, fmt.Errorf("%s: no operation poll path for a longrunning await", ty.Name)
+	}
+	for attempt := 0; ; attempt++ {
+		if done, _ := op["done"].(bool); done {
+			// An operation that completed with an error is not an await failure,
+			// it is a GCP failure, and its message is the only thing the user can
+			// act on. Do not replace it with our own wording.
+			if e, ok := op["error"].(map[string]any); ok {
+				return nil, operationError(ty, e)
+			}
+			if r, ok := op["response"].(map[string]any); ok {
+				return r, nil
+			}
+			// Done, no error, no response: a delete, or a create whose result
+			// must be read back. The caller decides which.
+			return nil, nil
+		}
+		if err := p.sleepBackoff(ctx, attempt); err != nil {
+			return nil, fmt.Errorf("%s: waiting for %s: %w", ty.Name, name, err)
+		}
+		pollPath, err := ExpandURL(ty.OperationPollPath, map[string]value.Value{
+			"name": value.String(name, value.SourceProvider),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%s: building the operation poll url: %w", ty.Name, err)
+		}
+		op, err = p.client.Do(ctx, http.MethodGet, ty.APIBaseURL+pollPath, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 // awaitComputeOperation polls a compute-style operation until status is DONE.
