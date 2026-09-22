@@ -6704,11 +6704,20 @@ just add the missing prefix.
 **Do not synthesize the prefix from the version.** The obvious shortcut --
 `APIBaseURL = RootURL + Version + "/"` when `servicePath` is empty -- is wrong.
 Measured across the empty-`servicePath` APIs, 41 of 2318 method paths do not
-begin with the bare version: `dns` uses `dns/v1/projects/...` for its
-responsePolicies collection while its other collections use `v1/...`, and
+begin with the bare version: all 40 of `dns`'s methods use
+`dns/v1/projects/...`, and
 `cloudresourcemanager` has a custom verb at `v3:fetchResourceSemantics`. The
-prefix therefore varies WITHIN a single API and must be derived per type from
-that type's own method path.
+prefix therefore varies BETWEEN APIs by no rule predictable from the version
+alone, and must be read off a real method path.
+
+(CORRECTION, after Task 13a's review measured it: an earlier draft said dns
+mixed `dns/v1/` and `v1/` WITHIN the one API and argued from that that the
+prefix must be derived per TYPE. That is false. Every method in all 505
+method-bearing collections across all 43 Discovery documents yields the same
+prefix as its siblings. Per-type derivation still shipped, because it cannot
+go wrong if that ever changes, but it is belt-and-braces, not a fix for a
+conflict that exists. The wrong claim reached a code comment before the review
+caught it.)
 
 **Files:**
 - Modify: `internal/catalog/catalog.go` (new field)
@@ -6727,8 +6736,8 @@ In `internal/catalog/catalog.go`, inside `type Type struct`, after `APIBaseURL`:
 
 ```go
 	// PathPrefix is whatever sits between APIBaseURL and the relative
-	// resource name -- "v1/" for networksecurity, "dns/v1/" for dns's
-	// responsePolicies, "" for compute, storage and bigquery (whose
+	// resource name -- "v1/" for networksecurity, "dns/v1/" for every dns
+	// method, "" for compute, storage and bigquery (whose
 	// Discovery servicePath already carries the version).
 	//
 	// It exists because SelfLink cannot carry it. SelfLink is also the
@@ -6820,8 +6829,9 @@ var versionSegment = regexp.MustCompile(`^v[0-9][0-9a-zA-Z]*$`)
 // version segment, with a trailing "/".
 //
 // It is derived per TYPE, from that type's own method path, not once per API.
-// dns publishes "dns/v1/projects/..." for responsePolicies and "v1/..." for
-// its other collections, so an API-wide prefix would be wrong for one of them.
+// The prefix varies between APIs with no predictable rule: all 40 dns methods
+// use "dns/v1/" while networksecurity uses a bare "v1/". Within an API every
+// collection agrees, so per-type derivation is belt-and-braces.
 //
 // Returns "" when the path has no version segment, which is the correct answer
 // for compute, storage and bigquery: their Discovery servicePath already
