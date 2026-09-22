@@ -77,6 +77,9 @@ type Server struct {
 	computeOps     map[string]*computeOp
 	neverComplete  bool
 	createThenFail map[string]apiErrorSpec
+	// opLinkVersion replaces the leading api version segment of a compute
+	// operation's own selfLink and targetLink, for AnswerComputeOperationLinksUnder.
+	opLinkVersion string
 
 	failNext *apiErrorSpec
 	requests []Request

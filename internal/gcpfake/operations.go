@@ -235,15 +235,47 @@ func (s *Server) computeOpSelfLink(targetPath, name string) string {
 	return s.absolute(scope + "/operations/" + name)
 }
 
-// absolute turns a request path into the absolute url GCP would answer with.
-// A selfLink or targetLink is always absolute on the wire, and callers
-// reduce it back to a relative name themselves; a fake that answered with a
-// bare path would let a caller that never reduces anything pass.
+// absolute turns a request path into the absolute url GCP would answer with
+// for a compute operation's own links. A selfLink or targetLink is always
+// absolute on the wire, and callers reduce it back to a relative name
+// themselves; a fake that answered with a bare path would let a caller that
+// never reduces anything pass. AnswerComputeOperationLinksUnder, if a test
+// asked for it, swaps the version segment out here.
 func (s *Server) absolute(path string) string {
 	if path == "" {
 		return ""
 	}
+	if s.opLinkVersion != "" {
+		path = "/" + s.opLinkVersion + "/" + afterFirstSegment(path)
+	}
 	return s.srv.URL + path
+}
+
+// afterFirstSegment is path with its leading "/" and first segment removed:
+// "/v1/projects/p/widgets/one" becomes "projects/p/widgets/one".
+func afterFirstSegment(path string) string {
+	rest := strings.TrimPrefix(path, "/")
+	if i := strings.IndexByte(rest, '/'); i >= 0 {
+		return rest[i+1:]
+	}
+	return ""
+}
+
+// AnswerComputeOperationLinksUnder makes every compute operation report its
+// selfLink and targetLink with version as their leading path segment,
+// whatever version the request itself came in on -- an operation answering
+// ".../v1beta1/projects/p/..." for a create posted to ".../v1/projects/p/...".
+//
+// This is not a contrivance. An operation's targetLink is whatever url its
+// own API chose to publish, and nothing makes that agree with the version
+// the caller's catalog pinned: sqladmin's Discovery document documents no
+// description for targetLink at all. A caller reducing that url by its own
+// api prefix finds nothing to reduce by, which for a create is the orphan
+// case, so it has to be something a test can produce on purpose.
+func (s *Server) AnswerComputeOperationLinksUnder(version string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.opLinkVersion = version
 }
 
 // handleComputeWait answers the long-poll wait method for a compute-style

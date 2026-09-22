@@ -284,7 +284,7 @@ func TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder(t *testing.T) {
 // widgetCatalogAwaitingLongRunning: the mutation answers with a compute
 // operation ({"name","status","selfLink","targetLink"}) that must be waited
 // on, and only then does the created resource have an identity. widgetType's
-// own self_link ends in "{{name}}", the shape 13 of the 65 real
+// own self_link ends in "{{name}}", the shape 12 of the 65 real
 // compute-style types have, so this fixture exercises both ways the old
 // return was wrong at once.
 func widgetCatalogAwaitingComputeOperation() *catalog.Catalog {
@@ -335,5 +335,82 @@ func TestCreatingThroughAComputeOperationIdentifiesTheResourceNotTheOperation(t 
 	}
 	if got := back.Attributes["sizeGb"]; got.Raw != int64(10) {
 		t.Errorf("the id addressed something other than the widget: read back %v", back.Attributes)
+	}
+}
+
+// TestCreateSurvivesAnOperationTargetItCannotReduce. An operation's
+// targetLink is whatever url its own API publishes, and nothing makes that
+// agree with the version the catalog pinned for the type: a "v1beta1/..."
+// target against a type whose path_prefix is "v1/" leaves reduceSelfLink
+// nothing to reduce by, and ProviderID fails. Failing there would make
+// Create return an error for a resource GCP has already made, and the host
+// drops a failed create's result, so the resource would exist and be tracked
+// nowhere. The caller's own attributes describe the same resource, so they
+// are used instead -- the same id Create would have used had the operation
+// named no target at all.
+func TestCreateSurvivesAnOperationTargetItCannotReduce(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.AnswerComputeOperationLinksUnder("v1beta1")
+	p := testProviderWithCatalog(t, s, widgetCatalogAwaitingComputeOperation())
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.widget",
+		Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one", "sizeGb": int64(10)}),
+	})
+	if err != nil {
+		t.Fatalf("Create errored for a resource GCP already made, which orphans it: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one the caller's attributes imply", st.ProviderID)
+	}
+
+	// Non-vacuity: if the fake ever stops answering with a target under
+	// another version, nothing above is being tested at all.
+	op := getJSON(t, s.URL()+"/v1/projects/p/locations/r/operations/op-1")
+	if target, _ := op["targetLink"].(string); !strings.Contains(target, "/v1beta1/") {
+		t.Fatalf("the operation's target is reducible after all, so this test proves nothing: %q", target)
+	}
+	if widgetType().PathPrefix != "v1/" {
+		t.Fatalf("this test needs a type whose path_prefix cannot reduce a v1beta1 url; got %q", widgetType().PathPrefix)
+	}
+}
+
+// TestCreateSurvivesAnUnreducibleTargetWhenTheReadbackNeverSeesIt covers the
+// same orphan path one step over: bestEffortState, which Create falls to
+// when the readback GET keeps 404ing inside GCP's eventual-consistency
+// window, computes the id from the awaited body a second time and used to
+// wrap a failure there into an error. Both of Create's consumers of the
+// awaited body have to survive an unreducible target, not just the first.
+//
+// Zero jitter for the same reason TestCreateTrustsTheAwaitWhenTheReadbackNeverSeesIt
+// uses it: the wall-clock cost is notFoundPatience, which no test can shorten.
+func TestCreateSurvivesAnUnreducibleTargetWhenTheReadbackNeverSeesIt(t *testing.T) {
+	gcptest.Isolate(t)
+	withJitterForTest(t, func(int64) int64 { return 0 })
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.AnswerComputeOperationLinksUnder("v1beta1")
+	s.NotFoundTimes("/v1/projects/p/locations/r/widgets/one", 1<<30)
+	p := testProviderWithCatalog(t, s, widgetCatalogAwaitingComputeOperation())
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.widget",
+		Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one"}),
+	})
+	if err != nil {
+		t.Fatalf("Create errored for a resource GCP already made, which orphans it: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one the caller's attributes imply", st.ProviderID)
 	}
 }
