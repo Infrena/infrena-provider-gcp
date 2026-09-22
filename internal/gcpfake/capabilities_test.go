@@ -253,12 +253,17 @@ func TestPatchMasksANestedPath(t *testing.T) {
 // are the pair a discover fallback needs to tell apart: scanning every type
 // across a project genuinely finds nothing for most of them, and that must
 // come back as an empty list, not a 404 — while getting one specific,
-// never-created resource must still 404. Both requests hit a totally virgin
-// server (nothing ever seeded or created), so the difference can only come
-// from the path shape itself, never from history.
+// never-created resource must still 404.
+//
+// The collection here is declared explicitly (DeclareCollection), not
+// inferred from its URL: list-vs-get is no longer guessed from path shape
+// (an earlier version tried that and was silently wrong for about a fifth of
+// the real catalog — see declaredCollections's doc comment), so a
+// genuinely-empty collection a test cares about has to say so.
 func TestAnEmptyCollectionListsEmpty(t *testing.T) {
 	s := New(t)
 	defer s.Close()
+	s.DeclareCollection("/v1/projects/p/locations/r/widgets")
 
 	resp, err := http.Get(s.URL() + "/v1/projects/p/locations/r/widgets")
 	if err != nil {
@@ -288,6 +293,94 @@ func TestAnAbsentIndividualResourceStill404s(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != 404 {
 		t.Fatalf("status = %d, want 404: a specific absent resource is not the same request as its collection", resp.StatusCode)
+	}
+}
+
+// TestAGlobalScopeCollectionIsNotConfusedWithItsResource uses the real shape
+// that broke the old segment-parity heuristic: compute's firewalls sit at
+// "projects/{project}/global/firewalls", where "global" is a bare literal
+// with no paired variable segment, unlike "zones/{zone}" or
+// "locations/{region}". Declaring rather than inferring means this needs no
+// special case at all — Seed just declares its own parent, whatever shape it
+// is.
+func TestAGlobalScopeCollectionIsNotConfusedWithItsResource(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+	s.Seed("/v1/projects/p/global/firewalls/fw-1", map[string]any{"name": "fw-1", "direction": "INGRESS"})
+
+	listResp, err := http.Get(s.URL() + "/v1/projects/p/global/firewalls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listResp.Body.Close()
+	if listResp.StatusCode != 200 {
+		t.Fatalf("list status = %d, want 200", listResp.StatusCode)
+	}
+	var list struct {
+		Items []map[string]any `json:"items"`
+	}
+	json.NewDecoder(listResp.Body).Decode(&list)
+	if len(list.Items) != 1 || list.Items[0]["name"] != "fw-1" {
+		t.Errorf("list = %+v, want one item named fw-1", list.Items)
+	}
+
+	getResp, err := http.Get(s.URL() + "/v1/projects/p/global/firewalls/fw-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer getResp.Body.Close()
+	if getResp.StatusCode != 200 {
+		t.Fatalf("get status = %d, want 200 (not the list branch, and not 404)", getResp.StatusCode)
+	}
+	var got map[string]any
+	json.NewDecoder(getResp.Body).Decode(&got)
+	if got["direction"] != "INGRESS" {
+		t.Errorf("get = %v, want the seeded resource, not an empty list envelope", got)
+	}
+}
+
+// TestALeadingVersionSegmentEmbeddedInTheTypesOwnTemplateIsNotConfused is the
+// other real shape the old heuristic broke: Cloud Resource Manager's v3
+// folders collection is just "v3/folders" — its own template embeds a
+// version segment on top of the "/v1/" every request in this fake already
+// carries, so the real, full path is "/v1/v3/folders" (list) and
+// "/v1/v3/folders/123" (get). Under segment parity this used to invert BOTH
+// ways at once: the list path (even segment count) was misread as a get, and
+// the get path (odd) was misread as a list — so a read of an existing
+// resource silently came back as an empty list instead of the resource.
+func TestALeadingVersionSegmentEmbeddedInTheTypesOwnTemplateIsNotConfused(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+	s.Seed("/v1/v3/folders/123", map[string]any{"name": "folders/123", "displayName": "Engineering"})
+
+	listResp, err := http.Get(s.URL() + "/v1/v3/folders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listResp.Body.Close()
+	if listResp.StatusCode != 200 {
+		t.Fatalf("list status = %d, want 200", listResp.StatusCode)
+	}
+	var list struct {
+		Items []map[string]any `json:"items"`
+	}
+	json.NewDecoder(listResp.Body).Decode(&list)
+	if len(list.Items) != 1 {
+		t.Fatalf("list = %+v, want one item", list.Items)
+	}
+
+	getResp, err := http.Get(s.URL() + "/v1/v3/folders/123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer getResp.Body.Close()
+	if getResp.StatusCode != 200 {
+		t.Fatalf("get status = %d, want 200", getResp.StatusCode)
+	}
+	var got map[string]any
+	json.NewDecoder(getResp.Body).Decode(&got)
+	if got["displayName"] != "Engineering" {
+		t.Errorf("get = %v, want the seeded resource, not an empty list envelope", got)
 	}
 }
 
