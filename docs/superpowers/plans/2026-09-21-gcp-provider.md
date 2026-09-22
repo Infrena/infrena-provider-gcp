@@ -6957,3 +6957,176 @@ git add internal/catalog/catalog.go internal/catalog/real_test.go \
         internal/gcprov/crud_test.go catalog.json.gz
 git commit -m "Put the api version in one place"
 ```
+
+---
+
+### Task 13b: A compute operation is not the thing it created
+
+**Why this exists.** Found while reviewing Task 13's fix round, by asking what
+`await` actually hands back. The two await strategies return different KINDS of
+object and nothing downstream distinguishes them:
+
+- `awaitLongRunning` returns `op["response"]` -- the created resource. Correct.
+- `awaitComputeOperation` returns `op` -- the **operation**, not the resource.
+
+`readAfterCreate` and `bestEffortState` both call
+`ProviderID(ty, awaited, desiredAttrs)`, and `ProviderID`'s first move is:
+
+```go
+if raw, ok := body["selfLink"].(string); ok && raw != "" {
+    return reduceSelfLink(ty, raw)
+}
+```
+
+A real compute `Operation` carries `selfLink` -- verified in
+`schemas/compute.json`, where `Operation.properties.selfLink` is
+"[Output Only] Server-defined URL for **the resource**", meaning the operation
+resource itself, e.g.
+`https://compute.googleapis.com/compute/v1/projects/p/zones/z/operations/operation-1740...`.
+
+`reduceSelfLink` finds the literal prefix `projects/` in that URL and happily
+returns `projects/p/zones/z/operations/operation-1740...`. That is the provider
+id for the resource. It names an operation. Every later Read, Delete and Import
+for that resource addresses the operation URL instead.
+
+**All 65 compute-style types are affected.** 13 of them are wrong a second way:
+their `self_link` uses a `{{name}}` placeholder, and when the selfLink branch is
+not taken, `ProviderID` merges the operation's own fields over the caller's
+attributes, so `name` becomes the OPERATION's name (`operation-1740...`) rather
+than the resource's.
+
+**Why no test caught it, again.** `internal/gcpfake/operations.go:188` builds a
+compute operation as
+`map[string]any{"name": name, "status": "RUNNING", "targetLink": path}` -- with
+no `selfLink`. So in every test `ProviderID` falls through to the expansion
+branch and picks `{instance}` out of the caller's own attributes, producing the
+right answer for the wrong reason. The fake and the production code share one
+wrong assumption, so no test written against the fake can fail. This is the
+third instance of that exact shape in this project (Task 12's compute wait path,
+Task 13a's URL version, this).
+
+**The fix.** A compute operation publishes the thing it created in `targetLink`
+("[Output Only] The URL of the resource that the operation modifies"). Return
+that, not the operation.
+
+**Files:**
+- Modify: `internal/gcprov/await.go`
+- Modify: `internal/gcpfake/operations.go`
+- Test: `internal/gcprov/await_test.go`, `internal/gcprov/crud_test.go`
+
+- [ ] **Step 1: Make the fake tell the truth**
+
+In `internal/gcpfake/operations.go:188`, a compute operation must carry its OWN
+`selfLink`, the way the real API does -- otherwise no test can distinguish the
+operation from its target:
+
+```go
+return map[string]any{
+    "name":   name,
+    "status": "RUNNING",
+    // The operation's OWN url, which real compute always sends. The fake
+    // omitted it, and that omission is precisely why no test could catch
+    // ProviderID reading it as though it named the created resource.
+    "selfLink":   s.baseURL + "/projects/" + project + "/zones/" + zone + "/operations/" + name,
+    "targetLink": path,
+}
+```
+
+Use whatever the surrounding code already has for the base URL, project and
+scope; if a compute operation in the fake has no scope to hand, build the
+`selfLink` from the same pieces the wait path already uses. The requirement is
+only that it be present, absolute, and DIFFERENT from `targetLink`.
+
+- [ ] **Step 2: Watch the existing suite break**
+
+Run: `go test ./internal/gcprov/...`
+Expected: FAIL. Compute-style create tests now derive their provider id from the
+operation's selfLink and produce ids containing `/operations/`. If the suite
+still passes, stop -- it means nothing asserts on a compute-style provider id
+at all, which is its own finding. Report the failing test names.
+
+- [ ] **Step 3: Return the target, not the operation**
+
+In `awaitComputeOperation`, at the DONE branch that currently does
+`return op, nil`:
+
+```go
+        if st, _ := op["status"].(string); st == "DONE" {
+            if e, ok := op["error"].(map[string]any); ok {
+                return nil, operationError(ty, e)
+            }
+            // An operation is not the thing it created. compute publishes
+            // the created resource's own url in targetLink; the operation's
+            // selfLink names the OPERATION, and handing that to ProviderID
+            // yields an id addressing ".../operations/operation-1740..."
+            // for all 65 compute-style types.
+            if target, _ := op["targetLink"].(string); target != "" {
+                return map[string]any{"selfLink": target}, nil
+            }
+            // No targetLink: nothing here identifies the resource, so say
+            // nothing rather than something wrong. Create falls back to the
+            // caller's own attributes, which is exactly the right answer.
+            return nil, nil
+        }
+```
+
+Returning `(nil, nil)` is already a shape `Create` handles -- `awaitLongRunning`
+returns it for a done-with-no-response operation, and `ProviderID(ty, nil, attrs)`
+expands `ty.SelfLink` against the caller's attributes.
+
+- [ ] **Step 4: Run the suite again**
+
+Run: `go test ./internal/gcprov/...`
+Expected: PASS, with ids back to naming resources. Any test that had encoded the
+operation-shaped id was encoding the bug; fix it and name it in the report.
+
+- [ ] **Step 5: The test that pins it**
+
+In `internal/gcprov/await_test.go`:
+
+```go
+// TestAComputeOperationYieldsTheResourceItCreatedNotItself. A compute
+// Operation carries BOTH selfLink (its own url) and targetLink (the created
+// resource's). ProviderID prefers selfLink, so returning the operation
+// unchanged gave all 65 compute-style types a provider id naming an
+// operation -- and every later Read, Delete and Import addressed that.
+//
+// The fake deliberately answers with a selfLink that differs from
+// targetLink; if it ever stops doing so this test passes vacuously, which is
+// how the original defect survived.
+func TestAComputeOperationYieldsTheResourceItCreatedNotItself(t *testing.T) {
+	// operation selfLink: .../projects/p/zones/z/operations/operation-1
+	// operation targetLink: .../projects/p/zones/z/instances/web1
+	// assert: awaited["selfLink"] == targetLink
+	// assert: the resulting provider id contains "/instances/" and NOT "/operations/"
+}
+```
+
+Assert on the provider id, not only on the awaited map -- the id is what the
+defect corrupted.
+
+- [ ] **Step 6: The 13 types with a `{{name}}` self_link**
+
+Add a test covering the second failure mode: for a compute-style type whose
+`self_link` uses `{{name}}` (e.g. `gcp.networkfirewallpolicy`,
+`projects/{{project}}/global/firewallPolicies/{{name}}`), confirm the provider
+id uses the RESOURCE's name and never the operation's. Before Step 3 the
+operation's `name` field merged over the caller's attributes and won.
+
+- [ ] **Step 7: Sabotage**
+
+1. Restore `return op, nil` -- Step 5's test must fail on an id containing
+   `/operations/`.
+2. Drop `selfLink` from the fake's compute operation -- Step 5's test must fail
+   as vacuous (assert the fake's two links differ, so this is caught).
+
+Restore by re-applying, never by `git checkout --`. Record each sabotage and the
+exact assertion in the commit body.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add internal/gcprov/await.go internal/gcpfake/operations.go \
+        internal/gcprov/await_test.go internal/gcprov/crud_test.go
+git commit -m "Return what a compute operation created, not the operation"
+```
