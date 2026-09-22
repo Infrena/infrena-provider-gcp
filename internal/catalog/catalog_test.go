@@ -176,3 +176,85 @@ func TestNestedReferenceIsNotProjected(t *testing.T) {
 		t.Errorf("nested References = %+v, want nil: only a top-level attribute's References is ever projected", nested.References)
 	}
 }
+
+// TestAnOutputAttributeIsNeverRequired covers the belt to Task 7's braces.
+//
+// Output and Required come from sources that never cross-validate — Discovery's
+// readOnly/prose union, and magic-modules' `required`. The generator resolves a
+// disagreement in favour of Output and names the field, but if one ever reached
+// the conversion anyway, Required+Computed is a combination schema.Validate
+// refuses, and it would fail the whole catalog at load with an error naming only
+// the attribute rather than the conflict behind it.
+func TestAnOutputAttributeIsNeverRequired(t *testing.T) {
+	c := &Catalog{Types: []*Type{{
+		Name: "gcp.widget", APIBaseURL: "https://tiny.googleapis.com/v1/",
+		BaseURL: "projects/{{project}}/widgets", TimeoutSeconds: 60,
+		Attributes: map[string]*Attr{
+			// Deliberately contradictory: both flags set.
+			"createTime": {Canonical: "createTime", Kind: value.KindString, Output: true, Required: true},
+		},
+	}}}
+	defs := c.Definitions()
+	a, ok := defs[0].Attribute("createTime")
+	if !ok {
+		t.Fatal("createTime missing")
+	}
+	if a.Required {
+		t.Error("an output-only attribute came out Required; schema.Validate refuses Required+Computed")
+	}
+	if !a.Computed {
+		t.Error("an output-only attribute must be Computed")
+	}
+	if err := schema.ValidateAll(defs); err != nil {
+		t.Errorf("infrena refuses the definitions: %v", err)
+	}
+}
+
+// TestEveryAttrFieldSurvivesEncoding covers Elem, Opaque and Unordered, which
+// TestTheCatalogSurvivesItsOwnEncoding never sets. Encode/Decode are plain
+// json.Marshal/Unmarshal today so the risk is low, but a future custom
+// MarshalJSON dropping one of these would be silent: the plugin would simply
+// stop reordering unordered lists, or start translating the keys of a free-form
+// map, with nothing failing.
+func TestEveryAttrFieldSurvivesEncoding(t *testing.T) {
+	in := &Catalog{Types: []*Type{{
+		Name: "gcp.widget", APIBaseURL: "https://tiny.googleapis.com/v1/",
+		BaseURL: "projects/{{project}}/widgets", TimeoutSeconds: 60,
+		ReadVia: "list_by_parent",
+		Attributes: map[string]*Attr{
+			"labels":   {Canonical: "labels", Kind: value.KindMap, Opaque: true},
+			"tags":     {Canonical: "tags", Kind: value.KindList, Unordered: true, Elem: &Attr{Kind: value.KindString}},
+			"rules":    {Canonical: "rules", Kind: value.KindList, Elem: &Attr{Kind: value.KindString}},
+			"backends": {Canonical: "backends", Kind: value.KindList, Elem: &Attr{Kind: value.KindMap, Fields: map[string]*Attr{"port": {Canonical: "port", Kind: value.KindInt, ForceNew: true}}}},
+		},
+	}}}
+	blob, err := Encode(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := Decode(blob)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, _ := out.Type("gcp.widget")
+	if ty.ReadVia != "list_by_parent" {
+		t.Errorf("ReadVia lost: %q", ty.ReadVia)
+	}
+	if !ty.Attributes["labels"].Opaque {
+		t.Error("Opaque lost; a free-form map would start having its keys translated")
+	}
+	if !ty.Attributes["tags"].Unordered {
+		t.Error("Unordered lost; the list would stop being reordered to match the reference")
+	}
+	// The contradicting case: rules is deliberately NOT unordered, so a decoder
+	// that defaulted everything to true would fail here rather than pass.
+	if ty.Attributes["rules"].Unordered {
+		t.Error("an ordered list came back Unordered")
+	}
+	if e := ty.Attributes["tags"].Elem; e == nil || e.Kind != value.KindString {
+		t.Errorf("scalar Elem lost: %+v", e)
+	}
+	if e := ty.Attributes["backends"].Elem; e == nil || e.Fields["port"] == nil || !e.Fields["port"].ForceNew {
+		t.Errorf("Elem's nested fields or their flags lost: %+v", e)
+	}
+}

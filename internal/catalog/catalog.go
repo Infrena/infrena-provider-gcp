@@ -209,6 +209,14 @@ func (a *Attr) toSchema(topLevel bool) schema.Attribute {
 	case a.Output:
 		// GCP chooses it. Computed and not Optional: configuration may not set it.
 		out.Computed = true
+		// And NOT Required, whatever the source said. Required+Computed is a
+		// combination schema.Validate refuses outright, so leaving it set would
+		// fail the whole catalog at load with an error naming only the attribute,
+		// not the fact that two independent sources disagreed about it. Task 7's
+		// generator already resolves that disagreement in favour of Output and
+		// names the field on stderr; this is the belt to its braces, because a
+		// conversion should not be able to emit what the host refuses.
+		out.Required = false
 	case a.Required:
 		// project, region, name and friends. Required wins; Computed would let a
 		// plan proceed without one.
