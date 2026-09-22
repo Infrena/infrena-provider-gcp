@@ -47,6 +47,13 @@ together.
 - Ask James before any `git push` and before creating a tag.
 - **Do not modify `../infrena`.** Defects there go to the vault note's follow-ups and to James.
 
+- **Build every URL with `absURL(ty, rel)`, never `ty.APIBaseURL + rel`.** The API
+  version lives in `ty.PathPrefix`, not in any stored template (Task 13a). Writing
+  the concatenation by hand drops the version and the call 404s, and no catalog
+  test catches it because those guard the stored data, not the composition. The one
+  deliberate exception is operation URLs in `await.go`, which are verbatim Discovery
+  method paths and carry their own version.
+
 ---
 
 ## Plan-level decisions (not in the spec)
