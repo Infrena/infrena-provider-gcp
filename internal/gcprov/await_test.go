@@ -102,16 +102,18 @@ func TestAFailedOperationReportsGCPsMessage(t *testing.T) {
 	}
 }
 
-// TestAComputeOperationIsPolledOnItsScope. OperationScope is a bare word
-// ("zone"/"region"/"global" — internal/gen/build.go), not the operations
-// collection's own name: the real embedded catalog carries only the bare
-// word (verified against the 65 compute-style types it generates), so
-// operationWaitURL must append "Operations" itself. An earlier draft of
-// task-12-brief.md (before today's correction landed in the plan doc, but
-// not in the brief file itself) set this fixture to "zoneOperations" and
-// had operationWaitURL use ty.OperationScope verbatim -- that version
-// passes this test by coincidence while 404ing against every real
-// compute-style type, since none of them carry the full collection name.
+// TestAComputeOperationIsPolledOnItsScope. The wait url is built from
+// ty.OperationWaitPath, the API's own published wait path, taken verbatim --
+// not reconstructed from a scope word. Three attempts at reconstructing it
+// were all wrong, this task's own included: the earlier "OperationScope is a
+// bare word, append Operations" fix (still visible in this task's git
+// history) built ".../zoneOperations/op-1/wait", but a reviewer who checked
+// schemas/compute.json directly found the real wire segment is always
+// "operations" -- "zoneOperations" is only Discovery's COLLECTION name for
+// the scope and never appears in a url at all. Both the earlier and the
+// current fixture happened to pass their own test, which is exactly why this
+// one asserts the real literal path rather than a substring that could match
+// either shape.
 //
 // The operation is seeded with SeedComputeOperation rather than handed to
 // await as a hand-built map the fake has never heard of: the fake used to
@@ -130,8 +132,8 @@ func TestAComputeOperationIsPolledOnItsScope(t *testing.T) {
 	p := testProvider(t, s)
 
 	ty := &catalog.Type{
-		Name: "gcp.instance", Await: catalog.AwaitComputeOperation,
-		OperationScope: "zone", Scope: catalog.ScopeZonal, TimeoutSeconds: 30,
+		Name: "gcp.instance", Await: catalog.AwaitComputeOperation, Scope: catalog.ScopeZonal, TimeoutSeconds: 30,
+		OperationWaitPath: "projects/{project}/zones/{zone}/operations/{operation}/wait",
 	}
 	op := map[string]any{"name": "op-1", "status": "RUNNING", "zone": "us-central1-a"}
 	if _, err := p.await(context.Background(), ty, op); err != nil {
@@ -139,14 +141,55 @@ func TestAComputeOperationIsPolledOnItsScope(t *testing.T) {
 	}
 	var polled bool
 	for _, r := range s.Requests() {
-		if contains(r.Path, "zoneOperations") && contains(r.Path, "/wait") {
+		if contains(r.Path, "/zones/us-central1-a/operations/op-1/wait") {
 			polled = true
 		}
 	}
 	// `wait` rather than `get`: it long-polls to a 2-minute deadline instead of
 	// burning one request per second against the project's quota.
 	if !polled {
-		t.Errorf("the zone operations wait endpoint was not used: %+v", s.Requests())
+		t.Errorf("the operations wait endpoint was not used with the right scope: %+v", s.Requests())
+	}
+}
+
+// TestANoWaitComputeOperationIsPolledWithGet covers the 7 of 65 compute-style
+// types (container, sqladmin) whose API publishes no wait method at all --
+// OperationWaitPath is empty for them, and the operation must be polled with
+// an ordinary GET on OperationPollPath instead, same status/error body shape
+// as the wait case. A wait call against one of these 404s rather than
+// long-polling, confirmed against their own Discovery documents (no `wait`
+// method anywhere in either schema).
+func TestANoWaitComputeOperationIsPolledWithGet(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.SeedComputeOperation("op-1")
+	p := testProvider(t, s)
+
+	ty := &catalog.Type{
+		Name: "gcp.sqladmin.instance", Await: catalog.AwaitComputeOperation, TimeoutSeconds: 30,
+		OperationPollPath: "v1/projects/{project}/operations/{operation}",
+	}
+	op := map[string]any{"name": "op-1", "status": "RUNNING"}
+	got, err := p.await(context.Background(), ty, op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("await returned nothing")
+	}
+	var polled bool
+	for _, r := range s.Requests() {
+		if r.Method == "GET" && contains(r.Path, "/projects/p/operations/op-1") {
+			polled = true
+		}
+		if r.Method == "POST" && contains(r.Path, "/wait") {
+			t.Errorf("a wait call was made against a type with no wait method: %+v", r)
+		}
+	}
+	if !polled {
+		t.Errorf("the operation poll path was not used: %+v", s.Requests())
 	}
 }
 
@@ -234,8 +277,8 @@ func TestAwaitDoesNotAbandonAComputeOperationInFlight(t *testing.T) {
 	cancel() // already cancelled before await is called
 
 	ty := &catalog.Type{
-		Name: "gcp.instance", Await: catalog.AwaitComputeOperation,
-		OperationScope: "zone", Scope: catalog.ScopeZonal, TimeoutSeconds: 30,
+		Name: "gcp.instance", Await: catalog.AwaitComputeOperation, Scope: catalog.ScopeZonal, TimeoutSeconds: 30,
+		OperationWaitPath: "projects/{project}/zones/{zone}/operations/{operation}/wait",
 	}
 	op := map[string]any{"name": "op-1", "status": "RUNNING", "zone": "us-central1-a"}
 	got, err := p.await(ctx, ty, op)
