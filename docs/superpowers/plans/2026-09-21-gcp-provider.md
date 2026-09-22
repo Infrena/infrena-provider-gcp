@@ -5419,7 +5419,14 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	if err != nil {
 		return nil, err
 	}
-	url += "?updateMask=" + neturl.QueryEscape(strings.Join(mask, ","))
+	// NOT every updatable type takes an updateMask. Measured across the 233
+	// generated types: 86 are updatable at all (they have an UpdateVerb), and
+	// only 71 of those use a mask — gcp.firewall, gcp.connection and 13 others
+	// PATCH without one. Appending the parameter unconditionally sends a query
+	// argument those APIs never asked for.
+	if ty.UpdateMask {
+		url += "?updateMask=" + neturl.QueryEscape(strings.Join(mask, ","))
+	}
 
 	if err := ctx.Err(); err != nil {
 		return nil, err // last point before the resource is modified
@@ -5454,7 +5461,11 @@ interchangeable across APIs.
 int64-as-string convention: a `KindString` attribute whose Discovery format was `int64` must go out as
 a string, not a number.
 
-**`Update` must never re-read before building the mask.** The AWS provider had exactly that workaround
+****The 147 types with no `UpdateVerb` are not updatable at all**, and `Capabilities.Update` is derived
+from that, so the host never calls `Update` for them — every attribute is effectively ForceNew. That is
+correct, not a gap: those APIs genuinely publish no update method.
+
+`Update` must never re-read before building the mask.** The AWS provider had exactly that workaround
 and removing it was a whole commit; the test that pins it here counts GETs of the resource and fails if
 there is more than one.
 
