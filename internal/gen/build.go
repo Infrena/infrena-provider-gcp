@@ -530,6 +530,16 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			t.SelfLink = get.Path
 		}
 	}
+
+	// ImportFormat is the ID shape `infrena import` accepts, and Capabilities.Import
+	// is derived from it — so a type without one cannot be adopted at all.
+	// magic-modules supplies it for only 75 of the 233 types; the rest fall back
+	// to SelfLink, which is the same thing by construction: a provider ID here IS
+	// the relative resource name (spec §5.5), and SelfLink is its template.
+	// Without this, 158 types generate fine and then silently refuse import.
+	if t.ImportFormat == "" {
+		t.ImportFormat = t.SelfLink
+	}
 	if t.BaseURL == "" {
 		// No magic-modules definition, or one with no base_url: fall back to
 		// the create method's own path, which for a REST-style insert is the
