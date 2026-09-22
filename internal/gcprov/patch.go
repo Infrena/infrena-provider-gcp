@@ -285,7 +285,7 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 			ty.Name, awaitErr)
 	}
 
-	st, readErr := p.readAfterPatch(ctx, ty, current)
+	st, readErr := p.readAfterPatch(ctx, ty, current, desired.Attrs)
 	switch {
 	case st != nil:
 		return st, nil
@@ -313,11 +313,22 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 // uncancellable applies to reading it back: abandoning here loses the record
 // of a change GCP has already made. The bound is the type's own timeout, not
 // the caller's.
-func (p *Provider) readAfterPatch(ctx context.Context, ty *catalog.Type, current *resource.ResourceState) (*resource.ResourceState, error) {
+//
+// The state it reads at carries DESIRED's attributes, not current's: the
+// patch has just made desired true, so desired is the shape and the order
+// GCP's answer should be expressed in (see ReconcileAttrs). Reconciling
+// against the pre-patch observation instead would order a set the way it was
+// before the change the user just made.
+func (p *Provider) readAfterPatch(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, desiredAttrs map[string]value.Value) (*resource.ResourceState, error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx),
 		time.Duration(ty.TimeoutSeconds)*time.Second)
 	defer cancel()
-	return p.Read(ctx, current)
+	return p.Read(ctx, &resource.ResourceState{
+		Address:    current.Address,
+		Type:       current.Type,
+		ProviderID: current.ProviderID,
+		Attributes: desiredAttrs,
+	})
 }
 
 // maskQuery renders the updateMask query argument, including its leading

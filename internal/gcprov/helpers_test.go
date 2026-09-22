@@ -144,9 +144,18 @@ func widgetType() *catalog.Type {
 		Attributes: map[string]*catalog.Attr{
 			"project": {Canonical: "project", Kind: value.KindString, Required: true, ForceNew: true},
 			"region":  {Canonical: "region", Kind: value.KindString, Required: true, ForceNew: true},
-			"name":    {Canonical: "name", Kind: value.KindString, Required: true, ForceNew: true},
-			"sizeGb":  {Canonical: "sizeGb", Kind: value.KindInt},
-			"tier":    {Canonical: "tier", Kind: value.KindString},
+			// NOT ForceNew, deliberately, and that is what the real corpus
+			// looks like: 10 of the 86 updatable types declare `name` as
+			// required, mutable AND consumed by their url (gcp.mesh,
+			// gcp.authzpolicy, gcp.packetmirroring and seven others). While
+			// all three of this fixture's url-named attributes were also
+			// ForceNew, TestAUrlIdentifyingAttributeIsNeverInTheMask could not
+			// tell "excluded because the url says it" from "excluded because
+			// it is immutable" -- and BuildMask implements the first rule,
+			// not the second.
+			"name":   {Canonical: "name", Kind: value.KindString, Required: true},
+			"sizeGb": {Canonical: "sizeGb", Kind: value.KindInt},
+			"tier":   {Canonical: "tier", Kind: value.KindString},
 			"createTime": {
 				Canonical: "createTime", Kind: value.KindString, Output: true,
 			},

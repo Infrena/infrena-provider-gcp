@@ -456,3 +456,65 @@ func keys(m map[string]*catalog.Attr) []string {
 	}
 	return out
 }
+
+// TestAFieldIsFoundByItsApiNameToo. magic-modules names a field whatever
+// Terraform calls it and records the API's own name separately, in api_name:
+// compute's Firewall declares "allow" with api_name "allowed", eventarc's
+// Trigger declares "matchingCriteria" with api_name "eventFilters". Discovery
+// only ever uses the API's name, so an index keyed on magic-modules' name
+// alone finds nothing for those fields and every lifecycle flag behind them
+// -- required, immutable, and is_set, which is what tells reconciliation a
+// list may come back reordered -- is dropped silently.
+//
+// Measured over the vendored corpus on 2026-09-22: 438 api_name lines, and 5
+// of the 35 is_set fields on types this plugin ships were reached only this
+// way (compute Firewall allow and deny, UrlMap and RegionUrlMap host_rule,
+// eventarc Trigger matchingCriteria).
+func TestAFieldIsFoundByItsApiNameToo(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"allowed": {Type: "array", Items: &disco.Schema{Type: "string"}},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "allow", ApiName: "allowed", IsSet: true, Required: true},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := attrs["allowed"]
+	if a == nil {
+		t.Fatal("the Discovery property vanished")
+	}
+	if !a.Unordered {
+		t.Error("allowed is not marked Unordered, so reconciliation will treat a set as " +
+			"an ordered list and propose a reordering forever")
+	}
+	if !a.Required {
+		t.Error("allowed is not Required; the magic-modules entry behind it was not found at all")
+	}
+}
+
+// TestARealFieldNameBeatsAnotherFieldsApiName. 14 of the corpus's 942
+// resources declare a field whose api_name is also some OTHER field's own
+// name (compute's InstanceGroupManager has an "id" and an
+// "instanceGroupManagerId" with api_name "id"). The real field has to win, or
+// a Discovery property would take its flags from an unrelated field --
+// whichever the walk happened to reach first.
+func TestARealFieldNameBeatsAnotherFieldsApiName(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"id": {Type: "string"},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		// The aliased one first, so first-seen-wins alone would pick it.
+		{Name: "instanceGroupManagerId", ApiName: "id", Required: true, Immutable: true},
+		{Name: "id"},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := attrs["id"]; a.Required || a.ForceNew {
+		t.Errorf("id: %+v -- want the field actually called \"id\", not the one that merely "+
+			"claims the name through api_name", a)
+	}
+}

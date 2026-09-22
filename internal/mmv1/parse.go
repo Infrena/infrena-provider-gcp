@@ -26,7 +26,15 @@ type Field struct {
 	// different order than they were sent. Task 15 reorders those to match the
 	// reference; reordering an ordered list would silently rewrite user intent,
 	// so this flag is what keeps the two apart. 216 fields in the corpus carry it.
-	IsSet      bool     `yaml:"is_set"`
+	IsSet bool `yaml:"is_set"`
+	// ApiName is the name the API itself uses, when magic-modules calls the
+	// field something else: compute's Firewall declares "allow" with
+	// api_name "allowed", eventarc's Trigger declares "matchingCriteria"
+	// with api_name "eventFilters". Discovery only ever uses the API's name,
+	// so without this every flag on such a field -- required, immutable,
+	// is_set -- is dropped on the floor when the two sources are joined
+	// (internal/gen's mmIndex). 438 fields in the corpus carry one.
+	ApiName    string   `yaml:"api_name"`
 	ItemType   any      `yaml:"item_type"`  // string, or a nested mapping for Array of objects
 	Properties []*Field `yaml:"properties"` // NestedObject and Array-of-NestedObject
 }

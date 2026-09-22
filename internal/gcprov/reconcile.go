@@ -1,0 +1,355 @@
+package gcprov
+
+import (
+	"strings"
+
+	"github.com/infrena/infrena-provider-gcp/internal/catalog"
+	"github.com/infrena/infrena/pkg/value"
+)
+
+// reservedLabelPrefix is the label namespace GCP keeps for itself:
+// goog-dm (Deployment Manager), goog-gke-node, goog-managed-by, and the rest.
+// A user cannot set or remove one, so reporting one as state makes every plan
+// propose deleting something nothing can delete -- the same reason the AWS
+// provider never reports aws:-prefixed tags.
+const reservedLabelPrefix = "goog-"
+
+// Reconcile makes GCP's answer comparable to what we asked for.
+//
+// GCP returns MORE than it was sent: fields it defaulted, fields it computed,
+// fields it reordered. Compared raw against the reference, every one of those
+// reads as drift, and the plan proposes a change that applying cannot fix --
+// because the next read returns the same extras again. That is a plan that
+// never converges, which is the single worst failure this provider can have.
+//
+// reference is what the user asked for (the desired or last-known value).
+// incoming is what GCP just returned. The result is incoming, expressed the way
+// reference is, so value.Equal between them means "no drift" and nothing else.
+//
+// BOTH SIDES ARE KEYED BY SCHEMA NAME. schemaAttrs (names.go) has already
+// translated the response body out of GCP's spelling by the time anything
+// here sees it, so this looks fields up by the same key configuration uses
+// and never by Canonical.
+func Reconcile(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	if attr == nil || !incoming.Known {
+		return incoming
+	}
+
+	// OPAQUE IS COPIED EXACTLY. A free-form map (additionalProperties with no
+	// declared properties) or a $ref tail the resolver truncated has no schema
+	// to reconcile against, so every key is equally unknown to us. Pruning the
+	// ones the reference happens not to mention would silently delete what the
+	// user wrote. Copy it and move on.
+	//
+	// Reserved labels are the one thing GCP adds to an opaque map that we know
+	// is not the user's, and they are dropped in a separate pass rather than
+	// here -- see withoutReservedLabels, and ReconcileAttrs, which runs both.
+	if attr.Opaque {
+		return incoming
+	}
+
+	switch {
+	case attr.Kind == value.KindMap && len(attr.Fields) > 0:
+		return reconcileObject(attr, reference, incoming)
+	case attr.Kind == value.KindList && attr.Elem != nil:
+		return reconcileList(attr, reference, incoming)
+	default:
+		return asDeclaredKind(attr, incoming)
+	}
+}
+
+// ReconcileAttrs reconciles a whole response body's worth of values against
+// the ones they are going to be compared with, and drops the labels GCP
+// reserves for itself. It is what the read path calls; Reconcile is one
+// attribute of it.
+//
+// reference may be nil -- a create's readback has no previous state -- and
+// then nothing is reordered, because there is no order to reorder to.
+//
+// AN UNDECLARED TOP-LEVEL KEY IS KEPT, which is the one place this does not
+// prune. infrena's own planner already ignores an attribute that is in state
+// but neither in configuration nor in the schema ("the provider's own
+// business" -- internal/planner/diff.go), so such a key costs no drift, while
+// an undeclared key NESTED inside a declared object does: it is part of that
+// object's value, and value.Equal compares maps by length and key before
+// anything else. Dropping the top-level ones as well would also throw away
+// what Import and Discover read a resource's own identity out of.
+func ReconcileAttrs(attrs map[string]*catalog.Attr, reference, incoming map[string]value.Value) map[string]value.Value {
+	out := make(map[string]value.Value, len(incoming))
+	for name, v := range incoming {
+		a := attrs[name]
+		out[name] = withoutReservedLabels(a, Reconcile(a, reference[name], v))
+	}
+	return out
+}
+
+// reconcileObject drops keys the schema does not declare and recurses into the
+// ones it does.
+//
+// An undeclared key is one GCP added and we never modelled -- a fingerprint, an
+// etag, a server-assigned id. Keeping it means comparing it, and comparing it
+// means drift forever.
+func reconcileObject(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	in, ok := incoming.Raw.(map[string]value.Value)
+	if !ok {
+		// Kind and Raw disagree; there is no object here to walk. Copying is
+		// the honest answer, the same one wireValue gives for the same case.
+		return incoming
+	}
+	ref, _ := reference.Raw.(map[string]value.Value)
+	out := make(map[string]value.Value, len(in))
+	for name, field := range attr.Fields {
+		v, found := in[name]
+		if !found {
+			continue
+		}
+		out[name] = Reconcile(field, ref[name], v)
+	}
+	return value.Value{Kind: value.KindMap, Known: true, Raw: out, Source: incoming.Source}
+}
+
+// reconcileList reorders an UNORDERED list to match the reference, and leaves an
+// ordered one strictly alone.
+//
+// GCP reorders lists it does not consider ordered, so a diff on order alone
+// plans a change forever. But reordering a list where order carries meaning --
+// a rule evaluation sequence, a priority list -- would silently rewrite the
+// user's intent. The catalog records which is which; never guess.
+func reconcileList(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	in, ok := incoming.Raw.([]value.Value)
+	if !ok {
+		return incoming
+	}
+	ref, _ := reference.Raw.([]value.Value)
+
+	items := make([]value.Value, len(in))
+	for i, item := range in {
+		// Positionally against the reference, which is exact for an ordered
+		// list and approximate for an unordered one -- there the elements are
+		// matched below, after each has been reconciled. Everything the
+		// element-level pass does except reordering a list nested inside an
+		// element is independent of which reference element it is handed.
+		var refItem value.Value
+		if i < len(ref) {
+			refItem = ref[i]
+		}
+		items[i] = Reconcile(attr.Elem, refItem, item)
+	}
+	if !attr.Unordered {
+		return value.Value{Kind: value.KindList, Known: true, Raw: items, Source: incoming.Source}
+	}
+
+	// Unordered: emit the reference's order for everything both sides hold,
+	// then whatever GCP added, so an addition still shows as drift while a pure
+	// reordering does not.
+	ordered := make([]value.Value, 0, len(items))
+	used := make([]bool, len(items))
+	for _, want := range ref {
+		for i, got := range items {
+			if !used[i] && answersTo(want, got) {
+				ordered = append(ordered, got)
+				used[i] = true
+				break
+			}
+		}
+	}
+	for i, got := range items {
+		if !used[i] {
+			ordered = append(ordered, got)
+		}
+	}
+	return value.Value{Kind: value.KindList, Known: true, Raw: ordered, Source: incoming.Source}
+}
+
+// answersTo reports whether got is the element want names -- used ONLY to
+// pair an unordered list's elements up with the reference's, never to decide
+// whether anything changed.
+//
+// Equality is too strict for that job. An element of a set-typed list is
+// routinely an object GCP fills fields into: gcp.packetmirroring's
+// mirroredResources.subnetworks is sent as {url} and comes back as
+// {url, canonicalUrl}, and canonicalUrl is a DECLARED attribute (output-only),
+// so reconcileObject rightly keeps it. Under value.Equal -- which compares
+// maps by length before content -- no element would ever match its own
+// reference, the reordering would silently not happen, and the plan for a
+// resource nobody touched would propose reordering that list forever.
+//
+// So: an element answers to the reference when it agrees with everything the
+// reference actually says, and is free to carry more. Pairing the wrong two
+// elements costs an order that still does not match, which is the same thing
+// not pairing them costs; it can never change a value, because only the
+// ORDER of already-reconciled elements is decided here.
+func answersTo(want, got value.Value) bool {
+	switch {
+	case want.Kind == value.KindMap && got.Kind == value.KindMap:
+		wf, wok := want.Raw.(map[string]value.Value)
+		gf, gok := got.Raw.(map[string]value.Value)
+		if !wok || !gok {
+			return want.Equal(got)
+		}
+		for k, w := range wf {
+			g, present := gf[k]
+			if !present || !answersTo(w, g) {
+				return false
+			}
+		}
+		return true
+	case want.Kind == value.KindList && got.Kind == value.KindList:
+		wl, wok := want.Raw.([]value.Value)
+		gl, gok := got.Raw.([]value.Value)
+		if !wok || !gok || len(wl) != len(gl) {
+			return want.Equal(got)
+		}
+		for i := range wl {
+			if !answersTo(wl[i], gl[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return want.Equal(got)
+	}
+}
+
+// asDeclaredKind retypes a numeric leaf to the Kind the catalog declares for
+// it, when the two disagree and the conversion is exact.
+//
+// JSON has one number type, so a response carrying 1 and a response carrying
+// 1.0 are the same bytes, and fromRaw (ids.go) types a whole number as
+// KindInt -- correct for the great majority of attributes and wrong for the
+// 134 the catalog declares as KindFloat (28 types, 60 of them inside a list,
+// at depths up to 9; measured 2026-09-22 following Fields AND Elem).
+// Value.Equal compares Kind BEFORE Raw, so a KindInt 1 never equals the
+// configured KindFloat 1, and that attribute patches on every update forever
+// however little the user changes.
+//
+// value.Coerce is the exactness rule, not a cast: it converts only across a
+// numeric pair, refuses a fractional part and refuses an int64 too large for
+// a float64 to hold. Anything it refuses is left exactly as it arrived, which
+// is a visible difference rather than a silently rounded value.
+func asDeclaredKind(attr *catalog.Attr, incoming value.Value) value.Value {
+	if attr.Kind == incoming.Kind {
+		return incoming
+	}
+	if out, ok := value.Coerce(incoming, attr.Kind); ok {
+		return out
+	}
+	return incoming
+}
+
+// withoutReservedLabels returns v with GCP's own labels dropped, at every
+// depth a declared attribute reaches -- through Fields AND through Elem,
+// because a label map inside a list element (gcp.automation's
+// selector.targets[].labels) is reachable only through the second.
+//
+// It is a separate pass from Reconcile rather than a case inside it because
+// the two rules genuinely disagree about the same value: a labels map is
+// Opaque, and Opaque means copied exactly. Copying a goog- label into state
+// costs a plan that proposes removing it, GCP putting it straight back, and a
+// plan that never converges; 123 of the catalog's 124 label attributes are
+// opaque maps, so the opaque rule alone would leave every one of them in that
+// state.
+//
+// Only a map called "labels" is filtered. The exception proves why the test
+// is not on the name alone: gcp.bigquery.table's model.modelOptions.labels is
+// a LIST of strings, nothing to do with resource labels, and a filter keyed on
+// the name by itself would reach into it.
+func withoutReservedLabels(attr *catalog.Attr, v value.Value) value.Value {
+	if attr == nil || !v.Known {
+		return v
+	}
+	if isLabelMap(attr) {
+		in, ok := v.Raw.(map[string]value.Value)
+		if !ok {
+			return v
+		}
+		out := make(map[string]value.Value, len(in))
+		for k, item := range in {
+			if strings.HasPrefix(k, reservedLabelPrefix) {
+				continue
+			}
+			out[k] = item
+		}
+		return value.Value{Kind: v.Kind, Known: true, Raw: out, Source: v.Source}
+	}
+	switch {
+	case len(attr.Fields) > 0:
+		in, ok := v.Raw.(map[string]value.Value)
+		if !ok {
+			return v
+		}
+		out := make(map[string]value.Value, len(in))
+		for k, item := range in {
+			out[k] = withoutReservedLabels(attr.Fields[k], item)
+		}
+		return value.Value{Kind: v.Kind, Known: true, Raw: out, Source: v.Source}
+	case attr.Elem != nil:
+		in, ok := v.Raw.([]value.Value)
+		if !ok {
+			return v
+		}
+		out := make([]value.Value, len(in))
+		for i, item := range in {
+			out[i] = withoutReservedLabels(attr.Elem, item)
+		}
+		return value.Value{Kind: v.Kind, Known: true, Raw: out, Source: v.Source}
+	}
+	return v
+}
+
+// isLabelMap reports whether attr is a resource's labels: the free-form map
+// GCP lets a user hang key/value pairs on, and the only place the goog-
+// prefix means "GCP put this here".
+func isLabelMap(attr *catalog.Attr) bool {
+	return attr.Canonical == "labels" && attr.Kind == value.KindMap
+}
+
+// LabelsIn converts GCP's labels into the map infrena compares, dropping the
+// ones GCP reserves for itself.
+//
+// goog-prefixed labels are applied by GCP (goog-dm, goog-gke-node,
+// goog-managed-by) and cannot be removed by a user. Reporting one makes every
+// plan propose deleting it, forever -- the same reason the AWS provider never
+// reports aws:-prefixed tags.
+//
+// A value that is not a known map, and an entry that is not a known string,
+// is left out rather than guessed at: labels are strings on the wire, and a
+// label whose value we had to invent would be a difference the user never
+// wrote.
+func LabelsIn(v value.Value) map[string]string {
+	entries, ok := v.Raw.(map[string]value.Value)
+	if !v.Known || !ok {
+		return nil
+	}
+	out := make(map[string]string, len(entries))
+	for k, item := range entries {
+		if strings.HasPrefix(k, reservedLabelPrefix) {
+			continue
+		}
+		s, ok := item.AsString()
+		if !ok {
+			continue
+		}
+		out[k] = s
+	}
+	return out
+}
+
+// LabelsOut renders a label map for the wire. An EMPTY map is omitted entirely
+// rather than sent as {}: some APIs read an explicit empty object as "remove
+// every label", which is a destructive reading of "this resource has none".
+//
+// "Omitted" is the zero Value -- not Known, so a caller that checks Known
+// before writing the key sends nothing at all. There is no way to say
+// "absent" in a value.Value otherwise, and returning a known empty map here
+// would put the destructive {} on the wire.
+func LabelsOut(m map[string]string) value.Value {
+	if len(m) == 0 {
+		return value.Value{}
+	}
+	entries := make(map[string]value.Value, len(m))
+	for k, s := range m {
+		entries[k] = value.String(s, value.SourceProvider)
+	}
+	return value.Map(entries, value.SourceProvider)
+}

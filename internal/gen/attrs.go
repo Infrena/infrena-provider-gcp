@@ -175,18 +175,39 @@ func snake(s string) string {
 // required/immutable flags) resolves to the Parameters entry. That is a real
 // precedence decision, not an accident of append order — see
 // TestParametersWinOverPropertiesOnNameCollision.
+//
+// TWO PASSES, names before api_names. The lookups against this index are by
+// DISCOVERY's property name, and magic-modules does not always use it: 438
+// fields in the corpus record the API's own spelling in api_name instead
+// (compute's Firewall "allow"/api_name allowed, eventarc's Trigger
+// "matchingCriteria"/api_name eventFilters). Indexing only by Name loses
+// every lifecycle flag on those — measured on 2026-09-22, 5 of the 35 is_set
+// fields on types this plugin ships were reachable ONLY through api_name, so
+// gcp.firewall's allowed and denied shipped as ordered lists and
+// reconciliation would have proposed reordering them forever.
+//
+// The order is what makes it safe. 14 of the corpus's 942 resources declare a
+// field whose api_name is also some OTHER field's own name (compute's
+// InstanceGroupManager has both "id" and an "instanceGroupManagerId" whose
+// api_name is "id"), and a single pass would resolve those by whichever the
+// walk happened to reach first. A real field name always wins; an api_name
+// only fills a key nothing else claimed. See
+// TestARealFieldNameBeatsAnotherFieldsApiName.
 func mmIndex(fields []*mmv1.Field) map[string]*mmv1.Field {
 	out := map[string]*mmv1.Field{}
-	var walk func(fs []*mmv1.Field)
-	walk = func(fs []*mmv1.Field) {
+	var walk func(fs []*mmv1.Field, key func(*mmv1.Field) string)
+	walk = func(fs []*mmv1.Field, key func(*mmv1.Field) string) {
 		for _, f := range fs {
-			if _, seen := out[f.Name]; !seen {
-				out[f.Name] = f
+			if k := key(f); k != "" {
+				if _, seen := out[k]; !seen {
+					out[k] = f
+				}
 			}
-			walk(f.Properties)
+			walk(f.Properties, key)
 		}
 	}
-	walk(fields)
+	walk(fields, func(f *mmv1.Field) string { return f.Name })
+	walk(fields, func(f *mmv1.Field) string { return f.ApiName })
 	return out
 }
 
