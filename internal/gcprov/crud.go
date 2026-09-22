@@ -110,8 +110,13 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 	for k, v := range desired.Attrs {
 		attrs[k] = v
 	}
-	for k, raw := range awaited {
-		attrs[k] = fromRaw(raw)
+	// awaited is a GCP response body, so it is keyed by wire name while
+	// desired.Attrs is keyed by schema name. Merging the two untranslated
+	// would produce a state holding both spellings of the same attribute --
+	// the same defect stateFrom exists to avoid, on the one path that
+	// bypasses stateFrom entirely.
+	for k, v := range schemaAttrs(ty.Attributes, awaited) {
+		attrs[k] = v
 	}
 	return &resource.ResourceState{
 		Type:       ty.Name,
@@ -315,6 +320,15 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 }
 
 // stateFrom builds a ResourceState from a successful get's response body.
+//
+// EVERY KEY IT STORES IS A SCHEMA NAME. The body arrives keyed the way GCP
+// writes it -- wire names -- and state is what the host diffs configuration
+// against, so storing a response key verbatim puts "type" in state while
+// configuration holds "type_value" and every plan thereafter reports a change
+// to a field nobody touched. That is the invariant BuildMask then relies on
+// to look current up by the same schema name it reads desire by. See
+// names.go.
+//
 // The provider id is recomputed (body's own name/selfLink wins, same as
 // readAfterCreate) rather than copied from current, so a rename GCP made
 // underneath this resource is picked up rather than silently ignored. The
@@ -348,11 +362,16 @@ func (p *Provider) stateFrom(ty *catalog.Type, current *resource.ResourceState, 
 		id = current.ProviderID
 	}
 	attrs := make(map[string]value.Value, len(idAttrs)+len(body))
+	// idAttrs is keyed by self_link's own PLACEHOLDER names, which for
+	// gcp.resourcerecordset ("...rrsets/{name}/{type}") is the wire spelling.
+	// Left untranslated it would put "type" into the same state map the body
+	// puts "type_value" into, and the host would diff configuration against
+	// both.
 	for k, v := range idAttrs {
-		attrs[k] = v
+		attrs[toSchema(ty.Attributes, k)] = v
 	}
-	for k, raw := range body {
-		attrs[k] = fromRaw(raw)
+	for k, v := range schemaAttrs(ty.Attributes, body) {
+		attrs[k] = v
 	}
 	return &resource.ResourceState{
 		Type:       current.Type,
@@ -548,17 +567,31 @@ func collectionMatchesSelfLink(base, selfLink string) bool {
 // attribute except the ones tmpl's own placeholders already consume (GCP
 // rejects a body that repeats what the url already said) and every Output
 // attribute (server-computed; GCP rejects a body that sets one).
+//
+// The keys it emits are WIRE names, at every depth (see names.go). attrs is
+// keyed the way configuration is, by schema name, and for the 306 attributes
+// the generator renamed those are not the same string: before this
+// translation existed a create sent {"type_value": "IPV4"} where GCP asked
+// for {"type": "IPV4"}, which for the 7 Required ones means asking an API to
+// create a resource without a field it demands.
+//
+// A placeholder is matched in EITHER spelling. Only gcp.resourcerecordset's
+// self_link names a renamed attribute today and it has no create template of
+// its own, so this is latent rather than live -- but a body that repeats
+// what the url already said is rejected by the whole API, not by that field,
+// and the cost of checking both is one map lookup.
 func requestBody(ty *catalog.Type, tmpl string, attrs map[string]value.Value) map[string]any {
 	inURL := placeholderNames(tmpl)
 	body := make(map[string]any, len(attrs))
 	for name, v := range attrs {
-		if inURL[name] {
+		a := ty.Attributes[name]
+		if inURL[name] || (a != nil && inURL[a.Canonical]) {
 			continue
 		}
-		if a, ok := ty.Attributes[name]; ok && a.Output {
+		if a != nil && a.Output {
 			continue
 		}
-		body[name] = toRaw(v)
+		body[toWire(ty.Attributes, name)] = wireValue(a, v)
 	}
 	return body
 }
