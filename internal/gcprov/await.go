@@ -122,9 +122,10 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 			// selfLink names the OPERATION, and ProviderID prefers selfLink,
 			// so handing the operation back yielded an id addressing
 			// ".../operations/operation-1740..." for all 65 compute-style
-			// types -- and, for the 13 whose self_link ends in "{{name}}",
-			// the operation's own name merged over the caller's attributes
-			// on top of that.
+			// types -- and, for the 12 of them whose self_link ENDS in
+			// "{{name}}" (the criterion the second failure mode turns on;
+			// 13 CONTAIN a name placeholder somewhere), the operation's own
+			// name merged over the caller's attributes on top of that.
 			if target, _ := op["targetLink"].(string); target != "" {
 				return map[string]any{"selfLink": target}, nil
 			}

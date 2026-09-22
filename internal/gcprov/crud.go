@@ -104,7 +104,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 // effort, not authoritative -- the next ordinary Read fills in whatever
 // awaited did not carry.
 func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredResource, awaited map[string]any) (*resource.ResourceState, error) {
-	id, err := ProviderID(ty, awaited, desired.Attrs)
+	id, err := p.createdID(ty, awaited, desired.Attrs)
 	if err != nil {
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
 			desired.Type, err)
@@ -123,6 +123,44 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 	}, nil
 }
 
+// createdID is the provider id for something GCP has just made: the awaited
+// body's own identity when it has one, and the caller's own attributes when
+// that identity cannot be turned into an id.
+//
+// THE FALLBACK EXISTS BECAUSE OF THE ORPHAN RULE. ProviderID reduces a
+// selfLink by the type's own api prefix, and reduceSelfLink errors when the
+// url does not carry it at a segment boundary -- a target answered under a
+// different api version ("v1beta1/projects/..." against a type whose
+// path_prefix is "v1/") is the realistic case, since a compute-style
+// operation's targetLink is whatever url its API chose to publish, not one
+// this provider built. Propagating that error makes Create return an error
+// for a resource that already exists, which the host drops, leaving it
+// tracked nowhere. 7 of the 65 compute-style types (sqladmin, container)
+// reduce a targetLink whose version segment this provider cannot verify from
+// their Discovery documents, so this is a live path, not a hypothetical one.
+//
+// The fallback is not a guess: ProviderID(ty, nil, attrs) expands the type's
+// self_link against the attributes this very create was given, which is the
+// same id Create would have used had the operation named no target at all.
+// If THAT fails too there is genuinely no id to report, and the error is the
+// truth.
+//
+// A body that was already nil got the fallback on the first call, so there
+// is nothing to retry and the original error stands.
+func (p *Provider) createdID(ty *catalog.Type, awaited map[string]any, desiredAttrs map[string]value.Value) (string, error) {
+	id, err := ProviderID(ty, awaited, desiredAttrs)
+	if err == nil || awaited == nil {
+		return id, err
+	}
+	// Loud, because a fallback id that is silently wrong is worse than the
+	// error it replaced: this names the type and the reason, so a wrong
+	// version segment in some API's targetLink is something a user can
+	// report rather than something they discover from a later plan.
+	fmt.Fprintf(os.Stderr, "gcp: %s: the operation's target could not be reduced to a provider id (%v); "+
+		"using the attributes this create was given instead\n", ty.Name, err)
+	return ProviderID(ty, nil, desiredAttrs)
+}
+
 // readAfterCreate resolves the just-created resource's identity -- preferring
 // the awaited response's own name/selfLink, falling back to the attributes
 // the caller supplied -- and reads it back through the ordinary Read path
@@ -130,7 +168,7 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 // only when the resource genuinely is not there is what lets Create tell
 // "created, then the operation failed" apart from "never created at all".
 func (p *Provider) readAfterCreate(ctx context.Context, ty *catalog.Type, desiredAttrs map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
-	id, err := ProviderID(ty, awaited, desiredAttrs)
+	id, err := p.createdID(ty, awaited, desiredAttrs)
 	if err != nil {
 		return nil, err
 	}
