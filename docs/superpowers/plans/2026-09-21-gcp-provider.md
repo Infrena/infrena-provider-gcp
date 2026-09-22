@@ -4576,14 +4576,125 @@ func TestAwaitStopsAtTheTypesTimeout(t *testing.T) {
 
 Run: `go test -count=1 -timeout 120s ./internal/gcprov/ -run Await`
 
-`await` switches on `ty.Await`:
-- `AwaitNone` — return `resp` unchanged, make no request.
-- `AwaitLongRunning` — poll `GET <api>/v1/<op name>` with backoff until `done`; on `error` return an
-  `APIError` carrying GCP's message; on success return `response` if present, else re-read the resource.
-- `AwaitComputeOperation` — poll `POST <api>/<scope>/<op>/wait` (the long-poll) until `status == "DONE"`;
-  report `error.errors[]` joined.
+```go
+// await blocks until a mutation has actually taken effect, and returns the
+// resource's state as GCP reports it.
+//
+// resp is whatever the mutating call returned: the resource itself for a
+// synchronous type, or an operation envelope for the other two. Which of the
+// three it is was decided at generation time from the Operation SCHEMA, not
+// from the API's name — container, dns and sqladmin all use compute-style
+// operations without being compute.
+func (p *Provider) await(ctx context.Context, ty *catalog.Type, resp map[string]any) (map[string]any, error) {
+	if ty.Await == catalog.AwaitNone {
+		// The mutation returned the resource. Polling anything here would be a
+		// request against a quota that belongs to the whole project, for an
+		// answer we already hold.
+		return resp, nil
+	}
 
-The whole body runs under `context.WithoutCancel(ctx)` with a deadline of `ty.TimeoutSeconds`.
+	// ONCE A MUTATION IS SENT, ABANDONING IT LEAVES SOMETHING THAT EXISTS AND IS
+	// TRACKED NOWHERE. Cancellation is checked BEFORE sending (in crud.go), never
+	// after. The bound from here on is the type's own timeout, not the caller's.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx),
+		time.Duration(ty.TimeoutSeconds)*time.Second)
+	defer cancel()
+
+	switch ty.Await {
+	case catalog.AwaitLongRunning:
+		return p.awaitLongRunning(ctx, ty, resp)
+	case catalog.AwaitComputeOperation:
+		return p.awaitComputeOperation(ctx, ty, resp)
+	default:
+		return nil, fmt.Errorf("%s: unknown await strategy %d", ty.Name, ty.Await)
+	}
+}
+
+// awaitLongRunning polls a google.longrunning.Operation by name until `done`.
+//
+// The shape is {"name": "...", "done": false} becoming either
+// {"done": true, "response": {...}} or {"done": true, "error": {...}}.
+func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op map[string]any) (map[string]any, error) {
+	name, _ := op["name"].(string)
+	if name == "" {
+		return nil, fmt.Errorf("%s: operation has no name to poll", ty.Name)
+	}
+	for attempt := 0; ; attempt++ {
+		if done, _ := op["done"].(bool); done {
+			// An operation that completed with an error is not an await failure,
+			// it is a GCP failure, and its message is the only thing the user can
+			// act on. Do not replace it with our own wording.
+			if e, ok := op["error"].(map[string]any); ok {
+				return nil, operationError(ty, e)
+			}
+			if r, ok := op["response"].(map[string]any); ok {
+				return r, nil
+			}
+			// Done, no error, no response: a delete, or a create whose result
+			// must be read back. The caller decides which.
+			return nil, nil
+		}
+		if err := p.sleepBackoff(ctx, attempt); err != nil {
+			return nil, fmt.Errorf("%s: waiting for %s: %w", ty.Name, name, err)
+		}
+		var err error
+		op, err = p.client.Do(ctx, http.MethodGet, ty.APIBaseURL+name, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+}
+
+// awaitComputeOperation polls a compute-style operation until status is DONE.
+//
+// It uses the operation collection's `wait` method, which LONG-POLLS to a
+// 2-minute deadline rather than returning immediately. That is the difference
+// between one request per slow operation and one per second against a quota
+// the whole project shares. ty.OperationScope names the collection:
+// globalOperations, regionOperations or zoneOperations.
+func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, op map[string]any) (map[string]any, error) {
+	for attempt := 0; ; attempt++ {
+		if st, _ := op["status"].(string); st == "DONE" {
+			// compute reports failure as error.errors[], a different shape from
+			// longrunning's error object. Both reach the user as one message.
+			if e, ok := op["error"].(map[string]any); ok {
+				return nil, operationError(ty, e)
+			}
+			return op, nil
+		}
+		url, err := p.operationWaitURL(ty, op)
+		if err != nil {
+			return nil, err
+		}
+		if attempt > 0 {
+			// `wait` already blocks server-side, so back off only between
+			// returns, and gently — this is not a busy poll.
+			if err := p.sleepBackoff(ctx, attempt); err != nil {
+				return nil, fmt.Errorf("%s: waiting for operation: %w", ty.Name, err)
+			}
+		}
+		if op, err = p.client.Do(ctx, http.MethodPost, url, nil); err != nil {
+			return nil, err
+		}
+	}
+}
+```
+
+`operationError` renders BOTH failure shapes into one `*APIError`: longrunning's
+`{"code":…, "message":…}` and compute's `{"errors":[{"code":…, "message":…}]}`, joining the latter's
+messages. It must carry GCP's own text through — a wrapper that says "the operation failed" and drops
+the reason leaves the user nothing to act on.
+
+`operationWaitURL` builds `<APIBaseURL><OperationScope>/<op name>/wait`, taking the scope-bearing
+segment from the operation's own `zone` or `region` field when present (compute returns them as full
+URLs, so use the last path segment) and falling back to the type's own scope. A `wait` URL built
+without the right scope 404s, which reads as "the operation vanished" rather than "we asked the wrong
+collection".
+
+**Both loops are unbounded by attempt count and bounded by the context deadline only.** That is
+deliberate: the number of polls a slow operation needs is not knowable in advance, and a cap on
+attempts would turn a slow-but-healthy create into a spurious failure. The type's `TimeoutSeconds` is
+the real bound.
 
 - [ ] **Step 5: Sabotage, confirm, restore**
 
