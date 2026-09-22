@@ -1,0 +1,54 @@
+# The project the e2e suite applies against the in-process fake GCP.
+#
+# `project:` and `region:` are on the PROVIDER INSTANCE, not on the resource,
+# and that is not a style choice. Almost no generated type declares `project`
+# as an attribute -- the generator takes a type's attributes from its API body
+# schema and a project is a path segment, never a body field -- so a resource
+# block naming one is refused by infrena as an undeclared attribute. The
+# instance is the only place it can be written. See gcprov's withScope.
+project: gcp-e2e
+environments:
+  dev: {}
+providers:
+  - plugin: gcp
+    project: infrena-e2e
+    region: us-central1
+resources:
+  # gcp.trigger, and every field below is here because it makes the workflow
+  # test something. See workflow_test.go's `workflowType` for why this type.
+  #
+  #   retry_policy.max_attempts is an INTEGER NESTED IN A DECLARED OBJECT, and
+  #   it is what makes `a_second_plan_is_clean` a real test. JSON has no
+  #   integers: the API answers 3 as a float, so without reconciliation state
+  #   records a float where configuration holds an int, every plan proposes a
+  #   change, and applying it cannot help because the next read returns a float
+  #   again. A plan that never converges is the worst failure this provider can
+  #   have, and this one line is the difference between catching it and not.
+  #
+  #   destination is a declared nested object, and event_filters a list of
+  #   them: both go through the object and list arms of Reconcile rather than
+  #   the scalar one.
+  #
+  #   labels is a free-form map, which is what drift is applied to.
+  #
+  # NESTED KEYS ARE WRITTEN IN THE SCHEMA'S OWN SPELLING -- cloudRun, not
+  # cloud_run -- and that is not a preference. infrena canonicalises a
+  # TOP-LEVEL attribute name against the schema (`event_filters` is accepted
+  # and becomes `eventFilters`) and does not do the same at depth: a nested
+  # `cloud_run` is carried through to the plugin verbatim and would be sent to
+  # Google as a field it has never heard of. Written the schema's way it is
+  # correct either way. See the task report.
+  bus:
+    type: gcp.trigger
+    name: e2e-trigger
+    labels:
+      owner: platform
+    eventFilters:
+      - attribute: type
+        value: google.cloud.pubsub.topic.v1.messagePublished
+    destination:
+      cloudRun:
+        service: e2e-service
+        region: us-central1
+    retryPolicy:
+      maxAttempts: 3

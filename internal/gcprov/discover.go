@@ -14,11 +14,17 @@ import (
 	"github.com/infrena/infrena/pkg/value"
 )
 
-// cloudAssetBaseURL is where Cloud Asset Inventory lives, from its own
+// CloudAssetBaseURL is where Cloud Asset Inventory lives, from its own
 // Discovery document (schemas/cloudasset.json: rootUrl
 // "https://cloudasset.googleapis.com/", servicePath ""). Settings.AssetInventoryBaseURL
 // overrides it; nothing else should.
-const cloudAssetBaseURL = "https://cloudasset.googleapis.com/"
+//
+// Exported because gcpplugin's endpoint override has to redirect CAI too,
+// and it can only do that by knowing where CAI would otherwise have been --
+// CAI is the one API this provider calls that has no catalog type to take a
+// host from. A second copy of the literal there would be a second thing to
+// keep in step.
+const CloudAssetBaseURL = "https://cloudasset.googleapis.com/"
 
 // searchAllResourcesPath is CAI's own method path, VERBATIM from its
 // Discovery document: "v1/{+scope}:searchAllResources", a GET.
@@ -110,7 +116,7 @@ func (p *Provider) discoverViaCAI(ctx context.Context, project string, want []st
 
 	base := p.settings.AssetInventoryBaseURL
 	if base == "" {
-		base = cloudAssetBaseURL
+		base = CloudAssetBaseURL
 	}
 	rel, err := ExpandURL(searchAllResourcesPath, map[string]value.Value{
 		"scope": value.String("projects/"+project, value.SourceProvider),
@@ -417,11 +423,11 @@ func idAttributes(ty *catalog.Type, id string) map[string]value.Value {
 	if err != nil {
 		return map[string]value.Value{}
 	}
-	out := make(map[string]value.Value, len(parsed))
-	for k, v := range parsed {
-		out[toSchema(ty.Attributes, k)] = v
-	}
-	return out
+	// Declared attributes only: the host refuses a discovered resource
+	// carrying one its own schema does not declare, and fails the whole
+	// discovery walk for that instance rather than dropping the attribute.
+	// See declaredIDAttrs.
+	return declaredIDAttrs(ty.Attributes, parsed)
 }
 
 // scopeAttrs are the values a collection url template can need that are not
@@ -445,6 +451,51 @@ func (p *Provider) scopeAttrs(project string) map[string]value.Value {
 	}
 	if p.settings.Zone != "" {
 		out["zone"] = value.String(p.settings.Zone, value.SourceProvider)
+	}
+	return out
+}
+
+// withScope returns attrs with the instance's own scope -- its project, and
+// whichever of the region/location/zone axes it configured -- filled in
+// wherever attrs does not already carry a known value for that name.
+//
+// THIS IS WHAT MAKES A CREATE POSSIBLE AT ALL, and it is not an optimisation.
+// 230 of the 233 shipped types have "{{project}}" in the url they are created
+// at, and only 3 declare `project` as an attribute -- the generator takes a
+// type's attributes from its API body schema, and a project is a path
+// segment, never a body field. So the project cannot come from the resource
+// block (infrena refuses configuration naming an attribute the schema does
+// not declare, and an instance `defaults:` entry for an undeclared attribute
+// is silently skipped -- compiler/schema.go's applyInstanceDefaults). It has
+// to come from the provider instance, which is where a user writes it once:
+//
+//	providers:
+//	  - plugin: gcp
+//	    project: my-project
+//	    region: us-central1
+//
+// Read, Update and Delete need no such thing: their url is rebuilt from the
+// provider id, which already carries every segment (ParseProviderID). Create
+// is the one call with nothing but configuration to go on.
+//
+// A value already in attrs WINS, so a type that does declare `project` (three
+// do) still uses what the resource itself says. An unset or empty setting
+// fills in nothing: expanding "{{project}}" to "" would send
+// "projects//global/firewalls", which GCP answers with a 404 naming nothing,
+// rather than an error naming what nobody configured.
+func (p *Provider) withScope(attrs map[string]value.Value) map[string]value.Value {
+	out := make(map[string]value.Value, len(attrs)+4)
+	for k, v := range attrs {
+		out[k] = v
+	}
+	for k, v := range p.scopeAttrs(p.settings.Project) {
+		if s, _ := v.Raw.(string); s == "" {
+			continue
+		}
+		if have, ok := out[k]; ok && have.Known {
+			continue
+		}
+		out[k] = v
 	}
 	return out
 }
