@@ -8,28 +8,65 @@
       "id": "Widget",
       "type": "object",
       "properties": {
-        "name": {"type": "string", "description": "The widget name."},
-        "selfLink": {"type": "string", "description": "[Output Only] Server-defined URL."},
-        "creationTimestamp": {"type": "string", "readOnly": true, "description": "When it was made."},
-        "spec": {"$ref": "WidgetSpec", "description": "The spec."},
-        "activeConfig": {"$ref": "WidgetSpec", "readOnly": true, "description": "Active spec, computed by the server."}
+        "name": {
+          "type": "string",
+          "description": "The widget name."
+        },
+        "selfLink": {
+          "type": "string",
+          "description": "[Output Only] Server-defined URL."
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "readOnly": true,
+          "description": "When it was made."
+        },
+        "spec": {
+          "$ref": "WidgetSpec",
+          "description": "The spec."
+        },
+        "activeConfig": {
+          "$ref": "WidgetSpec",
+          "readOnly": true,
+          "description": "Active spec, computed by the server."
+        },
+        "status": {
+          "$ref": "Status",
+          "description": "The widget's status."
+        }
       }
     },
     "WidgetSpec": {
       "id": "WidgetSpec",
       "type": "object",
       "description": "Generic spec container.",
-      "properties": {"size": {"type": "integer", "format": "int64", "description": "How big."}}
+      "properties": {
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "description": "How big."
+        }
+      }
     },
     "Operation": {
       "id": "Operation",
       "type": "object",
-      "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}}
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "targetLink": {
+          "type": "string"
+        }
+      }
     },
     "Status": {
       "id": "Status",
       "type": "string",
-      "enum": ["ACTIVE", "INACTIVE"]
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
     }
   },
   "resources": {
@@ -41,20 +78,28 @@
               "id": "tiny.projects.widgets.get",
               "path": "projects/{project}/widgets/{widget}",
               "httpMethod": "GET",
-              "response": {"$ref": "Widget"}
+              "response": {
+                "$ref": "Widget"
+              }
             },
             "insert": {
               "id": "tiny.projects.widgets.insert",
               "path": "projects/{project}/widgets",
               "httpMethod": "POST",
-              "request": {"$ref": "Widget"},
-              "response": {"$ref": "Operation"}
+              "request": {
+                "$ref": "Widget"
+              },
+              "response": {
+                "$ref": "Operation"
+              }
             },
             "delete": {
               "id": "tiny.projects.widgets.delete",
               "path": "projects/{project}/widgets/{widget}",
               "httpMethod": "DELETE",
-              "response": {"$ref": "Operation"}
+              "response": {
+                "$ref": "Operation"
+              }
             }
           }
         }

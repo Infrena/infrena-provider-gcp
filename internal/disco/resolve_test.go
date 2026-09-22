@@ -131,3 +131,42 @@ func TestResolveRefSiteDescriptionWinsOverTarget(t *testing.T) {
 			resolved.Description, want, d.Schemas["WidgetSpec"].Description)
 	}
 }
+
+// TestResolveClonesEnumThroughARefToo covers the OTHER clone.
+//
+// TestResolveClonesEnumSoTheSourceDocumentCannotBeMutated resolves Status
+// directly, which only ever reaches the structural branch's copy. The $ref
+// branch has a clone of its own, and until this test nothing drove an
+// enum-bearing schema through it.
+//
+// Worth knowing before "simplifying" either clone away: along the $ref path the
+// two are MUTUALLY REDUNDANT. The recursive call returns a schema the structural
+// branch has already cloned, so removing the $ref clone alone changes nothing,
+// and removing the structural clone alone is rescued by the $ref one. Only
+// removing BOTH corrupts the source document, which is what this test and its
+// sibling together pin down. Neither line is individually load-bearing; the pair
+// is.
+func TestResolveClonesEnumThroughARefToo(t *testing.T) {
+	d := load(t, "tiny.json")
+	original := slices.Clone(d.Schemas["Status"].Enum)
+	if len(original) == 0 {
+		t.Fatal("fixture is supposed to give Status a non-empty enum")
+	}
+
+	// Widget.status is a $ref to Status, so resolving Widget reaches the $ref
+	// branch rather than the structural one.
+	resolved, err := d.Resolve(d.Schemas["Widget"])
+	if err != nil {
+		t.Fatalf("Resolve(Widget): %v", err)
+	}
+	status := resolved.Properties["status"]
+	if status == nil || len(status.Enum) == 0 {
+		t.Fatalf("resolved Widget.status carries no enum: %+v", status)
+	}
+
+	status.Enum[0] = "MUTATED"
+
+	if got := d.Schemas["Status"].Enum; !slices.Equal(got, original) {
+		t.Errorf("mutating an enum resolved through a $ref corrupted d.Schemas: got %v, want %v", got, original)
+	}
+}
