@@ -3397,6 +3397,18 @@ func Build(in Inputs) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Per-file parse failures are REPORTED, not fatal and not dropped. LoadDir
+	// collects them so one bad file cannot fail a 942-file build; routing them
+	// here is what stops them vanishing instead.
+	var warnings []Warning
+	for _, le := range loadErrs {
+		warnings = append(warnings, Warning{
+			Service:  filepath.Base(filepath.Dir(le.Path)),
+			Resource: strings.TrimSuffix(filepath.Base(le.Path), ".yaml"),
+			Tier:     TierExcluded,
+			Reason:   "cannot parse: " + le.Err.Error(),
+		})
+	}
 
 	docs, err := loadDocs(in.SchemaDir)
 	if err != nil {
@@ -3411,7 +3423,6 @@ func Build(in Inputs) (*Result, error) {
 		cand Candidate
 	}
 	var shipping []pending
-	var warnings []Warning
 
 	for _, d := range docs {
 		mms := byProduct[d.Name]
@@ -3496,9 +3507,37 @@ func WriteWarnings(path string, ws []Warning) error {
 
 The helpers `loadDocs`, `matchResource`, `singular`, `readPin` and `buildType` are written in the same
 file. `buildType` assembles a `catalog.Type` from `BuildAttributes`, `ScopeOf`, `AwaitOf` and the mm
-URL fields, resolving each `Attr.Ref.Type` through `refName` and dropping the reference when the target
-did not ship (an edge pointing at a type the catalog does not serve is a compile error in a file the
-user never wrote).
+URL fields.
+
+**Reference resolution is NOT a bare-name lookup, and this is the part most likely to be got wrong.**
+`Attr.Ref.Type` arrives from Task 7 holding the raw magic-modules resource name. Measured on
+2026-09-21: **76 of those names are used by more than one product** — `Instance` by 16 (alloydb,
+apigee, compute, datafusion, filestore, firebasedatabase, …), `Service` by 10, `Cluster` by 8; 942
+resources share only 802 distinct names. A map keyed on the bare name therefore resolves a compute
+`ResourceRef` to whichever product built last, which is a SILENTLY WRONG edge — strictly worse than a
+dangling one, because a dangling edge is dropped and emits nothing while a wrong edge writes
+`${some-unrelated-resource}` into a user's generated configuration and compiles.
+
+So keep two maps — `refByProduct` keyed `"<product>/<Resource>"`, and `refCandidates` mapping a bare
+name to the set of products shipping it — and resolve in three steps:
+
+1. `<referring resource's product>/<Ref.Type>`. magic-modules' `resource:` names a resource in the same
+   product in the common case.
+2. Otherwise, if exactly ONE product ships that name, use it. Cross-product references are real:
+   `compute/Subnetwork` references `networkconnectivity`'s `InternalRange`.
+3. Otherwise DROP the reference and emit a warning naming the attribute and the candidate products.
+   Never guess.
+
+A reference whose target did not ship at all drops silently, as before.
+
+**`buildType` must also CONSUME the ruling, not merely have validated it.** A ruling that parses and
+changes nothing is a comment with extra steps:
+- `ruling.AllForceNew` → mark every settable (non-`Output`) attribute `ForceNew`, **at every depth**.
+  A top-level-only implementation passes a shallow test and leaves nested attributes updatable on a
+  type that has no patch method at all. This is what makes `gcp.tagbinding` honest, and Task 9 asserts
+  it.
+- `ruling.ReadVia` → record it on the `catalog.Type` so Task 16's `readByListingParent` has something
+  to read.
 
 **`buildType` must also CONSUME the ruling, not merely have validated it.** A ruling that parses and
 then changes nothing is a comment with extra steps:
