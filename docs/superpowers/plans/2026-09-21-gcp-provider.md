@@ -7147,3 +7147,189 @@ git add internal/gcprov/await.go internal/gcpfake/operations.go \
         internal/gcprov/await_test.go internal/gcprov/crud_test.go
 git commit -m "Return what a compute operation created, not the operation"
 ```
+
+---
+
+### Task 13c: The generator must pick the same operations path every time, and a usable one
+
+**Why this exists.** Task 13a's reviewer noticed the catalog reproduced
+byte-for-byte only on some runs. Following that up turned a housekeeping
+complaint into a Critical.
+
+`operationPollPath` (`internal/gen/build.go`) walks the Discovery document
+looking for a collection named `operations` and takes the first one it finds:
+
+```go
+	for name, r := range res {
+		if found != "" {
+			return
+		}
+		if name == "operations" {
+			...
+			found = m.Path
+```
+
+`range` over a map is unordered, and `container` publishes TWO operations
+collections:
+
+- `projects.locations.operations.get` -> `v1/{+name}`
+- `projects.zones.operations.get` -> `v1/projects/{projectId}/zones/{zone}/operations/{operationId}`
+
+So which one lands in the catalog is a coin flip per generation run. Running the
+generator 12 times on a clean checkout produced FOUR distinct catalogs,
+differing only in `operation_poll_path` for `gcp.container.cluster` and
+`gcp.container.nodepool`.
+
+**And one of the two choices does not work.** `operationRequestURL`
+(`internal/gcprov/await.go`) supplies exactly these placeholders: `operation`,
+`name`, `project`, and `zone`/`region` when the operation body carries them. It
+does NOT supply `projectId` or `operationId`. Expanding the legacy path is a
+hard error, demonstrated:
+
+```
+v1/projects/{projectId}/zones/{zone}/operations/{operationId}
+  -> "" err: url template ... needs "projectId", which is not set
+v1/{+name}
+  -> "v1/operation-123"  (nil error)
+```
+
+`gcp.container.cluster` has the legacy path in the CURRENTLY COMMITTED catalog.
+It is a compute-style await with no wait method, so it polls -- meaning **every
+create, update and delete of a GKE cluster fails at the polling step today**.
+GKE clusters are in `discover_default`. On a different generation run the broken
+type is `gcp.container.nodepool` instead, or both, or neither.
+
+**Files:**
+- Modify: `internal/gen/build.go`
+- Test: `internal/gen/build_test.go`, `internal/gcprov/await_test.go`
+
+- [ ] **Step 1: Write the invariant test that makes this permanent**
+
+In `internal/gcprov/await_test.go`. This is the test that should have existed
+from Task 12, and it catches the defect regardless of which type the coin lands
+on:
+
+```go
+// TestEveryOperationTemplateExpandsFromWhatTheRuntimeSupplies. An operation
+// template is useless if operationRequestURL cannot fill its placeholders.
+// container publishes two operations collections -- one taking {+name}, one
+// taking {projectId}/{operationId} -- and the generator used to pick between
+// them by map order, so gcp.container.cluster shipped a path needing
+// "projectId", which nothing supplies. Every GKE cluster mutation failed at
+// the polling step.
+//
+// The attrs below must stay in sync with operationRequestURL's own map. If
+// that gains a placeholder, add it here; if this test starts failing because
+// a new type needs something else, the fix is in the generator's choice of
+// path, not in loosening this test.
+func TestEveryOperationTemplateExpandsFromWhatTheRuntimeSupplies(t *testing.T) {
+	c, err := catalog.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs := map[string]value.Value{
+		"operation": value.String("op-1", value.SourceProvider),
+		"name":      value.String("op-1", value.SourceProvider),
+		"project":   value.String("p", value.SourceProvider),
+		"zone":      value.String("z", value.SourceProvider),
+		"region":    value.String("r", value.SourceProvider),
+	}
+	for _, ty := range c.Types {
+		tmpl := ty.OperationWaitPath
+		label := "operation_wait_path"
+		if tmpl == "" {
+			tmpl, label = ty.OperationPollPath, "operation_poll_path"
+		}
+		if tmpl == "" {
+			continue
+		}
+		if _, err := ExpandURL(tmpl, attrs); err != nil {
+			t.Errorf("%s %s=%q cannot be expanded by the runtime: %v",
+				ty.Name, label, tmpl, err)
+		}
+	}
+}
+```
+
+Run it. Expected: FAIL naming `gcp.container.cluster` (or `nodepool`, depending
+on the committed catalog). Record which, verbatim.
+
+- [ ] **Step 2: Make the walk deterministic AND make it choose**
+
+Rewrite `operationPollPath` to collect EVERY candidate rather than stopping at
+the first, then choose by a stated rule:
+
+```go
+// operationPollPath returns the API's own operations.get path.
+//
+// It collects every candidate and chooses, rather than taking the first one a
+// map walk happens to reach. Map iteration is unordered, and container
+// publishes two operations collections -- projects.locations.operations
+// ("v1/{+name}") and projects.zones.operations
+// ("v1/projects/{projectId}/zones/{zone}/operations/{operationId}"). Taking
+// whichever came first made the generator produce four different catalogs
+// across twelve runs, and half the time it chose a path the runtime cannot
+// expand at all: operationRequestURL supplies operation/name/project/zone/
+// region and nothing supplies projectId or operationId, so every GKE cluster
+// mutation failed at the polling step.
+//
+// The rule: prefer a template whose placeholders the runtime can actually
+// fill, and among those prefer the reserved-expansion "{+name}" form, which
+// is the shape every modern GCP API publishes. Ties break on the sorted path
+// string so the result never depends on map order.
+func operationPollPath(doc *disco.Document) string {
+```
+
+Walk with sorted keys (`slices.Sorted(maps.Keys(res))` or an explicit sort),
+gather all `operations` `get` paths, then pick. Define "placeholders the
+runtime can fill" as a named set in this file with a comment pointing at
+`operationRequestURL`, so the two cannot drift silently.
+
+- [ ] **Step 3: Audit the rest of the generator for the same shape**
+
+`operationPollPath` is unlikely to be the only place a map walk picks a first
+match. Grep `internal/gen/` for `range` over a map combined with an early
+`break`/`return`/first-wins assignment. For each one found, either make it
+deterministic or record in the report why its result cannot depend on order
+(e.g. it collects into a map keyed by something stable). List every site you
+checked in the report, including the ones you decided were safe -- "I checked
+and they are fine" without the list is not an audit.
+
+- [ ] **Step 4: Prove determinism**
+
+Run the generator at least 10 times, hashing the output each time:
+
+```bash
+for i in $(seq 1 10); do go run ./cmd/gen-gcp >/dev/null 2>&1; \
+  md5sum internal/catalog/catalog.json.gz; done | sort -u
+```
+
+Expected: exactly one hash. Put the actual output in the report. Before the
+fix this produced four distinct hashes over twelve runs.
+
+- [ ] **Step 5: Regenerate and re-run Step 1**
+
+Expected: PASS, and the catalog still holds 233 types. `gcp.container.cluster`
+and `gcp.container.nodepool` must both end up with `v1/{+name}`.
+
+- [ ] **Step 6: Full suite**
+
+Run: `go build ./... && go test ./...`
+
+- [ ] **Step 7: Sabotage**
+
+1. Revert the choice rule so the legacy path wins -- Step 1's test must fail
+   naming the exact type and the missing `projectId`.
+2. Revert the sorted walk -- Step 4's determinism check must produce more than
+   one hash. (Run it 12 times; if it produces one hash by luck, say so and run
+   more rather than claiming the sabotage passed.)
+
+Restore by re-applying, never `git checkout --`.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add internal/gen/build.go internal/gen/build_test.go \
+        internal/gcprov/await_test.go internal/catalog/catalog.json.gz
+git commit -m "Pick one operations path, the same one every run"
+```
