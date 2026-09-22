@@ -1,0 +1,42 @@
+# Copyright 2024 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+---
+name: Widget
+description: A test widget.
+base_url: projects/{{project}}/locations/{{region}}/widgets
+create_url: projects/{{project}}/locations/{{region}}/widgets?widgetId={{name}}
+self_link: projects/{{project}}/locations/{{region}}/widgets/{{name}}
+update_mask: true
+update_verb: PATCH
+import_format:
+  - projects/{{project}}/locations/{{region}}/widgets/{{name}}
+async:
+  type: OpAsync
+  actions: [create, delete, update]
+parameters:
+  - name: region
+    type: String
+    required: true
+    immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+    immutable: true
+  - name: sizeGb
+    type: Integer
+  - name: createTime
+    type: Time
+    output: true
+  - name: network
+    type: ResourceRef
+    resource: Network
+    imports: selfLink
+  - name: config
+    type: NestedObject
+    properties:
+      - name: mode
+        type: Enum
+      - name: replicaCount
+        type: Integer
+        immutable: true

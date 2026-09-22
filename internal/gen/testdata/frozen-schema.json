@@ -1,0 +1,50 @@
+{
+  "name": "tiny",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Frozen": {
+      "id": "Frozen",
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "The frozen name."},
+        "value": {"type": "string", "description": "The frozen value."}
+      }
+    },
+    "Operation": {
+      "id": "Operation",
+      "type": "object",
+      "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}}
+    }
+  },
+  "resources": {
+    "projects": {
+      "resources": {
+        "frozens": {
+          "methods": {
+            "insert": {
+              "id": "tiny.projects.frozens.insert",
+              "path": "projects/{project}/frozens",
+              "httpMethod": "POST",
+              "request": {"$ref": "Frozen"},
+              "response": {"$ref": "Operation"}
+            },
+            "delete": {
+              "id": "tiny.projects.frozens.delete",
+              "path": "projects/{project}/frozens/{frozen}",
+              "httpMethod": "DELETE",
+              "response": {"$ref": "Operation"}
+            },
+            "list": {
+              "id": "tiny.projects.frozens.list",
+              "path": "projects/{project}/frozens",
+              "httpMethod": "GET",
+              "response": {"$ref": "Frozen"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
