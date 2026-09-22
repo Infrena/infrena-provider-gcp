@@ -1,8 +1,12 @@
 package gen
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -672,9 +676,16 @@ func scopedDoc(service string) string {
 func TestScopeVariantsOfTheSameLeafGetDistinctNames(t *testing.T) {
 	in := writeRefFixture(t, map[string]string{
 		"schemas/acme.json": scopedDoc("acme"),
+		// base_url is a parent capture, the way the real four-scope case in
+		// the corpus spells it (logging's buckets are "{+parent}/buckets").
+		// A bare "widgets" would say the create posts to <api>/widgets while
+		// every one of these collections addresses its resources under an
+		// organization, folder, billing account or project -- which is the
+		// create-one-thing-read-another shape buildType now refuses outright,
+		// so the fixture would be asserting names for types that cannot ship.
 		"mmv1/products/acme/Widget.yaml": `name: Widget
 description: a scoped test widget.
-base_url: widgets
+base_url: '{+parent}/widgets'
 properties:
   - name: name
     type: String
@@ -1114,22 +1125,66 @@ func TestOperationPollPathFindsNothingWhenThereIsNothing(t *testing.T) {
 // TestRuntimeOperationPlaceholdersMatchesTheRuntime. runtimeOperationPlaceholders
 // is a copy of the attrs map operationRequestURL builds, and the two live in
 // different packages, so nothing but this test stops them drifting apart.
+//
+// It reads the source with go/ast rather than as text. The text version sliced
+// await.go from "func (p *Provider) operationRequestURL(" to the END OF THE
+// FILE and then asked strings.Contains -- so every function BELOW
+// operationRequestURL, and every comment anywhere in that region, counted as
+// evidence that operationRequestURL still sets a placeholder. A prose mention
+// of attrs["region"] in a comment satisfied it just as well as the assignment
+// did. Parsing bounds the search to the function's own body, and to code:
+// comments are not part of the syntax tree walked here.
 func TestRuntimeOperationPlaceholdersMatchesTheRuntime(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "gcprov", "await.go"))
+	path := filepath.Join("..", "gcprov", "await.go")
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := string(src)
-	i := strings.Index(body, "func (p *Provider) operationRequestURL(")
-	if i < 0 {
+	var body *ast.BlockStmt
+	for _, decl := range f.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == "operationRequestURL" {
+			body = fn.Body
+		}
+	}
+	if body == nil {
 		t.Fatal("operationRequestURL is no longer in internal/gcprov/await.go; this test needs rewriting")
 	}
-	body = body[i:]
-	for name := range runtimeOperationPlaceholders {
-		if !strings.Contains(body, `attrs["`+name+`"]`) && !strings.Contains(body, `"`+name+`":`) {
+	set := placeholderKeysSetIn(body)
+	for _, name := range sortedKeys(runtimeOperationPlaceholders) {
+		if !set[name] {
 			t.Errorf("the generator believes the runtime supplies %q, but operationRequestURL never sets it", name)
 		}
 	}
+}
+
+// placeholderKeysSetIn returns every string key the function body assigns a
+// url placeholder under, in either of the two forms operationRequestURL uses:
+// a "name": value entry in the attrs composite literal, and an
+// attrs["name"] = value assignment.
+func placeholderKeysSetIn(body *ast.BlockStmt) map[string]bool {
+	out := map[string]bool{}
+	add := func(e ast.Expr) {
+		lit, ok := e.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return
+		}
+		if s, err := strconv.Unquote(lit.Value); err == nil {
+			out[s] = true
+		}
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.KeyValueExpr:
+			add(x.Key)
+		case *ast.IndexExpr:
+			if ident, ok := x.X.(*ast.Ident); ok && ident.Name == "attrs" {
+				add(x.Index)
+			}
+		}
+		return true
+	})
+	return out
 }
 
 func TestPathPlaceholdersReadsBothSpellings(t *testing.T) {
@@ -1142,5 +1197,87 @@ func TestPathPlaceholdersReadsBothSpellings(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("got %v, want %v", got, want)
 		}
+	}
+}
+
+// TestAMagicModulesResourceIsPairedByCollectionNotJustByName. The real case,
+// reduced: compute's Discovery collection "vpnGateways" is HA VPN, while
+// magic-modules' resource NAMED "VpnGateway" is the classic gateway, whose
+// base_url is a different collection entirely (targetVpnGateways); HA VPN is
+// described by "HaVpnGateway", which matches no Discovery leaf. Pairing on
+// the name alone produced a type whose base_url and self_link named two
+// different resources, so every create orphaned.
+func TestAMagicModulesResourceIsPairedByCollectionNotJustByName(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/tinycompute.json": simpleDoc("tinycompute", "vpnGateways", "VpnGateway", ""),
+		"mmv1/products/tinycompute/VpnGateway.yaml": `name: VpnGateway
+description: the CLASSIC gateway, which lives in another collection entirely.
+base_url: projects/{{project}}/targetVpnGateways
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+		"mmv1/products/tinycompute/HaVpnGateway.yaml": `name: HaVpnGateway
+description: the gateway this collection actually serves.
+base_url: projects/{{project}}/vpnGateways
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.vpngateway")
+	if !ok {
+		t.Fatalf("gcp.vpngateway missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if !strings.Contains(ty.BaseURL, "/vpnGateways") || strings.Contains(ty.BaseURL, "targetVpnGateways") {
+		t.Errorf("base_url = %q, want the collection the Discovery document's create posts to", ty.BaseURL)
+	}
+	if !strings.Contains(ty.Description, "actually serves") {
+		t.Errorf("description = %q, so the type was still paired with the classic gateway", ty.Description)
+	}
+}
+
+// TestATypeWhoseIDNamesAnotherCollectionDoesNotShip is the gate behind that
+// pairing: when no magic-modules resource describes the right collection, the
+// name match stands (it is what says whether the type has wire hooks) and the
+// type is refused instead, with both templates named in gen/warnings.txt. A
+// type that creates one resource and reads another cannot be vouched for, and
+// the generator ships nothing it cannot vouch for.
+func TestATypeWhoseIDNamesAnotherCollectionDoesNotShip(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/tinycompute.json": simpleDoc("tinycompute", "vpnGateways", "VpnGateway", ""),
+		"mmv1/products/tinycompute/VpnGateway.yaml": `name: VpnGateway
+description: the CLASSIC gateway, which lives in another collection entirely.
+base_url: projects/{{project}}/targetVpnGateways
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ty, ok := res.Catalog.Type("gcp.vpngateway"); ok {
+		t.Errorf("a type that posts to %q and names %q shipped anyway", ty.BaseURL, ty.SelfLink)
+	}
+	var said string
+	for _, w := range res.Warnings {
+		if w.Resource == "VpnGateway" {
+			said = w.Reason
+		}
+	}
+	if said == "" {
+		t.Fatal("the refusal was not recorded in the warnings at all, which is the one thing worse than shipping it")
+	}
+	if !strings.Contains(said, "targetVpnGateways") || !strings.Contains(said, "vpnGateways/") {
+		t.Errorf("the warning names neither template it refused over: %q", said)
 	}
 }

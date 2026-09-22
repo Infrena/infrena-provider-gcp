@@ -38,10 +38,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 	if !ok {
 		return nil, fmt.Errorf("gcp: unknown type %q", desired.Type)
 	}
-	collTmpl := ty.CreateURL
-	if collTmpl == "" {
-		collTmpl = ty.BaseURL
-	}
+	collTmpl := createTemplate(ty)
 	reqURL, err := p.expandedURL(ty, collTmpl, desired.Attrs)
 	if err != nil {
 		return nil, err // nothing sent yet: an ordinary error is safe here
@@ -124,8 +121,15 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 }
 
 // createdID is the provider id for something GCP has just made: the awaited
-// body's own identity when it has one, and the caller's own attributes when
-// that identity cannot be turned into an id.
+// body's own identity when it has one AND that identity names something this
+// create could have made, and the caller's own attributes otherwise.
+//
+// Both halves of that matter. An id was previously accepted whenever
+// ProviderID returned no error -- that is, whenever it PARSED -- so a
+// targetLink naming a different resource entirely became the stored id
+// silently. outsideCreatedCollection is the second question, and this is the
+// only place either is asked: readAfterCreate and bestEffortState both come
+// through here.
 //
 // THE FALLBACK EXISTS BECAUSE OF THE ORPHAN RULE. ProviderID reduces a
 // selfLink by the type's own api prefix, and reduceSelfLink errors when the
@@ -149,16 +153,106 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 // is nothing to retry and the original error stands.
 func (p *Provider) createdID(ty *catalog.Type, awaited map[string]any, desiredAttrs map[string]value.Value) (string, error) {
 	id, err := ProviderID(ty, awaited, desiredAttrs)
-	if err == nil || awaited == nil {
+	if awaited == nil {
 		return id, err
+	}
+	reason := ""
+	switch {
+	case err != nil:
+		reason = fmt.Sprintf("could not be reduced to a provider id (%v)", err)
+	default:
+		reason = outsideCreatedCollection(ty, id, desiredAttrs)
+	}
+	if reason == "" {
+		return id, nil
 	}
 	// Loud, because a fallback id that is silently wrong is worse than the
 	// error it replaced: this names the type and the reason, so a wrong
 	// version segment in some API's targetLink is something a user can
 	// report rather than something they discover from a later plan.
-	fmt.Fprintf(os.Stderr, "gcp: %s: the operation's target could not be reduced to a provider id (%v); "+
-		"using the attributes this create was given instead\n", ty.Name, err)
+	fmt.Fprintf(os.Stderr, "gcp: %s: the operation's target %s; "+
+		"using the attributes this create was given instead\n", ty.Name, reason)
 	return ProviderID(ty, nil, desiredAttrs)
+}
+
+// outsideCreatedCollection says why id cannot name something this create
+// made, or "" when it can. THE TEST IS NOT WHETHER THE ID PARSES. It is
+// whether the id names a resource in the collection the POST actually went
+// to -- the difference between an identity that is well-formed and one that
+// is this resource's.
+//
+// Without it, a targetLink that reduces cleanly but names a DIFFERENT
+// resource becomes the stored provider id, silently, and a later Delete
+// destroys whatever that id named. For the 83 types whose self_link is a
+// bare "{+name}" or "{{name}}" capture, ParseProviderID accepts literally any
+// string, so nothing downstream would ever notice; for the ones with literal
+// segments (gcp.sqladmin.databas, gcp.user, gcp.backuprun) it surfaces
+// instead as "created, but the resource cannot be read back" -- an error
+// after a successful POST, which is the orphan e3476ac exists to prevent.
+// This check covers both, because it compares the id against the create's
+// own url rather than against the id template's literal text.
+//
+// Two things stop it misfiring. It compares against the template the create
+// POSTED to (create_url when the type has one, base_url otherwise -- the
+// same choice Create itself makes, via createTemplate), with any query string
+// dropped: 72 types carry their id in a query parameter
+// ("...?attestorId={{name}}"), which names no path segment. And the tighter
+// "exactly one segment deeper" rule is applied only where the type's own two
+// templates agree that that is the shape (collectionMatchesSelfLink).
+// Measured over the 233 shipped types: 142 are collection-plus-one, 1
+// (gcp.bigquery.table) has a base_url that IS the item, 1
+// (gcp.resourcerecordset) is two segments deeper, and 88 cannot be compared
+// at the template level at all because one side is a whole-path capture --
+// and every one of those 88 is still checked here, on the expanded values.
+//
+// A collection template that cannot be expanded is not a failure: Create
+// expands the same template to build the POST url before anything is sent,
+// so an unexpandable one never reaches this. Nothing to compare means no
+// complaint.
+func outsideCreatedCollection(ty *catalog.Type, id string, attrs map[string]value.Value) string {
+	tmpl := pathPart(createTemplate(ty))
+	coll, err := ExpandURL(tmpl, attrs)
+	if err != nil {
+		return ""
+	}
+	coll = strings.TrimSuffix(coll, "/")
+	if id == coll {
+		// gcp.bigquery.table's collection template is the item's own path.
+		return ""
+	}
+	rest, under := strings.CutPrefix(id, coll+"/")
+	if !under {
+		return fmt.Sprintf("names %q, which is not in %q, the collection this create posted to", id, coll)
+	}
+	if strings.Contains(rest, "/") && collectionMatchesSelfLink(tmpl, ty.SelfLink) {
+		return fmt.Sprintf("names %q, which is deeper than one resource inside %q, "+
+			"the collection this create posted to", id, coll)
+	}
+	return ""
+}
+
+// createTemplate is the url template a create POSTs to: create_url when the
+// type has one (72 of 233), base_url otherwise. One place, because Create
+// builds its request url from it and outsideCreatedCollection has to ask
+// about the same collection the request actually went to -- the same reason
+// requestBody takes the template it was called with rather than re-deriving
+// one.
+func createTemplate(ty *catalog.Type) string {
+	if ty.CreateURL != "" {
+		return ty.CreateURL
+	}
+	return ty.BaseURL
+}
+
+// pathPart is tmpl without its query string. A create_url's query carries
+// the new resource's id ("...?attestorId={{name}}") and GCP needs it, so
+// Create sends the template whole; only the PATH names a collection, so only
+// the path takes part in a comparison against a resource name.
+func pathPart(tmpl string) string {
+	if i := strings.IndexByte(tmpl, '?'); i >= 0 {
+		return tmpl[:i]
+	}
+	return tmpl
 }
 
 // readAfterCreate resolves the just-created resource's identity -- preferring
