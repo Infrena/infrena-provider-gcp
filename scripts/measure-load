@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Measures what the embedded catalog costs infrena to load, against a no-op
+# plugin baseline (P8). Builds this plugin and infrena-plugin-fake, points
+# `infrena validate` at a trivial one-resource project through each, five
+# times apiece, and reports the median wall-clock difference.
+#
+# `infrena validate` is timed rather than a Go benchmark of catalog.Load
+# alone because the number that matters is what a REAL invocation pays: the
+# process spawn, the plugin handshake and the Definitions() call together,
+# which is what every command a user actually runs pays once per plugin
+# process. A microbenchmark of Load() alone (about 90ms measured 2026-09-22)
+# undercounts that.
+#
+# Nothing here runs at build time or in the normal test suite: it needs a
+# built `infrena` binary and a sibling infrena-provider-fake checkout, and it
+# takes several seconds. Run it by hand.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root="$PWD"
+
+runs=5
+
+# infrena itself: PATH first (a released binary, which is what a user's
+# `infrena validate` actually is), falling back to building the sibling
+# checkout this repo's go.work already points at.
+if command -v infrena >/dev/null 2>&1; then
+  infrena_bin=$(command -v infrena)
+else
+  echo "infrena not on PATH; building the sibling checkout" >&2
+  if [ ! -d ../infrena ]; then
+    echo "no ../infrena checkout either; cannot measure anything without a host binary" >&2
+    exit 1
+  fi
+  tmp_infrena=$(mktemp -d)
+  (cd ../infrena && go build -o "$tmp_infrena/infrena" ./cmd/infrena)
+  infrena_bin="$tmp_infrena/infrena"
+fi
+
+# The no-op baseline. infrena-plugin-fake is infrena's own reference plugin
+# (github.com/infrena/infrena-provider-fake), built here from a sibling
+# checkout the same way tests/integration in the infrena repo itself does —
+# see that suite's fakePluginDir for the convention this mirrors. It targets
+# a RELEASED infrena (no sibling-workspace requirement of its own), so a
+# plain build is enough.
+fake_repo="${INFRENA_FAKE_SRC:-../infrena-provider-fake}"
+if [ ! -d "$fake_repo" ]; then
+  echo "no fake provider checkout at $fake_repo (set INFRENA_FAKE_SRC to override);" \
+       "cannot measure a no-op baseline without one" >&2
+  exit 1
+fi
+
+workdir=$(mktemp -d)
+trap 'rm -rf "$workdir"' EXIT
+
+gcp_dir="$workdir/gcp-plugin"
+fake_dir="$workdir/fake-plugin"
+mkdir -p "$gcp_dir" "$fake_dir"
+echo "building infrena-plugin-gcp"
+go build -o "$gcp_dir/infrena-plugin-gcp" ./cmd/infrena-plugin-gcp
+echo "building infrena-plugin-fake"
+(cd "$fake_repo" && go build -o "$fake_dir/infrena-plugin-fake" ./cmd/infrena-plugin-fake)
+
+gcp_project="$workdir/gcp-project"
+fake_project="$workdir/fake-project"
+mkdir -p "$gcp_project" "$fake_project"
+# `init`'s [dir] argument is joined onto the CURRENT directory rather than
+# treated as absolute (filepath.Join drops the leading "/"), so this cd's
+# into each project directory and passes "." rather than the absolute path --
+# passing the absolute path silently creates the project under a mangled
+# path relative to wherever this script happens to run from instead.
+(cd "$gcp_project" && "$infrena_bin" init --provider gcp --plugin-dir "$gcp_dir" . >/dev/null)
+(cd "$fake_project" && "$infrena_bin" init --provider fake --plugin-dir "$fake_dir" . >/dev/null)
+
+# `infrena validate` is timed, not asserted to succeed: this plugin's New()
+# is not implemented until Task 17 (it errors "not implemented until the
+# catalog is wired"), so validate against the gcp project ends in a reported
+# configuration error, same as it will until that lands. What's measured is
+# everything BEFORE and INCLUDING that point — process spawn, handshake and
+# the Definitions() call this task wires up — which is the cost this gate is
+# about. The fake project validates cleanly; both are timed the same way.
+time_runs() {
+  local dir=$1 plugin_dir=$2
+  local times=()
+  for i in $(seq 1 "$runs"); do
+    local start end
+    start=$(date +%s%N)
+    (cd "$dir" && "$infrena_bin" validate staging --plugin-dir "$plugin_dir" >/dev/null 2>&1) || true
+    end=$(date +%s%N)
+    times+=($(( (end - start) / 1000000 )))
+  done
+  echo "${times[@]}"
+}
+
+echo "timing infrena-plugin-gcp ($runs runs)"
+gcp_times=($(time_runs "$gcp_project" "$gcp_dir"))
+echo "  ${gcp_times[*]} ms"
+echo "timing infrena-plugin-fake ($runs runs)"
+fake_times=($(time_runs "$fake_project" "$fake_dir"))
+echo "  ${fake_times[*]} ms"
+
+python3 - "${gcp_times[@]}" -- "${fake_times[@]}" <<'PY'
+import sys, statistics
+
+sep = sys.argv.index("--")
+gcp = [int(x) for x in sys.argv[1:sep]]
+fake = [int(x) for x in sys.argv[sep+1:]]
+
+gcp_med = statistics.median(gcp)
+fake_med = statistics.median(fake)
+diff = gcp_med - fake_med
+
+print(f"\nmedian infrena-plugin-gcp:  {gcp_med:.0f} ms")
+print(f"median infrena-plugin-fake: {fake_med:.0f} ms")
+print(f"difference:                 {diff:.0f} ms")
+
+if diff > 1000:
+    print("\nGATE: over 1000ms. STOP and report these numbers rather than proceeding --")
+    print("this suggests something changed for the worse, not that the catalog is simply large.")
+    sys.exit(1)
+elif diff > 500:
+    print("\nGATE: over the ~500ms 'fine' guideline but under the 1000ms stop line. Worth noting in the report.")
+else:
+    print("\nGATE: within the ~500ms budget.")
+PY

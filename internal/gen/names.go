@@ -11,9 +11,35 @@ import (
 type Candidate struct {
 	Service  string
 	Resource string
+	// Scope distinguishes a collection reached through a non-project resource
+	// hierarchy root (organization, folder, billing account) from the
+	// project-scoped collection that shares its resource segment after
+	// singularizing it. These are genuinely different resources -- different
+	// base URLs, different IAM, and Terraform models them separately too --
+	// but they collapse to one Candidate without this: the four Discovery
+	// collections behind an org's, a folder's, a billing account's and a
+	// project's own logging buckets all singularize to "bucket". Empty for
+	// the project-scoped collection and for anything not reached through a
+	// recognised root, both of which keep naming exactly as it was before
+	// this field existed.
+	Scope string
+	// Qualified marks a Resource segment that was extended by walking its
+	// Discovery path leftward to disambiguate it from an unrelated candidate
+	// that shared its original bare leaf (see resolveWithinServiceCollisions
+	// in build.go — iam's ServiceAccountKey and WorkloadIdentityPoolProviderKey
+	// both start out as "key"). Its Resource is already made unique by that
+	// walk, but it still always takes the service-qualified form: a name this
+	// specific (workloadidentitypool.provider.key) is not what "the short
+	// name" is FOR, even on the rare occasion nothing else happens to want it.
+	Qualified bool
 }
 
-func (c Candidate) key() string { return c.Service + "/" + c.Resource }
+func (c Candidate) key() string {
+	if c.Scope == "" {
+		return c.Service + "/" + c.Resource
+	}
+	return c.Service + "/" + c.Scope + "/" + c.Resource
+}
 
 // Lock records every name ever assigned. It ONLY GROWS: an entry is never
 // removed and never changed, so a name released to users cannot later move to a
@@ -88,9 +114,16 @@ func Assign(cands []Candidate, lock *Lock) (map[Candidate]string, error) {
 
 	// How many NEW candidates want each resource segment. A segment wanted by more
 	// than one newcomer is ambiguous even if the lock has never seen it.
+	//
+	// Only unscoped, unqualified candidates compete for the bare resource
+	// segment: a scoped or already-qualified candidate never receives a short
+	// name (nameFor always qualifies it), so counting it here would wrongly
+	// push its unscoped sibling into a qualified name it has no need for.
 	wants := map[string]int{}
 	for _, c := range fresh {
-		wants[c.Resource]++
+		if c.Scope == "" && !c.Qualified {
+			wants[c.Resource]++
+		}
 	}
 
 	// Held until every fresh candidate resolves cleanly. The lock is append-only
@@ -115,11 +148,33 @@ func Assign(cands []Candidate, lock *Lock) (map[Candidate]string, error) {
 	return out, nil
 }
 
-// nameFor picks the short or qualified name for c, given how many OTHER fresh
-// candidates in this call want its resource segment, and which names are
-// already spoken for (by the lock or by a fresh candidate resolved earlier in
-// this same call).
+// nameFor picks the name for c, given how many OTHER fresh candidates in this
+// call want its resource segment, and which names are already spoken for (by
+// the lock or by a fresh candidate resolved earlier in this same call).
+//
+// A scoped candidate (organization, folder or billing account) always gets
+// the fully qualified gcp.<service>.<scope>.<resource> form -- there is no
+// short form to consider, because the whole point of Scope is that this
+// candidate is NOT what a user means by the bare resource name. Likewise a
+// Qualified candidate (its Resource already walked to disambiguate it from
+// an unrelated one) always gets gcp.<service>.<resource>, never the short
+// form. An ordinary candidate keeps the original short-unless-contested rule
+// unchanged.
 func nameFor(c Candidate, wants map[string]int, taken map[string]string) (string, error) {
+	if c.Scope != "" {
+		name := "gcp." + c.Service + "." + c.Scope + "." + c.Resource
+		if holder, clash := taken[name]; clash && holder != c.key() {
+			return "", fmt.Errorf("cannot name %s: %s is already taken (by %s)", c.key(), name, holder)
+		}
+		return name, nil
+	}
+	if c.Qualified {
+		name := "gcp." + c.Service + "." + c.Resource
+		if holder, clash := taken[name]; clash && holder != c.key() {
+			return "", fmt.Errorf("cannot name %s: %s is already taken (by %s)", c.key(), name, holder)
+		}
+		return name, nil
+	}
 	short := "gcp." + c.Resource
 	qualified := "gcp." + c.Service + "." + c.Resource
 	name := short

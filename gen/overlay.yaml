@@ -5,8 +5,17 @@
 # names only some is treated as stale, because that is what it is.
 
 rulings:
+  # This ruling originally said `hooks: []`, written before the real
+  # magic-modules resource (products/tags/TagBinding.yaml) was ever matched to
+  # it — matchResource couldn't find TagBinding at all until product_aliases
+  # was added (2026-09-22), so Classify() never had a chance to compare this
+  # ruling's hook list against the real one. Once matching started working,
+  # Classify correctly flagged the ruling as stale: the real resource declares
+  # pre_create and custom_import, neither of which is `[]`. Both inspected
+  # below (against the pinned mmv1 commit's
+  # templates/terraform/{pre_create,custom_import}/tags_tag_binding.go.tmpl).
   cloudresourcemanager/TagBinding:
-    hooks: []
+    hooks: [pre_create, custom_import]
     read_via: list_by_parent
     all_force_new: true
     note: >
@@ -15,7 +24,44 @@ rulings:
       is therefore a list filtered by parent, and every field is ForceNew because
       there is no update path at all. Required at v1.0 by spec decision G6.
 
+      pre_create rewrites tag_value onto one of two wire fields depending on
+      its VALUE at runtime: a "tagValues/{id}"-prefixed string is sent as
+      tagValue unchanged (exactly what the generic path already does), but a
+      namespaced short-name string (e.g. "myorg/env/prod") is instead meant to
+      go out as tagValueNamespacedName, which the generic path has no way to
+      produce. Accepted for v1.0 with a known, bounded gap: a config that
+      writes tag_value in tagValues/{id} form (the common, unambiguous form,
+      and the only one gcp.tagvalue's own self_link produces) behaves
+      identically to the real hook; a config using the namespaced short-name
+      form will send it verbatim as tagValue instead. We EXPECT the real API
+      to reject that rather than silently misapply it, but this is an
+      ASSUMPTION, not something verified against a live project — nothing in
+      this codebase has touched real GCP yet (that begins at Task 18). Task
+      18's live suite should confirm it; if the API instead accepts a
+      namespaced value under the wrong key and does something else with it,
+      this ruling is wrong and needs revisiting, not just this note.
+
+      custom_import only affects `terraform import`'s own ID parsing, which
+      infrena does not consume (Import here goes through read_via, not this
+      hook) — recorded for completeness, not because it does anything on
+      infrena's wire.
+
 aliases: {}
+
+# product_aliases: Discovery API name -> every vendored magic-modules product
+# directory that also carries resources for it. mmv1's directory names
+# routinely diverge from Google's Discovery API names (TagBinding lives under
+# products/tags, not products/cloudresourcemanager), and without this,
+# matchResource cannot find those resources at all -- mm comes back nil, and
+# any ruling above keyed to them (cloudresourcemanager/TagBinding included) is
+# silently never consulted. Found against the real corpus generated 2026-09-21
+# and 2026-09-22.
+product_aliases:
+  cloudresourcemanager: [resourcemanager, resourcemanagerv3, tags]
+  cloudkms: [kms]
+  sqladmin: [sql]
+  iam: [iam2, iam3, iambeta, iamworkforcepool]
+  cloudbuild: [cloudbuildv2]
 
 # The types `discover` scans when an instance names none. Unlike AWS this is not
 # a cost measure — Cloud Asset Inventory returns a whole project in a few calls —
