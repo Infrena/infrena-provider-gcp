@@ -100,12 +100,6 @@ type Type struct {
 	OperationPollPath string `json:"operation_poll_path,omitempty"`
 
 	Await AwaitKind `json:"await"`
-	// OperationScope is DEPRECATED and about to be removed: it is a bare word
-	// ("global"/"region"/"zone") derived from Scope with no independent source,
-	// and every attempt to build a wait URL from it was wrong. Kept only until
-	// await.go stops reading it.
-	OperationScope string `json:"operation_scope,omitempty"`
-
 	// OperationWaitPath is the API's own operations wait path for this type's
 	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
 	// EMPTY means the API publishes no wait method — container and sqladmin do

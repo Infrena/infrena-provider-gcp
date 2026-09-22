@@ -561,14 +561,6 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		// publish NO wait method anywhere, so a wait call against them 404s and
 		// they must be polled with get instead. Both paths are recorded and the
 		// runtime picks whichever exists.
-		switch t.Scope { // deprecated, removed once await.go stops reading it
-		case catalog.ScopeGlobal:
-			t.OperationScope = "global"
-		case catalog.ScopeRegional:
-			t.OperationScope = "region"
-		case catalog.ScopeZonal:
-			t.OperationScope = "zone"
-		}
 		t.OperationWaitPath = operationWaitPath(doc, t.Scope)
 		t.OperationPollPath = operationPollPath(doc)
 		t.TimeoutSeconds = 600
