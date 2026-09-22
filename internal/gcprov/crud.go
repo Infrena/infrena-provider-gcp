@@ -229,10 +229,29 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 // APIs never echo them back in the body at all -- without this an imported
 // or refreshed resource would show those attributes as unset and a plan
 // would propose "setting" them forever.
+//
+// THE ORPHAN RULE REACHES HERE TOO, even on a plain Read. We asked GCP for
+// this exact resource BY ID and it answered 200, so the resource exists at
+// current's id whether or not the body's own selfLink happens to reduce
+// against this type's api prefix -- reducing it exists only to notice a
+// rename GCP made underneath us, and failing to reduce it means "I could not
+// tell whether it was renamed", not "the read failed". Reached from Create
+// by way of readAfterCreate, returning an error here for that case would
+// land in Create's default branch and fail a create for a resource GCP
+// already made -- the host drops that result, so the resource would exist
+// and be tracked nowhere. So on a reduction failure this keeps current's own
+// id rather than erroring; the body's other fields are still reported, and
+// the ordinary "id didn't reduce" case (the id genuinely doesn't belong to
+// this type) still surfaces from Import and Delete, which parse it directly
+// instead of going through here. A silently wrong id would be worse than the
+// error it replaces, so the failure still goes to stderr, naming the type
+// and the reason.
 func (p *Provider) stateFrom(ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
 	id, err := ProviderID(ty, body, idAttrs)
 	if err != nil {
-		return nil, err
+		fmt.Fprintf(os.Stderr, "gcp: %s: the response's identity could not be reduced to a provider id (%v); "+
+			"keeping the id this resource was read at\n", ty.Name, err)
+		id = current.ProviderID
 	}
 	attrs := make(map[string]value.Value, len(idAttrs)+len(body))
 	for k, v := range idAttrs {
