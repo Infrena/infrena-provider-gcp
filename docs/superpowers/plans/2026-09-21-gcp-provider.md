@@ -4702,17 +4702,39 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 messages. It must carry GCP's own text through — a wrapper that says "the operation failed" and drops
 the reason leaves the user nothing to act on.
 
-`operationWaitURL` builds `<APIBaseURL><OperationScope>Operations/<op name>/wait`.
+**Do NOT build the wait URL. Read the one the API publishes, and handle the APIs that have none.**
 
-**Note the `Operations` suffix — `OperationScope` holds a BARE WORD, not the collection name.** Counted
-across the 233 generated types on 2026-09-22: the 65 compute-style types carry `global` (30), `region`
-(29) or `zone` (6), while the collection to poll is `globalOperations`/`regionOperations`/`zoneOperations`.
-An earlier draft of this passage said `OperationScope` named the collection directly; it does not, and
-building the URL verbatim from that gives `.../global/op-1/wait`, which 404s. The `wait` method itself
-does exist on all three collections, verified against `schemas/compute.json`.
+This passage was wrong three times — twice in ways that produced working-looking code:
 
-Take the scope-bearing segment from the operation's own `zone` or `region` field when present (compute
-returns them as full URLs, so use the last path segment) and fall back to the type's own scope. A `wait` URL built
+- v1 said `OperationScope` names the collection, so the URL was `<scope>/<op>/wait`.
+- v2 said append `Operations`, giving `zoneOperations/<op>/wait`. **Further from the truth than v1.**
+- The actual wire path, read from `schemas/compute.json`:
+
+      globalOperations wait -> projects/{project}/global/operations/{operation}/wait
+      regionOperations wait -> projects/{project}/regions/{region}/operations/{operation}/wait
+      zoneOperations   wait -> projects/{project}/zones/{zone}/operations/{operation}/wait
+
+  The literal segment is **`operations`**, always. `zoneOperations` is only the Discovery COLLECTION
+  name and never appears in a URL.
+
+And `wait` does not exist everywhere. Scanning every document for a `wait` method: **sqladmin NONE,
+container NONE, dns NONE.** The 65 compute-style types are compute 58, sqladmin 5, container 2 — so 7
+of them must be polled with `get`, and a `wait` against them 404s.
+
+So the catalog carries both, and the runtime picks:
+
+- `ty.OperationWaitPath` — the scope-appropriate wait path, verbatim. **Empty is a real answer**
+  meaning this API publishes no wait method.
+- `ty.OperationPollPath` — the `operations.get` path, set for longrunning types AND for the 7
+  compute-style types with no wait. These differ per API: container `v1/{+name}`, sqladmin
+  `v1/projects/{project}/operations/{operation}`.
+
+Expand both through `ExpandURL`; the templates use `{project}`/`{zone}`/`{operation}` single-brace and
+`{+name}` reserved forms, all already handled.
+
+**`gcpfake` must match.** Its `waitPathRE` encoded the same wrong assumption, which is why no test
+could catch any of this: the fake and the production code were built to the same wrong spec, and a
+test can only ever compare them to each other. A `wait` URL built
 without the right scope 404s, which reads as "the operation vanished" rather than "we asked the wrong
 collection".
 
