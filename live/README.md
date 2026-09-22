@@ -114,6 +114,11 @@ lookups were made. Refusing is not the same as refusing first.
 | tag value | `gcp.tagvalue` | the same await, plus a `${...}` reference resolved against a real generated id | free |
 | tag binding | `gcp.tagbinding` | `read_via: list_by_parent`, the only type in the catalog with no `get` at all | free |
 
+`TestLiveTagBindingOnASeededTag` seeds a tag key and value **directly through
+the API** and has infrena manage only the binding, because the tag key's
+broken create otherwise skips the binding before it is ever attempted. It
+**skips** today — see finding 8.
+
 The three tag types were in `TestLiveWorkflow` until the first live run.
 They fail their create (finding 3 below) and took the bucket, the firewall
 and the instance down with them, so no claim about any of those could be
@@ -232,7 +237,7 @@ findings and only one of them is an answer.
 
 ## What this suite found that no fake could
 
-Seven, and every one of them was invisible to the 1,400-odd tests that came
+Eight, and every one of them was invisible to the 1,400-odd tests that came
 before, because every one of them lives where this provider meets Google.
 
 **1. compute reports a quota throttle as 403, so none of them were retried.**
@@ -307,6 +312,41 @@ reuses it for every later `Token()` call, and `t.Context()` is cancelled
 with `obtaining the base token: context canceled`, and an e2-micro was left
 running. `gcpplugin/credentials.go` warns about exactly this and this suite
 walked into it anyway. Fixed here; `newGoogle` builds on `context.Background()`.
+
+**8. The tag binding path still cannot be measured, and here is exactly why.**
+`roles/resourcemanager.tagAdmin` grants tag **key** and **value** admin. It
+does **not** grant `resourcemanager.hierarchyNodes.createTagBinding` or
+`listTagBindings` on the resource being tagged — those come from
+`roles/resourcemanager.tagUser`, held on the target. So seeding a tag key and
+value succeeds and the binding itself is refused:
+
+```
+x create binding: gcp: The caller does not have permission (403 PERMISSION_DENIED)
+```
+
+`TestLiveTagBindingOnASeededTag` **skips** rather than fails, naming the grant,
+because reporting a missing IAM role as a bug in this provider is the one
+thing a live suite must never do. To close it:
+
+```bash
+gcloud projects add-iam-policy-binding example-project-1234 \
+  --member=serviceAccount:infrena-live@example-project-1234.iam.gserviceaccount.com \
+  --role=roles/resourcemanager.tagUser
+```
+
+IAM in this project took over a minute to propagate, so retry before
+concluding anything is still wrong.
+
+**So what the real API does with a tag binding's id remains UNKNOWN.** It has
+only ever been seen through sabotage against our own fake. The defect is
+confirmed for `gcp.tagkey` from a real 400 (finding 3), and the binding is
+expected to be the same shape — but expected is not measured, and this file
+does not pretend otherwise.
+
+One more thing the attempt did establish: **`readByListingParent` can only
+ever list bindings on the configured PROJECT** — it builds the parent from
+`Settings.Project`. A tag bound to a bucket or an instance would be created
+and then never readable, so the read path is narrower than the type is.
 
 ### What passes
 
