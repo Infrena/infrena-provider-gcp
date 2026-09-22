@@ -4643,9 +4643,20 @@ func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op ma
 		if err := p.sleepBackoff(ctx, attempt); err != nil {
 			return nil, fmt.Errorf("%s: waiting for %s: %w", ty.Name, name, err)
 		}
-		var err error
-		op, err = p.client.Do(ctx, http.MethodGet, ty.APIBaseURL+name, nil)
+		// The poll URL comes from the API's OWN operations.get template, stored
+		// verbatim in the catalog as OperationPollPath ("v1/{+name}"), NOT from
+		// concatenating APIBaseURL and the name. An earlier draft did the latter
+		// and omitted the version segment entirely: 58 of the 97 longrunning
+		// types record no version anywhere, so that URL was not even
+		// constructible for most of them. {+name} is reserved expansion — an
+		// operation name is a path containing "/" and must not be escaped.
+		rel, err := ExpandURL(ty.OperationPollPath, map[string]value.Value{
+			"name": value.String(name, value.SourceProvider),
+		})
 		if err != nil {
+			return nil, err
+		}
+		if op, err = p.client.Do(ctx, http.MethodGet, ty.APIBaseURL+rel, nil); err != nil {
 			return nil, err
 		}
 	}
