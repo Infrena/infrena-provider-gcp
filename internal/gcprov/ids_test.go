@@ -113,3 +113,55 @@ func TestParseProviderIDAcceptsAnImportFormatShorthand(t *testing.T) {
 		t.Errorf("the short form parsed wrong: %v", short)
 	}
 }
+
+// TestReduceSelfLinkTakesTheFirstAnchoredMatch. The counterexample, verbatim:
+// a project whose id is literally "projects" -- eight lowercase letters, a
+// syntactically valid GCP project id. Taking the LAST anchored match instead
+// of the first reduces to "projects/zones/us-central1-a/instances/web1",
+// silently deleting the project segment from the id, which then imports and
+// reads as some other resource.
+//
+// The argument that once justified "last" -- that a resource's own trailing
+// name might repeat a hierarchy keyword -- does not hold: every prefix
+// searched for ends in "/", and a trailing name has nothing after it, so it
+// can never produce an anchored match at all. An earlier hierarchy VALUE can,
+// and does here.
+//
+// Driven through ProviderID rather than the helper, so it also fails if
+// reduceSelfLink goes back to searching for self_link's literal head.
+func TestReduceSelfLinkTakesTheFirstAnchoredMatch(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.instance", Scope: catalog.ScopeZonal,
+		APIBaseURL: "https://compute.googleapis.com/compute/v1/",
+		SelfLink:   "projects/{{project}}/zones/{{zone}}/instances/{{name}}"}
+	got, err := ProviderID(ty, map[string]any{
+		"selfLink": "https://www.googleapis.com/compute/v1/projects/projects/zones/us-central1-a/instances/web1",
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/projects/zones/us-central1-a/instances/web1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// TestReduceSelfLinkTakesTheFirstAnchoredPrefix is the same choice asked of
+// the prefix itself rather than of a hierarchy keyword: "v1" is a legal
+// cloudkms key ring id, so the prefix "v1/" occurs twice at a segment
+// boundary. The first one is the api prefix; the second is the user's own key
+// ring, and reducing past it would return "cryptoKeys/k" as the id of a
+// resource that is nothing of the sort.
+func TestReduceSelfLinkTakesTheFirstAnchoredPrefix(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.cryptokey", Scope: catalog.ScopeRegional,
+		APIBaseURL: "https://cloudkms.googleapis.com/",
+		PathPrefix: "v1/",
+		SelfLink:   "projects/{{project}}/locations/{{location}}/keyRings/{{key_ring}}/cryptoKeys/{{name}}"}
+	got, err := ProviderID(ty, map[string]any{
+		"selfLink": "https://cloudkms.googleapis.com/v1/projects/p/locations/us-central1/keyRings/v1/cryptoKeys/k",
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/p/locations/us-central1/keyRings/v1/cryptoKeys/k"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
