@@ -246,3 +246,256 @@ func TestARulingsAllForceNewAndReadViaBothTakeEffect(t *testing.T) {
 		}
 	}
 }
+
+// writeRefFixture builds a temp input tree from an explicit file listing. The
+// three tests below each need a specific, small product/service layout to
+// exercise one branch of resolveOneRef, and that layout IS the point of the
+// test, so it's written out inline rather than hidden in a testdata file.
+func writeRefFixture(t *testing.T, files map[string]string) Inputs {
+	t.Helper()
+	dir := t.TempDir()
+	for rel, content := range files {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	overlay := filepath.Join(dir, "overlay.yaml")
+	if err := os.WriteFile(overlay, []byte("rulings: {}\naliases: {}\ndiscover_default: []\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return Inputs{
+		SchemaDir:   filepath.Join(dir, "schemas"),
+		MMV1Dir:     filepath.Join(dir, "mmv1", "products"),
+		OverlayPath: overlay,
+		LockPath:    filepath.Join(dir, "names.lock.json"),
+	}
+}
+
+// simpleDoc is a minimal Discovery document: one resource schema (name plus
+// one string property) and one matching get/insert/delete collection.
+func simpleDoc(service, collection, schema, extraProp string) string {
+	return `{
+  "name": "` + service + `",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "` + schema + `": {
+      "id": "` + schema + `",
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"}` + extraProp + `
+      }
+    },
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "projects": {"resources": {"` + collection + `": {"methods": {
+      "get": {"id": "x.get", "path": "projects/{project}/` + collection + `/{id}", "httpMethod": "GET", "response": {"$ref": "` + schema + `"}},
+      "insert": {"id": "x.insert", "path": "projects/{project}/` + collection + `", "httpMethod": "POST", "request": {"$ref": "` + schema + `"}, "response": {"$ref": "Operation"}},
+      "delete": {"id": "x.delete", "path": "projects/{project}/` + collection + `/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+    }}}}
+  }
+}`
+}
+
+// TestASameProductReferenceResolves. Step 1 of resolveOneRef: the referring
+// resource's own product is tried FIRST, before the cross-product/ambiguity
+// steps even look at the candidate set. A third, unrelated product ships a
+// second resource also named "Target" — if step 1 were skipped, "Target"
+// would have two candidates (samesvc, othersvc) and steps 2/3 would treat it
+// as ambiguous and drop it instead of resolving it locally. Only the
+// same-product check distinguishes "my own product's Target" from "some
+// other product's Target that happens to share the name".
+func TestASameProductReferenceResolves(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/samesvc.json": simpleDoc("samesvc", "referrers", "Referrer",
+			`, "target": {"type": "string", "description": "The target."}`),
+		"schemas/samesvc-targets.json": simpleDoc("samesvc", "targets", "Target", ""),
+		"schemas/othersvc.json":        simpleDoc("othersvc", "targets", "Target", ""),
+		"mmv1/products/samesvc/Referrer.yaml": `name: Referrer
+description: references a target in the same product.
+base_url: projects/{{project}}/referrers
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: target
+    type: ResourceRef
+    resource: Target
+    imports: selfLink
+`,
+		"mmv1/products/samesvc/Target.yaml": `name: Target
+description: the same-product reference target.
+base_url: projects/{{project}}/targets
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+		"mmv1/products/othersvc/Target.yaml": `name: Target
+description: an unrelated product's own Target, sharing the bare name only.
+base_url: projects/{{project}}/targets
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.referrer")
+	if !ok {
+		t.Fatalf("gcp.referrer missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	a, ok := ty.Attributes["target"]
+	if !ok || a.Ref == nil {
+		t.Fatalf("target attribute or its Ref missing: %+v", a)
+	}
+	// "target" is wanted by both samesvc's and othersvc's Target, so Assign
+	// qualifies both names — samesvc's own is gcp.samesvc.target, not the
+	// short gcp.target.
+	if a.Ref.Type != "gcp.samesvc.target" {
+		t.Errorf("target.Ref.Type = %q, want gcp.samesvc.target (samesvc's OWN Target, not othersvc's)", a.Ref.Type)
+	}
+	for _, w := range res.Warnings {
+		if strings.Contains(w.Reason, "ambiguous") {
+			t.Errorf("unexpected ambiguity warning: same-product resolution must short-circuit before the ambiguity check: %+v", w)
+		}
+	}
+}
+
+// Two Discovery documents share one schemas dir and one mmv1/products dir
+// deliberately: separate services/products loaded in a single Build() call,
+// which is exactly what happens for the real ~40-API corpus.
+
+// TestAUniqueCrossProductReferenceResolves. Step 2 of resolveOneRef: the
+// referring resource's own product misses, but exactly one other product
+// shipped the target name, so it's a real (not ambiguous) cross-product edge
+// — e.g. compute/Subnetwork -> networkconnectivity/InternalRange.
+func TestAUniqueCrossProductReferenceResolves(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/crossa.json": simpleDoc("crossa", "referrer2s", "Referrer2",
+			`, "shared": {"type": "string", "description": "The shared target."}`),
+		"schemas/crossb.json": simpleDoc("crossb", "shareds", "Shared", ""),
+		"mmv1/products/crossa/Referrer2.yaml": `name: Referrer2
+description: references a target that ships in a different product.
+base_url: projects/{{project}}/referrer2s
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: shared
+    type: ResourceRef
+    resource: Shared
+    imports: selfLink
+`,
+		"mmv1/products/crossb/Shared.yaml": `name: Shared
+description: ships in a different product than its referrer.
+base_url: projects/{{project}}/shareds
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.referrer2")
+	if !ok {
+		t.Fatalf("gcp.referrer2 missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	a, ok := ty.Attributes["shared"]
+	if !ok || a.Ref == nil {
+		t.Fatalf("shared attribute or its Ref missing: %+v", a)
+	}
+	if a.Ref.Type != "gcp.shared" {
+		t.Errorf("shared.Ref.Type = %q, want gcp.shared", a.Ref.Type)
+	}
+	for _, w := range res.Warnings {
+		if strings.Contains(w.Reason, "ambiguous") {
+			t.Errorf("unexpected ambiguity warning for a unique cross-product reference: %+v", w)
+		}
+	}
+}
+
+// TestAnAmbiguousReferenceIsDroppedAndWarned. Step 3 of resolveOneRef: the
+// referring resource's own product misses, AND more than one other product
+// shipped the target name (942 magic-modules resources share only 802
+// distinct names in the real corpus — "Instance" alone spans 16 products).
+// Guessing would write a wrong edge into a user's generated configuration, so
+// this must drop the reference and warn naming every candidate, not pick one.
+func TestAnAmbiguousReferenceIsDroppedAndWarned(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/ambref.json": simpleDoc("ambref", "referrer3s", "Referrer3",
+			`, "thing": {"type": "string", "description": "The ambiguous target."}`),
+		"schemas/thinga.json": simpleDoc("thinga", "things", "Thing", ""),
+		"schemas/thingb.json": simpleDoc("thingb", "things", "Thing", ""),
+		"mmv1/products/ambref/Referrer3.yaml": `name: Referrer3
+description: references a target name that is ambiguous across products.
+base_url: projects/{{project}}/referrer3s
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: thing
+    type: ResourceRef
+    resource: Thing
+    imports: selfLink
+`,
+		"mmv1/products/thinga/Thing.yaml": `name: Thing
+description: a Thing shipped by product thinga.
+base_url: projects/{{project}}/things
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+		"mmv1/products/thingb/Thing.yaml": `name: Thing
+description: a Thing shipped by product thingb, colliding by name with thinga's.
+base_url: projects/{{project}}/things
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.referrer3")
+	if !ok {
+		t.Fatalf("gcp.referrer3 missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	a, ok := ty.Attributes["thing"]
+	if !ok {
+		t.Fatal("thing attribute missing")
+	}
+	if a.Ref != nil {
+		t.Errorf("thing.Ref = %+v, want nil: Thing is ambiguous across thinga and thingb", a.Ref)
+	}
+	var found bool
+	for _, w := range res.Warnings {
+		if w.Resource == "gcp.referrer3.thing" {
+			found = true
+			if !strings.Contains(w.Reason, "ambiguous") {
+				t.Errorf("warning does not say the reference is ambiguous: %q", w.Reason)
+			}
+			if !strings.Contains(w.Reason, "thinga") || !strings.Contains(w.Reason, "thingb") {
+				t.Errorf("warning does not name both candidates: %q", w.Reason)
+			}
+		}
+	}
+	if !found {
+		t.Error("the ambiguous reference was dropped without a warning naming the candidates")
+	}
+}
