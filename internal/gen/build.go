@@ -188,6 +188,13 @@ func Build(in Inputs) (*Result, error) {
 	c := &catalog.Catalog{
 		Generated:  time.Now().UTC().Format("2006-01-02"),
 		MMV1Commit: readPin(filepath.Dir(in.MMV1Dir)),
+		// The overlay is a generator-time input, so the runtime's discovery
+		// fallback has no way to read discover_default except through the
+		// catalog it already loads. Copied verbatim; whether every name in it
+		// is a type this catalog actually serves is checked by
+		// TestDiscoverDefaultNamesOnlyTypesWeServe (internal/catalog), which
+		// reads the overlay and the built catalog together.
+		DiscoverDefault: overlay.DiscoverDefault,
 	}
 	type built struct {
 		p pending
@@ -493,6 +500,35 @@ func singular(s string) string {
 // solve. The three below are it; the generator-level uniqueness check in
 // Build catches anything scopeSegment doesn't, loudly, rather than silently
 // merging it the way the pre-fix Candidate did.
+// hierarchyRoot is catalog.Type.ParentRoot: the resource-hierarchy root a
+// Discovery collection hangs off, which is also the first segment of every
+// resource name that collection serves.
+//
+// It reports the segment VERBATIM ("projects", "organizations", "folders",
+// "billingAccounts") because that is what it is compared against at runtime:
+// the head of a Cloud Asset Inventory full resource name. scopeSegment, just
+// below, answers a different question for a different consumer -- it names
+// the NON-project roots in the singular, lowercased, because its answer
+// becomes a segment of the assigned type name -- so the two deliberately do
+// not share an implementation. Folding them together would mean either
+// naming types "gcp.logging.folders.bucket" or comparing a resource name
+// against "folder", and each is wrong in its own direction.
+//
+// "" for a collection rooted at anything else, which is honest: discovery
+// only uses this to tell two types with the same asset type apart, and a
+// root this does not recognise is one it cannot help with.
+func hierarchyRoot(path []string) string {
+	if len(path) == 0 {
+		return ""
+	}
+	switch path[0] {
+	case "projects", "organizations", "folders", "billingAccounts":
+		return path[0]
+	default:
+		return ""
+	}
+}
+
 func scopeSegment(path []string) string {
 	if len(path) == 0 {
 		return ""
@@ -645,6 +681,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		Name:       name,
 		Service:    doc.Name,
 		APIBaseURL: doc.ResolvedBaseURL(),
+		ParentRoot: hierarchyRoot(col.Path),
 		Attributes: attrs,
 	}
 	if mm != nil {

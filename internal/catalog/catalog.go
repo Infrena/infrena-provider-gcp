@@ -133,6 +133,30 @@ type Type struct {
 	AssetType    string `json:"asset_type,omitempty"`
 	Scope        Scope  `json:"scope"`
 
+	// ParentRoot is the resource-hierarchy root this type's collection hangs
+	// off -- the FIRST segment of its Discovery collection path, and so the
+	// first segment of every one of its resource names: "projects",
+	// "organizations", "folders", "billingAccounts", or "" for a collection
+	// rooted at something else.
+	//
+	// It exists because AssetType is NOT unique. Measured on this catalog,
+	// 2026-09-22: 27 of the 191 distinct asset types are shared by two or
+	// more of the 233 catalog types, and for 13 of those 27 the sharing
+	// types' BaseURL and SelfLink templates are CHARACTER-IDENTICAL --
+	// logging's four LogBucket variants are all base_url "{+parent}/buckets",
+	// self_link "{+name}", and the three CapabilityConfig variants are all
+	// "{{parent}}/capabilityConfigs/{{capability_config_id}}". The parent
+	// root is the only thing that tells them apart, and before this field it
+	// was recorded nowhere but inside the assigned name's own spelling
+	// ("gcp.logging.folder.bucket"), which is not something a runtime should
+	// have to parse.
+	//
+	// Discovery (internal/gcprov/discover.go) uses it to decide which catalog
+	// type a Cloud Asset Inventory result belongs to. Without it a
+	// folder-scoped log bucket is reported as a project-scoped one, which
+	// generates configuration that looks right and cannot apply.
+	ParentRoot string `json:"parent_root,omitempty"`
+
 	// ListField is the array-valued property this type's List response
 	// carries its results under. There is no universal name across GCP's own
 	// APIs to assume instead: a sample of 532 List methods across 25 APIs
@@ -149,6 +173,17 @@ type Catalog struct {
 	Generated  string  `json:"generated"`
 	MMV1Commit string  `json:"mmv1_commit"`
 	Types      []*Type `json:"types"`
+
+	// DiscoverDefault is the type list discovery's per-type fallback scans
+	// when neither the request nor the instance names any -- gen/overlay.yaml's
+	// own discover_default, carried here because the overlay is a
+	// generator-time input and the runtime has no other way to read it.
+	//
+	// It matters ONLY on the fallback path. Cloud Asset Inventory answers for
+	// a whole project in a handful of calls and needs no list at all; this is
+	// what discovery falls back to when CAI is unavailable, which is why it
+	// is short rather than exhaustive.
+	DiscoverDefault []string `json:"discover_default,omitempty"`
 
 	byName map[string]*Type
 }

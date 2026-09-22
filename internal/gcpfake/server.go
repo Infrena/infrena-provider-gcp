@@ -301,7 +301,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch {
-	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, ":searchAllResources"):
+	// Matched on the path alone, whatever the method: cloudasset publishes
+	// searchAllResources as a GET (see handleSearchAllResources), and a
+	// client that sends it as anything else should get the fake's own answer
+	// and be caught by whatever asserts on Requests(), not fall through to
+	// ordinary CRUD and come back with an unrelated 404.
+	case strings.HasSuffix(r.URL.Path, ":searchAllResources"):
 		s.handleSearchAllResources(w, r)
 	case r.Method == http.MethodPost && waitPathRE.MatchString(r.URL.Path):
 		s.handleComputeWait(w, r)

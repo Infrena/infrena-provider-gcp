@@ -334,6 +334,20 @@ type Settings struct {
 
 	DiscoverTypes    []string
 	DiscoverProjects []string
+
+	// AssetInventoryBaseURL is where Cloud Asset Inventory lives. Empty means
+	// cloudAssetBaseURL, the real endpoint, which is what every configured
+	// instance uses.
+	//
+	// It is a field rather than a constant because CAI is the one API this
+	// provider calls that is NOT in the catalog for the type being
+	// discovered: every other request url comes from a catalog type's own
+	// APIBaseURL, which a test redirects at the fake by rewriting the catalog
+	// (pointCatalogAt). Discovery has no catalog type to take a host from --
+	// the asset search is about the project, not about any one type -- so
+	// without this a discovery test would send its search to the real
+	// cloudasset.googleapis.com.
+	AssetInventoryBaseURL string
 }
 
 // Provider is one configured GCP provider instance: the generic Client and
