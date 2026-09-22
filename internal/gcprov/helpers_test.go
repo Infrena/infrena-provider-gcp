@@ -113,18 +113,25 @@ func contains(s, substr string) bool { return strings.Contains(s, substr) }
 // catalog while building this fixture: of its 233 types, only one
 // (gcp.attestor) puts {{name}} in base_url at all, and every other type's
 // base_url is collection-shaped. self_link is the ITEM's relative resource
-// name for provider-id purposes and never carries a "v1"-style version
-// segment, also matching the real catalog. The per-item HTTP path CRUD code
-// needs for Read/Update/Delete is therefore expected to come from expanding
-// base_url and appending the id's last segment (exactly how gcpfake itself
-// resolves a create's storage path: collection + "/" + id) -- not from
-// expanding self_link directly, which would produce an url missing the
-// version segment base_url carries. See task-11-report.md.
+// name for provider-id purposes. The per-item HTTP path CRUD code needs for
+// Read/Update/Delete is expected to come from expanding base_url and
+// appending the id's last segment (exactly how gcpfake itself resolves a
+// create's storage path: collection + "/" + id). See task-11-report.md.
+//
+// NEITHER template carries the "v1" segment: it lives in path_prefix, the
+// one place the version is allowed to be, and absURL puts it back in front
+// of every request url. This fixture used to spell base_url "v1/projects/..."
+// and self_link "projects/...", which is precisely the split Task 13a
+// removed -- the fake serves whatever path it is handed, so the fixture
+// agreed with the defect instead of catching it. Every wire path the
+// task-11-through-16 fixtures pin ("/v1/projects/p/locations/r/widgets/one")
+// is unchanged by the move.
 func widgetType() *catalog.Type {
 	return &catalog.Type{
 		Name:           "gcp.widget",
 		Service:        "widgets",
-		BaseURL:        "v1/projects/{{project}}/locations/{{region}}/widgets",
+		PathPrefix:     "v1/",
+		BaseURL:        "projects/{{project}}/locations/{{region}}/widgets",
 		SelfLink:       "projects/{{project}}/locations/{{region}}/widgets/{{name}}",
 		ImportFormat:   "projects/{project}/locations/{region}/widgets/{name}",
 		AssetType:      "tiny.googleapis.com/Widget",

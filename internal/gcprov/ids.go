@@ -50,54 +50,79 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 
 // reduceSelfLink turns an ABSOLUTE selfLink GCP answered with (scheme, host
 // and whatever service/version prefix that host's own convention puts in
-// front) into the relative resource name ty.SelfLink's template describes.
+// front) into the relative resource name ty.SelfLink's template describes --
+// which is the provider id.
 //
-// The template's own literal text before its first placeholder (e.g.
-// "projects/" for "projects/{{project}}/zones/{{zone}}/instances/{{name}}")
-// is found inside raw, and everything from there on is the relative name --
-// whatever precedes it (host, api name, version segment) is exactly the
-// part a hostname change would alter, which is why it is never stored.
+// It reduces by the API's OWN prefix -- APIBaseURL's path component plus
+// PathPrefix, exactly what absURL puts in front of every relative name for
+// this type -- and not by the literal text at the head of ty.SelfLink. 16 of
+// the 233 types have a self_link that begins with a placeholder
+// ("{{parent}}/locations/..."), so there is no literal text to search for at
+// all; two of them (gcp.networksecurity.addressgroup and
+// gcp.networksecurity.organization.addressgroup) also return a selfLink in
+// their bodies, so the literal search failed on every create -- and per the
+// orphan rule, an error after a successful create orphans the resource.
 //
-// The match must fall at a path-segment boundary (raw's own start, or right
-// after a "/") -- an unanchored search would happily match prefix in the
-// middle of some other word (a host or version segment that merely contains
-// it as a substring) and return a bogus relative name built from the wrong
-// offset. Anchored occurrences are searched from the END of raw, not the
-// first one found: the resource's own name is always the tail of its self
-// link, and a name can legitimately repeat a hierarchy keyword used earlier
-// in the path -- the last anchored match is the one that actually starts the
-// relative name.
+// The host is ignored on purpose: GCP answers compute self links from
+// www.googleapis.com while the catalog names compute.googleapis.com, and a
+// hostname is exactly the part of a self link that must not reach an id.
+// Only the path after the host is matched.
+//
+// The match must fall at a path-segment boundary (the path's own start, or
+// right after a "/") -- an unanchored search would happily match the prefix
+// in the middle of some other segment that merely ends with it ("apiv1/"
+// containing "v1/") and reduce from the wrong offset. The FIRST anchored
+// occurrence is the one taken, not the last: the prefix sits at the head of
+// the path, immediately after the host, and any later occurrence is a
+// resource in the hierarchy that happens to be spelled the same way.
 func reduceSelfLink(ty *catalog.Type, raw string) (string, error) {
-	prefix := ty.SelfLink
-	if i := strings.IndexByte(prefix, '{'); i >= 0 {
-		prefix = prefix[:i]
-	}
+	prefix := urlPath(ty.APIBaseURL) + ty.PathPrefix
 	if prefix == "" {
-		return "", fmt.Errorf("gcprov: %s: self_link has no literal prefix to find %q by", ty.Name, raw)
+		return "", fmt.Errorf("gcprov: %s: no api prefix to reduce %q by", ty.Name, raw)
 	}
-	i := lastAnchoredIndex(raw, prefix)
-	if i < 0 {
-		return "", fmt.Errorf("gcprov: %s: %q does not look like one of this type's self links (no %q)", ty.Name, raw, prefix)
+	path := urlPath(raw)
+	if rest, ok := strings.CutPrefix(path, prefix); ok {
+		return rest, nil
 	}
-	return raw[i:], nil
+	if i := firstAnchoredIndex(path, prefix); i >= 0 {
+		return path[i+len(prefix):], nil
+	}
+	return "", fmt.Errorf("gcprov: %s: %q does not look like one of this type's self links (no %q)", ty.Name, raw, prefix)
 }
 
-// lastAnchoredIndex returns the index of the last occurrence of prefix in
-// raw that starts at raw's own beginning or is immediately preceded by "/"
+// urlPath returns u's path with its scheme, host and leading "/" removed --
+// the form a relative resource name is measured against. A u that is already
+// relative comes back unchanged apart from a leading "/".
+func urlPath(u string) string {
+	if i := strings.Index(u, "://"); i >= 0 {
+		u = u[i+3:]
+		j := strings.IndexByte(u, '/')
+		if j < 0 {
+			return ""
+		}
+		u = u[j:]
+	}
+	return strings.TrimPrefix(u, "/")
+}
+
+// firstAnchoredIndex returns the index of the first occurrence of prefix in
+// path that starts at path's own beginning or is immediately preceded by "/"
 // -- i.e. at a path-segment boundary -- or -1 if none does. See
-// reduceSelfLink for why the match must be anchored and why the LAST one,
-// not the first, is the one that matters.
-func lastAnchoredIndex(raw, prefix string) int {
-	for end := len(raw); ; {
-		i := strings.LastIndex(raw[:end], prefix)
+// reduceSelfLink for why the match must be anchored and why the FIRST one is
+// the one that matters.
+func firstAnchoredIndex(path, prefix string) int {
+	for off := 0; off < len(path); {
+		i := strings.Index(path[off:], prefix)
 		if i < 0 {
 			return -1
 		}
-		if i == 0 || raw[i-1] == '/' {
+		i += off
+		if i == 0 || path[i-1] == '/' {
 			return i
 		}
-		end = i
+		off = i + 1
 	}
+	return -1
 }
 
 // ParseProviderID recovers the attributes a provider id's own hierarchy
