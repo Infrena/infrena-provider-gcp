@@ -5285,13 +5285,122 @@ func TestUpdateDiffsAgainstTheCurrentItWasGiven(t *testing.T) {
 
 Run: `go test -count=1 ./internal/gcprov/ -run 'Mask|Update|Patch'`
 
-`BuildMask` walks the catalog type's attributes, skipping `Output` ones and the scoping attributes,
-comparing `current` to `desired` with `value.Equal`, and recursing into `Fields` to produce dotted
-paths. An attribute present in `current` but absent from `desired` is skipped entirely.
+```go
+// BuildMask computes the patch body and the updateMask from a diff.
+//
+// The mask is what gives this provider AWS's "only adds or replaces, never
+// removes" rule for free: an attribute dropped from configuration contributes
+// no mask entry, so GCP keeps whatever it currently holds. That is enforced by
+// the API rather than by anything we write, which is a better place for it.
+//
+// current is the REFRESHED observation the host handed Update, not the last
+// state persisted to disk. There is deliberately no extra read here — infrena
+// >= 0.7.1 passes the observation from immediately before planning, and the AWS
+// provider carried a re-read workaround until that was fixed. Do not add one.
+func BuildMask(ty *catalog.Type, current, desired map[string]value.Value) (map[string]any, []string) {
+	body := map[string]any{}
+	var mask []string
+	// Sorted, because the mask is a query parameter a human reads in a plan and
+	// a test asserts on. Map iteration order would make both unstable.
+	for _, name := range sortedKeys(ty.Attributes) {
+		a := ty.Attributes[name]
+		switch {
+		case a.Output:
+			// GCP owns it. A mask naming a read-only field fails the whole
+			// request, not just that field.
+			continue
+		case isScoping(ty, name):
+			// project/region/zone/location live in the URL and are ForceNew
+			// anyway: a change replaces the resource rather than patching it.
+			continue
+		}
+		want, inDesired := desired[name]
+		if !inDesired {
+			// Absent from configuration is NOT "set it to empty". infrena cannot
+			// tell "never set" from "no longer configured", so both keep GCP's
+			// value. This single branch is the whole never-removes guarantee.
+			continue
+		}
+		have := current[name]
+		if value.Equal(have, want) {
+			continue
+		}
+		if len(a.Fields) > 0 && want.Kind == value.KindMap && have.Kind == value.KindMap {
+			// Mask the CHANGED LEAVES, not the parent. Naming the parent
+			// replaces the whole object and drops anything GCP put inside it
+			// that we never modelled.
+			sub, subMask := buildNested(a, name, have, want)
+			if len(subMask) > 0 {
+				body[a.Canonical] = sub
+				mask = append(mask, subMask...)
+			}
+			continue
+		}
+		body[a.Canonical] = rawFor(want)
+		mask = append(mask, a.Canonical)
+	}
+	return body, mask
+}
 
-`Update` builds the mask, sends `ty.UpdateVerb` to the expanded `UpdateURL` (or `SelfLink`) with
-`?updateMask=<comma-joined>`, awaits, and reads back. **An empty mask sends no request at all** and
-returns the current state.
+// Update patches a resource and returns its new state.
+func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, desired *resource.DesiredResource) (*resource.ResourceState, error) {
+	ty, ok := p.catalog.Type(desired.Type)
+	if !ok {
+		return nil, fmt.Errorf("unknown type %q", desired.Type)
+	}
+	body, mask := BuildMask(ty, current.Attributes, desired.Attrs)
+	if len(mask) == 0 {
+		// Nothing changed. Sending an empty patch would be a request against a
+		// project-wide quota for no effect, and some APIs reject it outright.
+		return current, nil
+	}
+
+	attrs, err := ParseProviderID(ty, current.ProviderID)
+	if err != nil {
+		return nil, err
+	}
+	url, err := p.updateURL(ty, attrs)
+	if err != nil {
+		return nil, err
+	}
+	url += "?updateMask=" + neturl.QueryEscape(strings.Join(mask, ","))
+
+	if err := ctx.Err(); err != nil {
+		return nil, err // last point before the resource is modified
+	}
+	verb := ty.UpdateVerb
+	if verb == "" {
+		verb = http.MethodPatch
+	}
+	resp, err := p.client.Do(ctx, verb, url, body)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.await(ctx, ty, resp); err != nil {
+		// Same reasoning as Create: something may have changed. Report the
+		// truthful state rather than returning an error that tells the host
+		// nothing happened.
+		fmt.Fprintf(os.Stderr, "gcp: %s: update reported a failure, reading back: %v\n", desired.Type, err)
+	}
+	return p.Read(ctx, current)
+}
+```
+
+`buildNested` recurses one level of `Fields` at a time, producing dotted paths (`config.mode`), and
+returns both the sub-body and the sub-mask. A nested attribute absent from `desired` is skipped by the
+same rule as a top-level one.
+
+`isScoping` returns true for `project` and for whichever of `region`/`zone`/`location` the type's
+templates actually name — derive it from the type, not from a fixed list, because the three are not
+interchangeable across APIs.
+
+`rawFor` converts a `value.Value` to the Go value the JSON encoder should emit, preserving GCP's
+int64-as-string convention: a `KindString` attribute whose Discovery format was `int64` must go out as
+a string, not a number.
+
+**`Update` must never re-read before building the mask.** The AWS provider had exactly that workaround
+and removing it was a whole commit; the test that pins it here counts GETs of the resource and fails if
+there is more than one.
 
 - [ ] **Step 3: Sabotage, confirm, restore**
 
