@@ -249,6 +249,70 @@ func TestPatchMasksANestedPath(t *testing.T) {
 	}
 }
 
+// TestAnEmptyCollectionListsEmpty and TestAnAbsentIndividualResourceStill404s
+// are the pair a discover fallback needs to tell apart: scanning every type
+// across a project genuinely finds nothing for most of them, and that must
+// come back as an empty list, not a 404 — while getting one specific,
+// never-created resource must still 404. Both requests hit a totally virgin
+// server (nothing ever seeded or created), so the difference can only come
+// from the path shape itself, never from history.
+func TestAnEmptyCollectionListsEmpty(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL() + "/v1/projects/p/locations/r/widgets")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200: an empty collection is a valid, empty list, not an absence", resp.StatusCode)
+	}
+	var got struct {
+		Items []map[string]any `json:"items"`
+	}
+	json.NewDecoder(resp.Body).Decode(&got)
+	if len(got.Items) != 0 {
+		t.Errorf("items = %v, want empty", got.Items)
+	}
+}
+
+func TestAnAbsentIndividualResourceStill404s(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL() + "/v1/projects/p/locations/r/widgets/never-created")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404: a specific absent resource is not the same request as its collection", resp.StatusCode)
+	}
+}
+
+func TestSetListFieldOverridesTheDefaultItemsKey(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+	s.Seed("/v1/projects/p/locations/global/buckets/b1", map[string]any{"name": "b1"})
+	s.SetListField("/v1/projects/p/locations/global/buckets", "buckets")
+
+	resp, err := http.Get(s.URL() + "/v1/projects/p/locations/global/buckets")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var got map[string]any
+	json.NewDecoder(resp.Body).Decode(&got)
+	if _, hasItems := got["items"]; hasItems {
+		t.Errorf("response still used the default \"items\" key: %v", got)
+	}
+	buckets, ok := got["buckets"].([]any)
+	if !ok || len(buckets) != 1 {
+		t.Errorf("buckets = %v, want one entry under the overridden field name", got["buckets"])
+	}
+}
+
 func TestDeletingSomethingAlreadyGoneIs404(t *testing.T) {
 	s := New(t)
 	defer s.Close()

@@ -566,6 +566,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.ReadVia = ruling.ReadVia
 	}
 
+	t.ListField = ListFieldOf(doc, col)
+
 	return t, nil
 }
 

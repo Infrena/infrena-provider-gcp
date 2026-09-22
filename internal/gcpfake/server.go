@@ -85,6 +85,11 @@ type Server struct {
 	caiFail   *apiErrorSpec
 
 	tagBindings map[string][]map[string]any
+
+	// listFields overrides the array-valued field name a GET on a specific
+	// collection path uses in its list response, keyed by that exact
+	// collection path. See SetListField.
+	listFields map[string]string
 }
 
 // New starts the fake. The caller must Close it.
@@ -99,6 +104,7 @@ func New(t *testing.T) *Server {
 		createThenFail:    map[string]apiErrorSpec{},
 		caiAssets:         map[string][]Asset{},
 		tagBindings:       map[string][]map[string]any{},
+		listFields:        map[string]string{},
 	}
 	s.srv = httptest.NewServer(s)
 	return s
@@ -139,6 +145,31 @@ func (s *Server) SetOperationStyle(style OperationStyle) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.opStyle = style
+}
+
+// SetListField overrides the array-valued field name a GET on
+// collectionPath's list response carries its results under. Defaults to
+// "items" (compute's own convention) when never set for that path.
+//
+// There is no field name universal across GCP's own List responses to
+// assume instead — measured 209 distinct names across 532 sampled List
+// methods, and "items" covers only 24% of them (see catalog.Type.ListField,
+// which the real generator derives per type from that type's own Discovery
+// schema). A test exercising a type whose real API answers with a different
+// name (e.g. "buckets", "savedQueries") must set it here to match.
+func (s *Server) SetListField(collectionPath, field string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.listFields[collectionPath] = field
+}
+
+func (s *Server) listFieldFor(path string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if f, ok := s.listFields[path]; ok && f != "" {
+		return f
+	}
+	return "items"
 }
 
 // FailNext makes the very next request, of any method or path, fail with
@@ -214,8 +245,32 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleGet answers a GET, first deciding whether the path names a
+// collection (a list call, however many — zero included — resources it
+// currently holds) or a specific resource (a get call, which 404s if
+// nothing is there). See isCollectionPath for how that's decided: GCP's own
+// URL templates alternate a literal collection segment with a variable id
+// segment starting from a literal, so the two cases are never actually
+// ambiguous from the path alone, and the fake does not need history (what
+// was previously created or seeded) to tell them apart. This matters
+// specifically because Task 16's discovery fallback scans every type across
+// a project and will genuinely find nothing for most of them — those must
+// list empty (200), not 404, or the fallback cannot tell "nothing here" from
+// "this API doesn't exist."
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+
+	if isCollectionPath(path) {
+		items := s.collectionItems(path)
+		field := s.listFieldFor(path)
+		page, next := paginate(items, r.URL.Query())
+		out := map[string]any{field: page}
+		if next != "" {
+			out["nextPageToken"] = next
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
 
 	s.mu.Lock()
 	if n := s.notFoundRemaining[path]; n > 0 {
@@ -229,29 +284,37 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		body = cloneMap(body)
 	}
 	s.mu.Unlock()
-	if ok {
-		writeJSON(w, http.StatusOK, body)
+	if !ok {
+		writeNotFound(w, path)
 		return
 	}
+	writeJSON(w, http.StatusOK, body)
+}
 
-	if items, ok := s.collectionItems(path); ok {
-		page, next := paginate(items, r.URL.Query())
-		out := map[string]any{"items": page}
-		if next != "" {
-			out["nextPageToken"] = next
-		}
-		writeJSON(w, http.StatusOK, out)
-		return
+// isCollectionPath decides list-vs-get from path shape alone, no history
+// needed: every GCP REST URL template this catalog uses alternates a
+// literal collection segment with a variable id segment, always starting
+// with a literal ("projects/{project}/locations/{location}/widgets" or
+// "projects/{project}/locations/{location}/widgets/{id}"). Stripping the
+// version prefix, a list call therefore always lands on an ODD number of
+// remaining segments (ending on a literal) and a get call on an EVEN number
+// (ending on the id). This holds regardless of how many resources are
+// currently stored at or under the path, which is exactly the property
+// needed to answer "list of an empty collection" and "get of a specific
+// absent resource" differently.
+func isCollectionPath(path string) bool {
+	rel := trimVersionPrefix(path)
+	if rel == "" {
+		return false
 	}
-	writeNotFound(w, path)
+	return len(strings.Split(rel, "/"))%2 == 1
 }
 
 // collectionItems finds every resource stored directly under path (one path
-// segment deeper, not further nested), for a GET on a collection rather than
-// a single resource. A path with no such children is not a collection the
-// fake knows about, so its GET falls through to a plain 404 instead of a
-// silently-empty list.
-func (s *Server) collectionItems(path string) ([]map[string]any, bool) {
+// segment deeper, not further nested). Always returns a non-nil, possibly
+// empty slice: a collection with nothing stored under it is a real, valid
+// state (an empty list), not an absent one.
+func (s *Server) collectionItems(path string) []map[string]any {
 	prefix := path + "/"
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -261,15 +324,12 @@ func (s *Server) collectionItems(path string) ([]map[string]any, bool) {
 			keys = append(keys, k)
 		}
 	}
-	if len(keys) == 0 {
-		return nil, false
-	}
 	sort.Strings(keys)
 	items := make([]map[string]any, len(keys))
 	for i, k := range keys {
 		items[i] = cloneMap(s.resources[k])
 	}
-	return items, true
+	return items
 }
 
 func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
