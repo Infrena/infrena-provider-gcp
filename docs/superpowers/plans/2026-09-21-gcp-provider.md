@@ -5558,6 +5558,142 @@ the catalog.
 
 Run: `go test -count=1 ./internal/gcprov/ -run 'Reconcile|Label|List'`
 
+```go
+// Reconcile makes GCP's answer comparable to what we asked for.
+//
+// GCP returns MORE than it was sent: fields it defaulted, fields it computed,
+// fields it reordered. Compared raw against the reference, every one of those
+// reads as drift, and the plan proposes a change that applying cannot fix —
+// because the next read returns the same extras again. That is a plan that
+// never converges, which is the single worst failure this provider can have.
+//
+// reference is what the user asked for (the desired or last-known value).
+// incoming is what GCP just returned. The result is incoming, expressed the way
+// reference is, so value.Equal between them means "no drift" and nothing else.
+func Reconcile(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	if attr == nil || !incoming.Known {
+		return incoming
+	}
+
+	// OPAQUE IS COPIED EXACTLY. A free-form map (additionalProperties with no
+	// declared properties) or a $ref tail the resolver truncated has no schema
+	// to reconcile against, so every key is equally unknown to us. Pruning the
+	// ones the reference happens not to mention would silently delete what the
+	// user wrote. Copy it and move on.
+	if attr.Opaque {
+		return incoming
+	}
+
+	switch {
+	case attr.Kind == value.KindMap && len(attr.Fields) > 0:
+		return reconcileObject(attr, reference, incoming)
+	case attr.Kind == value.KindList && attr.Elem != nil:
+		return reconcileList(attr, reference, incoming)
+	default:
+		return incoming
+	}
+}
+
+// reconcileObject drops keys the schema does not declare and recurses into the
+// ones it does.
+//
+// An undeclared key is one GCP added and we never modelled — a fingerprint, an
+// etag, a server-assigned id. Keeping it means comparing it, and comparing it
+// means drift forever.
+func reconcileObject(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	in, ok := incoming.Raw.(map[string]value.Value)
+	if !ok {
+		return incoming
+	}
+	ref, _ := reference.Raw.(map[string]value.Value)
+	out := make(map[string]value.Value, len(in))
+	for name, field := range attr.Fields {
+		// Look the key up under every spelling this attribute answers to: GCP
+		// returns its own name, while the reference may hold the snake_case or
+		// curated alias the user typed.
+		v, found := lookupSpelling(in, field)
+		if !found {
+			continue
+		}
+		out[name] = Reconcile(field, ref[name], v)
+	}
+	return value.Value{Kind: value.KindMap, Known: true, Raw: out, Source: incoming.Source}
+}
+
+// reconcileList reorders an UNORDERED list to match the reference, and leaves an
+// ordered one strictly alone.
+//
+// GCP reorders lists it does not consider ordered, so a diff on order alone
+// plans a change forever. But reordering a list where order carries meaning —
+// a rule evaluation sequence, a priority list — would silently rewrite the
+// user's intent. The catalog records which is which; never guess.
+func reconcileList(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	in, ok := incoming.Raw.([]value.Value)
+	if !ok {
+		return incoming
+	}
+	ref, _ := reference.Raw.([]value.Value)
+
+	items := make([]value.Value, len(in))
+	for i, item := range in {
+		var refItem value.Value
+		if i < len(ref) {
+			refItem = ref[i]
+		}
+		items[i] = Reconcile(attr.Elem, refItem, item)
+	}
+	if !attr.Unordered {
+		return value.Value{Kind: value.KindList, Known: true, Raw: items, Source: incoming.Source}
+	}
+
+	// Unordered: emit the reference's order for everything both sides hold,
+	// then whatever GCP added, so an addition still shows as drift while a pure
+	// reordering does not.
+	ordered := make([]value.Value, 0, len(items))
+	used := make([]bool, len(items))
+	for _, want := range ref {
+		for i, got := range items {
+			if !used[i] && value.Equal(want, got) {
+				ordered = append(ordered, got)
+				used[i] = true
+				break
+			}
+		}
+	}
+	for i, got := range items {
+		if !used[i] {
+			ordered = append(ordered, got)
+		}
+	}
+	return value.Value{Kind: value.KindList, Known: true, Raw: ordered, Source: incoming.Source}
+}
+```
+
+`lookupSpelling` tries the attribute's canonical GCP name first, then each of its `Aliases`. A reader
+that only looked up the canonical name would silently drop every field the user wrote in snake_case.
+
+**Labels are a map, and GCP's own labels are never reported.**
+
+```go
+// LabelsIn converts GCP's labels into the map infrena compares, dropping the
+// ones GCP reserves for itself.
+//
+// goog-prefixed labels are applied by GCP (goog-dm, goog-gke-node,
+// goog-managed-by) and cannot be removed by a user. Reporting one makes every
+// plan propose deleting it, forever — the same reason the AWS provider never
+// reports aws:-prefixed tags.
+func LabelsIn(v value.Value) map[string]string
+
+// LabelsOut renders a label map for the wire. An EMPTY map is omitted entirely
+// rather than sent as {}: some APIs read an explicit empty object as "remove
+// every label", which is a destructive reading of "this resource has none".
+func LabelsOut(m map[string]string) value.Value
+```
+
+**A change to this file is a change to whether plans converge.** The unit tests here cannot prove that
+— only Task 17's e2e `a_second_plan_is_clean` subtest can, because convergence is a property of the
+whole loop rather than of one function. Treat a green unit suite here as necessary and not sufficient.
+
 - [ ] **Step 3: Sabotage, confirm, restore**
 
 Make `Reconcile` ignore `Opaque`: `TestAnOpaqueValueIsCopiedExactly` must fail. Restore. Make it
