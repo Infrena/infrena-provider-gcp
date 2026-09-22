@@ -57,3 +57,34 @@ func TestImportRefusesAnIDThatDoesNotMatchTheType(t *testing.T) {
 		t.Errorf("refused a valid id: %v", err)
 	}
 }
+
+// TestParseProviderIDAcceptsAnImportFormatShorthand. magic-modules supplies
+// more than one accepted id shape for 11 of the 233 real types, newline-
+// joined in import_format -- e.g. gcp.bigquery.table's own import_format is
+// its full relative name, then "{{table_id}}" alone. Both are legitimate: a
+// user importing by the short form is not making a typo, and refusing it
+// because it does not match self_link would be wrong.
+func TestParseProviderIDAcceptsAnImportFormatShorthand(t *testing.T) {
+	ty := &catalog.Type{
+		Name:         "gcp.bigquery.table",
+		Scope:        catalog.ScopeGlobal,
+		SelfLink:     "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		ImportFormat: "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}\n{{table_id}}",
+	}
+
+	long, err := ParseProviderID(ty, "projects/p/datasets/d/tables/t")
+	if err != nil {
+		t.Fatalf("the full relative name did not parse: %v", err)
+	}
+	if long["project"].Raw != "p" || long["dataset_id"].Raw != "d" || long["table_id"].Raw != "t" {
+		t.Errorf("the full form parsed wrong: %v", long)
+	}
+
+	short, err := ParseProviderID(ty, "t")
+	if err != nil {
+		t.Fatalf("the short {{table_id}} form did not parse: %v", err)
+	}
+	if short["table_id"].Raw != "t" {
+		t.Errorf("the short form parsed wrong: %v", short)
+	}
+}

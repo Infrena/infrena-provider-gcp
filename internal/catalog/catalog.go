@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/infrena/infrena/pkg/schema"
 	"github.com/infrena/infrena/pkg/value"
@@ -205,7 +206,7 @@ func (c *Catalog) Definitions() []*schema.ResourceDefinition {
 				Delete: true,
 				Import: t.ImportFormat != "",
 			},
-			ImportID: schema.ImportSpec{Description: t.ImportFormat},
+			ImportID: schema.ImportSpec{Description: importDescription(t.ImportFormat)},
 		}
 		for name, a := range t.Attributes {
 			d.Attributes[name] = a.toSchema(true)
@@ -214,6 +215,20 @@ func (c *Catalog) Definitions() []*schema.ResourceDefinition {
 	}
 	sort.Slice(defs, func(i, j int) bool { return defs[i].Type < defs[j].Type })
 	return defs
+}
+
+// importDescription renders an import_format for `infrena explain`.
+// magic-modules gives 11 of the 233 types more than one accepted id shape,
+// newline-joined (e.g. the full relative name plus a short "{{name}}" form) --
+// ParseProviderID (internal/gcprov/ids.go) tries each in order, and a user
+// reading `infrena explain` needs to see every one of them too, not a blob
+// with raw newlines in it.
+func importDescription(format string) string {
+	lines := strings.Split(format, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimSpace(l)
+	}
+	return strings.Join(lines, " or ")
 }
 
 // toSchema converts one attribute, at any depth. topLevel is true only for an
