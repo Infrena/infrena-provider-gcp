@@ -71,19 +71,23 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 // The match must fall at a path-segment boundary (the path's own start, or
 // right after a "/") -- an unanchored search would happily match the prefix
 // in the middle of some other segment that merely ends with it ("apiv1/"
-// containing "v1/") and reduce from the wrong offset. The FIRST anchored
-// occurrence is the one taken, not the last: the prefix sits at the head of
-// the path, immediately after the host, and any later occurrence is a
-// resource in the hierarchy that happens to be spelled the same way.
+// containing "v1/") and reduce from the wrong offset.
+//
+// The FIRST anchored occurrence is the one taken, never the last. The prefix
+// sits at the head of the path, immediately after the host; any later
+// anchored occurrence is a value INSIDE the hierarchy that happens to be
+// spelled the same way -- a key ring named "v1", a project whose id is
+// literally "projects" -- and reducing past it silently deletes real
+// segments from the id. The argument for taking the last one does not hold:
+// every prefix searched for here ends in "/", and a trailing resource name
+// has nothing after it, so a resource name can never produce a spurious
+// anchored match in the first place.
 func reduceSelfLink(ty *catalog.Type, raw string) (string, error) {
 	prefix := urlPath(ty.APIBaseURL) + ty.PathPrefix
 	if prefix == "" {
 		return "", fmt.Errorf("gcprov: %s: no api prefix to reduce %q by", ty.Name, raw)
 	}
 	path := urlPath(raw)
-	if rest, ok := strings.CutPrefix(path, prefix); ok {
-		return rest, nil
-	}
 	if i := firstAnchoredIndex(path, prefix); i >= 0 {
 		return path[i+len(prefix):], nil
 	}
