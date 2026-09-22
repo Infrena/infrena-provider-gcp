@@ -4691,9 +4691,17 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 messages. It must carry GCP's own text through — a wrapper that says "the operation failed" and drops
 the reason leaves the user nothing to act on.
 
-`operationWaitURL` builds `<APIBaseURL><OperationScope>/<op name>/wait`, taking the scope-bearing
-segment from the operation's own `zone` or `region` field when present (compute returns them as full
-URLs, so use the last path segment) and falling back to the type's own scope. A `wait` URL built
+`operationWaitURL` builds `<APIBaseURL><OperationScope>Operations/<op name>/wait`.
+
+**Note the `Operations` suffix — `OperationScope` holds a BARE WORD, not the collection name.** Counted
+across the 233 generated types on 2026-09-22: the 65 compute-style types carry `global` (30), `region`
+(29) or `zone` (6), while the collection to poll is `globalOperations`/`regionOperations`/`zoneOperations`.
+An earlier draft of this passage said `OperationScope` named the collection directly; it does not, and
+building the URL verbatim from that gives `.../global/op-1/wait`, which 404s. The `wait` method itself
+does exist on all three collections, verified against `schemas/compute.json`.
+
+Take the scope-bearing segment from the operation's own `zone` or `region` field when present (compute
+returns them as full URLs, so use the last path segment) and fall back to the type's own scope. A `wait` URL built
 without the right scope 404s, which reads as "the operation vanished" rather than "we asked the wrong
 collection".
 
