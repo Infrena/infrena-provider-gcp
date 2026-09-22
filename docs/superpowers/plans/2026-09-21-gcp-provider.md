@@ -6346,6 +6346,24 @@ works is supportable until this suite has run**, and it needs James's explicit a
 
 Ask before doing any of this; it creates billable resources.
 
+**DONE on 2026-09-22, and not as written here.** Project creation failed: the
+account holds 8 projects and `gcloud projects create` returned
+`QuotaFailure: you have exceeded your allotted project quota`. James chose to
+reuse a dormant project and swap the name-based guard for a label-based one.
+
+What was actually done, against `example-project-1234` ("My Project", created
+2017, compute API never enabled, zero buckets — verified empty before use):
+
+```bash
+gcloud billing projects link example-project-1234 --billing-account=012345-567890-ABCDEF
+gcloud alpha projects update example-project-1234 --update-labels=infrena-live-tests=true
+```
+
+Note `alpha`: `gcloud projects update` does not carry `--update-labels` on the
+GA track.
+
+The original, for the record, if a project slot ever frees up:
+
 ```bash
 gcloud projects create infrena-live-<suffix> --name="infrena live tests"
 gcloud billing projects link infrena-live-<suffix> --billing-account=<account>
@@ -6393,10 +6411,34 @@ func guard(t *testing.T) (project, sa string) {
 	if !strings.HasPrefix(sa, "infrena-live@") {
 		t.Fatalf("refusing to run as %q: the live suite runs only as the infrena-live service account", sa)
 	}
-	if !strings.Contains(project, "infrena-live") {
-		t.Fatalf("refusing to touch project %q: it is not an infrena live test project", project)
+	// NOT a name check. The project is example-project-1234, an old dormant
+	// project reused because the account's project quota is exhausted, so
+	// there is no "infrena-live" in its id to match on.
+	//
+	// This is stronger than the name check it replaces. A project id can
+	// coincidentally contain a substring; a label is something a human set on
+	// purpose. `gcloud alpha projects update <id> --update-labels=infrena-live-tests=true`
+	// is the only way this becomes true, so a production project cannot drift
+	// into being an acceptable target.
+	//
+	// Fetched LIVE, before any other call, and a failure to fetch is fatal --
+	// never assume the label is present because it was present last run.
+	if !hasLiveLabel(t, project) {
+		t.Fatalf("refusing to touch project %q: it does not carry infrena-live-tests=true", project)
 	}
 	return project, sa
+}
+
+// hasLiveLabel asks Resource Manager whether this project is labelled as a
+// live-test sandbox. It is the first API call the suite makes, on purpose:
+// everything else in this package creates or deletes something.
+func hasLiveLabel(t *testing.T, project string) bool {
+	t.Helper()
+	// cloudresourcemanager v3: GET v3/projects/{project}, read labels.
+	// A non-200, a transport error, or a missing label all mean NO.
+	// Implement with the same client the provider uses so the impersonated
+	// credentials are exercised here too, before anything is created.
+	panic("implement against cloudresourcemanager v3; see live/README.md")
 }
 
 func TestTheGuardRefusesTheWrongIdentity(t *testing.T) {
