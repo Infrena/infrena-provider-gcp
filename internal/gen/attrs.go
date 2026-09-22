@@ -263,6 +263,11 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if f.Output {
 				a.Output = true
 			}
+			// A set-typed list may come back reordered. Without this the
+			// reconciler treats every list as ordered, so a pure reordering
+			// reads as drift and the plan never converges — the exact failure
+			// reconciliation exists to prevent.
+			a.Unordered = f.IsSet
 			// Output WINS over Required, and the disagreement is reported.
 			//
 			// The two come from independent sources that do not cross-validate:
