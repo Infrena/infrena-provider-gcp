@@ -7491,3 +7491,133 @@ git add internal/gcprov/await.go internal/gcprov/crud.go internal/gen/build.go \
         internal/catalog/catalog.json.gz gen/warnings.txt
 git commit -m "Make an id prove it names the thing we created"
 ```
+
+---
+
+### Task 14a: A schema name and a wire name are not the same key
+
+**Why this exists.** Task 14's review found `BuildMask` looking up current state
+with a schema key while state is keyed by wire name. Following that found the
+real problem: `Canonical` is referenced ONLY in `patch.go`, the file Task 14
+created. Nothing in `crud.go` has ever consulted it. Task 14 was the first code
+in this project to respect wire names, and doing so exposed that no other path
+does.
+
+**The two namespaces.** `catalog.Type.Attributes` is keyed by the SCHEMA name --
+what a user writes in config. `Attr.Canonical` is the WIRE name -- what GCP
+sends and expects. They are equal for most attributes, and deliberately not for
+43 of them, where the generator renamed a field that collides with something
+reserved: `type` -> `type_value`, `provider` -> `provider_value`.
+
+Measured on the current catalog: **43 attributes across the corpus have a schema
+key that differs from their wire name, 7 of them Required**, in types including
+`gcp.compute.instance`, `gcp.container.cluster`, `gcp.container.nodepool`,
+`gcp.bigquery.table`, `gcp.bigtableadmin.instance` and `gcp.dnsauthorization`.
+15 of the 86 updatable types are affected.
+
+**Three live consequences, one per CRUD path:**
+
+1. **Create sends the wrong field name.** `requestBody` (`crud.go`) does
+   `body[name] = toRaw(v)` with `name` the schema key, so a create sends
+   `"type_value": "IPV4"` where GCP expects `"type"`. For the 7 Required ones
+   the API is being asked to create a resource without a field it demands.
+2. **Read stores the wrong key.** `stateFrom` does `attrs[k] = fromRaw(raw)`
+   with `k` straight off the response body, so state holds `type` while config
+   holds `type_value`. The host diffs those two maps, so every plan reports a
+   change for a field nobody touched, forever.
+3. **Update masks a field nobody changed.** `BuildMask` reads
+   `current.Attributes[schemaKey]`, gets a zero `Value` whose `Known` is false,
+   `Equal` returns false, and the field is masked on every update. On the ones
+   that are also ForceNew, an `updateMask` naming an immutable field is likely
+   rejected outright -- unverified, needs a live call.
+
+This is ONE defect with three faces: nothing translates between the namespaces
+at the boundary. Fix it once, in one place, not three times.
+
+**Files:**
+- Create: `internal/gcprov/names.go`
+- Modify: `internal/gcprov/crud.go`, `internal/gcprov/patch.go`
+- Test: `internal/gcprov/names_test.go`, `internal/gcprov/crud_test.go`,
+  `internal/gcprov/patch_test.go`, `internal/catalog/real_test.go`
+
+- [ ] **Step 1: The failing round-trip test first**
+
+In `internal/gcprov/names_test.go`, against the REAL catalog, not a fixture --
+`widgetType()` has no renamed attributes, which is exactly why this was
+invisible:
+
+```go
+// TestEveryRenamedAttributeSurvivesARoundTrip. 43 attributes in the corpus
+// have a schema name that differs from their wire name (type -> type_value,
+// provider -> provider_value), because the generator renames fields that
+// collide with something reserved. A config value written under the schema
+// name must reach GCP under the wire name, and a body field arriving under
+// the wire name must land in state under the schema name. Neither held
+// before this task: Canonical was consulted only in patch.go.
+func TestEveryRenamedAttributeSurvivesARoundTrip(t *testing.T) {
+	// for each type, for each attribute whose Canonical differs from its key:
+	//   toWire(ty, schemaKey)   == Canonical
+	//   toSchema(ty, Canonical) == schemaKey
+	// Assert the corpus still contains at least one such attribute, so this
+	// test fails loudly rather than silently passing on an empty set if the
+	// generator ever stops renaming.
+}
+```
+
+That last sentence is not optional. A test that iterates a set which can become
+empty is the ninth vacuous test in this project waiting to happen.
+
+- [ ] **Step 2: One translation layer**
+
+`internal/gcprov/names.go`. Two functions and nothing else:
+
+```go
+// toWire maps a schema attribute name to the name GCP expects on the wire.
+// toSchema maps a wire field name back to the schema name config uses.
+// Both are identity for the great majority of attributes; they exist for the
+// 43 the generator renamed around reserved words.
+```
+
+They must work at DEPTH -- the renamed attributes include
+`cluster.nodeConfig.sandboxConfig.type_value` and
+`resourceStatus.upcomingMaintenance.type_value`, so a top-level-only mapping
+fixes a third of the problem and hides the rest.
+
+- [ ] **Step 3: Apply it at all three boundaries**
+
+- `requestBody`: emit `toWire(ty, name)`, recursing into nested values.
+- `stateFrom`: store under `toSchema(ty, k)`, recursing likewise.
+- `BuildMask`: look current up by the wire name (or translate first). Task 14
+  already emits `a.Canonical` into the mask and body, which is correct; only
+  the lookup side is wrong.
+
+- [ ] **Step 4: Prove each face separately**
+
+Three tests, each failing before its own fix:
+- a create of a type with a renamed REQUIRED attribute puts the WIRE name on
+  the wire and never the schema name
+- a read of a body carrying the wire name produces state keyed by the SCHEMA
+  name
+- an update where the two agree produces an EMPTY mask (today it masks the
+  field every time)
+
+- [ ] **Step 5: A catalog invariant**
+
+In `internal/catalog/real_test.go`, assert the renamed set is non-empty and
+report its size, so a regeneration that changes the renaming strategy is
+visible rather than silent.
+
+- [ ] **Step 6: Full suite, then sabotage**
+
+One sabotage per boundary, each leaving the code compiling, each restored by
+re-applying. Record each and the exact assertion in the commit body.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add internal/gcprov/names.go internal/gcprov/names_test.go \
+        internal/gcprov/crud.go internal/gcprov/patch.go \
+        internal/gcprov/crud_test.go internal/gcprov/patch_test.go \
+        internal/catalog/real_test.go
+git commit -m "Translate between config names and wire names"
+```
