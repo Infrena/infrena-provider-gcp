@@ -27,10 +27,27 @@ type APIError struct {
 	Status  int
 	Code    string
 	Message string
+	// Reason is google.rpc.ErrorInfo's own `reason` -- "RATE_LIMIT_EXCEEDED",
+	// "SERVICE_DISABLED", "IAM_PERMISSION_DENIED" -- or, when the response is
+	// in the older Discovery shape that carries no ErrorInfo at all, the
+	// legacy error.errors[].reason ("rateLimitExceeded", "forbidden").
+	//
+	// IT IS SEPARATE FROM Code BECAUSE IT IS A DIFFERENT FIELD, not a
+	// fallback for one. Measured against live compute on 2026-09-22: a quota
+	// throttle answers 403 with NO error.status at all, so Code is empty and
+	// the HTTP status is indistinguishable from a real permission denial.
+	// The reason is the only thing in the response that tells them apart.
+	Reason string
 	// RetryAfter is honoured when the response carries a Retry-After header.
-	// Whether GCP's own APIs ever send one is Task 18's question to measure
-	// against a live project -- this only reads the header when present and
-	// makes no claim about how often that is.
+	//
+	// MEASURED AGAINST LIVE GCP, 2026-09-22 (live/README.md): across roughly
+	// 65,000 throttled responses in two independent rounds, cloudresourcemanager
+	// (429 RESOURCE_EXHAUSTED) and compute (403 rateLimitExceeded) sent it
+	// zero times, and storage could not be throttled at all inside a minute.
+	// Two of the twenty-five APIs this provider calls is not "never", which
+	// is why this stays: it reads the header when present and makes no claim
+	// about how often that is. See live/README.md for what would close the
+	// question.
 	RetryAfter time.Duration
 }
 
@@ -48,7 +65,44 @@ type errorEnvelope struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 		Status  string `json:"status"`
+		// Details is google.rpc's own status detail list. Only ErrorInfo is
+		// read, and only its reason: that is the machine-readable cause
+		// Google documents as stable, where the message is prose.
+		Details []struct {
+			Type   string `json:"@type"`
+			Reason string `json:"reason"`
+		} `json:"details"`
+		// Errors is the OLDER Discovery error shape, which compute, storage
+		// and the other pre-google.rpc APIs still answer with. It carries no
+		// status and no ErrorInfo, so without reading it a compute throttle
+		// has nothing in it to recognise at all.
+		Errors []struct {
+			Reason string `json:"reason"`
+		} `json:"errors"`
 	} `json:"error"`
+}
+
+// errorInfoType is the google.rpc.ErrorInfo detail's own @type. Matched
+// exactly rather than by suffix: a detail list carries several types
+// (RetryInfo, QuotaFailure, Help) and only ErrorInfo's `reason` is the
+// documented, stable cause.
+const errorInfoType = "type.googleapis.com/google.rpc.ErrorInfo"
+
+// reasonOf reads the machine-readable cause out of one error envelope:
+// google.rpc.ErrorInfo's reason when the response carries one, and the legacy
+// Discovery errors[].reason otherwise. Empty when neither is present.
+func reasonOf(env errorEnvelope) string {
+	for _, d := range env.Error.Details {
+		if d.Type == errorInfoType && d.Reason != "" {
+			return d.Reason
+		}
+	}
+	for _, e := range env.Error.Errors {
+		if e.Reason != "" {
+			return e.Reason
+		}
+	}
+	return ""
 }
 
 // decodeAPIError builds an APIError from one HTTP response and its
@@ -65,6 +119,7 @@ func decodeAPIError(resp *http.Response, body []byte) *APIError {
 			ae.Message = env.Error.Message
 		}
 		ae.Code = env.Error.Status
+		ae.Reason = reasonOf(env)
 	}
 	ae.RetryAfter = parseRetryAfter(resp.Header.Get("Retry-After"))
 	return ae
@@ -110,6 +165,40 @@ var notRetryableCodes = map[string]bool{
 	"ALREADY_EXISTS":      true,
 }
 
+// retryableReasons are the google.rpc.ErrorInfo (and legacy Discovery)
+// reasons that mean "you asked too fast", whatever HTTP status they arrive
+// with.
+//
+// THIS EXISTS BECAUSE COMPUTE DOES NOT SEND 429. Measured against the live
+// project on 2026-09-22 by driving a real throttle: cloudresourcemanager
+// answers a quota throttle with 429 and status RESOURCE_EXHAUSTED, which the
+// code and status tables below already catch -- but compute answers the same
+// thing with
+//
+//	403 {"error":{"code":403,"message":"Quota exceeded for quota metric
+//	'Read requests' ...","errors":[{"domain":"usageLimits",
+//	"reason":"rateLimitExceeded"}],"details":[{"@type":".../ErrorInfo",
+//	"reason":"RATE_LIMIT_EXCEEDED"}]}}
+//
+// and NO error.status at all. So Code was empty, 403 is not in
+// retryableStatus, and every compute throttle was classified NotSafeToRetry
+// -- a transient quota blip reported to the user as a permanent failure, on
+// the API this provider calls more than any other. 3,219 such responses were
+// produced in sixty seconds, so it is not a corner.
+//
+// Both spellings, because both are live: the screaming-snake one is
+// google.rpc.ErrorInfo's, the camel one is the older Discovery shape's, and
+// which a service uses is a fact about the service's age.
+//
+// A 403 that is a REAL permission denial carries a different reason
+// ("forbidden", "IAM_PERMISSION_DENIED", "SERVICE_DISABLED") and still falls
+// through to NotSafeToRetry, which is what stops this turning every
+// permission problem into a retry storm.
+var retryableReasons = map[string]bool{
+	"RATE_LIMIT_EXCEEDED": true,
+	"rateLimitExceeded":   true,
+}
+
 var retryableStatus = map[int]bool{
 	http.StatusTooManyRequests:     true, // 429
 	http.StatusInternalServerError: true, // 500
@@ -122,9 +211,13 @@ var retryableStatus = map[int]bool{
 // whose call actually failed (provider.Provider.ClassifyError), so nothing
 // here may read Client or Provider state.
 //
-// The switch tries Code first and Status second, per the task-11 brief: a
-// Code this function does not recognise (e.g. "INTERNAL") still gets a
-// verdict from Status. errors.As, not a type assertion: a caller wrapping the
+// The switch tries Reason first, Code second and Status third. Reason leads
+// because it is the only field that survives an API answering a throttle
+// with a status code that means something else -- see retryableReasons, and
+// the live measurement that found it. A Code this function does not
+// recognise (e.g. "INTERNAL") still gets a verdict from Status.
+//
+// errors.As, not a type assertion: a caller wrapping the
 // failure with fmt.Errorf("...: %w", err) -- normal, expected practice
 // everywhere else in this codebase -- must still classify correctly. A bare
 // type assertion would silently degrade every wrapped *APIError to
@@ -148,6 +241,13 @@ var retryableStatus = map[int]bool{
 func ClassifyError(err error) provider.Retryability {
 	var ae *APIError
 	if errors.As(err, &ae) {
+		// FIRST, because it is the most specific thing in the response and
+		// the only thing that distinguishes compute's 403 throttle from
+		// compute's 403 permission denial. A body that names a rate limit is
+		// a rate limit whatever status it arrived with.
+		if retryableReasons[ae.Reason] {
+			return provider.SafeToRetry
+		}
 		if retryableCodes[ae.Code] {
 			return provider.SafeToRetry
 		}
