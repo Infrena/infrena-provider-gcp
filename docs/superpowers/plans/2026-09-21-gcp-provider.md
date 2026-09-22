@@ -4949,16 +4949,155 @@ func TestImportReadsAnExistingResource(t *testing.T) {
 
 Run: `go test -count=1 ./internal/gcprov/`
 
-`Create`: expand `CreateURL` (falling back to `BaseURL`), POST the body built from `desired.Attrs` minus
-`project`/`region`/`zone`/output-only attributes, `await`, then read back. **Once GCP has created
-something, no path returns an error** — a failure goes to stderr and the truthful state is returned.
+```go
+// Create makes a resource and reports what now exists.
+//
+// THE RULE THAT SHAPES THIS WHOLE FUNCTION: once GCP has created something, no
+// path below returns an error. The host DROPS the result of a failed create, so
+// an error return after a successful POST leaves a real resource tracked
+// nowhere, unfindable by any later plan or destroy. A failure after that point
+// goes to stderr and the truthful state is returned instead; the next plan
+// converges it.
+func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource) (*resource.ResourceState, error) {
+	ty, ok := p.catalog.Type(desired.Type)
+	if !ok {
+		return nil, fmt.Errorf("unknown type %q", desired.Type)
+	}
+	url, err := p.createURL(ty, desired.Attrs)
+	if err != nil {
+		return nil, err // nothing sent yet: an ordinary error is safe here
+	}
+	body := p.requestBody(ty, desired.Attrs)
 
-`Read`: GET the self link; on 404 retry a bounded number of times (~4 s total) before returning
-`(nil, nil)`.
+	// The LAST point cancellation is allowed to stop us. After the POST there is
+	// something real in the world and abandoning it orphans the resource.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
-`Delete`: DELETE, `await`, treat 404 as success.
+	resp, err := p.client.Do(ctx, http.MethodPost, url, body)
+	if err != nil {
+		// The POST itself failed, so nothing was created. Safe to error.
+		return nil, err
+	}
 
-`Import`: `ParseProviderID` first — **before any API call** — then read.
+	// From here on, errors are REPORTED, not returned.
+	awaited, awaitErr := p.await(ctx, ty, resp)
+	if awaitErr != nil {
+		fmt.Fprintf(os.Stderr, "gcp: %s: create reported a failure, reading back what exists: %v\n",
+			desired.Type, awaitErr)
+	}
+	st, readErr := p.readAfterCreate(ctx, ty, desired.Attrs, awaited)
+	switch {
+	case st != nil:
+		return st, nil
+	case awaitErr != nil:
+		// Nothing exists AND the operation failed: the create genuinely did not
+		// happen, so the error is the truth and returning it orphans nothing.
+		return nil, awaitErr
+	default:
+		return nil, fmt.Errorf("%s: created, but the resource cannot be read back: %w",
+			desired.Type, readErr)
+	}
+}
+
+// Read returns the current state, or (nil, nil) when the resource is gone.
+//
+// A NotFound is NOT proof of absence for a resource created seconds ago: GCP is
+// eventually consistent, and reporting "gone" makes the next plan create it a
+// second time. So a 404 is retried briefly before it is believed.
+func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*resource.ResourceState, error) {
+	ty, ok := p.catalog.Type(current.Type)
+	if !ok {
+		return nil, fmt.Errorf("unknown type %q", current.Type)
+	}
+	attrs, err := ParseProviderID(ty, current.ProviderID)
+	if err != nil {
+		return nil, err
+	}
+	url, err := p.selfLinkURL(ty, attrs)
+	if err != nil {
+		return nil, err
+	}
+	deadline := time.Now().Add(notFoundPatience)
+	for attempt := 0; ; attempt++ {
+		body, err := p.client.Do(ctx, http.MethodGet, url, nil)
+		switch {
+		case err == nil:
+			return p.stateFrom(ty, current, attrs, body)
+		case !isNotFound(err):
+			return nil, err
+		case time.Now().After(deadline):
+			return nil, nil // believed absent
+		}
+		if err := p.sleepBackoff(ctx, attempt); err != nil {
+			return nil, err
+		}
+	}
+}
+
+// Delete removes the resource. A 404 means the goal is already met.
+func (p *Provider) Delete(ctx context.Context, current *resource.ResourceState) error {
+	ty, ok := p.catalog.Type(current.Type)
+	if !ok {
+		return fmt.Errorf("unknown type %q", current.Type)
+	}
+	attrs, err := ParseProviderID(ty, current.ProviderID)
+	if err != nil {
+		return err
+	}
+	url, err := p.deleteURL(ty, attrs)
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err // last chance to stop before anything is destroyed
+	}
+	resp, err := p.client.Do(ctx, http.MethodDelete, url, nil)
+	if isNotFound(err) {
+		// Destroy must converge. Something already gone is not a failure.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = p.await(ctx, ty, resp)
+	if isNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+// Import adopts an existing resource by its provider ID.
+func (p *Provider) Import(ctx context.Context, resourceType, id string) (*resource.ResourceState, error) {
+	ty, ok := p.catalog.Type(resourceType)
+	if !ok {
+		return nil, fmt.Errorf("unknown type %q", resourceType)
+	}
+	// BEFORE any API call. A malformed or wrong-type ID costs a message naming
+	// the problem, not a confusing 404 from a URL built out of nonsense.
+	attrs, err := ParseProviderID(ty, id)
+	if err != nil {
+		return nil, err
+	}
+	return p.Read(ctx, &resource.ResourceState{Type: resourceType, ProviderID: id, Attributes: attrs})
+}
+```
+
+`requestBody` builds the POST body from `desired.Attrs`, dropping the scoping attributes
+(`project`, and whichever of `region`/`zone`/`location` the type carries) because those live in the URL,
+and dropping every `Output` attribute because GCP rejects a body that sets one.
+
+`readAfterCreate` resolves the created resource's identity: prefer the awaited response's own `name` or
+`selfLink`, fall back to the attributes the caller supplied. It returns `(nil, err)` when the resource
+genuinely is not there, which is what lets `Create` tell "created then failed" apart from "never
+created".
+
+`notFoundPatience` is a package constant, around 4 seconds total. Name it; a bare literal in a retry
+loop is a number nobody can tune with confidence later.
+
+`isNotFound` unwraps to `*APIError` and tests `Status == 404` or `Code == "NOT_FOUND"` — both occur, and
+matching on only one of them misses half the cases.
 
 - [ ] **Step 4: Sabotage, confirm, restore**
 
