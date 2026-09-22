@@ -11,6 +11,12 @@ import (
 type Asset struct {
 	AssetType string
 	Name      string // e.g. "//tiny.googleapis.com/projects/p/locations/r/widgets/one"
+	// Labels are the user labels CAI indexes for the resource. A search
+	// result carries them without any readMask being asked for
+	// (schemas/cloudasset.json, ResourceSearchResult.labels), which is what
+	// lets discovery decide system ownership from a search result alone
+	// rather than reading every resource it finds.
+	Labels map[string]string
 }
 
 // SeedCAI makes searchAllResources under parent (e.g. "projects/p", no
@@ -32,7 +38,13 @@ func (s *Server) FailCAI(status int, code, message string) {
 	s.caiFail = &apiErrorSpec{Status: status, Code: code, Message: message}
 }
 
-// handleSearchAllResources answers POST <parent>:searchAllResources.
+// handleSearchAllResources answers GET <scope>:searchAllResources.
+//
+// A GET. The custom-verb suffix reads like an RPC, but cloudasset's own
+// Discovery document (schemas/cloudasset.json) publishes
+// "v1/{+scope}:searchAllResources" with httpMethod GET and seven query
+// parameters, and no request body: this fake serves GCP's real wire format,
+// so it answers the method GCP answers.
 func (s *Server) handleSearchAllResources(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	fail := s.caiFail
@@ -50,7 +62,15 @@ func (s *Server) handleSearchAllResources(w http.ResponseWriter, r *http.Request
 	page, next := paginate(assets, r.URL.Query())
 	results := make([]map[string]any, len(page))
 	for i, a := range page {
-		results[i] = map[string]any{"assetType": a.AssetType, "name": a.Name}
+		res := map[string]any{"assetType": a.AssetType, "name": a.Name}
+		if len(a.Labels) > 0 {
+			labels := make(map[string]any, len(a.Labels))
+			for k, v := range a.Labels {
+				labels[k] = v
+			}
+			res["labels"] = labels
+		}
+		results[i] = res
 	}
 	out := map[string]any{"results": results}
 	if next != "" {
