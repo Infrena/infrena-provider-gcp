@@ -5396,6 +5396,27 @@ reason and falls back to per-type `list` over `DiscoverTypes` (defaulting to the
 `discover_default`). **Fail-open**: a failure of either path for one type logs and continues rather
 than failing the whole discovery.
 
+**The list response's array field is NOT `items`, and must be read from `catalog.Type.ListField`.**
+Measured across the fetched corpus on 2026-09-22: **209 distinct array-field names across 532 `list`
+methods, and `items` accounts for only 127 of them (24%)**. `compute.firewalls` uses `items`,
+`logging.buckets` uses `buckets`, `cloudasset.savedQueries` uses `savedQueries`. Hardcoding `items`
+produces a fallback path that works for compute and silently returns nothing for everything else —
+which reads as "this project has none of that type" rather than as a bug. A type whose `ListField` is
+empty cannot be listed; skip it and say so, rather than guessing.
+
+**An empty collection is a 200 with no results, not a 404.** The fallback scans many types across a
+project and finds nothing for most of them, so empty is the common case. Treat a 404 on a collection
+as a genuinely missing API and report it; do not learn to swallow 404s, because that hides the real
+thing this path is meant to surface.
+
+**Check `discover_default` against the real catalog before relying on it.** As generated on
+2026-09-22 it names `gcp.network` and `gcp.subnetwork`, which do not exist at all (compute's `Network`
+and `Subnetwork` are tier-2 on unruled hooks), and `gcp.instance`/`gcp.bucket`, which ship as
+`gcp.compute.instance`/`gcp.storage.bucket`. Nothing consumed it before this task, so it was never
+wrong until now. Fix the overlay as part of this task and assert in a test that every entry in
+`discover_default` resolves to a type the catalog actually serves — otherwise the list rots again the
+next time naming changes.
+
 `SystemOwned` returns evidence strings, never category names.
 
 - [ ] **Step 5: Sabotage, confirm, restore**
