@@ -42,6 +42,13 @@ git clone --quiet --filter=blob:none --sparse https://github.com/GoogleCloudPlat
 git -C "$tmp/mm" sparse-checkout set mmv1/products
 git -C "$tmp/mm" checkout --quiet "$pin"
 
+# This check is deliberately redundant: `sparse-checkout set mmv1/products`
+# above already keeps third_party/ and tools/ out of the working tree in cone
+# mode, so $tmp/mm/$forbidden should never exist. Kept anyway, on purpose —
+# the sparse-checkout scope is one line someone could widen later (to vendor
+# another mmv1 subdirectory, say) without thinking about licensing, and this
+# is what fails loudly if they do. A licence boundary is worth defence in
+# depth even when the primary defence looks sufficient today.
 for forbidden in mmv1/third_party tools; do
   if [ -e "$tmp/mm/$forbidden" ]; then
     echo "refusing to vendor $forbidden: it is MPL 2.0, not Apache 2.0" >&2

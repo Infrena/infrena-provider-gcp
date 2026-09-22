@@ -9,7 +9,25 @@
       "type": "object",
       "properties": {
         "name": {"type": "string", "description": "The frozen name."},
-        "value": {"type": "string", "description": "The frozen value."}
+        "value": {"type": "string", "description": "The frozen value."},
+        "config": {
+          "type": "object",
+          "description": "A nested object, to check AllForceNew recurses into Fields.",
+          "properties": {
+            "mode": {"type": "string", "description": "The mode."},
+            "computed": {"type": "string", "readOnly": true, "description": "[Output Only] server-computed; must stay Output, not ForceNew."}
+          }
+        },
+        "tags": {
+          "type": "array",
+          "description": "An array of objects, to check AllForceNew recurses into Elem.Fields.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {"type": "string", "description": "The tag key."}
+            }
+          }
+        }
       }
     },
     "Operation": {
