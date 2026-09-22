@@ -27,29 +27,54 @@ func TestTheLimiterSurvivesBetweenRequests(t *testing.T) {
 	}
 }
 
-// TestNextBackoffIsBoundedAndJittered. A fixed attempt number must never
+// TestBackoffDelayIsBoundedAndJittered. A fixed attempt number must never
 // exceed the ceiling exponential backoff would set for it, and repeated
 // calls must not all return the same value -- a backoff with no jitter at
 // all defeats the point of adding it.
-func TestNextBackoffIsBoundedAndJittered(t *testing.T) {
+func TestBackoffDelayIsBoundedAndJittered(t *testing.T) {
 	seen := map[time.Duration]bool{}
 	for i := 0; i < 50; i++ {
-		d := nextBackoff(1) // ceiling: backoffBase*2 = 500ms
+		d := backoffDelay(1, 0) // ceiling: backoffBase*2 = 500ms
 		if d < 0 || d > 2*backoffBase {
-			t.Fatalf("nextBackoff(1) = %v, out of bounds", d)
+			t.Fatalf("backoffDelay(1, 0) = %v, out of bounds", d)
 		}
 		seen[d] = true
 	}
 	if len(seen) < 2 {
-		t.Error("nextBackoff(1) returned the same value every time; no jitter")
+		t.Error("backoffDelay(1, 0) returned the same value every time; no jitter")
 	}
 }
 
-// TestNextBackoffIsCapped. A long run of failures must never wait longer
+// TestBackoffDelayIsCapped. A long run of failures must never wait longer
 // than backoffCap between tries, however large the attempt number grows.
-func TestNextBackoffIsCapped(t *testing.T) {
-	if d := nextBackoff(20); d > backoffCap {
-		t.Errorf("nextBackoff(20) = %v, exceeds the cap %v", d, backoffCap)
+func TestBackoffDelayIsCapped(t *testing.T) {
+	if d := backoffDelay(20, 0); d > backoffCap {
+		t.Errorf("backoffDelay(20, 0) = %v, exceeds the cap %v", d, backoffCap)
+	}
+}
+
+// TestBackoffDelayHonoursRetryAfter. GCP naming a wait is more informed than
+// this client's own guess, and must simply be used, not blended with jitter
+// or the exponential schedule.
+func TestBackoffDelayHonoursRetryAfter(t *testing.T) {
+	if d := backoffDelay(5, 7*time.Second); d != 7*time.Second {
+		t.Errorf("backoffDelay(5, 7s) = %v, want exactly 7s", d)
+	}
+}
+
+// TestBackoffDelayScheduleIsDeterministicUnderAFixedJitterSource. jitter is
+// swappable specifically so the schedule can be asserted exactly, rather
+// than only "it returned something in range" -- this is that assertion.
+func TestBackoffDelayScheduleIsDeterministicUnderAFixedJitterSource(t *testing.T) {
+	old := jitter
+	defer func() { jitter = old }()
+	jitter = func(n int64) int64 { return n - 1 } // always the ceiling itself
+
+	if d := backoffDelay(0, 0); d != backoffBase {
+		t.Errorf("backoffDelay(0, 0) = %v, want the full ceiling %v under a fixed jitter source", d, backoffBase)
+	}
+	if d := backoffDelay(1, 0); d != 2*backoffBase {
+		t.Errorf("backoffDelay(1, 0) = %v, want %v", d, 2*backoffBase)
 	}
 }
 

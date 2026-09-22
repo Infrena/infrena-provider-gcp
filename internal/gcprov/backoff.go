@@ -18,13 +18,26 @@ const (
 	backoffCap  = 30 * time.Second
 )
 
-// nextBackoff returns how long to wait before retry attempt n (0-based: the
-// wait before the FIRST retry is nextBackoff(0)), using full jitter -- a
+// jitter is the randomness source backoffDelay draws from, swappable so a
+// test can assert the resulting schedule deterministically rather than only
+// "it returned something in range". Production leaves it as rand.Int63n,
+// which since Go 1.20 draws from an automatically-seeded global source.
+var jitter = rand.Int63n
+
+// backoffDelay returns how long to wait before retry attempt n (0-based: the
+// wait before the FIRST retry is backoffDelay(0, 0)).
+//
+// ra, when non-zero, is honoured directly: it is the previous attempt's own
+// APIError.RetryAfter, and GCP naming a wait is more informed than a guess
+// this client makes on its own. Otherwise the wait is full jitter -- a
 // uniformly random duration between 0 and min(backoffCap, backoffBase*2^n).
 // Full jitter, not capped exponential alone, is what keeps many clients that
 // all hit a shared failure (a regional blip, a deploy) from retrying in
 // lockstep and re-creating the very spike that caused it.
-func nextBackoff(n int) time.Duration {
+func backoffDelay(n int, ra time.Duration) time.Duration {
+	if ra > 0 {
+		return ra
+	}
 	ceiling := float64(backoffBase) * math.Pow(2, float64(n))
 	if ceiling > float64(backoffCap) {
 		ceiling = float64(backoffCap)
@@ -32,7 +45,7 @@ func nextBackoff(n int) time.Duration {
 	if ceiling <= 0 {
 		return 0
 	}
-	return time.Duration(rand.Int63n(int64(ceiling) + 1))
+	return time.Duration(jitter(int64(ceiling) + 1))
 }
 
 // limiter is a hand-rolled token bucket: qps tokens accrue per second, up to

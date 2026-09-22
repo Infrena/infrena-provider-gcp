@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -47,13 +48,14 @@ type errorEnvelope struct {
 	} `json:"error"`
 }
 
-// decodeAPIError builds an APIError from one HTTP response's status, body and
-// headers. The body is parsed on a best-effort basis: a response that is not
-// GCP's own JSON error shape (a proxy's plain-text 502, say) still produces
-// an APIError carrying the raw body as its message, rather than a decode
-// failure masking the real one.
-func decodeAPIError(status int, body []byte, header http.Header) *APIError {
-	ae := &APIError{Status: status, Message: string(body)}
+// decodeAPIError builds an APIError from one HTTP response and its
+// already-read body. The body is parsed on a best-effort basis: a response
+// that is not GCP's own JSON error shape (a proxy's plain-text 502, an empty
+// or truncated body) still produces a usable APIError carrying the status and
+// the raw body as its message, rather than a decode failure masking the real
+// one or, worse, becoming a nil error.
+func decodeAPIError(resp *http.Response, body []byte) *APIError {
+	ae := &APIError{Status: resp.StatusCode, Message: string(body)}
 	var env errorEnvelope
 	if err := json.Unmarshal(body, &env); err == nil && (env.Error.Status != "" || env.Error.Message != "") {
 		if env.Error.Message != "" {
@@ -61,7 +63,7 @@ func decodeAPIError(status int, body []byte, header http.Header) *APIError {
 		}
 		ae.Code = env.Error.Status
 	}
-	ae.RetryAfter = parseRetryAfter(header.Get("Retry-After"))
+	ae.RetryAfter = parseRetryAfter(resp.Header.Get("Retry-After"))
 	return ae
 }
 
@@ -122,9 +124,14 @@ var retryableStatus = map[int]bool{
 // verdict from Status, but an error that is not an *APIError at all, or
 // whose Code AND Status both go unrecognised, is NotSafeToRetry -- the least
 // safe kind, and the correct default for something nobody has classified.
+//
+// errors.As, not a type assertion: a caller wrapping the failure with
+// fmt.Errorf("...: %w", err) -- normal, expected practice everywhere else in
+// this codebase -- must still classify correctly. A bare type assertion would
+// silently degrade every wrapped *APIError to NotSafeToRetry.
 func ClassifyError(err error) provider.Retryability {
-	ae, ok := err.(*APIError)
-	if !ok {
+	var ae *APIError
+	if !errors.As(err, &ae) {
 		return provider.NotSafeToRetry
 	}
 	if retryableCodes[ae.Code] {
