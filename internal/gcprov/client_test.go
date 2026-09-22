@@ -3,6 +3,7 @@ package gcprov
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -12,6 +13,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/infrena/infrena-provider-gcp/internal/gcptest"
+	"github.com/infrena/infrena/pkg/provider"
 )
 
 // staticTokenValue is staticToken with a caller-chosen token value, for the
@@ -290,5 +292,72 @@ func TestParseProjectAndAPI(t *testing.T) {
 			t.Errorf("parseProjectAndAPI(%q) = (%q, %q), want (%q, %q)",
 				c.url, project, api, c.wantProject, c.wantAPI)
 		}
+	}
+}
+
+// TestAQuotaProject403SaysItIsAboutTheQuotaProject.
+//
+// The body is verbatim from the live run on 2026-09-22: a service account
+// holding roles/storage.admin, with quota_project set, told it lacks
+// "serviceusage.services.use access". That reads as a broken storage grant
+// and is nothing of the kind, and a user who believes the message goes and
+// edits the wrong role.
+func TestAQuotaProject403SaysItIsAboutTheQuotaProject(t *testing.T) {
+	const body = `{"error":{"code":403,"message":"infrena-live@example-project-1234.iam.` +
+		`gserviceaccount.com does not have serviceusage.services.use access to the Google Cloud ` +
+		`project.","status":"PERMISSION_DENIED","details":[{"@type":` +
+		`"type.googleapis.com/google.rpc.ErrorInfo","reason":"USER_PROJECT_DENIED"}]}}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := NewClient(staticToken(), srv.URL, ClientOptions{QuotaProject: "some-project", MaxAttempts: 1})
+	_, err := c.Do(context.Background(), http.MethodGet, srv.URL+"/v1/thing", nil)
+	if err == nil {
+		t.Fatal("a 403 produced no error")
+	}
+	if !contains(err.Error(), "quota_project") {
+		t.Errorf("the error never mentions quota_project, so the reader is sent after the wrong "+
+			"permission:\n%s", err)
+	}
+	if !contains(err.Error(), "some-project") {
+		t.Errorf("the error does not name the configured quota project:\n%s", err)
+	}
+	// AND THE TAXONOMY SURVIVES. Wrapping must not hide the *APIError, or
+	// ClassifyError silently degrades every one of these to "unrecognised".
+	var ae *APIError
+	if !errors.As(err, &ae) {
+		t.Fatalf("the wrapped error no longer unwraps to an *APIError: %T", err)
+	}
+	if ae.Status != http.StatusForbidden {
+		t.Errorf("Status = %d", ae.Status)
+	}
+	if got := ClassifyError(err); got != provider.NotSafeToRetry {
+		t.Errorf("ClassifyError = %v, want NotSafeToRetry", got)
+	}
+}
+
+// TestAnInstanceWithNoQuotaProjectIsNotToldAboutOne. The explanation must not
+// fire for an instance that never configured the setting, or it sends a
+// reader after something they do not have.
+func TestAnInstanceWithNoQuotaProjectIsNotToldAboutOne(t *testing.T) {
+	const body = `{"error":{"code":403,"message":"caller lacks storage.buckets.get",` +
+		`"status":"PERMISSION_DENIED"}}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := NewClient(staticToken(), srv.URL, ClientOptions{MaxAttempts: 1})
+	_, err := c.Do(context.Background(), http.MethodGet, srv.URL+"/v1/thing", nil)
+	if err == nil {
+		t.Fatal("a 403 produced no error")
+	}
+	if contains(err.Error(), "quota_project") {
+		t.Errorf("an instance that sets no quota project was told its problem is one:\n%s", err)
 	}
 }

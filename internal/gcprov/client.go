@@ -268,7 +268,7 @@ func (c *Client) doOnce(ctx context.Context, method, fullURL string, body any) (
 	}
 
 	if resp.StatusCode >= 300 {
-		return nil, decodeAPIError(resp, data)
+		return nil, c.explainQuotaProject(decodeAPIError(resp, data))
 	}
 	if len(data) == 0 {
 		return map[string]any{}, nil
@@ -278,6 +278,47 @@ func (c *Client) doOnce(ctx context.Context, method, fullURL string, body any) (
 		return nil, fmt.Errorf("gcprov: parsing the response: %w", err)
 	}
 	return out, nil
+}
+
+// userProjectDenied is the google.rpc.ErrorInfo reason GCP answers with when
+// X-Goog-User-Project names a project the caller may not bill to.
+const userProjectDenied = "USER_PROJECT_DENIED"
+
+// explainQuotaProject adds the ONE piece of context the caller cannot get
+// from the response: that this 403 is about the quota_project setting and
+// not about the permission it appears to name.
+//
+// Measured against live GCP, 2026-09-22. A service account holding
+// roles/storage.admin, sending X-Goog-User-Project, is told:
+//
+//	infrena-live@...iam.gserviceaccount.com does not have
+//	serviceusage.services.use access to the Google Cloud project
+//
+// which reads as "your storage grant is wrong". It is not. Setting a quota
+// project requires serviceusage.services.use ON THAT PROJECT, a permission
+// nothing about storage would lead anyone to look for, and the remediation
+// is usually to REMOVE the setting rather than to add a role: a quota
+// project exists for a USER credential, which has no project of its own to
+// bill, and an impersonated service account already belongs to one.
+//
+// Wrapped with %w, never replaced: ClassifyError, isNotFound and every other
+// caller reach the *APIError through errors.As, and swallowing it here would
+// silently downgrade the whole error taxonomy to "unrecognised".
+//
+// Only when a quota project is actually set, so an instance that never
+// configured one cannot be told its problem is a setting it does not use.
+func (c *Client) explainQuotaProject(ae *APIError) error {
+	if c.opts.QuotaProject == "" || ae.Status != http.StatusForbidden {
+		return ae
+	}
+	if ae.Reason != userProjectDenied && !strings.Contains(ae.Message, "serviceusage.services.use") {
+		return ae
+	}
+	return fmt.Errorf("%w -- this is the quota_project setting (%q), not the permission it names: "+
+		"sending it requires serviceusage.services.use on that project. An impersonated service "+
+		"account or a key already bills to its own project, so removing quota_project is usually "+
+		"the fix; granting roles/serviceusage.serviceUsageConsumer is the other",
+		ae, c.opts.QuotaProject)
 }
 
 // parseProjectAndAPI reads the (project, api) pair a request's own url
