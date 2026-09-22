@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -242,5 +243,39 @@ func TestImportReadsAnExistingResource(t *testing.T) {
 	// resource plans a change on the very next run for attributes nobody set.
 	if st.Attributes["project"].Raw != "p" || st.Attributes["region"].Raw != "r" {
 		t.Errorf("project/region not recovered from the id: %v", st.Attributes)
+	}
+}
+
+// TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder. 16 types have a
+// self_link beginning with {{parent}}, leaving reduceSelfLink no literal text
+// to search for. Two of them also return a selfLink in their bodies, so before
+// PathPrefix existed ProviderID failed on every create -- and per the orphan
+// rule, an error after a successful create orphans the resource.
+//
+// Against the REAL catalog entry, not a hand-built type, so this fails if the
+// generator ever stops emitting the prefix.
+func TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder(t *testing.T) {
+	ty, ok := mustCatalog(t).Type("gcp.networksecurity.addressgroup")
+	if !ok {
+		t.Fatal("the catalog no longer ships gcp.networksecurity.addressgroup")
+	}
+	if !strings.HasPrefix(ty.SelfLink, "{{") {
+		t.Fatalf("this test exists for a self_link that starts with a placeholder; got %q", ty.SelfLink)
+	}
+	if ty.PathPrefix == "" {
+		t.Fatalf("%s has no path_prefix, so its urls carry no api version", ty.Name)
+	}
+	got, err := ProviderID(ty, map[string]any{
+		"selfLink": "https://networksecurity.googleapis.com/" + ty.PathPrefix +
+			"projects/p/locations/us-central1/addressGroups/ag",
+	}, nil)
+	if err != nil {
+		t.Fatalf("ProviderID on a body selfLink: %v", err)
+	}
+	if want := "projects/p/locations/us-central1/addressGroups/ag"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if strings.Contains(got, "googleapis.com") || strings.Contains(got, ty.PathPrefix) {
+		t.Errorf("the provider id %q still carries the host or the api version", got)
 	}
 }

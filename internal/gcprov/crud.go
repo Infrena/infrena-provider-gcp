@@ -279,7 +279,14 @@ func (p *Provider) expandedURL(ty *catalog.Type, tmpl string, attrs map[string]v
 	if err != nil {
 		return "", err
 	}
-	return ty.APIBaseURL + rel, nil
+	return absURL(ty, rel), nil
+}
+
+// absURL joins a relative, already-expanded resource path onto the API base.
+// The version lives in PathPrefix, never in the template (see
+// catalog.Type.PathPrefix).
+func absURL(ty *catalog.Type, rel string) string {
+	return ty.APIBaseURL + ty.PathPrefix + rel
 }
 
 // itemURL returns the request url addressing ONE existing item: Read's GET
@@ -299,10 +306,8 @@ func (p *Provider) expandedURL(ty *catalog.Type, tmpl string, attrs map[string]v
 // + "/" + id, server.go's handleCreate) -- whenever that reconstruction is
 // structurally safe (collectionMatchesSelfLink). self_link is derived, for
 // 143 of 233 real types, from the collection's own Discovery `get` path
-// (internal/gen/build.go), and 4 of those 233 end up with a self_link whose
-// api-version placement disagrees with their own base_url's; reconstructing
-// from base_url keeps read/delete pointed at wherever create actually put
-// the resource rather than at a url one version segment short of it.
+// (internal/gen/build.go), so reconstructing from base_url keeps read and
+// delete pointed at wherever create actually put the resource.
 // Structurally unsafe cases -- self_link ending in a reserved "{+name}"
 // capture (which does not decompose into base_url's own placeholders, e.g.
 // a "{+parent}"), or one of the small number of real types whose self_link
@@ -315,12 +320,12 @@ func (p *Provider) itemURL(ty *catalog.Type, tmpl, id string, attrs map[string]v
 		if err != nil {
 			return "", err
 		}
-		return ty.APIBaseURL + rel, nil
+		return absURL(ty, rel), nil
 	}
 
 	if collectionMatchesSelfLink(ty.BaseURL, ty.SelfLink) {
 		if rel, err := ExpandURL(ty.BaseURL, attrs); err == nil {
-			return ty.APIBaseURL + strings.TrimSuffix(rel, "/") + "/" + url.PathEscape(lastPathSegment(id)), nil
+			return absURL(ty, strings.TrimSuffix(rel, "/")+"/"+url.PathEscape(lastPathSegment(id))), nil
 		}
 	}
 
@@ -328,7 +333,7 @@ func (p *Provider) itemURL(ty *catalog.Type, tmpl, id string, attrs map[string]v
 	if err != nil {
 		return "", err
 	}
-	return ty.APIBaseURL + rel, nil
+	return absURL(ty, rel), nil
 }
 
 // withNameFallback returns attrs with an additional "name" entry -- id's own
@@ -351,22 +356,6 @@ func withNameFallback(attrs map[string]value.Value, id string) map[string]value.
 	return out
 }
 
-// versionSegmentRE matches a leading path segment that is actually an api
-// version -- v1, v2, v1beta1, ... -- mirroring gcpfake's own
-// versionSegmentRE (server.go), which resolves the identical question from
-// the other direction (a request path against a bare name).
-var versionSegmentRE = regexp.MustCompile(`^v[0-9][0-9a-z]*$`)
-
-// stripLeadingVersion drops tmpl's own leading "<version>/" segment, if it
-// has one, leaving the rest of the template unchanged.
-func stripLeadingVersion(tmpl string) string {
-	parts := strings.SplitN(tmpl, "/", 2)
-	if len(parts) == 2 && versionSegmentRE.MatchString(parts[0]) {
-		return parts[1]
-	}
-	return tmpl
-}
-
 // placeholderTemplateRE matches one whole-segment placeholder in EITHER
 // spelling url templates use in this catalog -- "{{x}}" or "{x}" -- but not
 // the reserved "{+x}" form, which a caller must recognise on its own (see
@@ -382,14 +371,16 @@ func normalizeTemplateShape(tmpl string) string {
 }
 
 // collectionMatchesSelfLink reports whether self_link is, structurally,
-// exactly base's own collection path plus one more (non-reserved) segment --
-// modulo an api-version segment appearing at the front of one but not the
-// other, which stripLeadingVersion accounts for (see itemURL's doc comment
-// for why: it is the one shape a real type's own base_url/self_link pair
-// disagrees on). When it is not -- a reserved "{+name}" tail, or a real
-// structural difference -- reconstructing an item's url from base plus its
-// own id would not reliably reach the same resource self_link addresses, so
-// itemURL falls back to expanding self_link directly instead.
+// exactly base's own collection path plus one more (non-reserved) segment.
+// When it is not -- a reserved "{+name}" tail, or a real structural
+// difference -- reconstructing an item's url from base plus its own id would
+// not reliably reach the same resource self_link addresses, so itemURL falls
+// back to expanding self_link directly instead.
+//
+// Neither side can carry an api-version segment any more: the generator
+// moves it to PathPrefix, and TestNoStoredTemplateCarriesAnAPIVersion
+// (internal/catalog) is what keeps that true, so there is nothing to strip
+// before comparing.
 func collectionMatchesSelfLink(base, selfLink string) bool {
 	i := strings.LastIndex(selfLink, "/")
 	if i < 0 {
@@ -399,7 +390,7 @@ func collectionMatchesSelfLink(base, selfLink string) bool {
 	if strings.HasPrefix(last, "{+") {
 		return false
 	}
-	return normalizeTemplateShape(stripLeadingVersion(base)) == normalizeTemplateShape(stripLeadingVersion(parent))
+	return normalizeTemplateShape(base) == normalizeTemplateShape(parent)
 }
 
 // requestBody builds a mutation's JSON body from attrs: every configured

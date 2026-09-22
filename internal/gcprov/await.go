@@ -192,6 +192,16 @@ func (p *Provider) operationRequestURL(ty *catalog.Type, op map[string]any) (met
 	if err != nil {
 		return "", "", fmt.Errorf("%s: building the operation url: %w", ty.Name, err)
 	}
+	// APIBaseURL, never absURL: ty.PathPrefix has no business here. Both
+	// templates are Discovery method paths taken verbatim, so each already
+	// carries whatever version its own API puts in front of it, and
+	// APIBaseURL + methodPath is Discovery's own identity. Measured over the
+	// regenerated catalog: every type with a wait path is compute, whose
+	// PathPrefix is empty (its servicePath carries the version), and every
+	// type that falls back to the poll path -- container and sqladmin -- has
+	// PathPrefix "v1/" AND a poll path already beginning "v1/", so adding the
+	// prefix would send all 7 of them to a doubled ".../v1/v1/..." url. Same
+	// reasoning as awaitLongRunning's own poll above.
 	return method, ty.APIBaseURL + rel, nil
 }
 
