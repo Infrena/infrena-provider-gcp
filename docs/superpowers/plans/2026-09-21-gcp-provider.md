@@ -5899,11 +5899,95 @@ func TestATypeWithNoGetIsReadByListingItsParent(t *testing.T) {
 
 Run: `go test -count=1 ./internal/gcprov/`
 
-`Discover` tries CAI `searchAllResources` across `DiscoverProjects` (defaulting to the instance's
-`Project`), maps each asset type through the catalog, and on any CAI failure logs one line naming the
-reason and falls back to per-type `list` over `DiscoverTypes` (defaulting to the overlay's
-`discover_default`). **Fail-open**: a failure of either path for one type logs and continues rather
-than failing the whole discovery.
+```go
+// Discover lists what exists, whether or not this project manages it.
+//
+// Cloud Asset Inventory answers for a whole project in a handful of calls,
+// which is why GCP discovery is complete by default where the AWS provider has
+// to ship a curated type list to avoid ~1,500 ListResources calls per region.
+// When CAI is unavailable the per-type fallback is narrower by necessity, and
+// saying WHICH path ran matters: an empty result from CAI means "this project
+// has nothing", while an empty result from the fallback may only mean "we did
+// not look at that type".
+func (p *Provider) Discover(ctx context.Context, req provider.DiscoverRequest) ([]provider.DiscoveredResource, error) {
+	projects := p.settings.DiscoverProjects
+	if len(projects) == 0 {
+		projects = []string{p.settings.Project}
+	}
+	var out []provider.DiscoveredResource
+	for _, project := range projects {
+		found, err := p.discoverViaCAI(ctx, project, req.Types)
+		if err == nil {
+			out = append(out, found...)
+			continue
+		}
+		// One line, naming the reason. A silent fallback makes a permissions
+		// problem look like an empty project.
+		fmt.Fprintf(os.Stderr,
+			"gcp: %s: Cloud Asset Inventory unavailable (%v); falling back to per-type listing, "+
+				"which covers only the configured types\n", project, err)
+		found, err = p.discoverViaList(ctx, project, req.Types)
+		if err != nil {
+			// FAIL OPEN. A project we could not scan is reported and skipped;
+			// failing the whole discovery would make one bad project hide every
+			// good one.
+			fmt.Fprintf(os.Stderr, "gcp: %s: discovery failed: %v\n", project, err)
+			continue
+		}
+		out = append(out, found...)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ProviderID < out[j].ProviderID })
+	return out, nil
+}
+
+// discoverViaList scans one type at a time. Used only when CAI is unavailable.
+func (p *Provider) discoverViaList(ctx context.Context, project string, want []string) ([]provider.DiscoveredResource, error) {
+	types := want
+	if len(types) == 0 {
+		types = p.settings.DiscoverTypes
+	}
+	if len(types) == 0 {
+		types = p.overlayDiscoverDefault
+	}
+	var out []provider.DiscoveredResource
+	for _, name := range types {
+		ty, ok := p.catalog.Type(name)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "gcp: discover: no such type %q\n", name)
+			continue
+		}
+		if ty.ListField == "" {
+			// No list method: aggregatedList-only types, and types that only
+			// exist nested under a parent. Skip and SAY SO — silently omitting
+			// one is indistinguishable from it not existing.
+			fmt.Fprintf(os.Stderr, "gcp: discover: %s cannot be listed; skipping\n", name)
+			continue
+		}
+		found, err := p.listOneType(ctx, project, ty)
+		if err != nil {
+			// Fail open per type, for the same reason as per project.
+			fmt.Fprintf(os.Stderr, "gcp: discover: %s: %v\n", name, err)
+			continue
+		}
+		out = append(out, found...)
+	}
+	return out, nil
+}
+```
+
+`listOneType` expands the type's `BaseURL` with `project` (and the type's location attribute where its
+template needs one), pages through `pageToken`/`nextPageToken`, and reads the array from
+`ty.ListField` — never a hardcoded `items`. **An empty collection is a 200 with no results, not a
+404**; treat a 404 here as a genuinely missing API and report it rather than swallowing it, because a
+swallowed 404 hides exactly the thing this path exists to surface.
+
+`discoverViaCAI` POSTs `<parent>:searchAllResources`, pages on `nextPageToken`, and maps each result's
+`assetType` through the catalog's asset-type index. A result whose asset type the catalog does not
+serve is skipped silently — that is not an error, it is a GCP resource this provider does not model.
+
+**Naming a discovered resource is simpler here than on AWS.** GCP resources carry a real `name`, so
+there is no dependence on a `Name` tag and no sanitised-ID fallback: take the last segment of the
+relative resource name, prefixed with the type's last segment (`instance-web1`).
 
 **The list response's array field is NOT `items`, and must be read from `catalog.Type.ListField`.**
 Measured across the fetched corpus on 2026-09-22: **209 distinct array-field names across 532 `list`
