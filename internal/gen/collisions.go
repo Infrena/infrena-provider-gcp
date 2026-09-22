@@ -31,10 +31,18 @@ import (
 // warning can be written once its winner has an assigned name (Build only
 // knows that after Assign runs, which happens after this resolution pass).
 type aliasLoser struct {
-	doc        *disco.Document
-	rawName    string
-	winnerCol  []string
-	winnerCand Candidate
+	doc     *disco.Document
+	rawName string
+	// winner points directly at the winner's entry in shipping's backing
+	// array, rather than copying its Candidate and path out by value here.
+	// It must: this group's winner can ALSO be a survivor that
+	// disambiguateByPath (below, still to run when this loser is recorded)
+	// mutates, and a value copied before that mutation would go stale --
+	// build.go would then look up a Candidate nothing was ever named,
+	// finding nothing and silently writing a blank name into the warning. A
+	// pointer instead always reads whatever the winner's FINAL Candidate and
+	// path turned out to be, however this group resolved.
+	winner *pending
 }
 
 // resolveWithinServiceCollisions groups shipping's unscoped candidates by
@@ -101,10 +109,9 @@ func resolveWithinServiceCollisions(shipping []pending) ([]pending, []aliasLoser
 				}
 				drop[i] = true
 				losers = append(losers, aliasLoser{
-					doc:        shipping[i].doc,
-					rawName:    shipping[i].rawName,
-					winnerCol:  shipping[winner].col.Path,
-					winnerCand: shipping[winner].cand,
+					doc:     shipping[i].doc,
+					rawName: shipping[i].rawName,
+					winner:  &shipping[winner],
 				})
 			}
 			survivors = append(survivors, winner)

@@ -63,6 +63,23 @@ func (i *Instance) baseTokenSource(ctx context.Context) (oauth2.TokenSource, err
 	return creds.TokenSource, nil
 }
 
+// impersonationTimeout bounds one generateAccessToken call, INDEPENDENT of
+// whatever deadline (if any) the caller's context carries.
+//
+// This matters more than an ordinary outbound call's timeout would: the
+// context passed to TokenSource is stored on impersonatedTokenSource and
+// reused by oauth2.ReuseTokenSource for every future Token() call as the
+// cached token nears its roughly one-hour expiry, not just the first one.
+// A context that was reasonable when the provider was constructed is stale,
+// or carries no deadline at all, by the time a later call actually needs
+// one — New() has no deadline of its own to hand it today (Task 17 wires
+// that), so relying on the caller here would mean no bound at all in the
+// common case. This plugin is a child process infrena talks to over stdio;
+// a hung iamcredentials.googleapis.com wedges it with nothing to read and no
+// way out. A var, not a const, so the test below can shorten it rather than
+// waiting out 30 real seconds to prove a regression would hang.
+var impersonationTimeout = 30 * time.Second
+
 // impersonatedTokenSource exchanges the base token source's own token for one
 // belonging to a target service account, via the IAM Credentials API's
 // generateAccessToken.
@@ -73,10 +90,21 @@ func (i *Instance) baseTokenSource(ctx context.Context) (oauth2.TokenSource, err
 // REST call this plugin already knows how to make (crud.go, Task 10 on,
 // calls REST APIs the same way). The load-cost gate this task measures is
 // exactly what that dependency weight would have worked against.
+// iamCredentialsBaseURL is a var, not a const, purely so the timeout test
+// below can point Token() at an httptest server instead of the real Google
+// host -- constructing impersonatedTokenSource directly, bypassing
+// newImpersonatedTokenSource, since the test lives in this package.
+var iamCredentialsBaseURL = "https://iamcredentials.googleapis.com/v1"
+
 type impersonatedTokenSource struct {
 	ctx    context.Context
 	base   oauth2.TokenSource
 	target string
+	// client is a *http.Client field rather than http.DefaultClient so the
+	// timeout bound is visible right next to where it is used, and so a test
+	// can give it a short timeout without touching the process-wide default
+	// client.
+	client *http.Client
 }
 
 func newImpersonatedTokenSource(ctx context.Context, base oauth2.TokenSource, target string) oauth2.TokenSource {
@@ -84,7 +112,16 @@ func newImpersonatedTokenSource(ctx context.Context, base oauth2.TokenSource, ta
 	// Token is only actually called -- and only actually reaches the network
 	// -- once per hour (IAM Credentials access tokens default to a one hour
 	// lifetime), not once per API call.
-	return oauth2.ReuseTokenSource(nil, &impersonatedTokenSource{ctx: ctx, base: base, target: target})
+	return oauth2.ReuseTokenSource(nil, &impersonatedTokenSource{
+		ctx: ctx, base: base, target: target,
+		// http.Client.Timeout bounds the ENTIRE round trip (connect, TLS,
+		// headers, body) regardless of the request's own context, which is
+		// the belt to the per-request context timeout's braces in Token()
+		// below: either one alone would catch a hang, and a resolver or
+		// transport quirk that fails to honour one is still caught by the
+		// other.
+		client: &http.Client{Timeout: impersonationTimeout},
+	})
 }
 
 type generateAccessTokenRequest struct {
@@ -106,15 +143,21 @@ func (s *impersonatedTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("impersonating %s: %w", s.target, err)
 	}
-	url := fmt.Sprintf("https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken", s.target)
-	req, err := http.NewRequestWithContext(s.ctx, http.MethodPost, url, bytes.NewReader(reqBody))
+	// context.WithTimeout takes the EARLIER of s.ctx's own deadline (if any)
+	// and this one, so a caller-supplied deadline that is already shorter is
+	// still honoured -- this only ever adds a bound, never removes one.
+	ctx, cancel := context.WithTimeout(s.ctx, impersonationTimeout)
+	defer cancel()
+
+	url := fmt.Sprintf("%s/projects/-/serviceAccounts/%s:generateAccessToken", iamCredentialsBaseURL, s.target)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("impersonating %s: %w", s.target, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	baseTok.SetAuthHeader(req)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("impersonating %s: %w", s.target, err)
 	}

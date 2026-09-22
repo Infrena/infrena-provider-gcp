@@ -161,14 +161,17 @@ func Build(in Inputs) (*Result, error) {
 	}
 
 	// The alias losers' warning can only be written now that the winner it
-	// names actually has a name.
+	// names actually has a name. al.winner is read here, not captured by
+	// value back in resolveWithinServiceCollisions, specifically so this
+	// sees the winner's Candidate and path as they ended up AFTER
+	// disambiguateByPath ran -- see aliasLoser's doc comment.
 	for _, al := range aliasLosers {
 		warnings = append(warnings, Warning{
 			Service:  al.doc.Name,
 			Resource: al.rawName,
 			Tier:     TierGeneric,
-			Reason: fmt.Sprintf("legacy alias of %s (%s)", names[al.winnerCand],
-				strings.Join(al.winnerCol, ".")),
+			Reason: fmt.Sprintf("legacy alias of %s (%s)", names[al.winner.cand],
+				strings.Join(al.winner.col.Path, ".")),
 		})
 	}
 
