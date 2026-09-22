@@ -68,6 +68,16 @@ func Build(in Inputs) (*Result, error) {
 		mm   *mmv1.Resource
 		cand Candidate
 		dec  Decision
+		// rawName is the mm resource name, or (when there is no mm resource)
+		// the Discovery collection leaf — the spelling a human reading
+		// warnings.txt would recognize, as opposed to cand.Resource, which is
+		// lowercased and singularized purely for name assignment. Computed
+		// once here so a build failure in pass three names the SAME thing a
+		// tier refusal in this same loop would have (see F3: they used to
+		// disagree — "Hooked" from a tier refusal, "widget" from a build
+		// failure — over a file whose whole job is answering "why is this
+		// type unsupported").
+		rawName string
 	}
 	var shipping []pending
 	var warnings []Warning
@@ -89,20 +99,20 @@ func Build(in Inputs) (*Result, error) {
 		for _, col := range d.Collections() {
 			leaf := col.Path[len(col.Path)-1]
 			mm := matchResource(mms, leaf)
+			rawName := leaf
+			if mm != nil {
+				rawName = mm.Name
+			}
 			var ruling *Ruling
 			if mm != nil {
 				ruling = overlay.Rulings[d.Name+"/"+mm.Name]
 			}
 			dec := Classify(col, mm, ruling)
 			if dec.Tier != TierGeneric {
-				name := leaf
-				if mm != nil {
-					name = mm.Name
-				}
-				warnings = append(warnings, Warning{d.Name, name, dec.Tier, dec.Reason})
+				warnings = append(warnings, Warning{d.Name, rawName, dec.Tier, dec.Reason})
 				continue
 			}
-			shipping = append(shipping, pending{d, col, mm, Candidate{d.Name, strings.ToLower(singular(leaf))}, dec})
+			shipping = append(shipping, pending{d, col, mm, Candidate{d.Name, strings.ToLower(singular(leaf))}, dec, rawName})
 		}
 	}
 
@@ -120,46 +130,75 @@ func Build(in Inputs) (*Result, error) {
 		return nil, err
 	}
 
-	// Pass three: build each type, now that every reference target has a name.
+	// Pass three: build each type, now that every candidate has a name.
 	//
-	// A raw ResourceRef target name is not enough on its own to find that
-	// name: 942 magic-modules resources share only 802 distinct names
-	// (Instance alone spans 16 products), so resolving refName by bare name
-	// would silently point a compute Instance reference at
-	// gcp.alloydb.instance or whichever product happened to build last.
-	// refByProduct disambiguates by keying on "<product>/<name>", matching
-	// the key already used for tier rulings and the name lock; refCandidates
-	// records every product that shipped each bare name, so a same-product
-	// miss can still resolve a genuine cross-product reference (e.g.
-	// compute/Subnetwork -> networkconnectivity/InternalRange) when exactly
-	// one product has it, and can tell an ambiguous one from a dangling one
-	// when more than one does.
-	refByProduct := map[string]string{}           // "<product>/<mm resource name>" -> infrena type
-	refCandidates := map[string]map[string]bool{} // mm resource name -> products that shipped it
-	for _, p := range shipping {
-		if p.mm != nil {
-			refByProduct[p.mm.Product+"/"+p.mm.Name] = names[p.cand]
-			if refCandidates[p.mm.Name] == nil {
-				refCandidates[p.mm.Name] = map[string]bool{}
-			}
-			refCandidates[p.mm.Name][p.mm.Product] = true
-		}
-	}
-
+	// References are deliberately NOT resolved here — see pass four below.
+	// Classify only checks that a create METHOD exists (a candidate reaching
+	// `shipping` says nothing about whether its request body schema exists or
+	// its $refs resolve), so a candidate can pass tiering and still fail
+	// inside buildType. This pass collects exactly what survives that: c.Types
+	// and the build-failure warnings, and — in `succeeded` — enough of each
+	// pending to resolve references against in pass four.
 	c := &catalog.Catalog{
 		Generated:  time.Now().UTC().Format("2006-01-02"),
 		MMV1Commit: readPin(filepath.Dir(in.MMV1Dir)),
 	}
+	type built struct {
+		p pending
+		t *catalog.Type
+	}
+	var succeeded []built
 	for _, p := range shipping {
-		t, refWarnings, err := buildType(p.doc, p.col, p.mm, names[p.cand], overlay, refByProduct, refCandidates)
+		t, err := buildType(p.doc, p.col, p.mm, names[p.cand], overlay)
 		if err != nil {
-			warnings = append(warnings, Warning{p.doc.Name, p.cand.Resource, TierExcluded, err.Error()})
+			warnings = append(warnings, Warning{p.doc.Name, p.rawName, TierExcluded, err.Error()})
 			continue
 		}
 		t.Tier = int(p.dec.Tier)
 		t.TierReason = p.dec.Reason
+		succeeded = append(succeeded, built{p, t})
 		c.Types = append(c.Types, t)
-		warnings = append(warnings, refWarnings...)
+	}
+
+	// Pass four: resolve references, now that c.Types names exactly what
+	// actually shipped.
+	//
+	// A raw ResourceRef target name is not enough on its own to find that
+	// name: 942 magic-modules resources share only 802 distinct names
+	// (Instance alone spans 16 products), so resolving by bare name would
+	// silently point a compute Instance reference at gcp.alloydb.instance or
+	// whichever product happened to build last. refByProduct disambiguates by
+	// keying on "<product>/<name>", matching the key already used for tier
+	// rulings and the name lock; refCandidates records every product that
+	// shipped each bare name, so a same-product miss can still resolve a
+	// genuine cross-product reference (e.g. compute/Subnetwork ->
+	// networkconnectivity/InternalRange) when exactly one product has it, and
+	// can tell an ambiguous one from a dangling one when more than one does.
+	//
+	// Both maps are built from `succeeded`, not from `shipping`: building them
+	// from everything that merely passed tiering would let a reference resolve
+	// to a name that was assigned but never actually reached c.Types (its own
+	// build having failed in pass three) — the exact hazard this task exists
+	// to prevent, just one step removed. Building from `succeeded` instead
+	// makes the invariant structural: the map cannot name something that
+	// isn't in it, because it was built FROM what's in it.
+	refByProduct := map[string]string{}           // "<product>/<mm resource name>" -> infrena type
+	refCandidates := map[string]map[string]bool{} // mm resource name -> products that shipped it
+	for _, b := range succeeded {
+		if b.p.mm != nil {
+			refByProduct[b.p.mm.Product+"/"+b.p.mm.Name] = b.t.Name
+			if refCandidates[b.p.mm.Name] == nil {
+				refCandidates[b.p.mm.Name] = map[string]bool{}
+			}
+			refCandidates[b.p.mm.Name][b.p.mm.Product] = true
+		}
+	}
+	for _, b := range succeeded {
+		var selfProduct string
+		if b.p.mm != nil {
+			selfProduct = b.p.mm.Product
+		}
+		resolveRefs(b.t.Attributes, selfProduct, b.t.Service, b.t.Name, refByProduct, refCandidates, &warnings)
 	}
 	sort.Slice(c.Types, func(i, j int) bool { return c.Types[i].Name < c.Types[j].Name })
 	sort.Slice(warnings, func(i, j int) bool {
@@ -294,29 +333,30 @@ func requestBodySchema(d *disco.Document, m *disco.Method) (*disco.Schema, error
 // ScopeOf and AwaitOf for how it's called, and the magic-modules URL fields
 // for where.
 //
-// Every Attr.Ref still names the RAW magic-modules resource it points at —
-// BuildAttributes has no way to know the whole name map. buildType resolves
-// it through refByProduct/refCandidates (see Build's comment on them) and
-// returns any warnings that resolution produced (an ambiguous target, dropped
-// rather than guessed) alongside the type, since that's a per-attribute
-// concern, not a reason to refuse the whole type.
+// Every Attr.Ref is left holding the RAW magic-modules resource name it
+// points at (BuildAttributes has no way to know the whole name map, and
+// buildType itself only knows what's shipped so far in this one call —
+// resolving here would let a reference resolve against a type that hasn't
+// been decided yet, or that fails to build later in the same pass). Build's
+// pass four resolves every Ref once every type in this run has either
+// succeeded or been refused.
 //
 // It also CONSUMES the ruling, not merely validates it: AllForceNew marks
 // every settable (non-Output) attribute ForceNew at every depth — this is
 // what makes gcp.tagbinding honest, since it has create/delete/list and no
 // patch — and ReadVia is recorded on the type so the runtime knows to read it
 // by listing the parent instead.
-func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, name string, overlay *Overlay, refByProduct map[string]string, refCandidates map[string]map[string]bool) (*catalog.Type, []Warning, error) {
+func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, name string, overlay *Overlay) (*catalog.Type, error) {
 	create := col.Methods["insert"]
 	if create == nil {
 		create = col.Methods["create"]
 	}
 	if create == nil {
-		return nil, nil, fmt.Errorf("no insert or create method")
+		return nil, fmt.Errorf("no insert or create method")
 	}
 	body, err := requestBodySchema(doc, create)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var ruling *Ruling
@@ -330,14 +370,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 
 	attrs, err := BuildAttributes(doc, body, mm, aliases)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	var selfProduct string
-	if mm != nil {
-		selfProduct = mm.Product
-	}
-	var refWarnings []Warning
-	resolveRefs(attrs, selfProduct, doc.Name, name, refByProduct, refCandidates, &refWarnings)
 	if ruling != nil && ruling.AllForceNew {
 		forceNewAll(attrs)
 	}
@@ -416,7 +450,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.ReadVia = ruling.ReadVia
 	}
 
-	return t, refWarnings, nil
+	return t, nil
 }
 
 // resolveRefs substitutes each Attr.Ref's magic-modules target for its

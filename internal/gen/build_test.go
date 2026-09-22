@@ -237,12 +237,36 @@ func TestARulingsAllForceNewAndReadViaBothTakeEffect(t *testing.T) {
 	if len(ty.Attributes) == 0 {
 		t.Fatal("gcp.frozen has no attributes to check")
 	}
-	for name, a := range ty.Attributes {
+	// config (Fields) and tags (Elem.Fields) exist specifically so this check
+	// walks below the top level: a flat fixture can't tell a correct recursive
+	// forceNewAttr from one that only ever touched the top-level map.
+	var checked int
+	assertAllForceNew(t, "gcp.frozen", ty.Attributes, &checked)
+	if checked < 5 {
+		t.Fatalf("only checked %d attributes; the nested config/tags fixture should have produced at least 5 (name, value, config, config.mode, config.computed, tags, tags[].key)", checked)
+	}
+}
+
+// assertAllForceNew walks attrs (and every Fields/Elem below it) asserting
+// every non-Output attribute is ForceNew, and counts how many it checked —
+// used to catch a walker that silently visits nothing.
+func assertAllForceNew(t *testing.T, path string, attrs map[string]*catalog.Attr, checked *int) {
+	t.Helper()
+	for name, a := range attrs {
+		p := path + "." + name
+		*checked++
 		if a.Output {
-			continue
+			if a.ForceNew {
+				t.Errorf("%s is Output AND ForceNew; Output should have exempted it", p)
+			}
+		} else if !a.ForceNew {
+			t.Errorf("%s is not ForceNew, but the ruling says all_force_new and the type has no patch method", p)
 		}
-		if !a.ForceNew {
-			t.Errorf("gcp.frozen.%s is not ForceNew, but the ruling says all_force_new and the type has no patch method", name)
+		if a.Fields != nil {
+			assertAllForceNew(t, p, a.Fields, checked)
+		}
+		if a.Elem != nil {
+			assertAllForceNew(t, p+"[]", map[string]*catalog.Attr{"": a.Elem}, checked)
 		}
 	}
 }
@@ -497,5 +521,99 @@ properties:
 	}
 	if !found {
 		t.Error("the ambiguous reference was dropped without a warning naming the candidates")
+	}
+}
+
+// TestAReferenceToAFailedBuildIsDropped covers the path F1 review found:
+// Classify only checks that a create method exists, so a candidate can pass
+// tiering and still fail inside buildType (its create method's request
+// schema does not exist, here). Ghost has an mm resource and passes Classify,
+// but its own build fails; Referrer4, in the same product, references it.
+// Building refByProduct/refCandidates from `shipping` (everything that merely
+// passed tiering) rather than from `succeeded` (everything that actually
+// reached c.Types) would let Referrer4's reference resolve to "gcp.ghost" — a
+// name Assign reserved but that no catalog.Type actually carries. It must
+// resolve to nothing instead, and Ghost's own failure must still be warned
+// about on its own account.
+func TestAReferenceToAFailedBuildIsDropped(t *testing.T) {
+	in := writeRefFixture(t, map[string]string{
+		"schemas/ghostsvc.json": `{
+  "name": "ghostsvc",
+  "version": "v1",
+  "rootUrl": "https://tiny.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Referrer4": {
+      "id": "Referrer4",
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "ghost": {"type": "string", "description": "The (broken) target."}
+      }
+    },
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "projects": {"resources": {
+      "ghosts": {"methods": {
+        "get": {"id": "x.ghosts.get", "path": "projects/{project}/ghosts/{id}", "httpMethod": "GET", "response": {"$ref": "MissingSchema"}},
+        "insert": {"id": "x.ghosts.insert", "path": "projects/{project}/ghosts", "httpMethod": "POST", "request": {"$ref": "MissingSchema"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.ghosts.delete", "path": "projects/{project}/ghosts/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }},
+      "referrer4s": {"methods": {
+        "get": {"id": "x.referrer4s.get", "path": "projects/{project}/referrer4s/{id}", "httpMethod": "GET", "response": {"$ref": "Referrer4"}},
+        "insert": {"id": "x.referrer4s.insert", "path": "projects/{project}/referrer4s", "httpMethod": "POST", "request": {"$ref": "Referrer4"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "x.referrer4s.delete", "path": "projects/{project}/referrer4s/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}
+      }}
+    }}
+  }
+}`,
+		"mmv1/products/ghostsvc/Ghost.yaml": `name: Ghost
+description: a resource whose Discovery create method references a schema that does not exist.
+base_url: projects/{{project}}/ghosts
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+		"mmv1/products/ghostsvc/Referrer4.yaml": `name: Referrer4
+description: references Ghost, whose own build fails despite passing Classify.
+base_url: projects/{{project}}/referrer4s
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: ghost
+    type: ResourceRef
+    resource: Ghost
+    imports: selfLink
+`,
+	})
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := res.Catalog.Type("gcp.ghost"); ok {
+		t.Error("gcp.ghost shipped despite its create method referencing a schema that does not exist")
+	}
+	var buildFailureWarned bool
+	for _, w := range res.Warnings {
+		if w.Resource == "Ghost" && w.Tier == TierExcluded {
+			buildFailureWarned = true
+		}
+	}
+	if !buildFailureWarned {
+		t.Error("Ghost's own build failure was not warned about")
+	}
+	ty, ok := res.Catalog.Type("gcp.referrer4")
+	if !ok {
+		t.Fatalf("gcp.referrer4 missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	a, ok := ty.Attributes["ghost"]
+	if !ok {
+		t.Fatal("ghost attribute missing")
+	}
+	if a.Ref != nil {
+		t.Errorf("ghost.Ref = %+v, want nil: Ghost's name was reserved but it never actually shipped", a.Ref)
 	}
 }
