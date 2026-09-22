@@ -7333,3 +7333,161 @@ git add internal/gen/build.go internal/gen/build_test.go \
         internal/gcprov/await_test.go internal/catalog/catalog.json.gz
 git commit -m "Pick one operations path, the same one every run"
 ```
+
+---
+
+### Task 13d: An id must name the resource we actually created
+
+**Why this exists.** Task 13b/13c's review. Three related defects, all of them
+about the same confusion: the provider accepts an identity because it PARSED,
+never checking that it names the thing that was just created.
+
+#### D1 (Critical). `v1/{+name}` does not address a container operation.
+
+Task 13c chose `v1/{+name}` for `gcp.container.cluster` and
+`gcp.container.nodepool` because the runtime can fill `name`. It can, and the
+result is wrong. From `schemas/container.json`:
+
+- `Operation.properties.name`: "Output only. The server-assigned **ID** for the
+  operation."
+- `projects.locations.operations.get`'s `name` parameter:
+  `pattern: ^projects/[^/]+/locations/[^/]+/operations/[^/]+$`
+- the deprecated `operationId` parameter: "the server-assigned `name` of the
+  operation" -- confirming `name` in the body IS the bare id.
+
+`operationRequestURL` sets `attrs["name"] = op["name"]`, so the expansion is
+`v1/operation-1740000000000-abcdef`, which matches nothing. Every GKE cluster
+and node-pool mutation fails at the polling step. 13c turned a named expansion
+error into a 404 on a plausible URL, which is a worse diagnostic than what it
+replaced.
+
+`awaitLongRunning` is NOT affected and must keep working: for a
+`google.longrunning.Operation`, `name` genuinely IS the full resource path.
+That difference is the whole defect -- the two await strategies were handed the
+same placeholder name meaning two different things.
+
+Fix: for compute-style awaits, fill `{+name}` from the operation's own
+`selfLink`, reduced to a relative name, and fall back to `op["name"]` only when
+there is no selfLink. Container publishes
+`https://container.googleapis.com/v1/projects/123/locations/l/operations/op-...`,
+which reduces to exactly the shape the parameter's pattern demands.
+
+#### D2 (High). A derived id is accepted whenever it PARSES, not when it fits.
+
+`createdID` (`internal/gcprov/crud.go`) falls back to the caller's attributes
+only when `ProviderID` returns an **error**. A `targetLink` that reduces cleanly
+but names a DIFFERENT resource produces a wrong id, silently, with no stderr
+line. Measured shapes in the shipped catalog:
+
+- `gcp.sqladmin.databas`, `gcp.user`, `gcp.backuprun` have literal segments in
+  `self_link`, so a wrong id fails later in `ParseProviderID` -- surfacing as
+  "created, but the resource cannot be read back", an error after a successful
+  POST. That is the orphan `e3476ac` exists to prevent; its guard is narrower
+  than the rule it cites ("the target does not reduce", not "the target is not
+  this resource").
+- **83 types have a `self_link` that is a bare capture** (`{+name}` or
+  `{{name}}`). For every one of those `ParseProviderID` accepts ANY string, so a
+  wrong id is stored silently and `itemURL` expands it straight into a URL. A
+  later Delete then addresses whatever that id named. 3 of the 83 are
+  compute-style awaits and so reachable through `targetLink` today; the rest are
+  reachable by the same mechanism if any other path ever derives an id from a
+  response body.
+
+Fix: validate the derived id against the collection the create actually posted
+to. The created resource must live UNDER that collection. Expand the create
+template (`ty.CreateURL`, else `ty.BaseURL`) against the caller's attributes and
+require the derived id to be that collection path plus exactly one more
+segment. Where it is not, fall back to the attribute-derived id and say so on
+stderr, exactly as the reduction-failure path already does. This check does not
+depend on `self_link` having literal segments, which is why it covers all 83.
+
+#### D3 (Critical, isolated, pre-existing). `gcp.vpngateway` creates one resource and reads another.
+
+```
+base_url  projects/{{project}}/regions/{{region}}/targetVpnGateways
+self_link projects/{project}/regions/{region}/vpnGateways/{vpnGateway}
+```
+
+`targetVpnGateways` (classic VPN) and `vpnGateways` (HA VPN) are different GCP
+resources. The generator paired a magic-modules `base_url` with a Discovery
+`get` path from the wrong collection. Create posts to one, the id names the
+other, every create orphans. Measured: this is the ONLY type of 233 whose
+`base_url` collection does not appear in its `self_link` (the other 85 apparent
+mismatches are all bare captures, where there is nothing to compare).
+
+Fix: the GENERATOR must refuse to ship a type whose `self_link` is not under its
+`base_url` collection. That is the tier gate's own principle -- a type the
+generator cannot vouch for does not ship. Emit it to `gen/warnings.txt` with
+both templates named. If the correct pairing for vpngateway is determinable from
+the Discovery document, fix the pairing instead and say how; if not, let it drop
+and note that the catalog is now 232.
+
+**Files:**
+- Modify: `internal/gcprov/await.go` (D1)
+- Modify: `internal/gcprov/crud.go` (D2)
+- Modify: `internal/gen/build.go` (D3)
+- Test: `internal/gcprov/await_test.go`, `internal/gcprov/crud_test.go`,
+  `internal/gen/build_test.go`, `internal/catalog/real_test.go`
+
+- [ ] **Step 1: The reachability arm the invariant test is missing**
+
+`TestEveryOperationTemplateExpandsFromWhatTheRuntimeSupplies` asserts a template
+EXPANDS. It gave a false all-clear for D1 because expanding and addressing
+something are different properties, and the brief that specified it conflated
+them. Add the second arm: for every type, the expanded operation URL's path must
+contain an `operations` segment and must not be a single bare segment. Where the
+Discovery document publishes a `pattern` for the method's own parameter, assert
+against that pattern instead -- it is the API's own statement of what it accepts.
+
+Run it. Expected: FAIL naming both container types. Record the output verbatim.
+
+- [ ] **Step 2: Fix D1**
+
+In `operationRequestURL`, for the compute-style path, prefer the operation's
+`selfLink` reduced to a relative name over `op["name"]`. Keep
+`awaitLongRunning`'s use of `op["name"]` exactly as it is and say in a comment
+why the two differ. Re-run Step 1: PASS.
+
+- [ ] **Step 3: Fix D2**
+
+Add the collection check to `createdID` as described. Test with a compute-style
+create whose operation returns a `targetLink` naming a resource OUTSIDE the
+created collection, for both shapes:
+- a type whose `self_link` has literal segments (assert: no error, id comes from
+  attributes, stderr line emitted)
+- a type whose `self_link` is a bare capture (assert the same; before the fix
+  this stored the wrong id with no complaint, so sabotage must show that)
+
+- [ ] **Step 4: Fix D3**
+
+Add the generator check and a catalog invariant test asserting no shipped type's
+`self_link` disagrees with its `base_url` collection. State the resulting type
+count in the report; if it is 232, say which type dropped and why.
+
+- [ ] **Step 5: Fix the drift test's parse**
+
+`TestRuntimeOperationPlaceholdersMatchesTheRuntime` slices `await.go` from
+`operationRequestURL` to END OF FILE and plain-text `strings.Contains`, so it
+matches comments and unrelated later functions. Bound it to the function body,
+or parse with `go/ast` rather than text. It must fail when the function stops
+setting a placeholder the generator claims.
+
+- [ ] **Step 6: Full suite, then sabotage**
+
+One sabotage per fix, each leaving the code compiling, each restored by
+re-applying:
+1. Revert D1 to `op["name"]` -- Step 1's reachability arm must fail.
+2. Revert D2's collection check -- Step 3's bare-capture test must fail.
+3. Revert D3's generator refusal -- Step 4's catalog test must fail.
+4. Reformat `operationRequestURL` so the old text search would have matched a
+   comment -- Step 5's test must still behave correctly.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add internal/gcprov/await.go internal/gcprov/crud.go internal/gen/build.go \
+        internal/gcprov/await_test.go internal/gcprov/crud_test.go \
+        internal/gen/build_test.go internal/catalog/real_test.go \
+        internal/catalog/catalog.json.gz gen/warnings.txt
+git commit -m "Make an id prove it names the thing we created"
+```
