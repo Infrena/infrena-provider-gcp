@@ -6225,17 +6225,28 @@ func TestTheHostAcceptsTheWholeCatalog(t *testing.T) {
 	}
 	defer host.Close()
 	defs := host.Definitions()
-	if len(defs) < 300 {
-		t.Fatalf("the host sees %d types; the catalog should have roughly 500", len(defs))
+	// 200, not 300, and certainly not the "roughly 500" an early draft of the
+	// spec guessed before anything had been generated. The real catalog
+	// measured 233 on 2026-09-22; 200 is below that with room for ordinary
+	// drift in Google's own Discovery documents, and high enough to catch a
+	// whole API failing to fetch. TestTheRealCatalogIsOneInfrenaAccepts uses
+	// the same floor for the same reason.
+	if len(defs) < 200 {
+		t.Fatalf("the host sees %d types; the catalog measured 233, so below 200 means something broke", len(defs))
 	}
+	// gcp.compute.instance, NOT gcp.network. compute's Network and Subnetwork
+	// are tier-2 on unruled hooks and do not ship at all, so asserting on
+	// gcp.network fails immediately and for a reason that has nothing to do
+	// with the host. gcp.compute.instance is in discover_default and is pinned
+	// by TestDiscoverDefaultNamesOnlyTypesWeServe, so this cannot rot silently.
 	var found bool
 	for _, d := range defs {
-		if d.Type == "gcp.network" {
+		if d.Type == "gcp.compute.instance" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("gcp.network is not among the types the host sees")
+		t.Error("gcp.compute.instance is not among the types the host sees")
 	}
 }
 ```
