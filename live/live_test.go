@@ -1018,6 +1018,212 @@ resources:
 	}
 }
 
+// TestLiveTagBindingOnASeededTag is the only way to find out what the real API
+// does with a tag binding, and it exists because TestLiveTagTypes cannot tell
+// us.
+//
+// THE PROBLEM IT SOLVES. gcp.tagkey fails its create first (the ProviderID
+// defect), infrena correctly skips everything that depended on it, and the
+// binding is never attempted at all:
+//
+//	Creating tagkey... failed (0.9s)
+//	Creating binding... skipped
+//	Creating tagvalue... skipped
+//
+// So the run that was supposed to measure the binding measured nothing about
+// it. The defect has only ever been seen through sabotage against our own
+// fake, and a fake's answer to "what does the id come out as" is whatever the
+// fake was told to answer.
+//
+// THE TAG KEY AND VALUE ARE SEEDED DIRECTLY THROUGH THE API, not by infrena,
+// so the one broken create cannot hide the thing under test. They are free,
+// they are torn down by the same sweep, and seeding them is the only way to
+// reach a path that is otherwise unreachable through this provider today.
+func TestLiveTagBindingOnASeededTag(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	n.tagKey = "infrena-seed-" + n.run
+	g := newGoogle(t, project, sa)
+
+	number, err := g.projectNumber(t.Context(), project)
+	if err != nil {
+		t.Fatalf("reading the project number, which a tag binding's parent must carry: %v", err)
+	}
+
+	// Registered BEFORE anything is seeded, so a half-finished seed is still
+	// cleaned up.
+	registerTagSweep(t, g, project, n.tagKey)
+	tagValue := g.seedTag(t, project, n.tagKey, "bound")
+	t.Logf("seeded %s under a tag key with short name %s", tagValue, n.tagKey)
+
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", fmt.Sprintf(`project: infrena-gcp-live-binding
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    impersonate_service_account: %[3]s
+resources:
+  binding:
+    type: gcp.tagbinding
+    # A FULL resource name carrying the project NUMBER. cloudresourcemanager
+    # rejects the project id here, which is worth knowing: it is the one
+    # place in this whole suite where the id and the number are not
+    # interchangeable.
+    parent: //cloudresourcemanager.googleapis.com/projects/%[4]s
+    # A literal, because the tag value was seeded rather than managed.
+    tagValue: %[5]s
+`, project, region, sa, number, tagValue))
+
+	r := run(t, dir, "apply", "live", "--auto-approve")
+	t.Logf("apply:\n%s", r.combined())
+
+	// AN ENVIRONMENT GAP, NOT A PROVIDER DEFECT, and the difference matters
+	// enough to skip rather than fail.
+	//
+	// Measured 2026-09-22: the live service account holds
+	// roles/resourcemanager.tagAdmin, which grants tag KEY and VALUE admin
+	// and does NOT grant
+	// resourcemanager.hierarchyNodes.createTagBinding/listTagBindings on the
+	// project being tagged. Those come from roles/resourcemanager.tagUser,
+	// held on the TARGET resource. So the seeding above succeeds and the
+	// binding itself is refused:
+	//
+	//	x create binding: gcp: The caller does not have permission (403 PERMISSION_DENIED)
+	//
+	// Failing here would report a missing IAM grant as a bug in this
+	// provider, which is the one thing a live suite must never do. The skip
+	// names the grant so it is one command to fix, and the message is
+	// greppable for the same reason LIVE SKIPPED is.
+	if strings.Contains(r.combined(), "PERMISSION_DENIED") {
+		t.Skipf("LIVE SKIPPED: the tag binding path cannot be measured in this project. "+
+			"%s can create tag keys and values but not bind one to the project. Grant it with:\n"+
+			"  gcloud projects add-iam-policy-binding %s \\\n"+
+			"    --member=serviceAccount:%s --role=roles/resourcemanager.tagUser\n"+
+			"IAM here took over a minute to propagate, so retry before concluding anything.\n%s",
+			sa, project, sa, r.combined())
+	}
+
+	// WHAT GOOGLE ACTUALLY NAMES IT, read straight from the API, so every
+	// comparison below is against what exists rather than what the provider
+	// believes.
+	realID, err := g.findTagBinding(t.Context(), number, n.tagKey)
+	if err != nil {
+		t.Fatalf("listing tag bindings on the project: %v", err)
+	}
+	if realID == "" {
+		t.Fatalf("no tag binding on the project carries this run's tag, so the create did not "+
+			"reach Google at all:\n%s", r.combined())
+	}
+	t.Logf("GOOGLE NAMES THE BINDING: %q", realID)
+
+	if r.ExitCode != exitChanges {
+		t.Fatalf("applying the tag binding: exit %d\n%s", r.ExitCode, r.combined())
+	}
+
+	binding, ok := stateOf(t, dir)["binding"]
+	if !ok {
+		t.Fatalf("no binding in state: %v", keysOf(stateOf(t, dir)))
+	}
+	t.Logf("THE PROVIDER RECORDS:       %q", binding.ProviderID)
+	if binding.ProviderID != realID {
+		t.Errorf("the binding's provider id is %q; Google names it %q", binding.ProviderID, realID)
+	}
+
+	// The read-by-listing path is the claim this type is here for: Read has
+	// no get url to build, so it must find the binding by listing the
+	// project. A clean second plan is the only thing that proves it did.
+	if r := run(t, dir, "plan", "live"); r.ExitCode != exitOK {
+		out := filepath.Join(t.TempDir(), "plan.json")
+		run(t, dir, "plan", "live", "--output", out)
+		for _, c := range planChanges(t, out) {
+			t.Errorf("the plan right after creating the tag binding proposes a %s of %s because of %v",
+				c.Kind, c.Address, c.Reasons)
+		}
+		t.Errorf("the plan right after the tag binding apply is not clean (exit %d):\n%s",
+			r.ExitCode, r.combined())
+	}
+
+	write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+	if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges {
+		t.Errorf("destroying the tag binding: exit %d\n%s", r.ExitCode, r.combined())
+	}
+}
+
+// seedTag creates a tag key and one value under it, directly through Cloud
+// Resource Manager, and returns the value's own generated name
+// ("tagValues/281479..."). Both creates are google.longrunning.Operations and
+// both are waited out.
+func (g *google) seedTag(t *testing.T, project, keyShortName, valueShortName string) string {
+	t.Helper()
+	key := g.createAndAwaitLRO(t, g.crmURL("tagKeys"),
+		map[string]any{"parent": "projects/" + project, "shortName": keyShortName})
+	name, _ := key["name"].(string)
+	if name == "" {
+		t.Fatalf("seeding the tag key produced no name: %v", key)
+	}
+	value := g.createAndAwaitLRO(t, g.crmURL("tagValues"),
+		map[string]any{"parent": name, "shortName": valueShortName})
+	valueName, _ := value["name"].(string)
+	if valueName == "" {
+		t.Fatalf("seeding the tag value produced no name: %v", value)
+	}
+	return valueName
+}
+
+// createAndAwaitLRO POSTs, then polls the google.longrunning.Operation the
+// POST returned until it is done, and returns the operation's `response`.
+func (g *google) createAndAwaitLRO(t *testing.T, url string, body any) map[string]any {
+	t.Helper()
+	ctx := t.Context()
+	code, data, _, err := g.do(ctx, http.MethodPost, url, body)
+	if err != nil {
+		t.Fatalf("POST %s: %v", url, err)
+	}
+	if code >= 300 {
+		t.Fatalf("POST %s: %d: %s", url, code, data)
+	}
+	deadline := time.Now().Add(3 * time.Minute)
+	for {
+		var op struct {
+			Name     string         `json:"name"`
+			Done     bool           `json:"done"`
+			Response map[string]any `json:"response"`
+			Error    any            `json:"error"`
+		}
+		if err := json.Unmarshal(data, &op); err != nil {
+			t.Fatalf("decoding the operation from %s: %v", url, err)
+		}
+		if op.Done {
+			if op.Error != nil {
+				t.Fatalf("seeding through %s failed: %v", url, op.Error)
+			}
+			return op.Response
+		}
+		if op.Name == "" {
+			// Not an operation at all: the API answered with the resource.
+			var direct map[string]any
+			if json.Unmarshal(data, &direct) == nil {
+				return direct
+			}
+			t.Fatalf("POST %s answered neither an operation nor a resource: %s", url, data)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the seed operation %s never finished", op.Name)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("waiting for %s: %v", op.Name, ctx.Err())
+		case <-time.After(2 * time.Second):
+		}
+		if _, data, err = g.get(ctx, g.crmURL(op.Name)); err != nil {
+			t.Fatalf("polling %s: %v", op.Name, err)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Retry-After (spec §5.6, decision G7).
 // ---------------------------------------------------------------------------
