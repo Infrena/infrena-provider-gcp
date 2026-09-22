@@ -309,6 +309,27 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 	if err != nil {
 		return nil, err
 	}
+
+	// A type with no get method at all cannot be read by building an item
+	// url, because there is no url to build: cloudresourcemanager v3's
+	// tagBindings publishes create, delete and list and nothing else. Spec
+	// G6's ruling records that as read_via, and this is the one place it is
+	// consulted -- Import comes through Read, so adopting a tag binding works
+	// for the same reason a refresh of one does. The listing is authoritative
+	// about absence in its own right, so it does not go through the 404
+	// retry below: there is no 404 to retry, only an entry that is or is not
+	// in a parent's list.
+	if ty.ReadVia == ReadViaListByParent {
+		body, err := p.readByListingParent(ctx, ty, current.ProviderID)
+		if err != nil {
+			return nil, err
+		}
+		if body == nil {
+			return nil, nil // believed absent
+		}
+		return p.stateFromListing(ty, current, attrs, body)
+	}
+
 	reqURL, err := p.itemURL(ty, "", current.ProviderID, attrs)
 	if err != nil {
 		return nil, err

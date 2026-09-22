@@ -202,7 +202,15 @@ func pointCatalogAt(c *catalog.Catalog, base string) *catalog.Catalog {
 		cp.APIBaseURL = base
 		types[i] = &cp
 	}
-	return &catalog.Catalog{Generated: c.Generated, MMV1Commit: c.MMV1Commit, Types: types}
+	// DiscoverDefault travels too: discovery's fallback reads its type list
+	// off the catalog, so a copy that dropped it would make every fallback
+	// test scan nothing while looking like it had scanned everything.
+	return &catalog.Catalog{
+		Generated:       c.Generated,
+		MMV1Commit:      c.MMV1Commit,
+		Types:           types,
+		DiscoverDefault: c.DiscoverDefault,
+	}
 }
 
 // testProvider builds a Provider against the real embedded catalog, wired to
@@ -230,6 +238,11 @@ func testProviderWithCatalog(t *testing.T, s *gcpfake.Server, c *catalog.Catalog
 			Project:          "p",
 			Region:           "r",
 			DiscoverProjects: []string{"p"},
+			// Cloud Asset Inventory is the one API a Provider calls that has
+			// no catalog type to take a host from, so pointCatalogAt cannot
+			// redirect it and a discovery test would otherwise search the
+			// real cloudasset.googleapis.com. See Settings.AssetInventoryBaseURL.
+			AssetInventoryBaseURL: base,
 		},
 	}
 }

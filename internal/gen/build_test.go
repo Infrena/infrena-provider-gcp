@@ -1281,3 +1281,39 @@ properties:
 		t.Errorf("the warning names neither template it refused over: %q", said)
 	}
 }
+
+// TestHierarchyRootIsTheLiteralPathSegment. ParentRoot is compared at
+// runtime against the head of a Cloud Asset Inventory resource name
+// ("folders/123/locations/..."), so it must be the segment verbatim.
+// scopeSegment, which feeds the assigned type NAME, answers the same
+// question in the singular and lowercased ("folder"), and folding the two
+// together would make every comparison fail silently -- discovery would drop
+// every folder-, organization- and billing-account-scoped resource rather
+// than mislabel it, which is quieter and just as wrong.
+func TestHierarchyRootIsTheLiteralPathSegment(t *testing.T) {
+	cases := map[string]string{
+		"projects":        "projects",
+		"organizations":   "organizations",
+		"folders":         "folders",
+		"billingAccounts": "billingAccounts",
+		"buckets":         "",
+		"":                "",
+	}
+	for first, want := range cases {
+		var path []string
+		if first != "" {
+			path = []string{first, "things"}
+		}
+		if got := hierarchyRoot(path); got != want {
+			t.Errorf("hierarchyRoot(%v) = %q, want %q", path, got, want)
+		}
+	}
+	if got := hierarchyRoot(nil); got != "" {
+		t.Errorf("hierarchyRoot(nil) = %q", got)
+	}
+	// The two functions answer for the same input and must not be confused
+	// for one another.
+	if hierarchyRoot([]string{"folders", "x"}) == scopeSegment([]string{"folders", "x"}) {
+		t.Error("hierarchyRoot and scopeSegment now agree, so one of them is answering the wrong question")
+	}
+}

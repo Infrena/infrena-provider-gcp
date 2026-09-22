@@ -172,6 +172,63 @@ func TestDiscoverDefaultNamesOnlyTypesWeServe(t *testing.T) {
 			t.Errorf("discover_default names %q, which the catalog does not serve", name)
 		}
 	}
+
+	// And it must actually REACH the runtime. The overlay is a
+	// generator-time input; discovery's fallback reads the list off the
+	// catalog it already loads, so a generator that stopped copying it would
+	// leave the fallback with nothing to scan and report every project as
+	// empty, while this test's loop above went on passing.
+	if len(c.DiscoverDefault) != len(overlay.DiscoverDefault) {
+		t.Fatalf("the catalog carries %d discover_default entries, the overlay names %d",
+			len(c.DiscoverDefault), len(overlay.DiscoverDefault))
+	}
+	for i, name := range overlay.DiscoverDefault {
+		if c.DiscoverDefault[i] != name {
+			t.Errorf("discover_default[%d] is %q in the catalog and %q in the overlay",
+				i, c.DiscoverDefault[i], name)
+		}
+	}
+}
+
+// TestEveryTypeRecordsWhereItsNamesBegin. ParentRoot is what tells two
+// catalog types sharing one CAI asset type apart when their url templates
+// are identical, which 13 of the 27 shared asset types' are. It must be the
+// literal first segment of the type's own resource names, never the singular
+// lowercased form scopeSegment produces for type NAMES -- comparing
+// "folders/123/..." against "folder" matches nothing, silently, and every
+// resource of those types is dropped from discovery.
+func TestParentRootIsARealHierarchySegment(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowed := map[string]bool{
+		"": true, "projects": true, "organizations": true, "folders": true, "billingAccounts": true,
+	}
+	counts := map[string]int{}
+	for _, ty := range c.Types {
+		if !allowed[ty.ParentRoot] {
+			t.Errorf("%s: parent_root %q is not a hierarchy segment", ty.Name, ty.ParentRoot)
+		}
+		counts[ty.ParentRoot]++
+	}
+	if counts["projects"] == 0 || counts["folders"] == 0 || counts["organizations"] == 0 {
+		t.Errorf("parent_root is not being recorded: %v", counts)
+	}
+	// A type whose assigned NAME says it is folder- or organization-scoped
+	// must have the matching root: those are exactly the parent variants that
+	// share an asset type with their project-scoped sibling, and a mismatch
+	// between the two is what would put a folder's log bucket under
+	// gcp.logging.bucket.
+	for _, ty := range c.Types {
+		for segment, root := range map[string]string{
+			".folder.": "folders", ".organization.": "organizations", ".billingaccount.": "billingAccounts",
+		} {
+			if strings.Contains(ty.Name, segment) && ty.ParentRoot != root {
+				t.Errorf("%s is named as %s-scoped but its parent_root is %q", ty.Name, root, ty.ParentRoot)
+			}
+		}
+	}
 }
 
 // TestNoStoredTemplateCarriesAnAPIVersion. The absolute URL is APIBaseURL +
