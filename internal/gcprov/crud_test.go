@@ -279,3 +279,61 @@ func TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder(t *testing.T) {
 		t.Errorf("the provider id %q still carries the host or the api version", got)
 	}
 }
+
+// widgetCatalogAwaitingComputeOperation is the compute-style counterpart of
+// widgetCatalogAwaitingLongRunning: the mutation answers with a compute
+// operation ({"name","status","selfLink","targetLink"}) that must be waited
+// on, and only then does the created resource have an identity. widgetType's
+// own self_link ends in "{{name}}", the shape 13 of the 65 real
+// compute-style types have, so this fixture exercises both ways the old
+// return was wrong at once.
+func widgetCatalogAwaitingComputeOperation() *catalog.Catalog {
+	ty := widgetType()
+	ty.Await = catalog.AwaitComputeOperation
+	ty.OperationWaitPath = "projects/{project}/regions/{region}/operations/{operation}/wait"
+	return &catalog.Catalog{Types: []*catalog.Type{ty}}
+}
+
+// TestCreatingThroughAComputeOperationIdentifiesTheResourceNotTheOperation.
+// Create derives the provider id from what the await handed back, twice
+// (readAfterCreate and bestEffortState). When that was the operation itself,
+// the id named ".../operations/op-1" and every later Read, Delete and Import
+// addressed the operation instead of the resource -- and because the fake
+// answers a GET of an operation it knows, the readback even succeeded,
+// storing a state that points at the wrong thing forever.
+func TestCreatingThroughAComputeOperationIdentifiesTheResourceNotTheOperation(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	p := testProviderWithCatalog(t, s, widgetCatalogAwaitingComputeOperation())
+
+	st, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.widget",
+		Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one", "sizeGb": int64(10)}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("Create returned (nil, nil), which orphans the resource it just made")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the widget's own name", st.ProviderID)
+	}
+	if strings.Contains(st.ProviderID, "operations") {
+		t.Errorf("the provider id names the operation rather than what it created: %q", st.ProviderID)
+	}
+	// The id is only useful if it addresses something: a Read of it must find
+	// the widget, not the operation the fake would also happily answer for.
+	back, err := p.Read(context.Background(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back == nil {
+		t.Fatal("the created resource cannot be read back by the id Create reported")
+	}
+	if got := back.Attributes["sizeGb"]; got.Raw != int64(10) {
+		t.Errorf("the id addressed something other than the widget: read back %v", back.Attributes)
+	}
+}
