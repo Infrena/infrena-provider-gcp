@@ -224,3 +224,60 @@ func TestEveryTypeComposesAVersionedURL(t *testing.T) {
 		}
 	}
 }
+
+// TestNoShippedTypeReadsAnotherCollectionThanItCreatesIn. self_link is the
+// provider-id template and base_url (or create_url) is where a create POSTs.
+// If the id is not inside the collection the create posted to, the type
+// creates one resource and addresses another: the resource exists at the url
+// the POST went to, while the id that gets stored -- and that every later
+// Read, Update and Delete uses -- names something else. Every create of such
+// a type orphans.
+//
+// gcp.vpngateway was exactly that, posting to compute's targetVpnGateways
+// (classic VPN) while its id named vpnGateways (HA VPN), and it was the only
+// one of the 233: the generator had paired a magic-modules base_url with a
+// Discovery get path from a different collection. internal/gen refuses to
+// build such a type now; this is the assertion that the shipped catalog has
+// none, wherever a future one might come from.
+//
+// A template carrying a reserved "{+x}" capture is exempt, and that is not a
+// loophole: such a capture swallows any number of segments, so two of them
+// cannot disagree about a path neither one spells. 88 of the 233 are in that
+// position, and the runtime is where they get checked -- against the id GCP
+// actually answers with, at create time (outsideCreatedCollection,
+// internal/gcprov/crud.go).
+func TestNoShippedTypeReadsAnotherCollectionThanItCreatesIn(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	placeholder := regexp.MustCompile(`\{\{[^{}]+\}\}|\{[^{}]+\}`)
+	shape := func(tmpl string) string { return placeholder.ReplaceAllString(tmpl, "\x00") }
+	var compared int
+	for _, ty := range c.Types {
+		coll := ty.CreateURL
+		if coll == "" {
+			coll = ty.BaseURL
+		}
+		if i := strings.IndexByte(coll, '?'); i >= 0 {
+			coll = coll[:i]
+		}
+		coll = strings.TrimSuffix(coll, "/")
+		if coll == "" || ty.SelfLink == "" ||
+			strings.Contains(coll, "{+") || strings.Contains(ty.SelfLink, "{+") {
+			continue
+		}
+		compared++
+		self, want := shape(ty.SelfLink), shape(coll)
+		if self != want && !strings.HasPrefix(self, want+"/") {
+			t.Errorf("%s creates in %q but its id names %q, so every create orphans",
+				ty.Name, coll, ty.SelfLink)
+		}
+	}
+	// 144 of the 233 types were comparable on 2026-09-22 (the rest carry a
+	// whole-path capture on one side or the other). A run that compared
+	// nothing would pass this test while asserting nothing at all.
+	if compared < 100 {
+		t.Errorf("only %d types had two comparable templates; 144 did on 2026-09-22, so this test is no longer asserting what it says", compared)
+	}
+}

@@ -198,10 +198,14 @@ func (s *Server) newComputeOp(path string, result map[string]any, isDelete bool)
 	defer s.mu.Unlock()
 	s.opCounter++
 	name := fmt.Sprintf("op-%d", s.opCounter)
+	target := path
+	if s.opTargetPath != "" {
+		target = s.opTargetPath
+	}
 	op := &computeOp{
 		name:       name,
 		selfLink:   s.computeOpSelfLink(path, name),
-		targetLink: s.absolute(path),
+		targetLink: s.absolute(target),
 	}
 	if !isDelete {
 		op.response = cloneMap(result)
@@ -259,6 +263,26 @@ func afterFirstSegment(path string) string {
 		return rest[i+1:]
 	}
 	return ""
+}
+
+// AnswerComputeOperationTargetsAt makes every compute operation report path
+// as its targetLink, whatever the mutation actually created. The operation
+// itself is unchanged: it still completes, and the resource the create asked
+// for is still stored where it was posted.
+//
+// This is not a contrivance either. An operation's targetLink is whatever
+// url its own API chose to publish, and a caller that treats it as the
+// identity of the thing it just made is trusting the API to have named the
+// right resource. One type in the shipped catalog (gcp.vpngateway) posts to
+// targetVpnGateways while its own id template names vpnGateways, so a target
+// naming a resource in a DIFFERENT collection is a shape the real corpus
+// produces -- and for the 83 types whose self_link is a bare capture, a
+// wrong target parses as happily as a right one. A test cannot show that a
+// wrong target is refused unless it can produce one on purpose.
+func (s *Server) AnswerComputeOperationTargetsAt(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.opTargetPath = path
 }
 
 // AnswerComputeOperationLinksUnder makes every compute operation report its

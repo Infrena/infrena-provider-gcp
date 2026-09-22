@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,6 +59,11 @@ func (p *Provider) await(ctx context.Context, ty *catalog.Type, resp map[string]
 // reserved expansion -- an operation name is a path containing "/" -- which
 // ExpandURL (Task 11) already handles unescaped.
 func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op map[string]any) (map[string]any, error) {
+	// op["name"], deliberately and unlike the compute-style path, which fills
+	// the same placeholder from the operation's selfLink instead: a
+	// google.longrunning.Operation's name IS its full relative resource name,
+	// which is exactly what operations.get takes. See operationResourcePath
+	// for what happens when the two are confused for each other.
 	name, _ := op["name"].(string)
 	if name == "" {
 		return nil, fmt.Errorf("%s: operation has no name to poll", ty.Name)
@@ -173,6 +179,10 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 // API's poll path, e.g. container) -- ExpandURL handles whichever the
 // template actually names, and errors by placeholder name by itself when one
 // it does need is missing, so this does not duplicate that validation.
+//
+// What "name" is filled WITH is the one thing this cannot delegate: see
+// operationResourcePath, and the refusal below for when even that has
+// nothing that addresses an operation.
 func (p *Provider) operationRequestURL(ty *catalog.Type, op map[string]any) (method, url string, err error) {
 	name, _ := op["name"].(string)
 	if name == "" {
@@ -191,8 +201,18 @@ func (p *Provider) operationRequestURL(ty *catalog.Type, op map[string]any) (met
 
 	attrs := map[string]value.Value{
 		"operation": value.String(name, value.SourceProvider),
-		"name":      value.String(name, value.SourceProvider),
+		"name":      value.String(operationResourcePath(ty, op), value.SourceProvider),
 		"project":   value.String(p.settings.Project, value.SourceProvider),
+	}
+	// A template that captures the whole path under "name" is asking for the
+	// operation's own relative resource name. If all we have is the bare id,
+	// the url would expand to something like "v1/operation-1740000000000",
+	// which addresses nothing: every poll 404s, and a 404 on a plausible url
+	// is a worse diagnostic than a named error. So say what is missing.
+	if placeholderNames(tmpl)["name"] && !addressesAnOperation(attrs["name"].Raw.(string)) {
+		return "", "", fmt.Errorf("%s: %q needs the operation's own resource name, but the operation "+
+			"reports only the id %q and no selfLink this type's api prefix can reduce",
+			ty.Name, tmpl, name)
 	}
 	if zone := lastPathSegment(op["zone"]); zone != "" {
 		attrs["zone"] = value.String(zone, value.SourceProvider)
@@ -220,6 +240,59 @@ func (p *Provider) operationRequestURL(ty *catalog.Type, op map[string]any) (met
 	// prefix would send all 7 of them to a doubled ".../v1/v1/..." url. Same
 	// reasoning as awaitLongRunning's own poll above.
 	return method, ty.APIBaseURL + rel, nil
+}
+
+// operationResourcePath is what a compute-style operation template's "name"
+// placeholder must be filled with: the operation's OWN relative resource
+// name, taken from the selfLink the operation publishes for itself and
+// reduced by this type's api prefix (reduceSelfLink, ids.go -- the same
+// reduction a created resource's id goes through, not a hand-rolled slice).
+//
+// THIS IS WHERE THE TWO AWAIT STRATEGIES GENUINELY DIFFER, and the difference
+// is not a style choice. For a google.longrunning.Operation, "name" IS the
+// operation's full relative resource name, so awaitLongRunning fills its own
+// "{+name}" from op["name"] and is correct to. A compute-style operation's
+// "name" is something else entirely: compute, container and sqladmin all
+// document it as the server-assigned ID -- "Output only. The server-assigned
+// ID for the operation." (schemas/container.json), confirmed by container's
+// own deprecated "operationId" parameter, described as "the server-assigned
+// `name` of the operation". container's projects.locations.operations.get
+// then demands its "name" parameter match
+// "^projects/[^/]+/locations/[^/]+/operations/[^/]+$", which a bare id can
+// never satisfy. Handing both strategies op["name"] gave gcp.container.cluster
+// and gcp.container.nodepool a poll url of "v1/operation-1740000000000" and
+// failed every GKE mutation at the polling step.
+//
+// Only 2 of the 65 compute-style types name "name" in their template at all
+// (both container's); the other 63 fill {operation}/{project}/{zone}/{region}
+// and never read this. All three APIs publish Operation.selfLink, so the
+// reduction has something to work from in every case that needs it.
+//
+// The fallback to the bare id is deliberate but narrow: for the 63 templates
+// that do not capture a path it is exactly right, and for the two that do,
+// operationRequestURL refuses the url rather than sending a plausible one.
+func operationResourcePath(ty *catalog.Type, op map[string]any) string {
+	name, _ := op["name"].(string)
+	if raw, _ := op["selfLink"].(string); raw != "" {
+		if rel, err := reduceSelfLink(ty, raw); err == nil {
+			return rel
+		}
+	}
+	return name
+}
+
+// addressesAnOperation reports whether rel names an operation rather than
+// merely being a string a template will happily swallow: a path of more than
+// one segment, one of which is the literal "operations". That literal is the
+// wire segment every operations collection in the corpus uses -- Discovery's
+// "globalOperations"/"zoneOperations" are collection NAMES and never appear
+// in a url (see operationRequestURL).
+func addressesAnOperation(rel string) bool {
+	segs := strings.Split(strings.Trim(rel, "/"), "/")
+	if len(segs) < 2 {
+		return false
+	}
+	return slices.Contains(segs, "operations")
 }
 
 // lastPathSegment returns v's trailing "/"-delimited segment, or v itself

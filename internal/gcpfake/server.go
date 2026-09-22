@@ -80,6 +80,10 @@ type Server struct {
 	// opLinkVersion replaces the leading api version segment of a compute
 	// operation's own selfLink and targetLink, for AnswerComputeOperationLinksUnder.
 	opLinkVersion string
+	// opTargetPath replaces the path a compute operation reports as its
+	// targetLink, whatever was really created, for
+	// AnswerComputeOperationTargetsAt.
+	opTargetPath string
 
 	failNext *apiErrorSpec
 	requests []Request

@@ -2,6 +2,8 @@ package gcprov
 
 import (
 	"context"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -504,4 +506,161 @@ func TestCreateSurvivesAReadbackItCannotReduce(t *testing.T) {
 	if !ok || got["selfLink"] != unreducible {
 		t.Fatalf("the readback never saw the unreducible selfLink, so this test proves nothing: %v", got)
 	}
+}
+
+// widgetCatalogWithABareCaptureID is the shape 83 of the 233 shipped types
+// have: a self_link that is nothing but a whole-path capture. ParseProviderID
+// accepts ANY string against one of those, so a wrong id is not caught
+// anywhere downstream -- it is simply stored, and the next Delete addresses
+// whatever it named. Its "name" attribute is the full relative resource name,
+// which is what such a type's id template means by name (gcp.container.cluster
+// works exactly this way).
+func widgetCatalogWithABareCaptureID() *catalog.Catalog {
+	ty := widgetType()
+	ty.Await = catalog.AwaitComputeOperation
+	ty.OperationWaitPath = "projects/{project}/regions/{region}/operations/{operation}/wait"
+	ty.SelfLink = "{+name}"
+	ty.ImportFormat = "{+name}"
+	return &catalog.Catalog{Types: []*catalog.Type{ty}}
+}
+
+// TestACreateRefusesAnIDNamingAResourceItDidNotCreate. An operation's
+// targetLink is whatever url its own API published, and reducing it cleanly
+// says only that it is well-formed, not that it names the thing that was just
+// created. This is the literal-segment half: the id parses out of the
+// response fine, and the failure lands later, in ParseProviderID, as
+// "created, but the resource cannot be read back" -- an error after a
+// successful POST, which is exactly what the orphan rule forbids.
+func TestACreateRefusesAnIDNamingAResourceItDidNotCreate(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.AnswerComputeOperationTargetsAt("/v1/projects/p/locations/r/gadgets/one")
+	p := testProviderWithCatalog(t, s, widgetCatalogAwaitingComputeOperation())
+
+	var st *resource.ResourceState
+	var err error
+	stderr := captureStderr(t, func() {
+		st, err = p.Create(context.Background(), &resource.DesiredResource{
+			Type:  "gcp.widget",
+			Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one", "sizeGb": int64(10)}),
+		})
+	})
+	if err != nil {
+		t.Fatalf("Create errored for a resource GCP already made, which orphans it: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one the caller's attributes imply", st.ProviderID)
+	}
+	if !strings.Contains(stderr, "gadgets") {
+		t.Errorf("nothing was said about the target that named another resource; stderr was %q", stderr)
+	}
+}
+
+// TestACreateRefusesABareCaptureIDNamingAnotherCollection is the same defect
+// where nothing downstream can catch it. With a self_link of "{+name}",
+// ParseProviderID accepts the wrong id, itemURL expands it straight into a
+// url, and the create succeeds reporting an id that names someone else's
+// resource -- silently, with no stderr line and no failed read to give it
+// away. The id is checked against the collection the POST went to, which is
+// the only thing here that knows the difference.
+func TestACreateRefusesABareCaptureIDNamingAnotherCollection(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.AnswerComputeOperationTargetsAt("/v1/projects/p/locations/r/gadgets/one")
+	c := widgetCatalogWithABareCaptureID()
+	p := testProviderWithCatalog(t, s, c)
+
+	// Non-vacuity: if this type's own id template rejected the wrong id, the
+	// collection check would not be what saves it and this test would prove
+	// nothing.
+	if _, err := ParseProviderID(c.Types[0], "projects/p/locations/r/gadgets/one"); err != nil {
+		t.Fatalf("this type's id template refuses the wrong id by itself: %v", err)
+	}
+
+	var st *resource.ResourceState
+	var err error
+	stderr := captureStderr(t, func() {
+		st, err = p.Create(context.Background(), &resource.DesiredResource{
+			Type: "gcp.widget",
+			Attrs: attrsMixed(map[string]any{
+				"project": "p", "region": "r",
+				"name": "projects/p/locations/r/widgets/one", "sizeGb": int64(10),
+			}),
+		})
+	})
+	if err != nil {
+		t.Fatalf("Create errored for a resource GCP already made, which orphans it: %v", err)
+	}
+	if st == nil {
+		t.Fatal("Create returned no state for a resource that exists")
+	}
+	if strings.Contains(st.ProviderID, "gadgets") {
+		t.Errorf("the create adopted an id naming a resource it did not make: %q", st.ProviderID)
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q, want the one the caller's attributes imply", st.ProviderID)
+	}
+	if !strings.Contains(stderr, "gadgets") {
+		t.Errorf("a wrong id was replaced without a word about it; stderr was %q", stderr)
+	}
+}
+
+// TestAnIDTheCreateReallyMadeIsKeptAsIs is the other side of the two tests
+// above: the check must not fire on the ordinary case, where the operation's
+// target names exactly what was created. If it did, every create would quietly
+// fall back to the attributes and the stderr line would mean nothing.
+func TestAnIDTheCreateReallyMadeIsKeptAsIs(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	p := testProviderWithCatalog(t, s, widgetCatalogAwaitingComputeOperation())
+
+	var st *resource.ResourceState
+	var err error
+	stderr := captureStderr(t, func() {
+		st, err = p.Create(context.Background(), &resource.DesiredResource{
+			Type:  "gcp.widget",
+			Attrs: attrsMixed(map[string]any{"project": "p", "region": "r", "name": "one"}),
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/one" {
+		t.Errorf("provider id = %q", st.ProviderID)
+	}
+	if stderr != "" {
+		t.Errorf("a create whose target names exactly what it made complained anyway: %q", stderr)
+	}
+}
+
+// captureStderr runs f with os.Stderr redirected, and returns what it wrote.
+// The fallback paths in Create report on stderr rather than returning an
+// error (an error after a successful POST orphans the resource), so the
+// stderr line IS the observable behaviour and a test that cannot read it
+// cannot tell a silent wrong answer from a reported one.
+func captureStderr(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := os.Stderr
+	os.Stderr = w
+	f()
+	os.Stderr = orig
+	w.Close()
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
 }
