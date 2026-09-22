@@ -1119,8 +1119,40 @@ resources:
 	}
 	t.Logf("GOOGLE NAMES THE BINDING: %q", realID)
 
+	// THE READ PATH IS MEASURED WHETHER OR NOT THE CREATE SUCCEEDED, and
+	// that ordering is deliberate. The binding above is REAL -- Google just
+	// named it -- even when the apply reported a failure, because the create
+	// succeeds and the await rejects the answer (see below). Import goes
+	// through the same Read, so it exercises readByListingParent against a
+	// binding that genuinely exists. Bailing out on the apply's exit code
+	// would throw away the only chance to ask the question.
+	t.Run("read_by_listing_the_parent", func(t *testing.T) {
+		adopt := t.TempDir()
+		write(t, adopt, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+		r := run(t, adopt, "import", "live", "gcp.tagbinding."+realID)
+		t.Logf("import of the real binding id:\n%s", r.combined())
+		if r.ExitCode != exitOK {
+			t.Errorf("a tag binding that EXISTS cannot be adopted by its own real id %q.\n"+
+				"gcp.tagbinding's read_via is list_by_parent, so this is the only read path the "+
+				"type has, and spec decision G6 requires the type at v1.0.\n%s", realID, r.combined())
+			return
+		}
+		st := stateOf(t, adopt)
+		if len(st) != 1 {
+			t.Errorf("import adopted %d resources, want the one binding: %v", len(st), keysOf(st))
+		}
+	})
+
 	if r.ExitCode != exitChanges {
-		t.Fatalf("applying the tag binding: exit %d\n%s", r.ExitCode, r.combined())
+		t.Errorf("applying the tag binding: exit %d.\n"+
+			"If this names \"operation has no name to poll\", it is NOT the ProviderID defect and "+
+			"it is a different bug: cloudresourcemanager answers tagBindings.create with an "+
+			"operation that is ALREADY done and carries no name, because there is nothing to "+
+			"poll -- {\"done\":true,\"response\":{...}} and no \"name\" key at all. "+
+			"awaitLongRunning checks name before it checks done, so it refuses an answer that is "+
+			"sitting right there, AFTER the binding has been created. Another orphan.\n%s",
+			r.ExitCode, r.combined())
+		return
 	}
 
 	binding, ok := stateOf(t, dir)["binding"]
@@ -1132,9 +1164,6 @@ resources:
 		t.Errorf("the binding's provider id is %q; Google names it %q", binding.ProviderID, realID)
 	}
 
-	// The read-by-listing path is the claim this type is here for: Read has
-	// no get url to build, so it must find the binding by listing the
-	// project. A clean second plan is the only thing that proves it did.
 	if r := run(t, dir, "plan", "live"); r.ExitCode != exitOK {
 		out := filepath.Join(t.TempDir(), "plan.json")
 		run(t, dir, "plan", "live", "--output", out)
