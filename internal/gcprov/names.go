@@ -212,3 +212,36 @@ func wireAliases(attrs map[string]*catalog.Attr, vals map[string]value.Value) ma
 	}
 	return out
 }
+
+// declaredIDAttrs translates the attributes ParseProviderID recovered from a
+// provider id into schema names, and DROPS the ones the type does not
+// declare.
+//
+// A provider id is a path, and its segments are named after url
+// PLACEHOLDERS, which are not the same namespace as a type's attributes:
+// gcp.channel's id names "{{project}}" and "{{location}}" and gcp.channel
+// declares neither, because the generator takes a type's attributes from its
+// API BODY schema and those two are path segments. Only 3 of the 233 shipped
+// types declare `project` at all.
+//
+// The host REFUSES a resource state carrying an attribute the plugin's own
+// schema does not declare -- "gcp returned attribute \"location\" on a
+// gcp.channel, which its own schema does not declare" -- and fails the
+// operation. It is not a warning and not a filter on its side: the create,
+// the refresh or the discovery walk that produced it fails outright. So
+// every path that turns an id back into attributes must come through here.
+//
+// Nothing is lost by dropping them. Every url this provider builds for an
+// existing resource is built from the provider id itself (see itemURL), not
+// from state, so the segments are still there when they are needed.
+func declaredIDAttrs(attrs map[string]*catalog.Attr, idAttrs map[string]value.Value) map[string]value.Value {
+	out := make(map[string]value.Value, len(idAttrs))
+	for k, v := range idAttrs {
+		name := toSchema(attrs, k)
+		if _, declared := attrs[name]; !declared {
+			continue
+		}
+		out[name] = v
+	}
+	return out
+}
