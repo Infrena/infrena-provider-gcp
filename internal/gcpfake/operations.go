@@ -3,6 +3,7 @@ package gcpfake
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // OperationStyle picks which of GCP's two asynchronous mutation shapes a
@@ -18,9 +19,11 @@ const (
 	// polled at GET <api>/v1/<name> until {"done": true, "response": {...}}
 	// or {"done": true, "error": {...}}.
 	OpLongRunning
-	// OpCompute: compute-style {"name", "status": "RUNNING"|"DONE"}, polled
-	// via the long-poll wait method on the type's operation scope
-	// (globalOperations, regionOperations or zoneOperations).
+	// OpCompute: compute-style {"name", "status": "RUNNING"|"DONE"}. Polled
+	// via the long-poll wait method (POST .../operations/<op>/wait) for the
+	// 58 of 65 compute-style types whose API publishes one; the other 7
+	// (container, sqladmin) publish none and are polled with an ordinary GET
+	// instead, same body shape.
 	OpCompute
 )
 
@@ -186,14 +189,13 @@ func (s *Server) newComputeOp(path string, result map[string]any, isDelete bool)
 }
 
 // handleComputeWait answers the long-poll wait method for a compute-style
-// operation: unfinished forever under NeverCompleteOperations, otherwise
-// done on this very call. An operation name the fake has never seen -- not
-// created via a mutation, not registered with SeedComputeOperation -- 404s,
-// the same as handleGetOperation does for an unknown longrunning name. An
-// earlier version of this auto-vivified any unknown name as one that
-// completes successfully, on the reasoning that the fake's job is to answer
-// the wait, not to insist the operation was born through its own POST
-// handler. That reasoning does not survive contact with this package's own
+// operation. An operation name the fake has never seen -- not created via a
+// mutation, not registered with SeedComputeOperation -- 404s, the same as
+// handleGetOperation does for an unknown longrunning name. An earlier
+// version of this auto-vivified any unknown name as one that completes
+// successfully, on the reasoning that the fake's job is to answer the wait,
+// not to insist the operation was born through its own POST handler. That
+// reasoning does not survive contact with this package's own
 // declared-collections principle (server.go): inferring "this operation
 // exists" from the shape of a request the fake happens to receive is exactly
 // the kind of URL-shape guessing that principle rules out, and it meant a
@@ -205,27 +207,74 @@ func (s *Server) handleComputeWait(w http.ResponseWriter, r *http.Request) {
 		writeNotFound(w, r.URL.Path)
 		return
 	}
-	opName := m[2]
+	opName := m[1]
 
 	s.mu.Lock()
 	op, ok := s.computeOps[opName]
-	never := s.neverComplete
 	s.mu.Unlock()
 	if !ok {
 		writeNotFound(w, opName)
 		return
 	}
+	writeJSON(w, http.StatusOK, s.computeOperationBody(opName, op))
+}
 
-	if never {
-		writeJSON(w, http.StatusOK, map[string]any{"name": opName, "status": "RUNNING"})
+// computeOperationName reports whether path's last segment names a
+// registered compute-style operation -- the GET-poll counterpart of
+// operationName, for the 7 of 65 compute-style types (container, sqladmin)
+// whose API publishes no wait method at all and must be polled with an
+// ordinary GET instead. The operation id is the last path segment because
+// that is what both real shapes end in (sqladmin's
+// "v1/projects/{project}/operations/{operation}" and container's "v1/{+name}"
+// -- container's operation name is itself a path ending in "operations/<id>")
+// and what SeedComputeOperation and a mutation's own newComputeOp key
+// s.computeOps by.
+func (s *Server) computeOperationName(path string) (string, bool) {
+	trimmed := strings.TrimSuffix(path, "/")
+	i := strings.LastIndex(trimmed, "/")
+	if i < 0 || i == len(trimmed)-1 {
+		return "", false
+	}
+	name := trimmed[i+1:]
+	s.mu.Lock()
+	_, ok := s.computeOps[name]
+	s.mu.Unlock()
+	return name, ok
+}
+
+// handleGetComputeOperation answers a GET poll of a compute-style operation
+// whose API has no wait method -- the counterpart of handleGetOperation, for
+// the compute case. Same unknown-name handling as handleComputeWait: 404,
+// never auto-vivified.
+func (s *Server) handleGetComputeOperation(w http.ResponseWriter, name string) {
+	s.mu.Lock()
+	op, ok := s.computeOps[name]
+	s.mu.Unlock()
+	if !ok {
+		writeNotFound(w, name)
 		return
 	}
+	writeJSON(w, http.StatusOK, s.computeOperationBody(name, op))
+}
 
-	body := map[string]any{"name": opName, "status": "DONE"}
+// computeOperationBody builds the body a compute-style operation reports
+// once found, shared by the wait (POST) and poll (GET) paths -- their
+// completed and unfinished bodies are identical; only how the caller reaches
+// them (a blocking long-poll vs. an ordinary GET) differs, and that
+// difference belongs to the type's OperationWaitPath/OperationPollPath
+// choice, not to the fake.
+func (s *Server) computeOperationBody(name string, op *computeOp) map[string]any {
+	s.mu.Lock()
+	never := s.neverComplete
+	s.mu.Unlock()
+	if never {
+		return map[string]any{"name": name, "status": "RUNNING"}
+	}
+	body := map[string]any{"name": name, "status": "DONE"}
 	if op.errCode != "" {
 		body["error"] = map[string]any{"errors": []map[string]any{
 			{"code": op.errCode, "message": op.errMsg},
 		}}
 	}
-	writeJSON(w, http.StatusOK, body)
+	return body
 }

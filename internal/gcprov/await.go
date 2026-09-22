@@ -98,15 +98,18 @@ func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op ma
 
 // awaitComputeOperation polls a compute-style operation until status is DONE.
 //
-// It uses the operation collection's `wait` method, which LONG-POLLS to a
-// 2-minute deadline rather than returning immediately. That is the difference
-// between one request per slow operation and one per second against a quota
-// the whole project shares. ty.OperationScope names the location axis, a
-// bare word -- "global", "region" or "zone" (internal/gen/build.go) -- not
-// the operations collection itself: the collection is that word plus
-// "Operations" (globalOperations/regionOperations/zoneOperations), which
-// operationWaitURL builds.
+// It uses the operation's own published `wait` method when the type has one
+// (ty.OperationWaitPath), which LONG-POLLS to a 2-minute deadline rather than
+// returning immediately -- the difference between one request per slow
+// operation and one per second against a quota the whole project shares.
+// 7 of the 65 compute-style types (container, sqladmin) publish no wait
+// method at all -- a wait call against them is a 404, not a slow poll,
+// confirmed against their own Discovery documents -- and are polled with an
+// ordinary GET on ty.OperationPollPath instead, same status/error body shape.
+// Both paths are the API's own published templates, taken verbatim and
+// expanded rather than reconstructed: see operationRequestURL.
 func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, op map[string]any) (map[string]any, error) {
+	waits := ty.OperationWaitPath != ""
 	for attempt := 0; ; attempt++ {
 		if st, _ := op["status"].(string); st == "DONE" {
 			// compute reports failure as error.errors[], a different shape from
@@ -116,68 +119,80 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 			}
 			return op, nil
 		}
-		url, err := p.operationWaitURL(ty, op)
+		method, url, err := p.operationRequestURL(ty, op)
 		if err != nil {
 			return nil, err
 		}
-		if attempt > 0 {
-			// `wait` already blocks server-side, so back off only between
-			// returns, and gently -- this is not a busy poll.
+		// A published wait already blocks server-side for up to two minutes,
+		// so back off only between returns (never before the first), and
+		// gently -- this is not a busy poll. An API with no wait method
+		// returns immediately every time, so back off before every attempt,
+		// the same way awaitLongRunning's ordinary GET poll does.
+		if !(waits && attempt == 0) {
 			if err := p.sleepBackoff(ctx, attempt); err != nil {
 				return nil, fmt.Errorf("%s: waiting for operation: %w", ty.Name, err)
 			}
 		}
-		if op, err = p.client.Do(ctx, http.MethodPost, url, nil); err != nil {
+		if op, err = p.client.Do(ctx, method, url, nil); err != nil {
 			return nil, err
 		}
 	}
 }
 
-// operationWaitURL builds the compute-style `wait` url:
-// <APIBaseURL>projects/<project>/<scope segment>/<OperationScope>Operations/<op name>/wait.
+// operationRequestURL returns the http method and expanded url for the next
+// poll of a compute-style operation: POST ty.OperationWaitPath (a genuine
+// long-poll) when the API publishes one, otherwise GET ty.OperationPollPath
+// (an ordinary poll -- see awaitComputeOperation). Both are the API's own
+// published templates (verified against schemas/compute.json,
+// internal/gen/build.go), taken verbatim rather than reconstructed from a
+// scope word: three attempts at rebuilding this url from
+// ty.OperationScope -- a bare "global"/"region"/"zone" -- were all wrong,
+// because the wire's literal segment is always "operations", never
+// "globalOperations"/"regionOperations"/"zoneOperations" (only Discovery's
+// collection name for the scope). ty.OperationScope is no longer read here.
 //
-// The scope segment ("zones/<zone>", "regions/<region>", or "global") is
-// read from the operation's own "zone" or "region" field when present --
-// real compute operations carry those as full urls, so only the last path
-// segment is used -- and falls back to the type's own Settings-configured
-// zone/region otherwise. A wait url built without the right scope 404s,
-// which reads as "the operation vanished" rather than "we asked the wrong
-// collection".
-func (p *Provider) operationWaitURL(ty *catalog.Type, op map[string]any) (string, error) {
+// The templates use ordinary {project}/{zone}/{region}/{operation}
+// placeholders (compute's own wait path) or reserved {+name} (a no-wait
+// API's poll path, e.g. container) -- ExpandURL handles whichever the
+// template actually names, and errors by placeholder name by itself when one
+// it does need is missing, so this does not duplicate that validation.
+func (p *Provider) operationRequestURL(ty *catalog.Type, op map[string]any) (method, url string, err error) {
 	name, _ := op["name"].(string)
 	if name == "" {
-		return "", fmt.Errorf("%s: operation has no name to poll", ty.Name)
-	}
-	if ty.OperationScope == "" {
-		return "", fmt.Errorf("%s: no operation scope to build a wait url", ty.Name)
+		return "", "", fmt.Errorf("%s: operation has no name to poll", ty.Name)
 	}
 
-	var scopeSegment string
-	switch ty.Scope {
-	case catalog.ScopeZonal:
-		zone := lastPathSegment(op["zone"])
-		if zone == "" {
-			zone = p.settings.Zone
-		}
-		if zone == "" {
-			return "", fmt.Errorf("%s: no zone to poll a zone operation", ty.Name)
-		}
-		scopeSegment = "zones/" + zone
-	case catalog.ScopeRegional:
-		region := lastPathSegment(op["region"])
-		if region == "" {
-			region = p.settings.Region
-		}
-		if region == "" {
-			return "", fmt.Errorf("%s: no region to poll a region operation", ty.Name)
-		}
-		scopeSegment = "regions/" + region
-	default:
-		scopeSegment = "global"
+	tmpl := ty.OperationWaitPath
+	method = http.MethodPost
+	if tmpl == "" {
+		tmpl = ty.OperationPollPath
+		method = http.MethodGet
+	}
+	if tmpl == "" {
+		return "", "", fmt.Errorf("%s: no operation wait or poll path", ty.Name)
 	}
 
-	return fmt.Sprintf("%sprojects/%s/%s/%sOperations/%s/wait",
-		ty.APIBaseURL, p.settings.Project, scopeSegment, ty.OperationScope, name), nil
+	attrs := map[string]value.Value{
+		"operation": value.String(name, value.SourceProvider),
+		"name":      value.String(name, value.SourceProvider),
+		"project":   value.String(p.settings.Project, value.SourceProvider),
+	}
+	if zone := lastPathSegment(op["zone"]); zone != "" {
+		attrs["zone"] = value.String(zone, value.SourceProvider)
+	} else if p.settings.Zone != "" {
+		attrs["zone"] = value.String(p.settings.Zone, value.SourceProvider)
+	}
+	if region := lastPathSegment(op["region"]); region != "" {
+		attrs["region"] = value.String(region, value.SourceProvider)
+	} else if p.settings.Region != "" {
+		attrs["region"] = value.String(p.settings.Region, value.SourceProvider)
+	}
+
+	rel, err := ExpandURL(tmpl, attrs)
+	if err != nil {
+		return "", "", fmt.Errorf("%s: building the operation url: %w", ty.Name, err)
+	}
+	return method, ty.APIBaseURL + rel, nil
 }
 
 // lastPathSegment returns v's trailing "/"-delimited segment, or v itself
@@ -201,8 +216,12 @@ func lastPathSegment(v any) string {
 // google.longrunning reports {"code": <int>, "message": <string>} (the
 // grpc numeric code, google.rpc.Status); compute reports
 // {"errors": [{"code": <string>, "message": <string>}, ...]}, possibly
-// several -- their messages are joined, since any of them may be the one
-// that matters.
+// several -- their messages are ALL joined, since any of them may be the one
+// that matters, but only the FIRST sub-error's code is kept (APIError.Code
+// is a single field; a real multi-error compute failure is rare enough, and
+// the joined message carries every sub-error's own text regardless, so
+// nothing GCP said is lost -- only which single code represents a set of
+// them is a simplification).
 func operationError(ty *catalog.Type, e map[string]any) *APIError {
 	if rawErrors, ok := e["errors"].([]any); ok {
 		var code string

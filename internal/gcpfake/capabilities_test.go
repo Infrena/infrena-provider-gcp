@@ -56,7 +56,10 @@ func TestComputeOperationStyleServesStatusPollingOnItsScope(t *testing.T) {
 		t.Fatal("compute operation has no name to poll")
 	}
 
-	waitURL := s.URL() + "/v1/projects/p/zones/us-central1-a/zoneOperations/" + name + "/wait"
+	// The literal wire segment is "operations", never "zoneOperations" --
+	// that is only Discovery's collection name for the scope and never
+	// appears in a url (confirmed against schemas/compute.json).
+	waitURL := s.URL() + "/v1/projects/p/zones/us-central1-a/operations/" + name + "/wait"
 	r2, err := http.Post(waitURL, "application/json", nil)
 	if err != nil {
 		t.Fatal(err)

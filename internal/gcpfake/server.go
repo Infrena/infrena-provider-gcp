@@ -280,6 +280,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.handleGetOperation(w, name)
 			return
 		}
+		if name, ok := s.computeOperationName(r.URL.Path); ok {
+			s.handleGetComputeOperation(w, name)
+			return
+		}
 		s.handleGet(w, r)
 	case r.Method == http.MethodPost:
 		s.handleCreate(w, r, bodyBytes)
@@ -511,11 +515,19 @@ func (s *Server) respondMutation(w http.ResponseWriter, path string, result map[
 }
 
 // waitPathRE matches a compute-style operations-wait call, e.g.
-// ".../zones/us-central1-a/zoneOperations/op-1/wait". Only the scope
-// collection and the operation id are pulled out; the rest of the path
-// (project, region/zone) is never inspected because the fake does not need
-// it to answer.
-var waitPathRE = regexp.MustCompile(`/(globalOperations|regionOperations|zoneOperations)/([^/]+)/wait$`)
+// ".../zones/us-central1-a/operations/op-1/wait". The literal wire segment is
+// always "operations" -- never "globalOperations"/"regionOperations"/
+// "zoneOperations", which are only Discovery's COLLECTION names for the
+// three scopes and never appear in a url (confirmed against
+// schemas/compute.json: globalOperations' own wait path is
+// "projects/{project}/global/operations/{operation}/wait", zoneOperations'
+// is "projects/{project}/zones/{zone}/operations/{operation}/wait", etc. --
+// "operations" both times). An earlier version of this matched
+// "(globalOperations|regionOperations|zoneOperations)" instead, which never
+// matched anything a real client would actually send. Only the operation id
+// is pulled out; the rest of the path (project, region/zone) is never
+// inspected because the fake does not need it to answer.
+var waitPathRE = regexp.MustCompile(`/operations/([^/]+)/wait$`)
 
 // operationName reports whether path names a registered longrunning
 // operation, and if so its bare name (e.g. "operations/abc") — the same
