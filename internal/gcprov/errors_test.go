@@ -1,9 +1,12 @@
 package gcprov
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -142,5 +145,49 @@ func TestClassifyErrorSeesThroughAWrappedError(t *testing.T) {
 	wrapped := fmt.Errorf("gcp: creating the widget: %w", &APIError{Status: 503, Code: "UNAVAILABLE"})
 	if got := ClassifyError(wrapped); got != provider.SafeToRetry {
 		t.Errorf("ClassifyError(wrapped) = %v, want SafeToRetry", got)
+	}
+}
+
+// TestClassifyErrorTreatsANetErrorAsConditionallyRetryable. A connection
+// reset or timeout means the request may or may not have reached GCP and
+// taken effect -- neither SafeToRetry (risks a duplicate create) nor
+// NotSafeToRetry (fails an apply a retry would have completed) is honest.
+// context.DeadlineExceeded implements net.Error (Timeout() == true), which
+// makes it a convenient net.Error to construct directly in a test.
+func TestClassifyErrorTreatsANetErrorAsConditionallyRetryable(t *testing.T) {
+	if got := ClassifyError(context.DeadlineExceeded); got != provider.ConditionallyRetryable {
+		t.Errorf("ClassifyError(context.DeadlineExceeded) = %v, want ConditionallyRetryable", got)
+	}
+}
+
+// TestClassifyErrorTreatsAWrappedURLErrorAsConditionallyRetryable.
+// net/http.Client.Do wraps every RoundTrip failure (a dial refusal, a reset
+// connection) in a *url.Error, and Client.doOnce wraps THAT again with
+// fmt.Errorf("%w") -- both layers must still classify correctly.
+func TestClassifyErrorTreatsAWrappedURLErrorAsConditionallyRetryable(t *testing.T) {
+	transportErr := &url.Error{Op: "Get", URL: "https://compute.googleapis.com/", Err: errors.New("connection reset by peer")}
+	wrapped := fmt.Errorf("gcprov: GET https://compute.googleapis.com/: %w", transportErr)
+	if got := ClassifyError(wrapped); got != provider.ConditionallyRetryable {
+		t.Errorf("ClassifyError(wrapped url.Error) = %v, want ConditionallyRetryable", got)
+	}
+}
+
+func TestClassifyErrorTreatsUnexpectedEOFAsConditionallyRetryable(t *testing.T) {
+	if got := ClassifyError(io.ErrUnexpectedEOF); got != provider.ConditionallyRetryable {
+		t.Errorf("ClassifyError(io.ErrUnexpectedEOF) = %v, want ConditionallyRetryable", got)
+	}
+	wrapped := fmt.Errorf("reading the response: %w", io.ErrUnexpectedEOF)
+	if got := ClassifyError(wrapped); got != provider.ConditionallyRetryable {
+		t.Errorf("ClassifyError(wrapped io.ErrUnexpectedEOF) = %v, want ConditionallyRetryable", got)
+	}
+}
+
+// TestClassifyErrorStillDefaultsUnrecognisedToNotSafeToRetry. An error that
+// is neither an *APIError nor any recognised transport failure shape stays
+// NotSafeToRetry -- adding the transport-error branch must not turn
+// ClassifyError into "retry anything we don't understand".
+func TestClassifyErrorStillDefaultsUnrecognisedToNotSafeToRetry(t *testing.T) {
+	if got := ClassifyError(errors.New("something nobody classified")); got != provider.NotSafeToRetry {
+		t.Errorf("ClassifyError(plain error) = %v, want NotSafeToRetry", got)
 	}
 }

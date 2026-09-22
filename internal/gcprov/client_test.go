@@ -72,6 +72,35 @@ func TestDoSendsNoBodyWhenNil(t *testing.T) {
 	}
 }
 
+// TestDoJoinsARelativeURLWithBase. Every other Do test passes an absolute
+// srv.URL-prefixed url; this is the untested branch -- a caller (or a test)
+// that passes just the path, relying on the base NewClient was given, e.g.
+// how a Client built with base "" and always-absolute catalog urls would
+// never exercise this, but NewClient's own doc says base exists precisely so
+// a relative url works.
+func TestDoJoinsARelativeURLWithBase(t *testing.T) {
+	gcptest.Isolate(t)
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok": true}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(staticToken(), srv.URL+"/", ClientOptions{})
+	got, err := c.Do(context.Background(), http.MethodGet, "v1/widgets/one", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["ok"] != true {
+		t.Errorf("got %v", got)
+	}
+	if want := "/v1/widgets/one"; gotPath != want {
+		t.Errorf("the server received path %q, want %q: base was not joined with the relative url", gotPath, want)
+	}
+}
+
 func TestDoSetsTheQuotaProjectHeaderWhenConfigured(t *testing.T) {
 	gcptest.Isolate(t)
 	var got string

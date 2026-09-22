@@ -62,13 +62,28 @@ func TestBackoffDelayHonoursRetryAfter(t *testing.T) {
 	}
 }
 
-// TestBackoffDelayScheduleIsDeterministicUnderAFixedJitterSource. jitter is
+// withJitterForTest swaps jitterFn for the duration of one test, restoring it
+// on cleanup, under jitterMu both times -- so the swap is safe even once a
+// parallel test using backoffDelay exists (none does today, which is exactly
+// why an unguarded swap would have stayed latent instead of failing loudly).
+func withJitterForTest(t *testing.T, f func(int64) int64) {
+	t.Helper()
+	jitterMu.Lock()
+	old := jitterFn
+	jitterFn = f
+	jitterMu.Unlock()
+	t.Cleanup(func() {
+		jitterMu.Lock()
+		jitterFn = old
+		jitterMu.Unlock()
+	})
+}
+
+// TestBackoffDelayScheduleIsDeterministicUnderAFixedJitterSource. jitterFn is
 // swappable specifically so the schedule can be asserted exactly, rather
 // than only "it returned something in range" -- this is that assertion.
 func TestBackoffDelayScheduleIsDeterministicUnderAFixedJitterSource(t *testing.T) {
-	old := jitter
-	defer func() { jitter = old }()
-	jitter = func(n int64) int64 { return n - 1 } // always the ceiling itself
+	withJitterForTest(t, func(n int64) int64 { return n - 1 }) // always the ceiling itself
 
 	if d := backoffDelay(0, 0); d != backoffBase {
 		t.Errorf("backoffDelay(0, 0) = %v, want the full ceiling %v under a fixed jitter source", d, backoffBase)
