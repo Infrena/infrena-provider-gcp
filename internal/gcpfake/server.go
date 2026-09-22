@@ -534,16 +534,40 @@ func (s *Server) operationName(path string) (string, bool) {
 	return candidate, ok
 }
 
+// versionSegmentRE matches a leading path segment that is actually an API
+// version -- v1, v2, v3, v1beta1, v2beta, ... -- every form this catalog
+// uses. Anything else (e.g. "operations", the first segment of a bare
+// "operations/op-1" poll path) is a real path segment and must be kept, not
+// discarded on the unconditional assumption that whatever comes first is a
+// version. Task 12's await_test.go caught the unconditional version of this:
+// every fixture up to Task 10 happened to poll a "/v1/..." path, so the bug
+// was invisible to the shapes the suite exercised.
+var versionSegmentRE = regexp.MustCompile(`^v[0-9][0-9a-z]*$`)
+
 // trimVersionPrefix drops the leading "/<version>/" segment (whatever the
-// version is — v1, v3, ...), leaving the API-relative path. Used wherever
-// the fake compares a request path against a bare name or parent it was
-// given without a version prefix (operation names, CAI parents, tag-binding
+// version is — v1, v3, v1beta1, ...), leaving the API-relative path, but
+// ONLY when that first segment actually looks like a version. A path with no
+// version prefix at all (e.g. "/operations/op-1", which the fake's own
+// bare-name longrunning operations poll at) is returned unchanged rather
+// than having its real first segment silently discarded. Used wherever the
+// fake compares a request path against a bare name or parent it was given
+// without a version prefix (operation names, CAI parents, tag-binding
 // collections).
 func trimVersionPrefix(path string) string {
 	trimmed := strings.TrimPrefix(path, "/")
+	if trimmed == "" {
+		return ""
+	}
 	parts := strings.SplitN(trimmed, "/", 2)
 	if len(parts) != 2 {
+		// A single segment, no version to trim: e.g. "operations" alone,
+		// with nothing after it. Nothing here names an operation or parent by
+		// itself, so this deliberately does not fall into the "keep it
+		// unchanged" case below -- there IS no remainder to return.
 		return ""
+	}
+	if !versionSegmentRE.MatchString(parts[0]) {
+		return trimmed
 	}
 	return parts[1]
 }
