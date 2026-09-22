@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
+	"github.com/infrena/infrena-provider-gcp/internal/disco"
 )
 
 // buildFixture assembles a minimal input tree: one Discovery document, one
@@ -1037,6 +1038,109 @@ func TestPathPrefixOfIsDerivedPerType(t *testing.T) {
 	} {
 		if got := pathPrefixOf(c.path); got != c.want {
 			t.Errorf("pathPrefixOf(%q) = %q, want %q", c.path, got, c.want)
+		}
+	}
+}
+
+// containerShapedDoc is the two-operations-collections shape that made this
+// generator nondeterministic: container publishes both a modern
+// projects.locations.operations ("v1/{+name}") and a legacy
+// projects.zones.operations, and a map walk reached whichever it liked.
+func containerShapedDoc() *disco.Document {
+	return &disco.Document{
+		Name: "container",
+		Resources: map[string]*disco.Resource{
+			"projects": {Resources: map[string]*disco.Resource{
+				"locations": {Resources: map[string]*disco.Resource{
+					"operations": {Methods: map[string]*disco.Method{
+						"get": {Path: "v1/{+name}"},
+					}},
+				}},
+				"zones": {Resources: map[string]*disco.Resource{
+					"operations": {Methods: map[string]*disco.Method{
+						"get": {Path: "v1/projects/{projectId}/zones/{zone}/operations/{operationId}"},
+					}},
+				}},
+			}},
+		},
+	}
+}
+
+func TestOperationPollPathPrefersAPathTheRuntimeCanExpand(t *testing.T) {
+	// 200 walks of the same document: map order varies per run and per walk,
+	// so a first-match implementation fails this with overwhelming odds.
+	for i := 0; i < 200; i++ {
+		if got := operationPollPath(containerShapedDoc()); got != "v1/{+name}" {
+			t.Fatalf("walk %d chose %q, not the expandable v1/{+name}", i, got)
+		}
+	}
+}
+
+func TestOperationPollPathIsStableWhenEveryCandidateIsUnexpandable(t *testing.T) {
+	// Nothing here is fillable, so there is no right answer -- but there is
+	// still only one answer, the same one every run. await.go reports the
+	// missing placeholder by name at the point it matters.
+	doc := &disco.Document{
+		Name: "odd",
+		Resources: map[string]*disco.Resource{
+			"a": {Resources: map[string]*disco.Resource{
+				"operations": {Methods: map[string]*disco.Method{"get": {Path: "v1/b/{operationId}"}}},
+			}},
+			"b": {Resources: map[string]*disco.Resource{
+				"operations": {Methods: map[string]*disco.Method{"get": {Path: "v1/a/{projectId}"}}},
+			}},
+		},
+	}
+	want := operationPollPath(doc)
+	if want == "" {
+		t.Fatal("no candidate was returned at all")
+	}
+	for i := 0; i < 200; i++ {
+		if got := operationPollPath(doc); got != want {
+			t.Fatalf("walk %d returned %q, previously %q", i, got, want)
+		}
+	}
+}
+
+func TestOperationPollPathFindsNothingWhenThereIsNothing(t *testing.T) {
+	doc := &disco.Document{Name: "bare", Resources: map[string]*disco.Resource{
+		"widgets": {Methods: map[string]*disco.Method{"get": {Path: "v1/widgets/{widget}"}}},
+	}}
+	if got := operationPollPath(doc); got != "" {
+		t.Errorf("an API with no operations collection returned %q", got)
+	}
+}
+
+// TestRuntimeOperationPlaceholdersMatchesTheRuntime. runtimeOperationPlaceholders
+// is a copy of the attrs map operationRequestURL builds, and the two live in
+// different packages, so nothing but this test stops them drifting apart.
+func TestRuntimeOperationPlaceholdersMatchesTheRuntime(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "gcprov", "await.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(src)
+	i := strings.Index(body, "func (p *Provider) operationRequestURL(")
+	if i < 0 {
+		t.Fatal("operationRequestURL is no longer in internal/gcprov/await.go; this test needs rewriting")
+	}
+	body = body[i:]
+	for name := range runtimeOperationPlaceholders {
+		if !strings.Contains(body, `attrs["`+name+`"]`) && !strings.Contains(body, `"`+name+`":`) {
+			t.Errorf("the generator believes the runtime supplies %q, but operationRequestURL never sets it", name)
+		}
+	}
+}
+
+func TestPathPlaceholdersReadsBothSpellings(t *testing.T) {
+	got := pathPlaceholders("v1/projects/{{project}}/zones/{zone}/x/{+name}/y")
+	want := []string{"project", "zone", "name"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
 		}
 	}
 }
