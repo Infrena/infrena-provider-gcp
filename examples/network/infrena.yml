@@ -2,7 +2,7 @@
 #
 # Two types, one reference, and the reference is the point: the subnetwork
 # cannot be created until the network exists and has told GCP what its self
-# link is, so `${net.selfLink}` is both the value and the ordering.
+# link is, so `${net}` is both the value and the ordering.
 project: gcp-network-example
 
 infrena: ">= 0.15.0"
@@ -47,9 +47,19 @@ resources:
     type: gcp.subnetwork
     name: example-subnet
     ipCidrRange: 10.184.0.0/24
-    # selfLink, not name: the subnetworks API wants the network's URL. It is an
-    # output attribute, so this reference is also what orders the two creates.
-    network: ${net.selfLink}
+    # ${net}, the whole resource, not ${net.selfLink}. gcp.subnetwork.network
+    # declares which attribute of a gcp.network it holds -- selfLink, because
+    # the subnetworks API wants the network's URL rather than its name -- so
+    # infrena picks it for you. The provider says which attribute; you say
+    # which resource.
+    #
+    # ${net.selfLink} also works and means the same thing. This spelling is
+    # here because it is the one that stops being right if the API ever wants
+    # something else, without anyone having to edit configuration.
+    #
+    # Either way the reference is what orders the two creates: selfLink is an
+    # output, so the subnetwork cannot be built until the network exists.
+    network: ${net}
     # The region comes from the provider instance above. gcp.subnetwork does
     # declare a `region` attribute, but setting it there as well would put the
     # same fact in two places that can disagree.
