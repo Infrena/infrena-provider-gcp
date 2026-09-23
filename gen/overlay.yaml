@@ -109,6 +109,140 @@ rulings:
       generator does not count them: the first two are Terraform schema and Go
       declarations, the third belongs to a different tool entirely.
 
+
+  # P0 of the tier-2 backlog, worked 2026-09-23. Every template named below was
+  # READ at the pinned mmv1 commit (2d08a4a7b218c0c9d6c3ba236eae45193d386f44),
+  # not inferred from its name -- which mattered twice: `update_encoder/pubsub_topic`
+  # turned out to be a request envelope, and `update_encoder/managed_dns_zone`
+  # turned out to exist only because magic-modules updates via PUT.
+  #
+  # ONE of the nine candidates ships. The other eight are blocked, and not one of
+  # them is blocked on judgement -- each hit a distinct limitation recorded below,
+  # and the largest of them is not a tier-2 problem at all (see UPDATE VERB).
+
+  artifactregistry/Repository:
+    hooks: [encoder, pre_update]
+    note: >
+      One hook is scope resolution this provider already performs, and the
+      other hand-writes mask paths that buildNested produces natively.
+
+      encoder (encoders/location_from_region.go.tmpl) defaults `location` from
+      the provider's `region` when the resource does not set it. `location` is
+      a URL segment here (projects/*/locations/*/repositories), not a body
+      field, and filling scope segments from instance configuration is what
+      gcprov.Provider.withScope does for every type. Same job, done earlier.
+
+      pre_update (update_encoder/artifact_registry_repository_update.go.tmpl,
+      wired as pre_update) re-expands `remoteRepositoryConfig` into the body
+      and then appends two DEEP mask paths by hand --
+      remoteRepositoryConfig.upstreamCredentials.usernamePasswordCredentials.username
+      and .passwordSecretVersion -- before rewriting the updateMask query
+      parameter. Terraform needs this because its own diff does not reach that
+      far down a nested block. BuildMask's buildNested recurses through every
+      declared Fields level and emits exactly these dotted paths for the leaves
+      that changed (internal/gcprov/patch.go), and the mask goes on the query
+      string the same way, so the generic path reaches the same request.
+
+      Unblocks gcp.artifactregistry.rule, gcp.artifactregistry.tag and
+      gcp.attachment, all three of which ship and all three of which hang off a
+      repository.
+
+
+  # ----------------------------------------------------------------------------
+  # NOT RULED. Eight P0 candidates, four distinct blockers. Kept here rather than
+  # in a tracker because this is the file the next person opens.
+  #
+  # (1) THE UPDATE VERB DEFECT -- blocks bigquery/Dataset, dns/ManagedZone,
+  #     compute/HealthCheck and compute/RegionHealthCheck, and is much larger than
+  #     these four.
+  #
+  #     build.go takes UpdateVerb from magic-modules and from nowhere else
+  #     (`t.UpdateVerb = mm.UpdateVerb`). magic-modules relies on its own default
+  #     when a resource's yaml omits `update_verb:`, and most omit it. Our parser
+  #     applies no default, so the type ships with no update path at all, and
+  #     patch.go turns that into "every change replaces the resource".
+  #
+  #     All four rulings below were written, verified and then withdrawn on that
+  #     basis. Their hooks are benign:
+  #       bigquery/Dataset        update_encoder drops `access` unless it changed;
+  #                               BuildMask already omits unchanged attributes.
+  #       dns/ManagedZone         update_encoder re-adds output-only fields because
+  #                               mmv1 uses managedZones.update (PUT); we would use
+  #                               patch, where doing that is wrong. pre_delete is
+  #                               gated on `force_destroy`, a Terraform-only field.
+  #       compute/HealthCheck     encoder derives the required `type` from which
+  #       compute/RegionHealthCheck  per-protocol block was set, and defaults port
+  #                               to 80/443 -- which are the API's OWN documented
+  #                               defaults. `type` is a plain settable enum, so the
+  #                               user writes it. Same template for both resources.
+  #
+  #     They are withheld because a BigQuery dataset or a DNS zone that is
+  #     REPLACED rather than patched takes its tables or its records with it. That
+  #     is a worse answer than not shipping.
+  #
+  #     Measured 2026-09-23 against the Discovery documents: 154 shipping types
+  #     have no update verb, and for at least 33 of them Google publishes a PATCH
+  #     or PUT -- gcp.storage.bucket, gcp.network, gcp.subnetwork,
+  #     gcp.compute.instance, gcp.urlmap, gcp.securitypolicy, gcp.image and
+  #     gcp.sqladmin.instance among them. The generated reference tells users
+  #     "publishes no update method" for each, which is not true of the API. Fixing
+  #     that is worth more than the whole tier-2 backlog, and it is not a ruling.
+  #
+  # (2) THE NAME COLLISION -- blocks secretmanager/Secret (and logging/LogScope).
+  #
+  #     Both hooks on secretmanager/Secret are benign: pre_delete is gated on
+  #     `deletion_protection`, a Terraform-only field absent from the v1 Secret
+  #     message, and pre_update only re-masks `replication`, rewrites the
+  #     updateMask query parameter and drops `expireTime` when `ttl` changed --
+  #     all three of which BuildMask already does or does not need.
+  #
+  #     But admitting the resource produces TWO types: projects.secrets and
+  #     projects.locations.secrets are both real collections (global and regional
+  #     secrets) mapping to one magic-modules resource, and both want the name
+  #     gcp.secretmanager.secret. build.go's naming guard refuses that, correctly.
+  #     pathWalker (collisions.go) deliberately skips location-axis words when
+  #     disambiguating -- right almost everywhere, wrong here. Fixing it means
+  #     choosing two published names, and gen/names.lock.json only grows, so that
+  #     is a permanent decision and not one to make in passing.
+  #
+  # (3) THE REQUEST ENVELOPE -- blocks pubsub/Topic and pubsub/Subscription.
+  #
+  #     Their update_encoder templates are three lines that wrap the resource:
+  #     newObj["topic"] = obj. Not field shaping -- an envelope. The pubsub v1
+  #     Discovery document confirms it: topics.patch takes UpdateTopicRequest
+  #     {topic, updateMask}, not Topic, and the updateMask is REQUIRED and lives
+  #     IN THE BODY, not on the query string. Provider.Update sends the bare
+  #     resource with the mask as a query parameter, so every Pub/Sub update would
+  #     be rejected. Shipping them all_force_new is not an answer: replacing a
+  #     topic destroys its subscriptions. A CreateWrapper already exists in
+  #     catalog.Type for the create side; the update side has no equivalent.
+  #
+  #     Checked whether anything that ALREADY ships has this shape, by comparing
+  #     each updatable type's PATCH request $ref against its own GET response $ref:
+  #     78 of the 86 matched unambiguously and NONE is wrapped. The check was
+  #     verified against pubsub/Topic and pubsub/Subscription first and flags both,
+  #     so the negative result is real. Tier-2 blocker only; nothing shipped today
+  #     is broken by it.
+  #
+  # (4) NO WAY TO SUPPLY THE NAME -- blocks cloudkms/KeyRing.
+  #
+  #     Both hooks are fine: encoders/send_nil_body is `return nil, nil` and KeyRing
+  #     has exactly two properties in the cloudkms v1 Discovery document, `name` and
+  #     `createTime`, BOTH readOnly -- so our create body is `{}` and there is
+  #     nothing a body could carry. decoders/kms rewrites the returned full resource
+  #     name to the user's short name for the Terraform linter's benefit, which is
+  #     the opposite of what this provider wants, since provider ids ARE relative
+  #     resource names.
+  #
+  #     Withdrawn because ruling it ships a type nobody can create: the identity
+  #     travels in a `keyRingId` query parameter, `name` is readOnly so the
+  #     generator cannot fill it, and the create url comes out as
+  #     `...keyRings?keyRingId={{name}}` with "needs name". It would join the 65
+  #     types that ship without a create, and deliver nothing until CryptoKey --
+  #     which is not ruled -- ships too. Same family as the open gcp.serviceaccount
+  #     defect.
+  # ----------------------------------------------------------------------------
+
 # Curated aliases: the short word people actually say, for attributes they write
 # constantly. The generator already emits a snake_case alias for EVERY camelCase
 # attribute (11,680 of them), so this file is only for the cases where the

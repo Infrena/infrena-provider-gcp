@@ -28,7 +28,6 @@ tier3	apigateway/Api	min_version is beta, not ga
 tier3	apigateway/Gateway	min_version is beta, not ga
 tier3	apigateway/locations	no insert or create method
 tier3	apigateway/operations	no insert or create method
-tier2	artifactregistry/Repository	unruled wire hooks: encoder, pre_update
 tier3	artifactregistry/aptArtifacts	no insert or create method
 tier3	artifactregistry/dockerImages	no insert or create method
 tier3	artifactregistry/files	no insert or create method
@@ -291,8 +290,8 @@ tier3	monitoring/monitoredResourceDescriptors	no insert or create method
 tier3	monitoring/notificationChannelDescriptors	no insert or create method
 tier3	monitoring/snoozes	no delete method
 tier3	monitoring/timeSeries	no insert or create method
-tier3	monitoring/timeSeries	no delete method
 tier3	monitoring/timeSeries	no insert or create method
+tier3	monitoring/timeSeries	no delete method
 tier3	monitoring/uptimeCheckIps	no insert or create method
 tier3	networksecurity/AuthorizationPolicy	min_version is beta, not ga
 tier3	networksecurity/SacAttachment	min_version is beta, not ga
