@@ -2,10 +2,11 @@
 
 # artifactregistry
 
-3 type(s). [Back to the index](../README.md).
+4 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
+| [`gcp.artifactregistry.repository`](gcp.artifactregistry.repository.md) | yes | yes | yes | A repository for storing artifacts |
 | [`gcp.artifactregistry.rule`](gcp.artifactregistry.rule.md) | yes | yes | yes | A rule defines the deny or allow action of the operation it applies to and the conditions required for the rule to apply. |
 | [`gcp.attachment`](gcp.attachment.md) | **no** | **no** | yes | An Attachment refers to additional metadata that can be attached to artifacts in Artifact Registry. |
 | [`gcp.tag`](gcp.tag.md) | **no** | **no** | yes | Tags point to a version and represent an alternative name that can be used to access the version. |

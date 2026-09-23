@@ -3,6 +3,7 @@
   "accesscontextmanager/accesspolicy": "gcp.accesspolicy",
   "apigateway/config": "gcp.config",
   "artifactregistry/attachment": "gcp.attachment",
+  "artifactregistry/repository": "gcp.artifactregistry.repository",
   "artifactregistry/rule": "gcp.artifactregistry.rule",
   "artifactregistry/tag": "gcp.tag",
   "bigquery/routine": "gcp.routine",
