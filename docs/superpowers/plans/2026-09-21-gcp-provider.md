@@ -7915,6 +7915,36 @@ path the placeholder binds to, the same way Task 13a stored `PathPrefix` rather
 than re-deriving a version each call. A runtime search would re-answer the same
 question on every request and could answer it differently as attributes change.
 
+#### C2. A project id and a project number are the same project. `gcp.tagkey`.
+
+Found by Task 18a's live re-run, and only reachable once its defect C was fixed.
+
+Config says `parent: projects/example-project-1234`. Cloud Resource Manager
+answers `parent: "projects/123456789012"` — the same project, in canonical
+form, as a different string. `parent` is ForceNew, so **every plan after a
+successful apply proposes replacing the tag key.** It never converges.
+
+This is not a tag-specific quirk. GCP canonicalises a project reference to the
+project NUMBER across many APIs, and any attribute holding a project resource
+name can come back in the form the config did not use.
+
+**Ruling: normalise at reconcile, do not special-case the type.** `Reconcile`
+already exists to express GCP's answer in the terms the configuration uses —
+that is its stated job, and reordering an unordered list is the same idea. A
+project id against its own project number is exactly that case. Resolve the
+number ONCE (`cloudresourcemanager projects.get`), cache it on the provider, and
+treat `projects/<id>` and `projects/<number>` as equal wherever an attribute
+holds a project resource name.
+
+Do NOT normalise by rewriting the user's configuration value, and do NOT make
+the id parser lenient. The stored state should hold what GCP returned; the
+COMPARISON is what needs to know the two spellings are one project. That
+distinction is the same one `stateFrom` already draws.
+
+If resolving the number needs a call the provider cannot make in some context,
+say so and fall back to treating them as unequal with a stderr line — a spurious
+replacement plan the user can see beats a silent wrong equality.
+
 #### D. The remaining 11.
 
 Not classified. Classify them, report the breakdown, and fix what falls into a
