@@ -10,6 +10,19 @@ platforms: [linux/amd64, linux/arm64, linux/arm, linux/386, darwin/amd64, darwin
 description: The GCP provider for infrena, serving resource types generated from Google's API Discovery documents.
 # The OLDEST infrena release this plugin works with, which is not the same number as go.mod's
 # require (that is the NEWEST host it is tested against). Protocol 5 is `max_concurrency` in the
-# handshake, and 0.14.0 is the oldest release that speaks it.
-infrena: ">= 0.14.0"
+# handshake and 0.14.0 is the oldest release that speaks it, so the protocol is NOT what sets this
+# floor -- 0.14.1 is, for two reasons that are both silent on 0.14.0:
+#
+#   The generator emits a snake_case alias for every camelCase attribute: 1447 at the top level and
+#   9788 nested. Before 0.14.1 the host resolved aliases only on top-level attributes, so 9788 of
+#   them did nothing and a nested `trust_config:` reached Google verbatim.
+#
+#   An unresolved nested key was passed through to the provider rather than reported. 0.14.1 names
+#   it with its full path instead, which is the difference between an error message and a debugging
+#   session.
+#
+# Verified before raising the floor: zero fold collisions anywhere in the catalog, walking every
+# sibling group at every depth through both Fields and Elem, so activating those 9788 aliases
+# cannot make a name ambiguous or stop the plugin loading.
+infrena: ">= 0.14.1"
 source: https://github.com/infrena/infrena-provider-gcp

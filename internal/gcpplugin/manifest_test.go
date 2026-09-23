@@ -43,6 +43,22 @@ func TestTheManifestDescribesThisPlugin(t *testing.T) {
 
 // TestTheFloorAdmitsTheOldestHostThatWorks pins the boundary so that raising the floor is a
 // deliberate act with a failing test attached, never a side effect of bumping the require.
+//
+// It did its job on 2026-09-23: raising the floor to 0.14.1 failed this test, which is the
+// point of it. The boundary moved for a reason recorded here and in plugin.yaml.
+//
+// THE FLOOR IS NO LONGER THE PROTOCOL BOUNDARY. 0.14.0 is still the oldest release that speaks
+// protocol 5, so a 0.14.0 host and this binary do handshake and run. They just get two things
+// wrong, both silently:
+//
+//   - The generator emits a snake_case alias for every camelCase attribute, 1447 at the top level
+//     and 9788 nested. 0.14.0 resolves aliases only on top-level attributes, so those 9788 do
+//     nothing and a nested `trust_config:` goes to Google verbatim.
+//   - An unresolved nested key is passed through to the provider instead of being reported.
+//
+// "Works" has to mean the host honours what the catalog declares, not merely that it connects.
+// A host that starts and then quietly ignores 87% of this plugin's aliases is the "looks safe but
+// is not" case, which is worse than a refused handshake because nothing says a word.
 func TestTheFloorAdmitsTheOldestHostThatWorks(t *testing.T) {
 	m := readManifest(t)
 	admits := func(s string) bool {
@@ -52,8 +68,12 @@ func TestTheFloorAdmitsTheOldestHostThatWorks(t *testing.T) {
 		}
 		return m.Infrena.Allows(v)
 	}
-	if !admits("0.14.0") {
-		t.Error("the floor refuses 0.14.0, the oldest release that speaks protocol 5")
+	if !admits("0.14.1") {
+		t.Error("the floor refuses 0.14.1, the oldest release that resolves nested aliases")
+	}
+	if admits("0.14.0") {
+		t.Error("the floor admits 0.14.0, which speaks protocol 5 but silently ignores every " +
+			"nested alias this catalog declares")
 	}
 	if admits("0.13.1") {
 		t.Error("the floor admits 0.13.1, which does not speak protocol 5")
