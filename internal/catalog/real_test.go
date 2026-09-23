@@ -789,3 +789,56 @@ func TestNoSiblingGroupFoldsTogether(t *testing.T) {
 			"test is no longer reaching the nested attributes it exists to check", groups)
 	}
 }
+
+// TestDefinitionsCarryListElements. Protocol 6 added `elem` to a schema
+// attribute, and it is the only way to describe what a list's items look like:
+// Fields means "this map's known keys", which a list has none of.
+//
+// Emitting it is OUR half of the contract and nothing else asserts it. Before
+// this existed the host saw a bare KindList for 1901 attributes, so every key
+// inside a repeated block was unreachable: 5841 of this catalog's aliases did
+// not resolve, an unknown key was not reported, and both failures were silent.
+//
+// Asserted against the real catalog rather than a fixture, because the point is
+// that the GENERATOR produces elements the host accepts, and asserted with a
+// count floor so it cannot pass by finding none.
+func TestDefinitionsCarryListElements(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	withElem, withElemFields, elemAliases := 0, 0, 0
+	var walk func(map[string]schema.Attribute)
+	walk = func(as map[string]schema.Attribute) {
+		for _, a := range as {
+			if a.Elem != nil {
+				withElem++
+				if a.Elem.Kind == 0 {
+					t.Errorf("an element carries no Kind, which the host refuses outright")
+				}
+				if len(a.Elem.Fields) > 0 {
+					withElemFields++
+				}
+				for _, f := range a.Elem.Fields {
+					elemAliases += len(f.Aliases)
+				}
+				walk(a.Elem.Fields)
+			}
+			walk(a.Fields)
+		}
+	}
+	for _, d := range c.Definitions() {
+		walk(d.Attributes)
+	}
+	t.Logf("elements reaching the host: %d (%d carrying their own fields), element-field aliases: %d",
+		withElem, withElemFields, elemAliases)
+	// Measured 2026-09-23: 1901 elements, 1096 of them maps with fields.
+	if withElem < 1500 {
+		t.Errorf("only %d list elements reached the host; 1901 were measured, so this is no longer "+
+			"exercising the conversion it exists to check", withElem)
+	}
+	if elemAliases == 0 {
+		t.Error("no element field carries an alias, so the spellings inside a repeated block " +
+			"resolve to nothing and protocol 6 bought us nothing")
+	}
+}
