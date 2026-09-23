@@ -346,3 +346,47 @@ func TestAListOfScalarsIsCarriedThroughUnchanged(t *testing.T) {
 		}
 	}
 }
+
+// TestANestedComputedFieldNeverReachesACreateBody. GCP rejects a body that
+// sets a server-computed field at ANY depth, and 922 attributes below the top
+// level are Output across 101 types.
+//
+// The host does not stop one arriving: infrena refuses a computed attribute
+// only in its top-level loop, and checkNestedKeys, the only thing that walks
+// deeper, checks that a key exists and nothing else. So this is reachable from
+// ordinary configuration rather than theoretical.
+//
+// The patch path always withheld these (buildNested skips f.Output). The
+// create path did not, so the same field was correctly kept out of a PATCH and
+// sent on a POST.
+func TestANestedComputedFieldNeverReachesACreateBody(t *testing.T) {
+	ty := &catalog.Type{
+		Name: "gcp.widget",
+		Attributes: map[string]*catalog.Attr{
+			"config": {
+				Canonical: "config", Kind: value.KindMap,
+				Fields: map[string]*catalog.Attr{
+					"size":      {Canonical: "size", Kind: value.KindString},
+					"createdAt": {Canonical: "createdAt", Kind: value.KindString, Output: true},
+				},
+			},
+		},
+	}
+	body := wireBody(ty.Attributes, map[string]value.Value{
+		"config": value.Map(map[string]value.Value{
+			"size":      value.String("large", value.SourceExplicit),
+			"createdAt": value.String("2026-09-23T00:00:00Z", value.SourceExplicit),
+		}, value.SourceExplicit),
+	})
+	cfg, ok := body["config"].(map[string]any)
+	if !ok {
+		t.Fatalf("config came back as %T", body["config"])
+	}
+	if _, sent := cfg["createdAt"]; sent {
+		t.Error("a nested Output field reached the create body; GCP rejects a body that sets one")
+	}
+	if got := cfg["size"]; got != any("large") {
+		t.Errorf("the settable sibling did not survive: %v — this test would pass vacuously if "+
+			"the whole object were dropped", got)
+	}
+}
