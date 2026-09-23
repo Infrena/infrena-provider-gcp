@@ -17,7 +17,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 84 |
+| [unruled wire hooks](#unruled-wire-hooks) | 81 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
@@ -25,7 +25,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [no get method](#no-get-method) | 2 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 65 |
 
-**379** types did not ship. **65** more ship without a create.
+**376** types did not ship. **65** more ship without a create.
 
 ## no insert or create method
 
@@ -319,14 +319,12 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `compute/GlobalAddress` | 2 | post_create, pre_create |
 | `compute/GlobalForwardingRule` | 2 | post_create, pre_create |
 | `compute/GlobalVmExtensionPolicy` | 2 | post_delete, pre_delete, pre_update |
-| `compute/HealthCheck` | 2 | encoder |
 | `compute/Interconnect` | 2 | post_create |
 | `compute/InterconnectAttachment` | 2 | post_create, pre_delete |
 | `compute/NodeGroup` | 2 | pre_create |
 | `compute/OrganizationSecurityPolicy` | 2 | post_create, post_delete, post_update |
 | `compute/RegionBackendService` | 2 | decoder, encoder, post_create |
 | `compute/RegionDisk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
-| `compute/RegionHealthCheck` | 2 | encoder |
 | `compute/RegionTargetHttpsProxy` | 2 | decoder, encoder, update_encoder |
 | `compute/Reservation` | 2 | decoder, pre_update, update_encoder |
 | `compute/Route` | 2 | decoder |
@@ -340,7 +338,6 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `compute/ZoneVmExtensionPolicy` | 2 | pre_update |
 | `dataproc/Batch` | 2 | decoder |
 | `dataproc/SessionTemplate` | 2 | custom_import |
-| `dns/ManagedZone` | 2 | pre_delete, update_encoder |
 | `dns/Policy` | 2 | pre_delete |
 | `dns/ResponsePolicy` | 2 | pre_delete |
 | `firestore/Index` | 2 | custom_create, custom_import, encoder |

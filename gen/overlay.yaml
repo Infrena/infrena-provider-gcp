@@ -147,46 +147,117 @@ rulings:
       gcp.attachment, all three of which ship and all three of which hang off a
       repository.
 
+  # The three below were written and verified on 2026-09-23 and then held back,
+  # because both APIs publish a patch that magic-modules does not declare and the
+  # generator only read magic-modules, so all three would have shipped with the
+  # host REPLACING them on every change. A replaced DNS zone takes its records
+  # with it. gen.discoveredUpdate fixed that; these are the rulings it unblocked.
+
+  dns/ManagedZone:
+    hooks: [pre_delete, update_encoder]
+    note: >
+      Both hooks are Terraform's, and one of them exists only because
+      magic-modules picked a different update method than this provider does.
+
+      update_encoder (update_encoder/managed_dns_zone.go.tmpl) re-adds
+      `nameServers`, `id` and `creationTime` -- all output-only fields -- to the
+      update body, and its own comment says why: "The upstream update method
+      requires the full ManagedZones object". That is dns.managedZones.UPDATE,
+      a PUT full replace. This provider uses dns.managedZones.PATCH, which the
+      Discovery document publishes at the same path with a partial ManagedZone
+      body (both methods checked there, 2026-09-23). Under PATCH, naming an
+      output-only field in the body is at best ignored and at worst rejected, so
+      the hook is not merely unnecessary here, it would be wrong to apply.
+
+      pre_delete (pre_delete/managed_dns_zone.go.tmpl) is gated on
+      `force_destroy`, a Terraform-only convenience field with no counterpart in
+      the DNS API. When set it pages through every record set in the zone and
+      deletes each one -- skipping NS and SOA, which the API refuses -- before
+      deleting the zone. We do not offer the field, so the hook has nothing to
+      fire on, the same shape as compute/Network's post_create above.
+
+      THE BOUNDED GAP, stated rather than discovered: deleting a zone that still
+      holds records fails, with Google's own error. That is the API's own rule
+      and it is loud, not silent; the fix is to remove the records first.
+
+      AN HONEST UNKNOWN, recorded rather than assumed away. dns.managedZones
+      CREATE returns a ManagedZone, so the type's await strategy is None -- but
+      its PATCH returns an Operation, and await is a property of the TYPE, not of
+      the method. Nothing is corrupted by that: Update discards what await
+      returns and takes its state from readAfterPatch's own GET. The risk is only
+      that the read-back happens before the patch has landed, which would show up
+      as one spurious drift rather than as damage. Zone metadata patches look
+      synchronous, but that has NOT been checked against real Google, and this
+      type is not in the live suite. At least six eventarc types have the same
+      create-returns-resource, patch-returns-operation shape.
+
+      Unblocks gcp.resourcerecordset, which ships today and has nowhere to put a
+      record.
+
+  compute/HealthCheck:
+    hooks: [encoder]
+    note: >
+      One hook, doing two convenience jobs, both of which this provider asks the
+      user to do explicitly instead.
+
+      encoder (encoders/health_check_type.tmpl) looks at which of the seven
+      per-protocol blocks the configuration set -- http, https, http2, tcp, ssl,
+      grpc, grpc_tls -- and from that DERIVES the required top-level `type`
+      field. It also defaults the nested `port` to 80 or 443 when neither a port
+      nor a port_name was given.
+
+      `type` is an ordinary settable enum on the compute v1 HealthCheck message
+      (checked against the Discovery document: not readOnly, enum GRPC,
+      GRPC_WITH_TLS, HTTP, HTTP2, HTTPS, INVALID, SSL, TCP), so this provider
+      exposes it directly and the user writes it. The port defaults the hook
+      applies are the API's OWN documented defaults -- compute's HTTPHealthCheck
+      says "The default value is 80" in the Discovery document itself -- so
+      omitting the port leaves Google applying the same number the hook would
+      have sent.
+
+      THE BOUNDED GAP: `type` must be set in configuration. Terraform infers it;
+      we do not. Omitting it produces Google's own required-field error at create
+      time, which is loud and names the field. Inferring it would mean the
+      generator writing per-resource Go, which is the thing the tier gate exists
+      to keep out.
+
+      Needed for any load balancer: backend services reference health checks.
+
+  compute/RegionHealthCheck:
+    hooks: [encoder]
+    note: >
+      The regional twin of compute/HealthCheck, and the same template --
+      encoders/health_check_type.tmpl, one file referenced by both resources. The
+      reasoning above applies unchanged: `type` is a settable enum the user
+      writes, and the port defaults the hook applies are the API's own. Ruled
+      separately because a ruling names ONE resource's hooks, not because
+      anything differs.
 
   # ----------------------------------------------------------------------------
-  # NOT RULED. Eight P0 candidates, four distinct blockers. Kept here rather than
+  # NOT RULED. Five P0 candidates, four distinct blockers. Kept here rather than
   # in a tracker because this is the file the next person opens.
   #
-  # (1) THE UPDATE VERB DEFECT -- blocks bigquery/Dataset, dns/ManagedZone,
-  #     compute/HealthCheck and compute/RegionHealthCheck, and is much larger than
-  #     these four.
+  # (1) AN UPDATE URL WITH NO UPDATE VERB -- blocks bigquery/Dataset.
   #
-  #     build.go takes UpdateVerb from magic-modules and from nowhere else
-  #     (`t.UpdateVerb = mm.UpdateVerb`). magic-modules relies on its own default
-  #     when a resource's yaml omits `update_verb:`, and most omit it. Our parser
-  #     applies no default, so the type ships with no update path at all, and
-  #     patch.go turns that into "every change replaces the resource".
+  #     Its one hook is benign: update_encoder/bigquery_dataset.go.tmpl drops
+  #     `access` from the update body unless the ACL itself changed, because
+  #     BigQuery replaces the whole list with whatever it is sent and re-sending
+  #     an unchanged copy clobbers entries BigQuery maintains itself. BuildMask
+  #     omits every attribute whose value did not change, so that is already the
+  #     generic behaviour.
   #
-  #     All four rulings below were written, verified and then withdrawn on that
-  #     basis. Their hooks are benign:
-  #       bigquery/Dataset        update_encoder drops `access` unless it changed;
-  #                               BuildMask already omits unchanged attributes.
-  #       dns/ManagedZone         update_encoder re-adds output-only fields because
-  #                               mmv1 uses managedZones.update (PUT); we would use
-  #                               patch, where doing that is wrong. pre_delete is
-  #                               gated on `force_destroy`, a Terraform-only field.
-  #       compute/HealthCheck     encoder derives the required `type` from which
-  #       compute/RegionHealthCheck  per-protocol block was set, and defaults port
-  #                               to 80/443 -- which are the API's OWN documented
-  #                               defaults. `type` is a plain settable enum, so the
-  #                               user writes it. Same template for both resources.
+  #     What blocks it is Dataset.yaml declaring `update_url:` and NO
+  #     `update_verb:`. gen.discoveredUpdate refuses that combination rather than
+  #     guessing: magic-modules wrote that url for the verb IT chose, and pairing
+  #     someone else's url with a verb we inferred is exactly the kind of
+  #     reconstruction this codebase keeps getting wrong. Four resources in the
+  #     whole vendored tree do it -- apigee/TargetServer, bigquery/Dataset,
+  #     compute/Autoscaler and compute/RegionAutoscaler -- so deciding what it
+  #     should mean is small and nameable, and it also unblocks gcp.autoscaler and
+  #     gcp.regionautoscaler, which ship today with no update for the same reason.
   #
-  #     They are withheld because a BigQuery dataset or a DNS zone that is
-  #     REPLACED rather than patched takes its tables or its records with it. That
-  #     is a worse answer than not shipping.
-  #
-  #     Measured 2026-09-23 against the Discovery documents: 154 shipping types
-  #     have no update verb, and for at least 33 of them Google publishes a PATCH
-  #     or PUT -- gcp.storage.bucket, gcp.network, gcp.subnetwork,
-  #     gcp.compute.instance, gcp.urlmap, gcp.securitypolicy, gcp.image and
-  #     gcp.sqladmin.instance among them. The generated reference tells users
-  #     "publishes no update method" for each, which is not true of the API. Fixing
-  #     that is worth more than the whole tier-2 backlog, and it is not a ruling.
+  #     Withheld because a BigQuery dataset that is REPLACED rather than patched
+  #     takes its tables with it.
   #
   # (2) THE NAME COLLISION -- blocks secretmanager/Secret (and logging/LogScope).
   #
