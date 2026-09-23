@@ -1,0 +1,36 @@
+# A network and one subnetwork, as one unit.
+#
+# The file is `module.yml` and not `infrena.yml` on purpose: a module has
+# `inputs:` and `outputs:` and no `project:`, and the separate name keeps a
+# module directory from looking like a project you could run commands in.
+inputs:
+  # No `default:`, so the caller must supply it and infrena says so at the call
+  # site if it does not.
+  name:
+    type: string
+  cidr:
+    type: string
+  private_google_access:
+    type: boolean
+    default: true
+
+resources:
+  net:
+    type: gcp.network
+    name: ${var.name}
+    autoCreateSubnetworks: false
+
+  sub:
+    type: gcp.subnetwork
+    name: ${var.name}-subnet
+    ipCidrRange: ${var.cidr}
+    network: ${net.selfLink}
+    privateIpGoogleAccess: ${var.private_google_access}
+
+outputs:
+  # Read off the call as `${<call>.self_link}`. The dependency that creates is
+  # real: anything reading this waits for the network.
+  self_link:
+    value: ${net.selfLink}
+  subnet_self_link:
+    value: ${sub.selfLink}
