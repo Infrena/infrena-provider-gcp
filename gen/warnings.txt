@@ -122,7 +122,6 @@ tier3	compute/FutureReservation	min_version is beta, not ga
 tier2	compute/GlobalAddress	unruled wire hooks: post_create, pre_create
 tier2	compute/GlobalForwardingRule	unruled wire hooks: post_create, pre_create
 tier2	compute/GlobalVmExtensionPolicy	unruled wire hooks: post_delete, pre_delete, pre_update
-tier2	compute/HealthCheck	unruled wire hooks: encoder
 tier3	compute/InstanceGroup	magic-modules marks it exclude: true
 tier3	compute/InstanceGroupManager	magic-modules marks it exclude: true
 tier2	compute/Interconnect	unruled wire hooks: post_create
@@ -138,7 +137,6 @@ tier2	compute/RegionBackendService	unruled wire hooks: decoder, encoder, post_cr
 tier3	compute/RegionCommitment	no delete method
 tier2	compute/RegionDisk	unruled wire hooks: custom_update, decoder, encoder, pre_delete, update_encoder
 tier3	compute/RegionDiskType	magic-modules marks it exclude: true
-tier2	compute/RegionHealthCheck	unruled wire hooks: encoder
 tier3	compute/RegionInstanceGroupManager	magic-modules marks it exclude: true
 tier2	compute/RegionTargetHttpsProxy	unruled wire hooks: decoder, encoder, update_encoder
 tier2	compute/Reservation	unruled wire hooks: decoder, pre_update, update_encoder
@@ -200,7 +198,6 @@ tier3	dataproc/operations	no insert or create method
 tier3	dataproc/sparkApplications	no insert or create method
 tier3	dataproc/sparkApplications	no insert or create method
 tier1	dataproc/workflowTemplates	legacy alias of gcp.dataproc.workflowtemplate (projects.locations.workflowTemplates)
-tier2	dns/ManagedZone	unruled wire hooks: pre_delete, update_encoder
 tier2	dns/Policy	unruled wire hooks: pre_delete
 tier2	dns/ResponsePolicy	unruled wire hooks: pre_delete
 tier3	dns/changes	no delete method
@@ -290,8 +287,8 @@ tier3	monitoring/monitoredResourceDescriptors	no insert or create method
 tier3	monitoring/notificationChannelDescriptors	no insert or create method
 tier3	monitoring/snoozes	no delete method
 tier3	monitoring/timeSeries	no insert or create method
-tier3	monitoring/timeSeries	no insert or create method
 tier3	monitoring/timeSeries	no delete method
+tier3	monitoring/timeSeries	no insert or create method
 tier3	monitoring/uptimeCheckIps	no insert or create method
 tier3	networksecurity/AuthorizationPolicy	min_version is beta, not ga
 tier3	networksecurity/SacAttachment	min_version is beta, not ga
