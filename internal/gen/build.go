@@ -786,7 +786,44 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.SelfLink = t.SelfLink[:i]
 	}
 	if strings.HasSuffix(t.SelfLink, "/") || t.SelfLink == "" {
-		if first, _, _ := strings.Cut(t.ImportFormat, "\n"); first != "" {
+		// The API's OWN single-item path first, and magic-modules' import
+		// format only if there is none. A collection with no `get` still has
+		// a `delete`, and a delete addresses exactly one resource -- that is
+		// what it is for -- so its path is the id shape by definition.
+		//
+		// It matters for gcp.tagbinding, the one type in the corpus that
+		// reaches here. magic-modules says the id is "tagBindings/{{name}}",
+		// two segments. A real tag binding's name has FOUR:
+		//
+		//	tagBindings/%2F%2Fcloudresourcemanager.googleapis.com%2Fprojects%2F123456789012/tagValues/281479230039359
+		//
+		// Google percent-escapes the bound resource's own full name into one
+		// segment and appends "tagValues/<id>" as two more. Against a
+		// two-segment template ParseProviderID refuses the real id outright
+		// ("has more segments than gcp.tagbinding's id shape"), so import
+		// failed and every create stored an id addressing nothing. The API
+		// says the shape itself: tagBindings.delete is "v3/{+name}" with
+		// pattern "^tagBindings/.*$" -- reserved expansion, any number of
+		// segments, anchored on the collection.
+		if del := idTemplateFromDelete(col); del != "" {
+			t.SelfLink = del
+			// And it is what `infrena explain` must offer too. The
+			// import_format magic-modules supplied describes a shape the API
+			// does not accept, and a user reading it would type an id that
+			// is refused. self_link goes in front of it rather than
+			// replacing it: ParseProviderID still tries every line, and one
+			// of magic-modules' shorthands may well work.
+			t.ImportFormat = t.SelfLink + "\n" + t.ImportFormat
+			// And the delete template too, because it is the SAME path: this
+			// value came from the delete method. magic-modules says
+			// "tagBindings/{{name}}", a plain placeholder, so itemURL would
+			// percent-escape a name that is already escaped and DELETE
+			// "tagBindings/%252F%252F..." -- a url addressing nothing, on the
+			// one call whose failure leaves the resource behind. A delete_url
+			// that disagrees with the API's own delete path is not an
+			// override worth keeping.
+			t.DeleteURL = t.SelfLink
+		} else if first, _, _ := strings.Cut(t.ImportFormat, "\n"); first != "" {
 			t.SelfLink = first
 		}
 	}
@@ -1564,4 +1601,43 @@ func declareCreateURLParameters(t *catalog.Type, create *disco.Method) {
 			Description: desc,
 		}
 	}
+}
+
+// patternLiteralPrefixRE reads the literal path prefix out of a Discovery
+// parameter pattern whose tail is an unconstrained ".*" -- "^tagBindings/.*$"
+// gives "tagBindings". Only this exact shape, because it is the only one
+// that says "a fixed collection, then a name of any depth"; anything richer
+// is a constraint this cannot summarise into a template.
+var patternLiteralPrefixRE = regexp.MustCompile(`^\^([A-Za-z0-9]+)/\.\*\$$`)
+
+// idTemplateFromDelete is the id template the API's own delete method
+// implies, or "" when it implies none.
+//
+// A delete addresses exactly one resource, so its path IS an id shape. The
+// path is taken verbatim except for one addition: when it is a bare reserved
+// placeholder AND the parameter's pattern anchors the value on a literal
+// collection segment, that segment goes back in front. The anchor is not
+// decoration -- without it the template is "{+name}", which accepts any
+// string a user types and turns a typo into a 404 from Google instead of a
+// refusal naming the type. A wrong id that parses is worse than one that
+// errors.
+func idTemplateFromDelete(col disco.Collection) string {
+	del := col.Methods["delete"]
+	if del == nil || del.Path == "" {
+		return ""
+	}
+	path := strings.TrimPrefix(del.Path, pathPrefixOf(del.Path))
+	phs := templatePlaceholders(path)
+	if len(phs) != 1 || !phs[0].Reserved || path != "{+"+phs[0].Name+"}" {
+		return path
+	}
+	p := del.Parameters[phs[0].Name]
+	if p == nil || p.Location != "path" {
+		return path
+	}
+	m := patternLiteralPrefixRE.FindStringSubmatch(p.Pattern)
+	if m == nil {
+		return path
+	}
+	return m[1] + "/" + path
 }
