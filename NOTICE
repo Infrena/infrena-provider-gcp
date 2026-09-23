@@ -1,0 +1,41 @@
+infrena-provider-gcp
+Copyright 2026 Infrena
+
+This product includes software developed at Infrena.
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+--------------------------------------------------------------------------------
+Third-party material redistributed in this repository
+--------------------------------------------------------------------------------
+
+gen/mmv1/products/**/*.yaml
+
+  Vendored from GoogleCloudPlatform/magic-modules, at the commit recorded in
+  gen/mmv1.lock, by scripts/fetch-schemas.
+
+  Copyright Google Inc. and the magic-modules contributors.
+  Licensed under the Apache License, Version 2.0:
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Only mmv1/products is vendored, and only its .yaml files. That scope is a
+  licence boundary rather than a size one: magic-modules also contains
+  mmv1/third_party/ and tools/, which are MPL 2.0 and are NOT redistributed
+  here. scripts/fetch-schemas restricts the checkout to mmv1/products and then
+  refuses outright if either directory is present, and
+  scripts/scripts_test.go's TestFetchSchemasRefusesMPLDirectories keeps that
+  refusal honest.
+
+  1127 of the 1132 vendored files carry the Apache 2.0 header inline. The five
+  that do not (compute/InstanceTemplate.yaml, dialogflow/Environment.yaml,
+  iap/ForwardingRuleRegionalService.yaml, monitoring/Snooze.yaml,
+  networkservices/AgentConnectivityTemplate.yaml) omit the boilerplate upstream
+  and are covered by the magic-modules repository licence like the rest of the
+  tree.
+
+--------------------------------------------------------------------------------
+Material this repository reads but does NOT redistribute
+--------------------------------------------------------------------------------
+
+  Google API Discovery documents, fetched to schemas/ by scripts/fetch-schemas
+  and deliberately not committed. internal/catalog/catalog.json.gz is generated
+  from them, and contains descriptions authored by Google.
