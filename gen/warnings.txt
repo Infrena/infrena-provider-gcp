@@ -130,7 +130,6 @@ tier2	compute/Interconnect	unruled wire hooks: post_create
 tier2	compute/InterconnectAttachment	unruled wire hooks: post_create, pre_delete
 tier3	compute/MachineImage	min_version is beta, not ga
 tier3	compute/MachineType	magic-modules marks it exclude: true
-tier2	compute/Network	unruled wire hooks: decoder, encoder, post_create, update_encoder
 tier2	compute/NodeGroup	unruled wire hooks: pre_create
 tier2	compute/OrganizationSecurityPolicy	unruled wire hooks: post_create, post_delete, post_update
 tier3	compute/PreviewFeature	no insert or create method
@@ -150,7 +149,6 @@ tier2	compute/Snapshot	unruled wire hooks: decoder, pre_create
 tier2	compute/SslPolicy	unruled wire hooks: update_encoder
 tier2	compute/StoragePool	unruled wire hooks: pre_delete
 tier3	compute/StoragePoolType	magic-modules marks it exclude: true
-tier2	compute/Subnetwork	unruled wire hooks: post_update
 tier2	compute/TargetHttpsProxy	unruled wire hooks: decoder, encoder, update_encoder
 tier2	compute/TargetInstance	unruled wire hooks: post_create
 tier2	compute/VpnTunnel	unruled wire hooks: encoder, post_create
@@ -293,8 +291,8 @@ tier3	monitoring/monitoredResourceDescriptors	no insert or create method
 tier3	monitoring/notificationChannelDescriptors	no insert or create method
 tier3	monitoring/snoozes	no delete method
 tier3	monitoring/timeSeries	no insert or create method
-tier3	monitoring/timeSeries	no insert or create method
 tier3	monitoring/timeSeries	no delete method
+tier3	monitoring/timeSeries	no insert or create method
 tier3	monitoring/uptimeCheckIps	no insert or create method
 tier3	networksecurity/AuthorizationPolicy	min_version is beta, not ga
 tier3	networksecurity/SacAttachment	min_version is beta, not ga

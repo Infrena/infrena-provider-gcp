@@ -46,6 +46,69 @@ rulings:
       hook) — recorded for completeness, not because it does anything on
       infrena's wire.
 
+  # Both compute hooks below were read at the pinned mmv1 commit
+  # (2d08a4a7b218c0c9d6c3ba236eae45193d386f44) rather than inferred from their
+  # names, which is the only way to tell a hook that reshapes the wire from one
+  # that does Terraform's own bookkeeping.
+  compute/Network:
+    hooks: [decoder, encoder, post_create, update_encoder]
+    note: >
+      All four hooks are the Terraform provider's bookkeeping. None of them
+      changes what GCP receives for a configuration written in GCP's own
+      fields, which is why this ships.
+
+      post_create (compute_network_delete_default_route.tmpl) is gated on
+      `delete_default_routes_on_create`, a Terraform-only convenience field
+      with no counterpart in the compute API. When true it lists routes
+      matching the network with destRange 0.0.0.0/0 and deletes them. We do
+      not offer that field, so the hook has nothing to fire on.
+
+      encoder and update_encoder (compute_network.go.tmpl) do two things.
+      They map `bgp_always_compare_med` and `delete_bgp_always_compare_med` --
+      again Terraform-only fields -- onto routingConfig.bgpAlwaysCompareMed,
+      the real API field, which a user here sets directly. Then they
+      `delete(obj, "numeric_id")`, removing a Terraform-only computed field
+      from the body; we never put one there.
+
+      decoder (compute_network.go.tmpl) is one line: it copies res["id"] into
+      res["numericId"] before Terraform rewrites `id` into its own path-shaped
+      identifier. We do not rewrite ids, so there is nothing to preserve.
+
+      THE BOUNDED GAP, and it is deliberate: there is no
+      `delete_default_routes_on_create`. A network created here keeps the
+      default routes GCP gives it, which is GCP's own behaviour; deleting them
+      is a separate act. The BGP convenience pair is likewise absent -- set
+      routingConfig.bgpAlwaysCompareMed, and to clear it send the field
+      explicitly rather than dropping it, because updateMask never removes what
+      a request omits.
+
+  compute/Subnetwork:
+    hooks: [post_update]
+    note: >
+      One wire-affecting hook, and it exists to work around a Terraform
+      limitation this provider does not share in the same form.
+
+      post_update (compute_subnetwork.go.tmpl) is gated on
+      `send_secondary_ip_range_if_empty`, a Terraform-only field. When set, and
+      when configuration has no secondary_ip_range while state has some, it
+      sends a second PATCH carrying secondaryIpRanges: [] explicitly. Terraform
+      needs the flag because its schema cannot distinguish an absent list from
+      an empty one. We do not offer the field, so the hook has nothing to fire
+      on.
+
+      THE BOUNDED GAP is the same one the flag exists to paper over, and it is
+      worth stating plainly rather than discovering: REMOVING secondary ranges
+      from configuration does not clear them. updateMask only names fields a
+      request carries, so an omitted field is left alone -- that is the whole
+      reason "only adds or replaces, never removes" comes free (spec decision
+      on updateMask). To clear the ranges, set secondaryIpRanges to an empty
+      list explicitly.
+
+      The other three entries in this resource's custom_code -- constants,
+      extra_schema_entry and tgc_decoder -- are not wire-affecting and the
+      generator does not count them: the first two are Terraform schema and Go
+      declarations, the third belongs to a different tool entirely.
+
 aliases: {}
 
 # product_aliases: Discovery API name -> every vendored magic-modules product
@@ -74,10 +137,14 @@ discover_default:
   # list until Task 16's fallback discovery, so nothing noticed for nine tasks.
   # TestDiscoverDefaultNamesOnlyTypesWeServe now fails if it rots again.
   #
-  # Deliberately absent: a VPC network and a subnet, the two things anyone would
-  # most expect to discover. They cannot be listed because they are not served.
-  # This list should gain them the moment compute/Network and compute/Subnetwork
-  # get rulings.
+  # gcp.network and gcp.subnetwork were absent here for most of this project's
+  # life, because compute/Network and compute/Subnetwork were held back on
+  # unruled hooks. Both were ruled on 2026-09-23 once the hook templates were
+  # actually read rather than inferred from their names -- all five turned out
+  # to be the Terraform provider's own bookkeeping -- so the two things anyone
+  # would most expect to discover are finally here.
+  - gcp.network
+  - gcp.subnetwork
   - gcp.compute.instance
   - gcp.firewall
   - gcp.router
