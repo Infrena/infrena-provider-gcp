@@ -50,7 +50,7 @@ resources:
     type: gcp.subnetwork
     name: example-subnet
     cidr: 10.184.0.0/24
-    network: ${net.selfLink}
+    network: ${net}
 ```
 
 More in [`examples/`](examples/), all of which are compiled by CI so a stale one fails us rather
