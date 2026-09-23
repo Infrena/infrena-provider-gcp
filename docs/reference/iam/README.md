@@ -6,16 +6,16 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.credential`](gcp.credential.md) | **no** | **no** | yes | Represents an OauthClientCredential. |
-| [`gcp.iam.organization.role`](gcp.iam.organization.role.md) | **no** | **no** | yes | A role in the Identity and Access Management API. |
-| [`gcp.iam.role`](gcp.iam.role.md) | yes | **no** | yes | A role in the Identity and Access Management API. |
+| [`gcp.credential`](gcp.credential.md) | **no** | yes | yes | Represents an OauthClientCredential. |
+| [`gcp.iam.organization.role`](gcp.iam.organization.role.md) | **no** | yes | yes | A role in the Identity and Access Management API. |
+| [`gcp.iam.role`](gcp.iam.role.md) | yes | yes | yes | A role in the Identity and Access Management API. |
 | [`gcp.iam.serviceaccount.key`](gcp.iam.serviceaccount.key.md) | **no** | **no** | yes | The service account key create request. |
-| [`gcp.iam.workforcepool.provider`](gcp.iam.workforcepool.provider.md) | **no** | **no** | yes | A configuration for an external identity provider. |
+| [`gcp.iam.workforcepool.provider`](gcp.iam.workforcepool.provider.md) | **no** | yes | yes | A configuration for an external identity provider. |
 | [`gcp.iam.workforcepool.provider.key`](gcp.iam.workforcepool.provider.key.md) | **no** | **no** | yes | Represents a public key configuration for a Workforce Pool Provider. |
-| [`gcp.iam.workloadidentitypool.provider`](gcp.iam.workloadidentitypool.provider.md) | **no** | **no** | yes | A configuration for an external identity provider. |
+| [`gcp.iam.workloadidentitypool.provider`](gcp.iam.workloadidentitypool.provider.md) | **no** | yes | yes | A configuration for an external identity provider. |
 | [`gcp.iam.workloadidentitypool.provider.key`](gcp.iam.workloadidentitypool.provider.key.md) | **no** | **no** | yes | Represents a public key configuration for your workload identity pool provider. |
-| [`gcp.managedidentity`](gcp.managedidentity.md) | **no** | **no** | yes | Represents a managed identity for a workload identity pool namespace. |
-| [`gcp.namespace`](gcp.namespace.md) | **no** | **no** | yes | Represents a namespace for a workload identity pool. |
-| [`gcp.scimtenant`](gcp.scimtenant.md) | **no** | **no** | yes | Gemini Enterprise only. |
+| [`gcp.managedidentity`](gcp.managedidentity.md) | **no** | yes | yes | Represents a managed identity for a workload identity pool namespace. |
+| [`gcp.namespace`](gcp.namespace.md) | **no** | yes | yes | Represents a namespace for a workload identity pool. |
+| [`gcp.scimtenant`](gcp.scimtenant.md) | **no** | yes | yes | Gemini Enterprise only. |
 | [`gcp.serviceaccount`](gcp.serviceaccount.md) | yes | **no** | yes | An IAM service account. |
-| [`gcp.token`](gcp.token.md) | **no** | **no** | yes | Gemini Enterprise only. |
+| [`gcp.token`](gcp.token.md) | **no** | yes | yes | Gemini Enterprise only. |

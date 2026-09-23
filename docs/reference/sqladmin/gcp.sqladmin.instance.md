@@ -20,7 +20,7 @@ A Cloud SQL instance resource.
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/instances` |
 | Read | yes | `GET projects/{project}/instances/{instance}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/instances/{instance}` |
 | Delete | yes | `DELETE projects/{project}/instances/{instance}` |
 | Import | yes | by id, see below |
 

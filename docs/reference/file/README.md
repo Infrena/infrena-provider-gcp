@@ -6,6 +6,6 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.file.backup`](gcp.file.backup.md) | yes | **no** | yes | A Filestore backup. |
-| [`gcp.file.instance`](gcp.file.instance.md) | yes | **no** | yes | A Filestore instance. |
-| [`gcp.file.snapshot`](gcp.file.snapshot.md) | **no** | **no** | yes | A Filestore snapshot. |
+| [`gcp.file.backup`](gcp.file.backup.md) | yes | yes | yes | A Filestore backup. |
+| [`gcp.file.instance`](gcp.file.instance.md) | yes | yes | yes | A Filestore instance. |
+| [`gcp.file.snapshot`](gcp.file.snapshot.md) | **no** | yes | yes | A Filestore snapshot. |

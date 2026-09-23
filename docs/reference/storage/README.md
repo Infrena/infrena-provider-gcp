@@ -6,9 +6,9 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.bucketaccesscontrol`](gcp.bucketaccesscontrol.md) | yes | **no** | yes | Bucket ACLs can be managed authoritatively using the \[`storage_bucket_acl`\](https://registry.terraform.io/providers/hashicorp/google/lates … |
-| [`gcp.defaultobjectaccesscontrol`](gcp.defaultobjectaccesscontrol.md) | yes | **no** | yes | The DefaultObjectAccessControls resources represent the Access Control Lists (ACLs) applied to a new object within a Google Cloud Storage … |
+| [`gcp.bucketaccesscontrol`](gcp.bucketaccesscontrol.md) | yes | yes | yes | Bucket ACLs can be managed authoritatively using the \[`storage_bucket_acl`\](https://registry.terraform.io/providers/hashicorp/google/lates … |
+| [`gcp.defaultobjectaccesscontrol`](gcp.defaultobjectaccesscontrol.md) | yes | yes | yes | The DefaultObjectAccessControls resources represent the Access Control Lists (ACLs) applied to a new object within a Google Cloud Storage … |
 | [`gcp.notification`](gcp.notification.md) | yes | **no** | yes | A subscription to receive Google PubSub notifications. |
-| [`gcp.object`](gcp.object.md) | yes | **no** | yes | An object. |
-| [`gcp.objectaccesscontrol`](gcp.objectaccesscontrol.md) | yes | **no** | yes | The ObjectAccessControls resources represent the Access Control Lists (ACLs) for objects within Google Cloud Storage. |
-| [`gcp.storage.bucket`](gcp.storage.bucket.md) | yes | **no** | yes | The Buckets resource represents a bucket in Google Cloud Storage. |
+| [`gcp.object`](gcp.object.md) | yes | yes | yes | An object. |
+| [`gcp.objectaccesscontrol`](gcp.objectaccesscontrol.md) | yes | yes | yes | The ObjectAccessControls resources represent the Access Control Lists (ACLs) for objects within Google Cloud Storage. |
+| [`gcp.storage.bucket`](gcp.storage.bucket.md) | yes | yes | yes | The Buckets resource represents a bucket in Google Cloud Storage. |

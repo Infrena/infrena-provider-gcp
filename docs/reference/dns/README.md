@@ -6,5 +6,5 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.resourcerecordset`](gcp.resourcerecordset.md) | yes | **no** | yes | A unit of data that is returned by the DNS servers. |
+| [`gcp.resourcerecordset`](gcp.resourcerecordset.md) | yes | yes | yes | A unit of data that is returned by the DNS servers. |
 | [`gcp.responsepolicyrule`](gcp.responsepolicyrule.md) | yes | yes | yes | A Response Policy Rule is a selector that applies its behavior to queries that match the selector. |

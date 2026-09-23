@@ -6,6 +6,6 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.osconfig.folder.policyorchestrator`](gcp.osconfig.folder.policyorchestrator.md) | **no** | **no** | yes | A policy orchestrator manages project-level and zone-level policy resources, such as OS policy assignments. |
-| [`gcp.osconfig.organization.policyorchestrator`](gcp.osconfig.organization.policyorchestrator.md) | **no** | **no** | yes | A policy orchestrator manages project-level and zone-level policy resources, such as OS policy assignments. |
-| [`gcp.osconfig.policyorchestrator`](gcp.osconfig.policyorchestrator.md) | yes | **no** | yes | A policy orchestrator manages project-level and zone-level policy resources, such as OS policy assignments. |
+| [`gcp.osconfig.folder.policyorchestrator`](gcp.osconfig.folder.policyorchestrator.md) | **no** | yes | yes | A policy orchestrator manages project-level and zone-level policy resources, such as OS policy assignments. |
+| [`gcp.osconfig.organization.policyorchestrator`](gcp.osconfig.organization.policyorchestrator.md) | **no** | yes | yes | A policy orchestrator manages project-level and zone-level policy resources, such as OS policy assignments. |
+| [`gcp.osconfig.policyorchestrator`](gcp.osconfig.policyorchestrator.md) | yes | yes | yes | A policy orchestrator manages project-level and zone-level policy resources, such as OS policy assignments. |

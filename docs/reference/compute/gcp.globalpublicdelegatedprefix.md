@@ -20,7 +20,7 @@ A PublicDelegatedPrefix resource represents an IP block within a PublicAdvertise
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/global/publicDelegatedPrefixes` |
 | Read | yes | `GET projects/{project}/global/publicDelegatedPrefixes/{publicDelegatedPrefix}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/publicDelegatedPrefixes/{publicDelegatedPrefix}` |
 | Delete | yes | `DELETE projects/{project}/global/publicDelegatedPrefixes/{publicDelegatedPrefix}` |
 | Import | yes | by id, see below |
 

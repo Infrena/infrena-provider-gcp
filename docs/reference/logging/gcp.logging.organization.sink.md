@@ -21,7 +21,7 @@ Describes a sink used to export log entries to one of the following destinations
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/sinks` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+sinkName}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+sinkName}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+sinkName}` |
 | Import | yes | by id, see below |
 

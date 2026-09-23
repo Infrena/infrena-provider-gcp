@@ -21,7 +21,7 @@ The Cloud Deploy `Target` resource.
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/targets` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/targets/{{name}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{{project}}/locations/{{location}}/targets/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/targets/{{name}}` |
 | Import | yes | by id, see below |
 

@@ -7,6 +7,6 @@
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.dataproc.autoscalingpolicy`](gcp.dataproc.autoscalingpolicy.md) | yes | **no** | yes | Describes an autoscaling policy for Dataproc cluster autoscaler. |
-| [`gcp.dataproc.cluster`](gcp.dataproc.cluster.md) | yes | **no** | yes | Describes the identifying information, config, and status of a cluster |
+| [`gcp.dataproc.cluster`](gcp.dataproc.cluster.md) | yes | yes | yes | Describes the identifying information, config, and status of a cluster |
 | [`gcp.dataproc.session`](gcp.dataproc.session.md) | yes | **no** | yes | A representation of a session. |
 | [`gcp.dataproc.workflowtemplate`](gcp.dataproc.workflowtemplate.md) | yes | **no** | yes | A Dataproc workflow template resource. |

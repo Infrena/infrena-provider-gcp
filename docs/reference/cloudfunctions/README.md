@@ -6,4 +6,4 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.function`](gcp.function.md) | yes | **no** | yes | Describes a Cloud Function that contains user computation executed in response to an event. |
+| [`gcp.function`](gcp.function.md) | yes | yes | yes | Describes a Cloud Function that contains user computation executed in response to an event. |

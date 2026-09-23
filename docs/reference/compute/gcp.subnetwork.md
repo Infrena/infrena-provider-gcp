@@ -24,7 +24,7 @@ The other three entries in this resource's custom_code -- constants, extra_schem
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/regions/{{region}}/subnetworks` |
 | Read | yes | `GET projects/{project}/regions/{region}/subnetworks/{subnetwork}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/regions/{region}/subnetworks/{subnetwork}` |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/subnetworks/{subnetwork}` |
 | Import | yes | by id, see below |
 

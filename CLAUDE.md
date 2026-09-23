@@ -45,6 +45,14 @@ scripts/release-check vX.Y.Z
   for the same reason, and `createdID`/`stateFrom` fall back rather than erroring when an identity
   cannot be reduced.
 - **`Update` takes no extra read.** It diffs against the observation it was handed.
+- **The update verb is PATCH or nothing.** `magic-modules` spells `update_verb:` on only a
+  handful of resources and relies on its own default for the rest, so the generator asks the
+  Discovery collection too (`gen.discoveredUpdate`). It accepts **only** PATCH: `BuildMask` emits a
+  partial body, and a PUT replaces the resource with whatever body it is handed, so deriving PUT
+  would silently clear every field the diff left out — compute's instances collection is PUT-only.
+  It also refuses a patch whose request schema is not the resource's own (Pub/Sub's
+  `UpdateTopicRequest` wraps it and puts the mask in the body) or whose path is not the `get` path.
+  A type with no verb is not merely unpatchable: the host **replaces** it.
 - **Provider IDs are relative resource names** (`projects/p/zones/z/instances/web1`). None of the
   AWS `<region>/<identifier>` machinery applies: GCP names are already hierarchical and unique,
   which is what that machinery exists to fake.

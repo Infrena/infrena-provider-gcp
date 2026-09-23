@@ -21,7 +21,7 @@ ServiceBinding is the resource that defines a Service Directory Service to be us
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/global/serviceBindings?serviceBindingId={{name}}` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

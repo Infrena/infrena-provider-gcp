@@ -8,9 +8,9 @@
 | --- | --- | --- | --- | --- |
 | [`gcp.cloudresourcemanager.capabilityconfig`](gcp.cloudresourcemanager.capabilityconfig.md) | yes | yes | yes | Capability configs define the enabled capabilities and their scope of enforcement for folders, organizations, or projects within the … |
 | [`gcp.cloudresourcemanager.folder.capabilityconfig`](gcp.cloudresourcemanager.folder.capabilityconfig.md) | **no** | yes | yes | Capability configs define the enabled capabilities and their scope of enforcement for folders, organizations, or projects within the … |
-| [`gcp.cloudresourcemanager.folder.folder`](gcp.cloudresourcemanager.folder.folder.md) | yes | **no** | yes | A folder in an organization's resource hierarchy, used to organize that organization's resources. |
+| [`gcp.cloudresourcemanager.folder.folder`](gcp.cloudresourcemanager.folder.folder.md) | yes | yes | yes | A folder in an organization's resource hierarchy, used to organize that organization's resources. |
 | [`gcp.cloudresourcemanager.organization.capabilityconfig`](gcp.cloudresourcemanager.organization.capabilityconfig.md) | **no** | yes | yes | Capability configs define the enabled capabilities and their scope of enforcement for folders, organizations, or projects within the … |
-| [`gcp.project`](gcp.project.md) | yes | **no** | yes | A project is a high-level Google Cloud entity. |
+| [`gcp.project`](gcp.project.md) | yes | yes | yes | A project is a high-level Google Cloud entity. |
 | [`gcp.tagbinding`](gcp.tagbinding.md) | yes | **no** | yes | A TagBinding represents a connection between a TagValue and a cloud resource (currently project, folder, or organization). |
 | [`gcp.tagkey`](gcp.tagkey.md) | yes | yes | yes | A TagKey, used to group a set of TagValues. |
 | [`gcp.tagvalue`](gcp.tagvalue.md) | yes | yes | yes | A TagValue is a child of a particular TagKey. |

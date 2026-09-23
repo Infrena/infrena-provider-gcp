@@ -20,7 +20,7 @@ Represents a Google Cloud Armor security policy resource. Only external backend 
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/global/securityPolicies` |
 | Read | yes | `GET projects/{project}/global/securityPolicies/{securityPolicy}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/securityPolicies/{securityPolicy}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{project}/global/securityPolicies/{securityPolicy}` |
 | Import | yes | by id, see below |
 
