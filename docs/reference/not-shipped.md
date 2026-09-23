@@ -17,7 +17,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 85 |
+| [unruled wire hooks](#unruled-wire-hooks) | 84 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
@@ -25,7 +25,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [no get method](#no-get-method) | 2 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 65 |
 
-**380** types did not ship. **65** more ship without a create.
+**379** types did not ship. **65** more ship without a create.
 
 ## no insert or create method
 
@@ -299,7 +299,6 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `alloydb/Cluster` | 2 | pre_create, pre_delete, pre_update |
 | `alloydb/Instance` | 2 | custom_import, decoder, pre_create, pre_delete |
 | `alloydb/User` | 2 | custom_import, pre_update |
-| `artifactregistry/Repository` | 2 | encoder, pre_update |
 | `bigquery/Dataset` | 2 | update_encoder |
 | `bigquery/Job` | 2 | encoder |
 | `bigquery/RowAccessPolicy` | 2 | pre_delete |
