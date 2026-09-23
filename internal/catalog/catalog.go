@@ -13,6 +13,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/infrena/infrena/pkg/schema"
 	"github.com/infrena/infrena/pkg/value"
@@ -231,7 +232,8 @@ type Catalog struct {
 	// is short rather than exhaustive.
 	DiscoverDefault []string `json:"discover_default,omitempty"`
 
-	byName map[string]*Type
+	byName    map[string]*Type
+	indexOnce sync.Once
 }
 
 // Encode writes a catalog as gzipped JSON.
@@ -264,22 +266,37 @@ func Decode(blob []byte) (*Catalog, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("catalog: %w", err)
 	}
-	c.index()
+	c.indexOnce.Do(c.index)
 	return &c, nil
 }
 
+// index builds the name lookup. Call it through indexOnce, never directly.
 func (c *Catalog) index() {
-	c.byName = make(map[string]*Type, len(c.Types))
+	byName := make(map[string]*Type, len(c.Types))
 	for _, t := range c.Types {
-		c.byName[t.Name] = t
+		byName[t.Name] = t
 	}
+	// Assigned whole, after it is fully built. A reader that sees the field
+	// non-nil sees a complete map, never one still filling.
+	c.byName = byName
 }
 
 // Type looks one up by infrena type name.
+// THE INDEX IS BUILT ONCE, UNDER A LOCK, BECAUSE READS ARE CONCURRENT.
+//
+// This used to be `if c.byName == nil { c.index() }`, which is safe only for a
+// Catalog that arrived already indexed. Decode does index eagerly -- but
+// gcpplugin's redirect (the endpoint override) builds a Catalog STRUCT LITERAL
+// from the shared one, and a literal has a nil byName. The provider then serves
+// a plan's refreshes concurrently, two goroutines both saw nil, both rebuilt the
+// map, and one replaced it while another was reading: a lookup missed a type
+// that exists.
+//
+// It failed about one run in six and presented as `unknown type "gcp.urlmap"`
+// for a type plainly in the catalog. CI caught it on its second day; six local
+// runs under four different configurations had not.
 func (c *Catalog) Type(name string) (*Type, bool) {
-	if c.byName == nil {
-		c.index()
-	}
+	c.indexOnce.Do(c.index)
 	t, ok := c.byName[name]
 	return t, ok
 }

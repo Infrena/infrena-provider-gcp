@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/infrena/infrena/pkg/schema"
@@ -289,4 +290,34 @@ func TestImportDescriptionRendersEveryAcceptedShape(t *testing.T) {
 			t.Errorf("description %q is missing accepted shape %q", desc, want)
 		}
 	}
+}
+
+// TestTypeIsSafeUnderConcurrentLookup. A Catalog built as a struct literal has
+// no index, and gcpplugin's redirect builds exactly that from the shared one.
+// The provider then serves a plan's refreshes concurrently.
+//
+// Before indexOnce this raced: two goroutines both found byName nil, both
+// rebuilt it, and one replaced the map while another read it, so a lookup
+// missed a type that exists. It surfaced as `unknown type "gcp.urlmap"` about
+// one e2e run in six.
+//
+// Run with -race, which is what turns this from a probabilistic test into a
+// deterministic one.
+func TestTypeIsSafeUnderConcurrentLookup(t *testing.T) {
+	c := &Catalog{Types: []*Type{
+		{Name: "gcp.one"}, {Name: "gcp.two"}, {Name: "gcp.three"},
+	}}
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, n := range []string{"gcp.one", "gcp.two", "gcp.three"} {
+				if _, ok := c.Type(n); !ok {
+					t.Errorf("%s is in the catalog but the lookup missed it", n)
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
