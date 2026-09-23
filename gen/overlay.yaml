@@ -109,7 +109,37 @@ rulings:
       generator does not count them: the first two are Terraform schema and Go
       declarations, the third belongs to a different tool entirely.
 
-aliases: {}
+# Curated aliases: the short word people actually say, for attributes they write
+# constantly. The generator already emits a snake_case alias for EVERY camelCase
+# attribute (11,680 of them), so this file is only for the cases where the
+# mechanical spelling is not the natural one -- ip_cidr_range is correct and
+# nobody says it.
+#
+# TOP LEVEL ONLY. The format below is type -> attribute -> alias, with no path
+# notation, so a nested attribute cannot be given one here. That is a real
+# limit, not an oversight: infrena resolves nested aliases from v0.14.1 and
+# element aliases from v0.15.0, so a nested curated alias would work if this
+# file could express one.
+#
+# AN ALIAS IS A ONE-WAY COMMITMENT. Adding one later is additive; correcting or
+# removing a published one breaks whoever wrote it. Kept deliberately small for
+# that reason, and every entry below is a word that appears in Google's own
+# documentation prose for the same field.
+aliases:
+  gcp.subnetwork:
+    ipCidrRange: cidr
+  gcp.network:
+    autoCreateSubnetworks: auto_subnets
+  gcp.firewall:
+    sourceRanges: sources
+    destinationRanges: destinations
+    targetTags: targets
+  gcp.compute.instance:
+    machineType: machine
+  gcp.storage.bucket:
+    storageClass: class
+  gcp.container.cluster:
+    initialNodeCount: node_count
 
 # product_aliases: Discovery API name -> every vendored magic-modules product
 # directory that also carries resources for it. mmv1's directory names
