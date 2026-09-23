@@ -150,20 +150,67 @@ func ListFieldOf(d *disco.Document, col disco.Collection) string {
 	return ""
 }
 
-// snake converts GCP's lowerCamelCase to snake_case.
+// snake converts GCP's lowerCamelCase to snake_case, KEEPING ACRONYMS WHOLE.
+//
+// The first version put an underscore before every capital, which shattered
+// every acronym GCP uses: IPProtocol became "i_p_protocol", natIP "nat_i_p",
+// IPv4Range "i_pv4_range". Twelve aliases in the catalog were mangled that way,
+// on attributes people actually write -- IPProtocol is how a firewall rule
+// names its protocol.
+//
+// Caught before v0.1.0 was tagged, which matters: an alias is a compatibility
+// commitment. Adding one later is additive, but correcting a published one
+// breaks whoever wrote it.
+//
+// Two rules beyond the obvious lower-to-upper boundary:
+//
+//   A run of capitals ends one character early when a lowercase follows, so
+//   "IPProtocol" splits IP|Protocol rather than IPP|rotocol.
+//
+//   ...except when that lowercase is a plural "s" or a version suffix ("v4",
+//   "v6"), which belong to the acronym: "internalIPs" is internal|IPs, and
+//   "IPv4Range" is IPv4|Range. Without this the first rule reintroduces the
+//   bug for exactly the names it was written to fix.
 func snake(s string) string {
+	r := []rune(s)
 	var b strings.Builder
-	for i, r := range s {
-		if unicode.IsUpper(r) {
-			if i > 0 {
-				b.WriteByte('_')
-			}
-			b.WriteRune(unicode.ToLower(r))
-			continue
+	for i := 0; i < len(r); i++ {
+		if i > 0 && startsWord(r, i) {
+			b.WriteByte('_')
 		}
-		b.WriteRune(r)
+		b.WriteRune(unicode.ToLower(r[i]))
 	}
 	return b.String()
+}
+
+// startsWord reports whether r[i] begins a new snake_case word.
+func startsWord(r []rune, i int) bool {
+	if !unicode.IsUpper(r[i]) {
+		return false
+	}
+	prev := r[i-1]
+	// gatewayIPv4, natIP: an upper after a lower or a digit always starts one.
+	if !unicode.IsUpper(prev) {
+		return true
+	}
+	// Inside a run of capitals. It only ends here if a lowercase follows, and
+	// then only if that lowercase is not part of this same acronym.
+	if i+1 >= len(r) || !unicode.IsLower(r[i+1]) {
+		return false
+	}
+	return !acronymTail(r, i+1)
+}
+
+// acronymTail reports whether the lowercase run at r[i] belongs to the capitals
+// before it rather than to the next word: the "s" of IPs, the "v4" of IPv4.
+func acronymTail(r []rune, i int) bool {
+	if r[i] == 's' && (i+1 == len(r) || unicode.IsUpper(r[i+1])) {
+		return true // IPs, externalIPs
+	}
+	if (r[i] == 'v' || r[i] == 'V') && i+1 < len(r) && unicode.IsDigit(r[i+1]) {
+		return true // IPv4, IPv6
+	}
+	return false
 }
 
 // mmIndex flattens one magic-modules resource's fields by name, at every depth,
