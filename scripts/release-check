@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# release-check TAG: refuse to release unless the git tag, plugin.yaml's version and the version
+# the built binary reports all agree, and plugin.yaml's protocol: is exactly the protocol version
+# the binary's handshake announces. The manifest is authoritative and the
+# binary secondary; this check is what blocks a release where they disagree.
+#
+# PLUGIN_VERSION_SYMBOL overrides the -ldflags -X target. It exists so a test can simulate the
+# variable being renamed, which `go build -X` otherwise ignores in silence.
+#
+# PLUGIN_MANIFEST overrides the manifest path (default plugin.yaml, relative to the repo root).
+# It exists so a test can feed a manifest other than the repo's own — e.g. one with CRLF line
+# endings — which no test could otherwise reach.
+set -euo pipefail
+
+tag="${1:?usage: scripts/release-check vMAJOR.MINOR.PATCH}"
+version="${tag#v}"
+if [[ "$tag" != v* || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "release-check: tag '$tag' is not vMAJOR.MINOR.PATCH" >&2
+  exit 1
+fi
+
+# CDPATH= : an interactive CDPATH makes cd echo the resolved directory, which would put a
+# stray path line in release output. Harmless in CI, which has none set, but this script is
+# also run by hand.
+CDPATH= cd "$(dirname "$0")/.."
+manifest="${PLUGIN_MANIFEST:-plugin.yaml}"
+
+manifest_version="$(sed -n 's/^version:[[:space:]]*//p' "$manifest" | tr -d "\"' \r")"
+if [[ -z "$manifest_version" ]]; then
+  echo "release-check: $manifest has no top-level version: line" >&2
+  exit 1
+fi
+if [[ "$manifest_version" != "$version" ]]; then
+  echo "release-check: tag $tag names version $version, but $manifest says $manifest_version" >&2
+  exit 1
+fi
+
+symbol="${PLUGIN_VERSION_SYMBOL:-github.com/infrena/infrena-provider-gcp/internal/gcpplugin.Version}"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+CGO_ENABLED=0 go build -trimpath -ldflags "-X ${symbol}=${version}" -o "$work/infrena-plugin-gcp" ./cmd/infrena-plugin-gcp
+
+# The binary refuses to start without the host's cookie. With it and an empty stdin, it writes
+# its handshake {"protocol","name","version"} and exits. Captured whole, not piped to head,
+# so pipefail cannot turn an early-closed pipe into a false failure.
+out="$(INFRENA_PLUGIN_COOKIE=release-check "$work/infrena-plugin-gcp" </dev/null 2>/dev/null)"
+handshake="${out%%$'\n'*}"
+reported="$(printf '%s' "$handshake" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
+if [[ "$reported" != "$version" ]]; then
+  echo "release-check: the binary reports version '${reported}', not $version (handshake: $handshake)" >&2
+  echo "The -ldflags symbol ${symbol} does not set internal/gcpplugin.Version; every archive would report the wrong version." >&2
+  exit 1
+fi
+
+# protocol: is the versions THIS release's binary speaks. An
+# SDK-built binary announces exactly one, so the manifest must say exactly [that]. Compared with
+# whitespace stripped, so `[2]` and `[ 2 ]` agree and `[2, 1]` does not.
+manifest_protocol="$(sed -n 's/^protocol:[[:space:]]*//p' "$manifest" | sed 's/[[:space:]]*#.*//' | tr -d " \r")"
+spoken="$(printf '%s' "$handshake" | sed -n 's/.*"protocol":\([0-9][0-9]*\).*/\1/p')"
+if [[ -z "$spoken" ]]; then
+  echo "release-check: the binary's handshake carries no protocol version (handshake: $handshake)" >&2
+  exit 1
+fi
+if [[ "$manifest_protocol" != "[$spoken]" ]]; then
+  echo "release-check: $manifest says protocol: ${manifest_protocol:-<missing>}, but the binary speaks protocol $spoken, so it must say [$spoken]" >&2
+  echo "protocol: changes in the same commit as go.mod's infrena require." >&2
+  exit 1
+fi
+echo "release-check: tag, plugin.yaml and binary all say $version, and speak protocol [$spoken]"

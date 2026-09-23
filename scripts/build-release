@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# build-release VERSION OUTDIR: cross-compile infrena-plugin-gcp for every platform plugin.yaml
+# lists, archived under the name `infrena plugins install` constructs:
+# infrena-plugin-gcp_<version>_<goos>_<goarch>.tar.gz, and .zip for windows.
+#
+# PLATFORMS (space-separated GOOS/GOARCH) overrides the manifest's list, so a test can build two
+# platforms instead of eight.
+set -euo pipefail
+
+version="${1:?usage: scripts/build-release VERSION OUTDIR}"
+out="${2:?usage: scripts/build-release VERSION OUTDIR}"
+# CDPATH= : an interactive CDPATH makes cd echo the resolved directory, which would put a
+# stray path line in release output. Harmless in CI, which has none set, but this script is
+# also run by hand.
+CDPATH= cd "$(dirname "$0")/.."
+mkdir -p "$out"
+out="$(cd "$out" && pwd)"
+
+platforms="${PLATFORMS:-$(sed -n 's/^platforms:[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' plugin.yaml | tr ',' ' ')}"
+if [[ -z "${platforms// /}" ]]; then
+  echo "build-release: plugin.yaml has no single-line platforms: [...] list" >&2
+  exit 1
+fi
+
+for platform in $platforms; do
+  goos="${platform%/*}"
+  goarch="${platform#*/}"
+  name="infrena-plugin-gcp"
+  if [[ "$goos" == windows ]]; then name="$name.exe"; fi
+  goarm=""
+  if [[ "$goarch" == arm ]]; then goarm=7; fi   # still named _linux_arm: install builds the name from <goos>_<goarch>
+  stem="infrena-plugin-gcp_${version}_${goos}_${goarch}"
+
+  work="$(mktemp -d)"
+  mkdir "$work/$stem"
+  echo "==> $platform"
+  # CGO_ENABLED=0: a static binary that runs without a matching libc. -trimpath: no build-machine
+  # paths. Not -s -w: a stack trace is the whole diagnostic when a plugin panics.
+  CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" GOARM="$goarm" \
+    go build -trimpath \
+      -ldflags "-X github.com/infrena/infrena-provider-gcp/internal/gcpplugin.Version=${version}" \
+      -o "$work/$stem/$name" ./cmd/infrena-plugin-gcp
+  # README.md is Task 17's; until it exists the archive carries plugin.yaml alone.
+  if [[ -f README.md ]]; then cp README.md plugin.yaml "$work/$stem/"; else cp plugin.yaml "$work/$stem/"; fi
+  if [[ "$goos" == windows ]]; then
+    (cd "$work" && zip -qr "$out/$stem.zip" "$stem")
+  else
+    tar -czf "$out/$stem.tar.gz" -C "$work" "$stem"
+  fi
+  rm -rf "$work"
+done
