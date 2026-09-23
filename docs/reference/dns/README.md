@@ -2,9 +2,10 @@
 
 # dns
 
-2 type(s). [Back to the index](../README.md).
+3 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
+| [`gcp.managedzone`](gcp.managedzone.md) | yes | yes | yes | A zone is a subtree of the DNS namespace under one administrative responsibility. |
 | [`gcp.resourcerecordset`](gcp.resourcerecordset.md) | yes | yes | yes | A unit of data that is returned by the DNS servers. |
 | [`gcp.responsepolicyrule`](gcp.responsepolicyrule.md) | yes | yes | yes | A Response Policy Rule is a selector that applies its behavior to queries that match the selector. |

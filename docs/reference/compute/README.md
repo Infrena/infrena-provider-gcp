@@ -2,7 +2,7 @@
 
 # compute
 
-60 type(s). [Back to the index](../README.md).
+62 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
@@ -13,6 +13,7 @@
 | [`gcp.firewall`](gcp.firewall.md) | yes | yes | yes | Each network has its own firewall controlling access to and from the instances. |
 | [`gcp.globalnetworkendpointgroup`](gcp.globalnetworkendpointgroup.md) | yes | **no** | yes | A global network endpoint group contains endpoints that reside outside of Google Cloud. |
 | [`gcp.globalpublicdelegatedprefix`](gcp.globalpublicdelegatedprefix.md) | yes | yes | yes | A PublicDelegatedPrefix resource represents an IP block within a PublicAdvertisedPrefix that is configured within a single cloud scope … |
+| [`gcp.healthcheck`](gcp.healthcheck.md) | yes | yes | yes | Health Checks determine whether instances are responsive and able to do work. |
 | [`gcp.httphealthcheck`](gcp.httphealthcheck.md) | yes | yes | yes | An HttpHealthCheck resource. |
 | [`gcp.httpshealthcheck`](gcp.httpshealthcheck.md) | yes | yes | yes | An HttpsHealthCheck resource. |
 | [`gcp.image`](gcp.image.md) | yes | yes | yes | Represents an Image resource. |
@@ -35,6 +36,7 @@
 | [`gcp.regionautoscaler`](gcp.regionautoscaler.md) | yes | **no** | yes | Represents an Autoscaler resource. |
 | [`gcp.regioncompositehealthcheck`](gcp.regioncompositehealthcheck.md) | yes | yes | yes | A composite health check resource specifies the health source resources and the health destination resource to which the aggregated health … |
 | [`gcp.regionhealthaggregationpolicy`](gcp.regionhealthaggregationpolicy.md) | yes | yes | yes | The Health Aggregation Policy specifies how to aggregate the service's constituent source health status to determine an aggregated health … |
+| [`gcp.regionhealthcheck`](gcp.regionhealthcheck.md) | yes | yes | yes | Health Checks determine whether instances are responsive and able to do work. |
 | [`gcp.regionhealthcheckservice`](gcp.regionhealthcheckservice.md) | yes | yes | yes | Represents a Health-Check as a Service resource. |
 | [`gcp.regionhealthsource`](gcp.regionhealthsource.md) | yes | yes | yes | A health source resource specifies the source resources and the health aggregation policy applied to the source resources to determine the … |
 | [`gcp.regioninstancegroupmanagerresizerequest`](gcp.regioninstancegroupmanagerresizerequest.md) | yes | **no** | yes | InstanceGroupManagerResizeRequest represents a request to create a number of VMs: either immediately or by queuing the request for the … |

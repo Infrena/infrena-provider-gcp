@@ -2,12 +2,12 @@
 
 # GCP type reference
 
-This plugin serves **236 types** across 35 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
+This plugin serves **239 types** across 35 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
 - Catalog generated: 2026-09-23
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
-**[Types that are not served, and why](not-shipped.md)** — 379 entries. Read that page first if the type you want is missing from this one.
+**[Types that are not served, and why](not-shipped.md)** — 376 entries. Read that page first if the type you want is missing from this one.
 
 ## Services
 
@@ -28,10 +28,10 @@ This plugin serves **236 types** across 35 Google Cloud services. Every page bel
 | [cloudresourcemanager](cloudresourcemanager/README.md) | 8 |
 | [cloudtasks](cloudtasks/README.md) | 1 |
 | [composer](composer/README.md) | 3 |
-| [compute](compute/README.md) | 60 |
+| [compute](compute/README.md) | 62 |
 | [container](container/README.md) | 2 |
 | [dataproc](dataproc/README.md) | 4 |
-| [dns](dns/README.md) | 2 |
+| [dns](dns/README.md) | 3 |
 | [eventarc](eventarc/README.md) | 7 |
 | [file](file/README.md) | 3 |
 | [firestore](firestore/README.md) | 4 |
