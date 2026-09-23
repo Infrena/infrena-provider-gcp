@@ -1,0 +1,110 @@
+name: CI
+
+# Two jobs, answering two questions.
+#   pinned  Does this plugin work with the infrena go.mod requires? Builds with GOWORK=off against that release and runs
+#           the e2e suite against a host built from the same tag. Blocking, and what a release runs.
+#   main    Has infrena main broken us? Builds through a workspace against infrena's main. Advisory.
+#
+# Both jobs treat a SKIP as a failure wherever a skip would otherwise read as a pass. That is not
+# defensiveness for its own sake: this repository had no CI until now, and the check written to stop
+# a compute operation being polled at a url that expands cleanly and addresses nothing -- the defect
+# that broke every GKE cluster mutation -- read gitignored schemas/ and so skipped on every machine
+# that had not run the fetch script. It had very likely never executed anywhere but one laptop.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  pinned:
+    name: against the required infrena release
+    runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: infrena-provider-gcp
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache-dependency-path: infrena-provider-gcp/go.sum
+      - name: Read the infrena release go.mod requires
+        id: infrena
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          v="$(go mod edit -json | jq -r '.Require[] | select(.Path == "github.com/infrena/infrena") | .Version')"
+          [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::go.mod requires infrena $v, which is not a release tag"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      # The e2e host, at ../infrena where the suite looks for it, built from the same tag the plugin compiles against.
+      - uses: actions/checkout@v7
+        with:
+          repository: infrena/infrena
+          ref: ${{ steps.infrena.outputs.version }}
+          path: infrena
+      - name: gofmt
+        working-directory: infrena-provider-gcp
+        run: test -z "$(gofmt -l .)"
+      - name: vet
+        working-directory: infrena-provider-gcp
+        run: go vet ./... && go vet -tags e2e,live ./...
+      - name: test
+        working-directory: infrena-provider-gcp
+        run: go test -count=1 ./...
+      # schemas/ is gitignored and produced by scripts/fetch-schemas, so CI is exactly the clean
+      # checkout these guards used to skip in. Their patterns are committed data now
+      # (catalog.Type.OperationParamPatterns); this fails if a schemas/ dependency ever comes back,
+      # because the symptom would be a green run that asserted nothing.
+      - name: the operation-url guards must run, not skip
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          go test -count=1 -v -run TestEveryOperationURL ./internal/gcprov/ 2>&1 | tee "$RUNNER_TEMP/ops.log"
+          if grep -q -- '--- SKIP' "$RUNNER_TEMP/ops.log"; then
+            echo "::error::an operation-url guard skipped instead of running; a skip reads exactly like a pass"
+            exit 1
+          fi
+      - name: e2e against infrena ${{ steps.infrena.outputs.version }}
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          go test -tags e2e -count=1 -v ./e2e/ 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+          if grep -q 'E2E SKIPPED' "$RUNNER_TEMP/e2e.log"; then
+            echo "::error::the e2e suite skipped instead of running against ../infrena"
+            exit 1
+          fi
+
+  main:
+    name: against infrena main (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: infrena-provider-gcp
+      - uses: actions/checkout@v7
+        with:
+          repository: infrena/infrena
+          path: infrena
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache-dependency-path: infrena-provider-gcp/go.sum
+      - name: test and e2e against infrena main
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          go work init . ../infrena
+          go test -count=1 ./...
+          go test -tags e2e -count=1 -v ./e2e/ 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+          if grep -q 'E2E SKIPPED' "$RUNNER_TEMP/e2e.log"; then exit 1; fi
