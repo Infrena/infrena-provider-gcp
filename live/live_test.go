@@ -421,12 +421,13 @@ const networkTmpl = "https://www.googleapis.com/compute/v1/projects/%s/global/ne
 // names holds one run's resource names. Every one carries the run id, so two
 // runs never collide and a leaked resource says which run leaked it.
 type names struct {
-	run      string
-	bucket   string
-	tagKey   string
-	tagValue string
-	firewall string
-	instance string
+	run            string
+	bucket         string
+	tagKey         string
+	tagValue       string
+	firewall       string
+	instance       string
+	serviceAccount string
 }
 
 func newNames() names {
@@ -436,8 +437,12 @@ func newNames() names {
 		bucket:   "infrena-live-" + run,
 		tagKey:   "infrena-live-" + run,
 		tagValue: "live",
-		firewall: "infrena-live-" + run,
-		instance: "infrena-live-" + run,
+		// An account id is 6-30 characters, [a-z][a-z0-9-]*[a-z0-9]. "sa-"
+		// plus the run's own unix timestamp is 13, well inside it, and
+		// unique per run like every other name here.
+		serviceAccount: "sa-" + run,
+		firewall:       "infrena-live-" + run,
+		instance:       "infrena-live-" + run,
 	}
 }
 
@@ -465,14 +470,12 @@ func newNames() names {
 // instance down with them and no other claim here could be made at all.
 // They are measured on their own in TestLiveTagTypes.
 //
-// gcp.serviceaccount was in the brief's resource set and is NOT here.
-// Measured before the first live call: its create url template is
-// "{+name}/serviceAccounts", the type declares only `accountId` and
-// `serviceAccount` as attributes, and withScope supplies project/region/
-// zone/location and not `name`. So the create url cannot be expanded from
-// anything a user can write, and a create fails with
-// `url template "{+name}/serviceAccounts" needs "name", which is not set`
-// before a request is sent. See the task report; it has its own follow-up.
+// gcp.serviceaccount IS BACK in this suite but NOT in this project, for the
+// same reason the tag types are not: it is measured on its own, in
+// TestLiveServiceAccount. Task 18 dropped it because its create url could
+// not be built at all, which is the class task 18b fixed; whether the rest
+// of its lifecycle works is a separate question, and a type that fails it
+// here would take the bucket, the firewall and the instance down with it.
 func config(project string, n names) string {
 	return fmt.Sprintf(`# Written by live/live_test.go. Everything here is real.
 project: infrena-gcp-live
@@ -895,7 +898,7 @@ resources:
 // bucket, the firewall and the instance down with them, so no claim about
 // any of those could be made at all.
 //
-// WHAT IT IS FOR, once the defect below is fixed:
+// WHAT IT IS FOR:
 //
 //   - gcp.tagkey and gcp.tagvalue are a google.longrunning.Operation await,
 //     the strategy 189 of the sampled methods use and which nothing else in
@@ -907,21 +910,31 @@ resources:
 //     the ONLY type in the catalog with no get method: cloudresourcemanager
 //     v3's tagBindings publishes create, delete and list and nothing else.
 //
-// WHAT IT ACTUALLY FINDS, measured 2026-09-22: every one of the three fails
-// its create with
+// IT PASSES AS OF 2026-09-23, and it took four defects to get there. Every
+// one of them was found here and by nothing else:
 //
-//	gcp.tagkey: created, but the resource cannot be read back:
-//	Invalid CRM resource name: 'tagKeys/tagKeys%2F281476416384200' (400)
+//   - the id: ProviderID expanded a `name` that was already the relative
+//     resource name, storing "tagKeys/tagKeys%2F281476416384200" (task 18a);
+//   - the await: awaitLongRunning refused a finished operation for having no
+//     name to poll (18a);
+//   - the envelope: a google.longrunning response is a google.protobuf.Any
+//     and its "@type" reached state (18a);
+//   - the project number: the configuration writes
+//     `parent: projects/example-project-1234` and Cloud Resource Manager
+//     answers `parent: "projects/123456789012"`. Same project, canonical
+//     form, different string -- and `parent` is ForceNew, so every plan
+//     after a successful apply proposed replacing the tag key, forever
+//     (task 18b).
 //
-// The create response carries name "tagKeys/281476416384200"; self_link is
-// "tagKeys/{{name}}"; ProviderID expands the one against the other, escaping
-// the id's own prefix back into the result. THE RESOURCE IS REAL AND THE
-// ERROR ORPHANS IT: the host drops a failed create's result, so every run
-// leaves a tag key nothing tracks. This suite's sweep finds them by short
-// name and deletes them, which is the only reason the project is not full of
-// them.
+// So the clean second plan below is the assertion that matters most: it is
+// the only one that can catch a project id answered as a project number.
+// If it starts proposing a replace of tagkey because of [parent [forces
+// new]], the number resolution in internal/gcprov/projects.go has come
+// undone.
 //
-// The defect was reported against gcp.tagbinding alone. It reaches all three.
+// Spec decision G6 requires tagkey, tagvalue AND tagbinding at v1.0. This
+// test passing, together with TestLiveTagBindingOnASeededTag, is what
+// satisfies it.
 func TestLiveTagTypes(t *testing.T) {
 	project, sa := guard(t)
 	n := newNames()
@@ -1018,6 +1031,159 @@ resources:
 	if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges {
 		t.Errorf("destroying the tag types: exit %d\n%s", r.ExitCode, r.combined())
 	}
+}
+
+// TestLiveServiceAccount is the live proof of task 18b's part B, on the one
+// type James named.
+//
+// Task 18 dropped gcp.serviceaccount from the live resource set because it
+// could not be created AT ALL: its create url template is
+// "{+name}/serviceAccounts", the type declares only `accountId` and
+// `serviceAccount` as attributes, and nothing supplied `name` -- so every
+// create failed with
+//
+//	url template "{+name}/serviceAccounts" needs "name", which is not set
+//
+// before a request was sent. It was one instance of a class of 38. iam
+// publishes a `pattern` of `^projects/[^/]+$` for that method's own `name`
+// parameter -- so the placeholder means the PARENT PROJECT, not the service
+// account, even though the SAME collection's `get` uses the identical
+// spelling for the service account itself. The generator now binds it from
+// the pattern.
+//
+// A PROJECT OF ITS OWN, for the same reason the tag types have one. Whether
+// the create url can be built is one question and whether the rest of the
+// lifecycle works is another; a failure in the second must not take the
+// bucket, the firewall and the instance down with it, which is exactly what
+// happened to this suite once already.
+//
+// A service account is free and costs nothing per minute. The sweep deletes
+// it whatever happens, including when the apply fails halfway, because a
+// create that succeeds and is then refused by the host leaves a real
+// account behind -- the orphan rule, which this project has now seen six
+// times.
+func TestLiveServiceAccount(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	email := n.serviceAccount + "@" + project + ".iam.gserviceaccount.com"
+	name := "projects/" + project + "/serviceAccounts/" + email
+	t.Logf("live run %s: creating %s", n.run, name)
+
+	// BEFORE the apply. See TestLiveWorkflow.
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 5*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.serviceaccount", name, g.iamURL(name))
+	})
+
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", fmt.Sprintf(`project: infrena-gcp-live-sa
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    zone: %[3]s
+    impersonate_service_account: %[4]s
+resources:
+  sa:
+    type: gcp.serviceaccount
+    accountId: %[5]s
+    serviceAccount:
+      displayName: infrena live suite, run %[6]s
+`, project, region, zone, os.Getenv(saEnv), n.serviceAccount, n.run))
+
+	r := run(t, dir, "apply", "live", "--auto-approve")
+	t.Logf("apply:\n%s", r.combined())
+
+	// CLAIM ONE, AND THE ONE THIS TEST EXISTS FOR: the create url was built.
+	// Asserted on its own and first, because the failure it guards against
+	// is loud, specific and happens BEFORE any request -- so it can be told
+	// apart from anything that goes wrong afterwards.
+	if strings.Contains(r.combined(), `needs "name"`) {
+		t.Fatalf("the create url could not be built: the generator has stopped binding "+
+			"{+name} from iam's own `pattern` for the create method's name parameter, so "+
+			"gcp.serviceaccount is back where task 18 left it.\n%s", r.combined())
+	}
+
+	// CLAIM TWO: Google really made it. Retried, because IAM is eventually
+	// consistent about a brand new account and a single 404 here would read
+	// as "never created" for an account that exists -- which is the wrong
+	// conclusion to draw about the exact thing under test.
+	var code int
+	var body []byte
+	var err error
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		code, body, err = g.get(t.Context(), g.iamURL(name))
+		if err == nil && code == http.StatusOK {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Google answers %d for %s (%v) a minute after the apply: %s\n"+
+				"The create url expanded (no url-template error above), so the POST went to "+
+				"v1/projects/<project>/serviceAccounts -- but nothing is there.",
+				code, name, err, body)
+		}
+		time.Sleep(5 * time.Second)
+	}
+	t.Logf("the service account exists: %s", body)
+
+	// CLAIM THREE: infrena agrees. THIS IS WHERE IT FAILS TODAY, and the
+	// reason is NOT the create url.
+	//
+	// Measured against Google on 2026-09-23:
+	//
+	//	x create sa: gcp returned attribute "displayName" on a
+	//	  gcp.serviceaccount, which its own schema does not declare
+	//	  Declared: accountId, serviceAccount
+	//
+	// iam's create takes a CreateServiceAccountRequest -- a WRAPPER,
+	// {accountId, serviceAccount} -- and answers with a ServiceAccount. The
+	// generator builds a type's attributes from the create method's REQUEST
+	// body, so this type's schema describes the envelope and not the
+	// resource, and every field the resource really has (name, email, etag,
+	// displayName, uniqueId, oauth2ClientId, projectId) is one the host
+	// refuses. The host drops a failed create's result, so THE ACCOUNT IS
+	// ORPHANED -- confirmed here on 2026-09-23, and deleted by this test's
+	// own sweep.
+	//
+	// 13 of the 233 shipped types have a create whose request schema is not
+	// the resource: gcp.container.cluster, gcp.container.nodepool,
+	// gcp.bigtableadmin.instance and .table, gcp.iam.role and
+	// gcp.iam.organization.role, gcp.iam.serviceaccount.key,
+	// gcp.pubsub.snapshot, gcp.spanner.session, gcp.sslcert, gcp.task,
+	// gcp.feed and this one. Every one of them orphans on create for the
+	// same reason. It is a separate defect with its own follow-up; fixing it
+	// means modelling the resource from what the create RETURNS and wrapping
+	// the request body on the wire, which is a generator feature, not a line
+	// of code here.
+	if r.ExitCode != exitChanges {
+		t.Fatalf("the account was created and infrena still failed (exit %d). The create url "+
+			"is fixed; the state handoff is not, and the account was left behind for the "+
+			"sweep. See this test's comment: the create request schema is a wrapper, so the "+
+			"type's attributes describe the envelope rather than the resource.\n%s",
+			r.ExitCode, r.combined())
+	}
+
+	t.Run("a_second_plan_is_clean", func(t *testing.T) {
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after a successful apply proposes %v; a create that does not "+
+				"converge is the same failure the tag key's project number was", changes)
+		}
+	})
+
+	t.Run("destroy_removes_it", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+		mustRun(t, dir, exitChanges, "apply", "live", "--auto-approve")
+		if code, _, err := g.get(t.Context(), g.iamURL(name)); err == nil && code == http.StatusOK {
+			t.Errorf("CLEANUP FAILED: the service account is still there after a destroy: %s", name)
+		}
+	})
 }
 
 // TestLiveTagBindingOnASeededTag is the only way to find out what the real API
@@ -1456,6 +1622,9 @@ func (g *google) computeURL(rel string) string {
 }
 func (g *google) storageURL(rel string) string {
 	return "https://storage.googleapis.com/storage/v1/" + rel
+}
+func (g *google) iamURL(rel string) string {
+	return "https://iam.googleapis.com/v1/" + rel
 }
 func (g *google) crmURL(rel string) string {
 	return "https://cloudresourcemanager.googleapis.com/v3/" + rel
