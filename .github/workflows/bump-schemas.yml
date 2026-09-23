@@ -1,0 +1,120 @@
+name: Bump GCP schemas
+
+# Google edits its Discovery documents continually and announces nothing. This refetches them,
+# regenerates the catalog and proposes the diff.
+#
+# It is worth a schedule rather than a hand-run: the catalog committed on 2026-09-23 was already
+# behind by one real field (schemabundle gained avroSchema) within hours of being generated.
+#
+# magic-modules is NOT bumped here. scripts/fetch-schemas checks it out at the commit in
+# gen/mmv1.lock, so the vendored lifecycle data is identical run to run and the only thing that can
+# move is what Google published. Changing that pin is a deliberate act and belongs in its own PR.
+#
+# The name lock only grows, so a regeneration never renames a type. A new line in gen/warnings.txt
+# is a reason to read the PR, not to merge it blind: it means a type stopped qualifying, or a hook
+# appeared that no ruling covers.
+
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: "off"
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: infrena-provider-gcp
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache-dependency-path: infrena-provider-gcp/go.sum
+      - name: Fetch the documents and regenerate
+        id: gen
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          scripts/fetch-schemas
+          go run ./cmd/gen-gcp
+          # The vendored magic-modules tree must be untouched: the script checked out the same
+          # pinned commit it already had. If this fires, the script has started rewriting the
+          # files it vendors -- it did exactly that until 2026-09-23, marking 1129 data files
+          # executable -- and the PR below would bury the real diff under the noise.
+          if ! git diff --quiet -- gen/mmv1; then
+            echo "::error::scripts/fetch-schemas modified gen/mmv1 while vendoring the pinned commit"
+            git diff --stat -- gen/mmv1 | tail -5
+            exit 1
+          fi
+          if git diff --quiet -- internal/catalog/catalog.json.gz gen/names.lock.json gen/warnings.txt; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Test the new catalog
+        if: steps.gen.outputs.changed == 'true'
+        working-directory: infrena-provider-gcp
+        run: go vet ./... && go test -count=1 ./...
+      # What actually moved, in the PR body rather than in a log nobody opens. A type appearing or
+      # disappearing, and any new warning, are the two things worth a human before merging.
+      - name: Summarise the drift
+        if: steps.gen.outputs.changed == 'true'
+        id: drift
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          {
+            echo "summary<<EOF"
+            python3 - <<'PY'
+          import gzip, json, subprocess
+          new = json.load(gzip.open("internal/catalog/catalog.json.gz"))["types"]
+          old = json.loads(gzip.decompress(subprocess.run(
+              ["git", "show", "HEAD:internal/catalog/catalog.json.gz"],
+              capture_output=True).stdout))["types"]
+          o = {t["name"]: t for t in old}
+          n = {t["name"]: t for t in new}
+          added, removed = sorted(set(n) - set(o)), sorted(set(o) - set(n))
+          changed = [k for k in sorted(set(o) & set(n)) if o[k] != n[k]]
+          print(f"Types: {len(old)} -> {len(new)}")
+          if added:   print("\nAdded:\n" + "\n".join("- `%s`" % t for t in added))
+          if removed: print("\nRemoved:\n" + "\n".join("- `%s`" % t for t in removed))
+          if changed: print("\nChanged (%d):\n" % len(changed) + "\n".join("- `%s`" % t for t in changed[:40]))
+          PY
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          if ! git diff --quiet -- gen/warnings.txt; then
+            echo "warnings=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "warnings=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open the PR
+        if: steps.gen.outputs.changed == 'true'
+        working-directory: infrena-provider-gcp
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="bump-schemas-$(date +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add internal/catalog/catalog.json.gz gen/names.lock.json gen/warnings.txt
+          git commit -m "Regenerate the catalog from this week's discovery documents" -- internal/catalog/catalog.json.gz gen/names.lock.json gen/warnings.txt
+          git push origin "$branch"
+          body="Regenerated from Google's Discovery documents. magic-modules is unchanged, still at the commit in gen/mmv1.lock. The unit suite passed.
+
+          ${{ steps.drift.outputs.summary }}"
+          if [ "${{ steps.drift.outputs.warnings }}" = "true" ]; then
+            body="$body
+
+          **gen/warnings.txt changed.** Read that diff before merging: a type has stopped qualifying, or a hook appeared that no ruling covers."
+          fi
+          gh pr create --title "GCP schemas $(date +%Y-%m-%d)" --body "$body"
