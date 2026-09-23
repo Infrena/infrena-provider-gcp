@@ -886,6 +886,16 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.OperationPollPath = operationPollPath(doc)
 	}
 
+	// The patterns describe the template the RUNTIME will actually request:
+	// operationRequestURL uses the wait path when one exists and the poll path
+	// otherwise, so that is the rule here too. Taking them from the other
+	// template would produce a check on a url nobody builds.
+	if tmpl := t.OperationWaitPath; tmpl != "" {
+		t.OperationParamPatterns = operationParamPatterns(doc, tmpl)
+	} else if t.OperationPollPath != "" {
+		t.OperationParamPatterns = operationParamPatterns(doc, t.OperationPollPath)
+	}
+
 	if ruling != nil && ruling.ReadVia != "" {
 		t.ReadVia = ruling.ReadVia
 	}
@@ -1164,6 +1174,83 @@ func operationPollPath(doc *disco.Document) string {
 		}
 	}
 	return best
+}
+
+// operationParamPatterns returns the regular expressions the API publishes for
+// the parameters of the operation method whose path is exactly `path`, keyed by
+// placeholder name.
+//
+// It finds the method BY ITS PATH rather than repeating the search and ranking
+// that chose it. A second search could settle on a different operations method
+// -- container publishes two -- and patterns describing a method other than the
+// one whose template we stored would be a check that agrees with itself and
+// nothing else. Task 14 learned the same rule about request bodies: derive from
+// the template actually used, never from one that should match.
+//
+// Only placeholders the path actually names are returned, and only where
+// Discovery publishes a pattern at all, which for most parameters it does not.
+func operationParamPatterns(doc *disco.Document, path string) map[string]string {
+	if path == "" {
+		return nil
+	}
+	wanted := map[string]bool{}
+	for _, n := range pathPlaceholders(path) {
+		wanted[n] = true
+	}
+	// Collect every pattern published for each parameter, not the last one
+	// seen. ONE API CAN PUBLISH SEVERAL OPERATIONS COLLECTIONS AT THE SAME
+	// PATH -- iam has four, all "v1/{+name}", each with its own pattern -- and
+	// which one a given type's operations live in is not decidable from the
+	// path. Storing whichever was walked last would be a coin toss, and a
+	// stored coin toss is worse than a gap: the check would look thorough and
+	// assert something arbitrary.
+	seen := map[string]map[string]bool{}
+	var walk func(res map[string]*disco.Resource)
+	walk = func(res map[string]*disco.Resource) {
+		for _, name := range sortedKeys(res) {
+			r := res[name]
+			// OPERATIONS COLLECTIONS ONLY. "v1/{+name}" is the commonest path
+			// shape in these documents and ordinary getters use it constantly,
+			// so walking every method that matches would gather patterns from
+			// resources that are not operations at all, make almost every
+			// parameter look ambiguous, and drop it -- which is how the first
+			// version of this silently collected nothing for container, the one
+			// type the check exists for.
+			if name == "operations" || strings.HasSuffix(name, "Operations") {
+				for _, mn := range sortedKeys(r.Methods) {
+					m := r.Methods[mn]
+					if m == nil || m.Path != path {
+						continue
+					}
+					for _, pn := range sortedKeys(m.Parameters) {
+						if !wanted[pn] || m.Parameters[pn].Pattern == "" {
+							continue
+						}
+						if seen[pn] == nil {
+							seen[pn] = map[string]bool{}
+						}
+						seen[pn][m.Parameters[pn].Pattern] = true
+					}
+				}
+			}
+			walk(r.Resources)
+		}
+	}
+	walk(doc.Resources)
+
+	var out map[string]string
+	for _, pn := range sortedKeys(seen) {
+		if len(seen[pn]) != 1 {
+			continue // ambiguous: left unchecked rather than guessed
+		}
+		for pattern := range seen[pn] {
+			if out == nil {
+				out = map[string]string{}
+			}
+			out[pn] = pattern
+		}
+	}
+	return out
 }
 
 // runtimeCanExpand reports whether every placeholder in a Discovery method

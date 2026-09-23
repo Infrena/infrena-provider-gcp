@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -710,18 +708,17 @@ func TestASqladminStyleOperationStillPollsOnItsBareID(t *testing.T) {
 // or "locations/.../workforcePools/.../operations/..." -- every one of them a
 // statement about the fixture and none about the runtime.
 //
-// schemas/ is fetched by scripts/fetch-schemas and deliberately not
-// committed, so this skips when it is absent rather than asserting nothing
-// quietly -- the same treatment internal/disco/smoke_test.go gives it. The
-// structural arm above needs no schemas and always runs.
+// THIS USED TO SKIP IN EVERY CLEAN CHECKOUT, and that is why the patterns are
+// now in the catalog. It read schemas/, which is gitignored and produced by
+// scripts/fetch-schemas, so on any machine that had not run that script it
+// skipped -- and this repo has no CI, so the arm written to stop a compute
+// operation being polled at a url that expands cleanly and addresses nothing
+// had very likely never run anywhere but one laptop. A skip reads exactly like
+// a pass. The patterns are committed data now (Type.OperationParamPatterns),
+// taken from the very method whose template is stored, so this always runs.
 func TestEveryOperationURLSatisfiesTheAPIsOwnParameterPattern(t *testing.T) {
-	const schemaDir = "../../schemas"
-	if _, err := os.Stat(schemaDir); err != nil {
-		t.Skipf("%s absent (run scripts/fetch-schemas); the APIs' own parameter patterns cannot be read", schemaDir)
-	}
 	c := mustCatalog(t)
 	p := &Provider{settings: Settings{Project: "p", Zone: "z", Region: "r"}}
-	docs := map[string]map[string]*discoveryResource{}
 	var checked, checkedAPathCapture int
 	for _, ty := range c.Types {
 		if ty.Await != catalog.AwaitComputeOperation {
@@ -743,12 +740,7 @@ func TestEveryOperationURLSatisfiesTheAPIsOwnParameterPattern(t *testing.T) {
 			t.Errorf("%s: %v", ty.Name, err)
 			continue
 		}
-		res, ok := docs[ty.Service]
-		if !ok {
-			res = loadDiscoveryResources(t, filepath.Join(schemaDir, ty.Service+".json"))
-			docs[ty.Service] = res
-		}
-		for name, pattern := range operationParameterPatterns(res, tmpl) {
+		for name, pattern := range ty.OperationParamPatterns {
 			value, ok := values[name]
 			if !ok || pattern == "" {
 				continue
@@ -782,92 +774,6 @@ func TestEveryOperationURLSatisfiesTheAPIsOwnParameterPattern(t *testing.T) {
 		t.Error("no type polling a whole-path \"{+name}\" capture was checked, which is the shape " +
 			"container's two types have and the shape the defect lived in")
 	}
-}
-
-// discoveryResource is the sliver of a Discovery document this test needs:
-// which methods a resource publishes, what path each takes, and the pattern
-// each of its parameters declares. internal/disco does not read patterns
-// (nothing in the generator needs them), and teaching it to for a test's
-// sake would put a field in the production parser that only a test reads.
-type discoveryResource struct {
-	Methods map[string]struct {
-		Path       string `json:"path"`
-		Parameters map[string]struct {
-			Pattern string `json:"pattern"`
-		} `json:"parameters"`
-	} `json:"methods"`
-	Resources map[string]*discoveryResource `json:"resources"`
-}
-
-func loadDiscoveryResources(t *testing.T, path string) map[string]*discoveryResource {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		// A service whose document is not on disk simply cannot be checked;
-		// every one that is still is.
-		return nil
-	}
-	var doc struct {
-		Resources map[string]*discoveryResource `json:"resources"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatalf("%s: %v", path, err)
-	}
-	return doc.Resources
-}
-
-// operationParameterPatterns returns the patterns declared for the
-// parameters of the operations method whose path is tmpl.
-//
-// It looks only inside a resource that IS an operations collection -- named
-// "operations", or compute's scope-specific "globalOperations" /
-// "regionOperations" / "zoneOperations" -- which is how the generator picks
-// these paths in the first place (internal/gen/build.go). That restriction
-// is not cosmetic: container publishes "v1/{+name}" as the path of seven
-// different methods, and clusters.get's "name" pattern demands
-// ".../clusters/..." where operations.get's demands ".../operations/...".
-// Matching on the path alone would test the poll url against the wrong
-// resource's rule.
-func operationParameterPatterns(res map[string]*discoveryResource, tmpl string) map[string]string {
-	found := map[string]map[string]bool{}
-	var walk func(map[string]*discoveryResource)
-	walk = func(res map[string]*discoveryResource) {
-		for name, r := range res {
-			if name == "operations" || strings.HasSuffix(name, "Operations") {
-				for _, m := range r.Methods {
-					if m.Path != tmpl {
-						continue
-					}
-					for param, spec := range m.Parameters {
-						if spec.Pattern == "" {
-							continue
-						}
-						if found[param] == nil {
-							found[param] = map[string]bool{}
-						}
-						found[param][spec.Pattern] = true
-					}
-				}
-			}
-			walk(r.Resources)
-		}
-	}
-	walk(res)
-	out := map[string]string{}
-	for param, patterns := range found {
-		// One API can publish several operations collections at the same
-		// path -- iam has four, all "v1/{+name}", each with its own pattern.
-		// Which one a given type's operations live in is not decidable from
-		// the path, and asserting against whichever was walked last would be
-		// a coin toss, so an ambiguous parameter is left unchecked.
-		if len(patterns) != 1 {
-			continue
-		}
-		for pattern := range patterns {
-			out[param] = pattern
-		}
-	}
-	return out
 }
 
 // valuesSubstitutedInto recovers what each of tmpl's placeholders was filled

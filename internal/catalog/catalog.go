@@ -116,6 +116,27 @@ type Type struct {
 	// name is a path containing "/" and must not be escaped.
 	OperationPollPath string `json:"operation_poll_path,omitempty"`
 
+	// OperationParamPatterns is the regular expression the API publishes for
+	// each path parameter of the operation method this type actually polls --
+	// keyed by placeholder name, e.g. {"operation": "[a-z](?:[-a-z0-9]{0,61}...)?"}.
+	//
+	// It is stored so the assertion that an expanded operation url ADDRESSES
+	// something can run off committed data. That check previously read
+	// schemas/, which is gitignored and fetched by a script, so it SKIPPED in
+	// every clean checkout -- and it is the check written to stop a compute
+	// operation being polled at a url that expands cleanly and matches nothing
+	// (every GKE cluster mutation, fixed in Task 13d). A guard that is written
+	// but not armed reads exactly like a guard.
+	//
+	// Taken from the method whose path is stored above, not from whichever
+	// operations method a second search happens to find, so the patterns
+	// cannot describe a different method from the template they are checked
+	// against.
+	//
+	// Empty for a type that awaits nothing, and for one whose API publishes no
+	// pattern for a parameter -- Discovery omits them more often than not.
+	OperationParamPatterns map[string]string `json:"operation_param_patterns,omitempty"`
+
 	Await AwaitKind `json:"await"`
 	// OperationWaitPath is the API's own operations wait path for this type's
 	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
