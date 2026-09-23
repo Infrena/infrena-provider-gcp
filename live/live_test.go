@@ -1400,7 +1400,7 @@ func (g *google) seedTag(t *testing.T, project, keyShortName, valueShortName str
 func (g *google) createAndAwaitLRO(t *testing.T, url string, body any) map[string]any {
 	t.Helper()
 	ctx := t.Context()
-	code, data, _, err := g.do(ctx, http.MethodPost, url, body)
+	code, data, _, err := g.doRetry(ctx, http.MethodPost, url, body)
 	if err != nil {
 		t.Fatalf("POST %s: %v", url, err)
 	}
@@ -1653,9 +1653,14 @@ func (g *google) crmURL(rel string) string {
 	return "https://cloudresourcemanager.googleapis.com/v3/" + rel
 }
 
-// do sends one request and reads the whole response. It NEVER logs the
-// Authorization header or the token: the caller gets the status and the body,
-// which for every call here is a resource, not a credential.
+// do sends ONE request and does not retry. It NEVER logs the Authorization
+// header or the token: the caller gets the status and the body, which for
+// every call here is a resource, not a credential.
+//
+// NOT RETRYING IS THE POINT, for exactly one caller.
+// TestWhetherGoogleSendsRetryAfter measures throttled responses, so it has to
+// see each 429 as GCP sent it -- a retry here would swallow the very thing it
+// counts. Every other caller goes through doRetry instead.
 func (g *google) do(ctx context.Context, method, url string, body any) (int, []byte, http.Header, error) {
 	var r io.Reader
 	if body != nil {
@@ -1681,13 +1686,58 @@ func (g *google) do(ctx context.Context, method, url string, body any) (int, []b
 	return resp.StatusCode, data, resp.Header, err
 }
 
+// doRetry is do plus the backoff the PROVIDER already applies and this harness
+// did not.
+//
+// It exists because the harness starved itself. TestWhetherGoogleSendsRetryAfter
+// answers its question by deliberately exhausting quota -- 32,294 requests to
+// cloudresourcemanager in 60 seconds against a limit of 600/min -- and
+// TestLiveTagTypes then reads the project number from that same service as its
+// first act and got a 429, failing in half a second having done nothing. That
+// looked like the permissions failure it had a run earlier and was not, which
+// cost three confused re-runs.
+//
+// A suite whose result depends on how recently it last ran teaches people to
+// re-run rather than to look, which is the same fault as asserting on a single
+// read inside an eventual-consistency window.
+//
+// 429 and 503 only. A 403 is not a throttle and must stay loud: it was a real
+// missing role once already today.
+func (g *google) doRetry(ctx context.Context, method, url string, body any) (int, []byte, http.Header, error) {
+	const attempts = 6
+	var code int
+	var data []byte
+	var hdr http.Header
+	var err error
+	for i := range attempts {
+		code, data, hdr, err = g.do(ctx, method, url, body)
+		if err != nil || (code != http.StatusTooManyRequests && code != http.StatusServiceUnavailable) {
+			return code, data, hdr, err
+		}
+		if i == attempts-1 {
+			break
+		}
+		// Google sends no Retry-After -- measured, 0 of 34,000+ throttled
+		// responses carried one -- so the wait is ours to choose. Doubling
+		// from 2s gives ~62s across six attempts, which clears a per-minute
+		// window without turning a genuine outage into a long hang.
+		wait := time.Duration(2<<i) * time.Second
+		select {
+		case <-ctx.Done():
+			return code, data, hdr, ctx.Err()
+		case <-time.After(wait):
+		}
+	}
+	return code, data, hdr, err
+}
+
 func (g *google) get(ctx context.Context, url string) (int, []byte, error) {
-	code, body, _, err := g.do(ctx, http.MethodGet, url, nil)
+	code, body, _, err := g.doRetry(ctx, http.MethodGet, url, nil)
 	return code, body, err
 }
 
 func (g *google) patch(ctx context.Context, url string, body any) (int, []byte, error) {
-	code, data, _, err := g.do(ctx, http.MethodPatch, url, body)
+	code, data, _, err := g.doRetry(ctx, http.MethodPatch, url, body)
 	if err == nil && code >= 300 {
 		err = fmt.Errorf("PATCH %s: %d: %s", url, code, data)
 	}
@@ -1847,7 +1897,7 @@ func registerTagSweep(t *testing.T, g *google, project, shortName string) {
 // is gone. A 404 at any point is success: the goal is absence.
 func (g *google) deleteAndWait(t *testing.T, ctx context.Context, ty, id, url string) {
 	t.Helper()
-	code, body, _, err := g.do(ctx, http.MethodDelete, url, nil)
+	code, body, _, err := g.doRetry(ctx, http.MethodDelete, url, nil)
 	switch {
 	case err != nil:
 		t.Errorf("CLEANUP FAILED: %s %s: %v -- DELETE IT BY HAND: %s", ty, id, err, url)
@@ -1923,7 +1973,7 @@ func (g *google) sweepTagKey(t *testing.T, ctx context.Context, project, shortNa
 // the key cannot be re-created until it is really gone.
 func (g *google) deleteAndWaitLRO(t *testing.T, ctx context.Context, ty, id, url string) {
 	t.Helper()
-	code, body, _, err := g.do(ctx, http.MethodDelete, url, nil)
+	code, body, _, err := g.doRetry(ctx, http.MethodDelete, url, nil)
 	switch {
 	case err != nil:
 		t.Errorf("CLEANUP FAILED: %s %s: %v -- DELETE IT BY HAND: %s", ty, id, err, url)
