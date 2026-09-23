@@ -602,6 +602,125 @@ func readPin(mmv1Dir string) string {
 	return strings.TrimSpace(string(data))
 }
 
+// parentShapes maps a Discovery parameter pattern to what that placeholder
+// MEANS in a create path.
+//
+// An API that takes its parent as one capture writes "{+name}/serviceAccounts"
+// or "{+parent}/instances", and the placeholder is NOT the resource's own name
+// -- iam publishes `pattern: ^projects/[^/]+$` for that very parameter, which
+// says so exactly. Nothing filled it, so every create of such a type failed on
+// string substitution before a byte reached Google.
+//
+// The pattern is the API's own statement of the shape, so it is what the
+// binding is read from rather than a guess keyed on the placeholder's name.
+// Only patterns that pin a parent COMPLETELY are listed: a pattern naming a
+// resource ("^projects/[^/]+/topics/[^/]+$") is a different thing and is left
+// alone.
+var parentShapes = map[string]string{
+	`^projects/[^/]+$`:                  "projects/{{project}}",
+	`^projects/[^/]+/locations/[^/]+$`:  "projects/{{project}}/locations/{{location}}",
+	`^projects/[^/]+/regions/[^/]+$`:    "projects/{{project}}/regions/{{region}}",
+	`^projects/[^/]+/locations/global$`: "projects/{{project}}/locations/global",
+}
+
+// bindParentPlaceholders rewrites a collection template's placeholders into the
+// parent they stand for, where the create method's own parameter pattern says
+// what that is. A template with no such placeholder comes back unchanged, which
+// is every magic-modules-sourced one -- those already spell the parent out.
+func bindParentPlaceholders(tmpl string, create *disco.Method) string {
+	if tmpl == "" || create == nil || len(create.Parameters) == 0 {
+		return tmpl
+	}
+	for _, name := range pathPlaceholders(tmpl) {
+		p := create.Parameters[name]
+		if p == nil {
+			continue
+		}
+		shape, ok := parentShapes[p.Pattern]
+		if !ok {
+			continue
+		}
+		// ONLY the reserved-expansion form. "{+parent}" is how Discovery
+		// writes a capture that swallows a whole path, which is exactly the
+		// shape a parent is. A single "{parent}" is one ordinary segment and
+		// needs no binding, and "{{parent}}" is magic-modules' spelling in a
+		// template that already spells the rest of the path its own way --
+		// binding that one both corrupted the braces (the inner "{parent}"
+		// matched, leaving "{projects/...}") and doubled a segment, which
+		// dropped 7 types through the create-collection gate.
+		tmpl = strings.ReplaceAll(tmpl, "{+"+name+"}", shape)
+	}
+	return tmpl
+}
+
+// resourceSchema resolves the schema describing THE RESOURCE -- what GCP
+// stores and answers a read with -- and, separately, how the create request
+// wraps it.
+//
+// For 216 of the 233 types the create request body IS the resource and there
+// is no wrapper. Eleven use the AIP CreateXRequest shape instead: the request
+// is {accountId, serviceAccount} while a read answers with ServiceAccount
+// {displayName, email, name, ...}, and the two share not one field name.
+//
+// Declaring the request there describes what a user may SEND and not what GCP
+// answers with. The host refuses any attribute a provider returns that the
+// schema does not declare, so all eleven could neither create nor read --
+// gcp.container.cluster among them, with 86 undeclared fields. Nothing caught
+// it in 16 tasks because internal/gcpfake echoes back what it is sent, so a
+// create response always had exactly the request's shape and the two schemas
+// could never disagree in a test. The first live call this project ever made
+// failed on it in three seconds.
+//
+// The resource is the GET method's response, because that is by definition
+// what a read answers with, which is the thing the schema has to describe.
+func resourceSchema(d *disco.Document, col disco.Collection, create *disco.Method) (
+	body *disco.Schema, wrapper string, createOnly []string, err error) {
+
+	get := col.Methods["get"]
+	resourceRef := ""
+	if get != nil && get.Response != nil {
+		resourceRef = get.Response.Ref
+	}
+	requestRef := ""
+	if create.Request != nil {
+		requestRef = create.Request.Ref
+	}
+
+	// No get to learn the resource from (tagBindings has none), or the request
+	// already IS the resource: the long-standing path, unchanged.
+	if resourceRef == "" || resourceRef == requestRef {
+		b, err := requestBodySchema(d, create)
+		return b, "", nil, err
+	}
+
+	// A wrapper is a request property that refs the resource itself. Anything
+	// else in the request is a create-time parameter that is not part of the
+	// resource and will never come back from a read -- accountId, roleId.
+	raw, ok := d.Schemas[requestRef]
+	if ok && raw != nil {
+		for _, name := range sortedKeys(raw.Properties) {
+			p := raw.Properties[name]
+			if p != nil && p.Ref == resourceRef {
+				wrapper = name
+				continue
+			}
+			createOnly = append(createOnly, name)
+		}
+	}
+	if wrapper == "" {
+		// The request names the resource nowhere, so this is not the wrapper
+		// shape and guessing would be worse than the status quo.
+		b, err := requestBodySchema(d, create)
+		return b, "", nil, err
+	}
+
+	resolved, err := d.Resolve(d.Schemas[resourceRef])
+	if err != nil {
+		return nil, "", nil, err
+	}
+	return resolved, wrapper, createOnly, nil
+}
+
 // requestBodySchema resolves the schema that carries a method's settable
 // shape: its request body, or (for a method with none, such as some list-only
 // bodies) its response — some Discovery methods reuse a single schema for
@@ -700,7 +819,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	if create == nil {
 		return nil, fmt.Errorf("no insert or create method")
 	}
-	body, err := requestBodySchema(doc, create)
+	body, wrapper, createOnly, err := resourceSchema(doc, col, create)
 	if err != nil {
 		return nil, err
 	}
@@ -718,6 +837,37 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	if err != nil {
 		return nil, err
 	}
+	// A create-time parameter is settable and ForceNew, and a read never
+	// returns it, so it has to be declared alongside the resource's own
+	// attributes rather than instead of them. Added after BuildAttributes so
+	// the resource can never be overwritten by a wrapper field of the same
+	// name.
+	if wrapper != "" && len(createOnly) > 0 {
+		// Built through BuildAttributes on a schema holding just these
+		// properties, rather than a second construction path. A parallel
+		// builder would be one more place for the two to drift, which is the
+		// failure this whole fix exists to undo.
+		reqRaw := doc.Schemas[create.Request.Ref]
+		only := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{}}
+		for _, n := range createOnly {
+			if reqRaw != nil && reqRaw.Properties[n] != nil {
+				only.Properties[n] = reqRaw.Properties[n]
+			}
+		}
+		extra, err := BuildAttributes(doc, only, nil, nil)
+		if err != nil {
+			return nil, fmt.Errorf("create-only parameters of %s: %w", create.ID, err)
+		}
+		for n, a := range extra {
+			if _, taken := attrs[n]; taken {
+				continue // the resource's own field wins; it is what a read returns
+			}
+			a.ForceNew = true
+			a.CreateOnly = true
+			a.Output = false
+			attrs[n] = a
+		}
+	}
 	if ruling != nil && ruling.AllForceNew {
 		forceNewAll(attrs)
 	}
@@ -728,6 +878,9 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		APIBaseURL: doc.ResolvedBaseURL(),
 		ParentRoot: hierarchyRoot(col.Path),
 		Attributes: attrs,
+		// How the create call wants the resource wrapped. Empty for 216 of
+		// the 233 types, whose create body is the resource itself.
+		CreateWrapper: wrapper,
 	}
 	if mm != nil {
 		t.Description = mm.Description
@@ -901,6 +1054,12 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 
 	t.ListField = ListFieldOf(doc, col)
+
+	// Bind any parent placeholder BEFORE the version prefix is stripped, so
+	// both operate on the template as Discovery wrote it. The collection
+	// template is the create path, so BaseURL and CreateURL both take it.
+	t.BaseURL = bindParentPlaceholders(t.BaseURL, create)
+	t.CreateURL = bindParentPlaceholders(t.CreateURL, create)
 
 	// The API version lives in exactly one field, and this is where it is put
 	// there. It has to run LAST, after every fallback above has settled:

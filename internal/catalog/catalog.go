@@ -65,6 +65,13 @@ type Attr struct {
 	// no reordering. Free-form maps and truncated $ref tails are opaque, and
 	// translating their keys would corrupt user data.
 	Opaque bool `json:"opaque,omitempty"`
+	// CreateOnly marks an attribute that exists only in the create request and
+	// is not part of the resource: accountId on a service account, roleId on a
+	// role. A read never returns one, so the runtime carries it forward from
+	// prior state rather than expecting GCP to echo it back, and it is
+	// ForceNew because nothing can change it afterwards.
+	CreateOnly bool `json:"create_only,omitempty"`
+
 	// Unordered marks a list GCP may return in a different order than it was
 	// sent. Task 15 reorders those to match the reference; an ordered list is
 	// left alone, because there order carries meaning.
@@ -102,6 +109,17 @@ type Type struct {
 	UpdateURL string `json:"update_url,omitempty"`
 	DeleteURL string `json:"delete_url,omitempty"`
 	SelfLink  string `json:"self_link,omitempty"`
+
+	// CreateWrapper names the create request field that carries the resource,
+	// for the eleven types whose API uses the AIP CreateXRequest shape --
+	// "serviceAccount" on gcp.serviceaccount, "cluster" on
+	// gcp.container.cluster. Empty for the other 216, whose create body IS the
+	// resource.
+	//
+	// Attributes always describe the RESOURCE. This field is how the runtime
+	// puts them back in the shape the create call wants, without the schema
+	// having to lie about what a read returns. See gen.resourceSchema.
+	CreateWrapper string `json:"create_wrapper,omitempty"`
 
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`
