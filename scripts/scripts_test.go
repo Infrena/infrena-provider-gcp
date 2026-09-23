@@ -9,12 +9,18 @@ package scripts
 import (
 	"archive/tar"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 )
 
 // manifestVersion reads plugin.yaml's version, so these tests follow the manifest
@@ -255,4 +261,248 @@ func TestBuildReleaseNamesArchivesByTheInstallConvention(t *testing.T) {
 			t.Errorf("%s.tar.gz does not contain %s; it holds %v", stem, w, got)
 		}
 	}
+}
+
+// infrenaSource locates the infrena checkout scripts/check-examples builds its
+// host from, and SKIPS when there is none.
+//
+// A skip rather than a failure, for the reason e2e/e2e_test.go's TestMain
+// gives: a contributor who has not cloned infrena beside this repository has a
+// setup problem, not a defect, and until now `go test ./...` here has needed
+// no sibling checkout at all. The message is a literal, greppable line so a CI
+// job that meant to run this can tell a skip from a pass, which `go test`
+// itself cannot without -v.
+func infrenaSource(t *testing.T) string {
+	t.Helper()
+	src := os.Getenv("INFRENA_SRC")
+	if src == "" {
+		root, err := filepath.Abs("..")
+		if err != nil {
+			t.Fatal(err)
+		}
+		src = filepath.Join(filepath.Dir(root), "infrena")
+	}
+	if _, err := os.Stat(filepath.Join(src, "go.mod")); err != nil {
+		t.Skipf("CHECK-EXAMPLES SKIPPED: no infrena module at %s; "+
+			"clone it beside this repository or set INFRENA_SRC", src)
+	}
+	return src
+}
+
+// TestCheckExamplesIsAValidExecutableScript, for the same reason
+// fetch-schemas has one: a syntax error or a missing execute bit would
+// otherwise surface the first time somebody ran it by hand.
+func TestCheckExamplesIsAValidExecutableScript(t *testing.T) {
+	info, err := os.Stat("check-examples")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&0o111 == 0 {
+		t.Errorf("check-examples is not executable: mode %v", info.Mode())
+	}
+	if out, err := exec.Command("bash", "-n", "check-examples").CombinedOutput(); err != nil {
+		t.Errorf("bash -n check-examples: %v\n%s", err, out)
+	}
+}
+
+// TestCheckExamplesCompilesEveryExample is the claim examples/ makes: every
+// file under it is configuration a user could copy and run.
+//
+// It is the only test in this repository that reads examples/ at all. The unit
+// suites call into the provider and e2e compiles a fixture of its own, so a
+// renamed type, an attribute that turned out to be output-only, or a variable
+// that stopped resolving is invisible everywhere else until somebody copies
+// the file.
+func TestCheckExamplesCompilesEveryExample(t *testing.T) {
+	infrenaSource(t)
+	out, err := run(t, nil, "check-examples")
+	if err != nil {
+		t.Fatalf("check-examples failed: %v\n%s", err, out)
+	}
+	// Counted from the directory rather than written as a literal, so adding an
+	// example is not also a test edit -- but asserted, because a checker that
+	// walked past an example would otherwise pass in exactly the same words.
+	want := len(exampleProjects(t))
+	if !strings.Contains(out, fmt.Sprintf("all %d examples compile", want)) {
+		t.Errorf("check-examples did not report all %d examples compiling:\n%s", want, out)
+	}
+}
+
+// TestCheckExamplesRefusesAnExampleThatDoesNotCompile. A checker that reports
+// success whatever it is fed is worse than no checker, because CI then says
+// the examples are fine. gcp.vpc is the shape of the mistake this exists to
+// catch: a plausible type name that is not one this plugin serves.
+func TestCheckExamplesRefusesAnExampleThatDoesNotCompile(t *testing.T) {
+	infrenaSource(t)
+
+	body, err := os.ReadFile("../examples/network/infrena.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doctored := strings.Replace(string(body), "type: gcp.network", "type: gcp.vpc", 1)
+	if doctored == string(body) {
+		t.Fatal("examples/network no longer declares a gcp.network to doctor")
+	}
+	dir := filepath.Join(t.TempDir(), "examples", "network")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "infrena.yml"), []byte(doctored), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := run(t, []string{"EXAMPLES_DIR=" + filepath.Dir(dir)}, "check-examples")
+	if err == nil {
+		t.Fatalf("check-examples accepted an example naming a type this plugin does not serve:\n%s", out)
+	}
+	if !strings.Contains(out, "do not compile") {
+		t.Errorf("the refusal does not say the example failed to compile:\n%s", out)
+	}
+}
+
+// TestCheckExamplesRefusesADirectoryWithNoExamples. An unmatched glob checks
+// nothing, and "checked nothing" must not print the same thing as "checked
+// everything and it was fine".
+func TestCheckExamplesRefusesADirectoryWithNoExamples(t *testing.T) {
+	infrenaSource(t)
+	out, err := run(t, []string{"EXAMPLES_DIR=" + t.TempDir()}, "check-examples")
+	if err == nil {
+		t.Fatalf("check-examples passed over a directory holding no examples:\n%s", out)
+	}
+	if !strings.Contains(out, "checked nothing") {
+		t.Errorf("the refusal does not say that nothing was checked:\n%s", out)
+	}
+}
+
+// exampleProjects lists every example project directory: one `infrena.yml`
+// each, which is what check-examples walks.
+func exampleProjects(t *testing.T) []string {
+	t.Helper()
+	matches, err := filepath.Glob("../examples/*/infrena.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) == 0 {
+		t.Fatal("examples/ holds no */infrena.yml")
+	}
+	return matches
+}
+
+// exampleDocument is as much of an example as these two tests read: the
+// resource types it names, the variables it declares, and the provider
+// instances whose configuration crosses to the plugin.
+//
+// `providers` stays a yaml.Node because what is wanted from it is every string
+// anywhere inside it, at any depth and under any key -- `defaults:` and a
+// plugin's own options included -- and no struct can say that.
+type exampleDocument struct {
+	Variables map[string]struct {
+		// A yaml.Node rather than a bool: `default: false` and no `default:` at
+		// all are different declarations, and every other Go type conflates them.
+		// A node that was never decoded has Kind zero.
+		Default yaml.Node `yaml:"default"`
+	} `yaml:"variables"`
+	Providers yaml.Node `yaml:"providers"`
+	Resources map[string]struct {
+		Type string `yaml:"type"`
+	} `yaml:"resources"`
+}
+
+func readExample(t *testing.T, path string) exampleDocument {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc exampleDocument
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("%s is not valid YAML: %v", path, err)
+	}
+	return doc
+}
+
+// TestEveryExampleNamesTypesTheCatalogServes.
+//
+// check-examples catches this too, and more thoroughly, but it needs a
+// checkout of infrena to build a host from and skips without one. This needs
+// nothing but the embedded catalog, so the single most likely way an example
+// goes stale -- a regeneration renaming a type, or a plausible name that was
+// never one this plugin serves -- is caught on every machine.
+func TestEveryExampleNamesTypesTheCatalogServes(t *testing.T) {
+	c, err := catalog.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Modules too: a module's resources are as real as a project's, and
+	// examples/module/ keeps two of them out of the file check-examples names.
+	paths := exampleProjects(t)
+	modules, err := filepath.Glob("../examples/*/modules/*/module.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths = append(paths, modules...)
+
+	for _, path := range paths {
+		for name, r := range readExample(t, path).Resources {
+			if !strings.HasPrefix(r.Type, "gcp.") {
+				continue // module.vpc and friends are infrena's, not this catalog's
+			}
+			if _, ok := c.Type(r.Type); !ok {
+				t.Errorf("%s: resource %q is a %s, which this plugin does not serve", path, name, r.Type)
+			}
+		}
+	}
+}
+
+// TestEveryProviderVariableInAnExampleHasADefault is the rule that makes an
+// example runnable by a reader who has typed nothing yet.
+//
+// A provider instance's configuration crosses to the plugin's Configure, so
+// infrena resolves it for EVERY command -- `discover` included, and `discover`
+// takes no environment, so it has no environment-specific value to resolve
+// from. A variable with no `default:` is unresolvable there and infrena
+// refuses to run rather than let the plugin fall back to whatever project the
+// machine's credentials name.
+//
+// check-examples would catch it in `validate` as well. This says why, in the
+// place the rule lives, and without a host binary.
+func TestEveryProviderVariableInAnExampleHasADefault(t *testing.T) {
+	reference := regexp.MustCompile(`\$\{\s*var\.([A-Za-z_][A-Za-z0-9_]*)`)
+
+	for _, path := range exampleProjects(t) {
+		doc := readExample(t, path)
+		for _, text := range scalarsOf(&doc.Providers) {
+			for _, m := range reference.FindAllStringSubmatch(text, -1) {
+				name := m[1]
+				v, declared := doc.Variables[name]
+				if !declared {
+					t.Errorf("%s: `providers:` reads ${var.%s}, which the file does not declare", path, name)
+					continue
+				}
+				if v.Default.Kind == 0 {
+					t.Errorf("%s: `providers:` reads ${var.%s}, which is declared with no `default:`. "+
+						"Provider configuration is resolved for every command, including `discover`, "+
+						"which takes no environment -- so this example refuses to run as committed",
+						path, name)
+				}
+			}
+		}
+	}
+}
+
+// scalarsOf returns every scalar in a YAML subtree, keys included: a variable
+// reference is a string wherever it appears, and which key it sat under does
+// not change that.
+func scalarsOf(node *yaml.Node) []string {
+	if node == nil {
+		return nil
+	}
+	if node.Kind == yaml.ScalarNode {
+		return []string{node.Value}
+	}
+	var out []string
+	for _, child := range node.Content {
+		out = append(out, scalarsOf(child)...)
+	}
+	return out
 }
