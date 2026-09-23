@@ -39,9 +39,11 @@ jobs:
           go get github.com/infrena/infrena@upgrade
           go mod tidy
           after="$(go list -m -f '{{.Version}}' github.com/infrena/infrena)"
-          echo "before=$before" >> "$GITHUB_OUTPUT"
-          echo "after=$after" >> "$GITHUB_OUTPUT"
-          echo "changed=$([[ "$before" != "$after" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          {
+            echo "before=$before"
+            echo "after=$after"
+            echo "changed=$([[ "$before" != "$after" ]] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         if: steps.bump.outputs.changed == 'true'
         with:
