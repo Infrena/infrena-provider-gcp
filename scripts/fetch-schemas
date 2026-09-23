@@ -81,5 +81,11 @@ mkdir -p gen/mmv1
 # Copy ONLY the YAML files. A literal `cp -r` also vendors BUILD.bazel and
 # anything else upstream keeps beside the resources, which breaks the yaml-only
 # rule even though those files are Apache 2.0 like the rest of products/.
-(cd "$tmp/mm/mmv1/products" && find . -name '*.yaml' -exec install -D {} "$OLDPWD/gen/mmv1/products/{}" \;)
+# -m 644 is not cosmetic. GNU install defaults to 755, so without it every
+# vendored YAML arrives executable while the committed copies are 644, and
+# `git status` reports 1129 modified files with zero content changed after a
+# run that vendored the same pinned commit. That is noise on its own and it
+# would swamp the weekly regeneration PR, where the whole point is that a
+# reviewer can see what actually drifted. Data files are not executable.
+(cd "$tmp/mm/mmv1/products" && find . -name '*.yaml' -exec install -D -m 644 {} "$OLDPWD/gen/mmv1/products/{}" \;)
 echo "vendored magic-modules at $pin: $(find gen/mmv1 -name '*.yaml' ! -name product.yaml | wc -l) resources"
