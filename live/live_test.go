@@ -1186,8 +1186,25 @@ resources:
 	t.Run("destroy_removes_it", func(t *testing.T) {
 		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
 		mustRun(t, dir, exitChanges, "apply", "live", "--auto-approve")
-		if code, _, err := g.get(t.Context(), g.iamURL(name)); err == nil && code == http.StatusOK {
-			t.Errorf("CLEANUP FAILED: the service account is still there after a destroy: %s", name)
+		// POLLED, NOT READ ONCE. A deleted service account stays readable for
+		// a short window -- iam's own eventual consistency, the same property
+		// the provider's Read tolerates in the other direction with
+		// notFoundPatience. Asserting on one immediate GET made this test pass
+		// alone and fail inside the full suite, where the delete lands under
+		// load: the account was verifiably gone from the project both times.
+		// A test whose answer depends on how busy the API was is worse than no
+		// test, because it teaches people to re-run rather than to look.
+		deadline := time.Now().Add(90 * time.Second)
+		for {
+			code, _, err := g.get(t.Context(), g.iamURL(name))
+			if err != nil || code != http.StatusOK {
+				return // gone, which is what destroy promised
+			}
+			if time.Now().After(deadline) {
+				t.Errorf("CLEANUP FAILED: the service account is still there 90s after a destroy: %s", name)
+				return
+			}
+			time.Sleep(3 * time.Second)
 		}
 	})
 }
