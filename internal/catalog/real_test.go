@@ -524,3 +524,206 @@ func TestTheCatalogStillMarksUnorderedLists(t *testing.T) {
 		}
 	}
 }
+
+// TestNoTypeAdvertisesACreateItCannotPerform is the invariant that stops a
+// type nobody can create from claiming it can be.
+//
+// The tier gate's principle is that a capability the generator cannot vouch
+// for does not ship. A create url whose placeholders nothing can fill is
+// exactly that: the create fails on string substitution, before a byte
+// reaches Google. 38 types shipped in that state and the live suite found
+// exactly ONE of them (gcp.serviceaccount), because a live suite finds what
+// it exercises.
+//
+// The rule is the runtime's own. A create-url placeholder must be an
+// instance scope setting (project, region, zone, location -- what
+// gcprov.Provider.withScope actually fills in, and `parent` is deliberately
+// NOT among them because nothing in the plugin's configuration supplies
+// one), a stored CreateBinding, or one of the type's own SETTABLE
+// attributes.
+//
+// The fixed points below are named rather than counted, because a count
+// alone passes if the set changes while its size does not. Each is a type
+// whose create was broken by a DIFFERENT cause and is fixed by a different
+// part of task 18b; between them they cover every mechanism, so a
+// regeneration that undoes any one of them fails here by name.
+func TestNoTypeAdvertisesACreateItCannotPerform(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every type that must be creatable, and the cause that used to stop it.
+	for _, tc := range []struct{ name, why string }{
+		{"gcp.serviceaccount", "iam's create says {+name} and MEANS the parent project; " +
+			"the binding comes from Discovery's own pattern"},
+		{"gcp.bigquery.table", "{{dataset_id}} and {{table_id}} are snake_case names for " +
+			"attributes NESTED at tableReference.datasetId and tableReference.tableId"},
+		{"gcp.routine", "{{dataset_id}} nested at routineReference.datasetId"},
+		{"gcp.objectaccesscontrol", "{{%object}}'s leading %% is an escaping instruction, " +
+			"not part of the attribute's name"},
+		{"gcp.sslcert", "{instance} is a url PATH PARAMETER, never a body field, so it was " +
+			"in no schema until the generator declared it"},
+		{"gcp.artifactregistry.rule", "{{repository_id}} and {{rule_id}}, same cause"},
+		{"gcp.interceptdeployment", "{{intercept_deployment_id}} is the new resource's own " +
+			"id, carried in the create url's query string and in no body"},
+		{"gcp.logging.bucket", "{+parent} expands from Discovery's pattern to " +
+			"projects/{project}/locations/{location}, both of them instance settings"},
+		{"gcp.tagbinding", "part A's type: it must still be creatable after the id fix"},
+		{"gcp.storage.bucket", "the control: it was never broken and must not become so"},
+	} {
+		ty, ok := c.Type(tc.name)
+		if !ok {
+			t.Errorf("the catalog no longer ships %s", tc.name)
+			continue
+		}
+		if missing := ty.UnresolvedCreatePlaceholders(); len(missing) > 0 {
+			t.Errorf("%s cannot build a create url %q: %v is unresolved -- %s",
+				tc.name, ty.CreateTemplate(), missing, tc.why)
+		}
+	}
+
+	// And the capability the host is told about must agree with the fact.
+	byName := map[string]bool{}
+	for _, d := range c.Definitions() {
+		byName[d.Type] = d.Capabilities.Create
+	}
+	for _, ty := range c.Types {
+		can := len(ty.UnresolvedCreatePlaceholders()) == 0
+		if byName[ty.Name] != can {
+			t.Errorf("%s: `infrena explain` says create=%v, but the create url %q %s",
+				ty.Name, byName[ty.Name], ty.CreateTemplate(),
+				map[bool]string{true: "can be built", false: "cannot be built"}[can])
+		}
+	}
+}
+
+// TestTheTypesThatCannotBeCreatedAreExactlyTheseOnes pins the set, by name.
+//
+// It is a LIST, not a count, because a count passes while the membership
+// churns underneath it -- and this project has already found eight tests
+// that passed while testing nothing. A regeneration that breaks a create
+// that used to work fails here naming the type; a regeneration that FIXES
+// one also fails, and the list is meant to be shortened deliberately, in a
+// diff someone reads.
+//
+// Measured 2026-09-23 against the catalog this commit generates: 65 of 233
+// types ship without create. They divide into three causes, all recorded in
+// gen/warnings.txt:
+//
+//   - 56 whose create url names a PARENT the provider cannot express: an
+//     organization, folder, billing account, Bigtable instance, Spanner
+//     instance, Cloud Tasks queue and so on. The Discovery pattern now says
+//     exactly which segment is missing (it used to say only "parent"), and
+//     the value cannot be declared as an attribute because the type's
+//     self_link is a bare "{+name}" -- so nothing a later Read recovers
+//     would carry it back, and an attribute that does not round-trip makes
+//     every plan after a successful apply propose a change.
+//
+//   - 6 whose create url binds the new resource's id to a `name` that
+//     Discovery marks output-only while magic-modules declares it as a url
+//     PARAMETER. The two sources are describing different things -- the id
+//     the user chooses and the full resource name Google answers with -- and
+//     resolving that disagreement is a change to what `name` MEANS for those
+//     types, not a line of code here.
+//
+//   - 3 whose create url is "{+parent}" with a pattern that does not say
+//     which hierarchy root it means ("^[^/]+/[^/]+/..."), so there is
+//     nothing to expand it to.
+//
+// Every one of them still reads, imports, discovers and deletes; only the
+// create is refused, in gcprov.Create, before any request is sent.
+func TestTheTypesThatCannotBeCreatedAreExactlyTheseOnes(t *testing.T) {
+	want := map[string]bool{}
+	for _, n := range []string{
+		"gcp.appprofile",
+		"gcp.attachment",
+		"gcp.authorizedview",
+		"gcp.automation",
+		"gcp.bigtableadmin.backup",
+		"gcp.bigtableadmin.cluster",
+		"gcp.bigtableadmin.table",
+		"gcp.cloudasset.savedquery",
+		"gcp.cloudresourcemanager.folder.capabilityconfig",
+		"gcp.cloudresourcemanager.organization.capabilityconfig",
+		"gcp.config",
+		"gcp.credential",
+		"gcp.deploypolicy",
+		"gcp.feed",
+		"gcp.file.snapshot",
+		"gcp.iam.organization.role",
+		"gcp.iam.serviceaccount.key",
+		"gcp.iam.workforcepool.provider",
+		"gcp.iam.workforcepool.provider.key",
+		"gcp.iam.workloadidentitypool.provider",
+		"gcp.iam.workloadidentitypool.provider.key",
+		"gcp.logging.billingaccount.bucket",
+		"gcp.logging.billingaccount.exclusion",
+		"gcp.logging.billingaccount.link",
+		"gcp.logging.billingaccount.savedquery",
+		"gcp.logging.billingaccount.sink",
+		"gcp.logging.billingaccount.view",
+		"gcp.logging.folder.bucket",
+		"gcp.logging.folder.exclusion",
+		"gcp.logging.folder.link",
+		"gcp.logging.folder.savedquery",
+		"gcp.logging.folder.sink",
+		"gcp.logging.folder.view",
+		"gcp.logging.link",
+		"gcp.logging.organization.bucket",
+		"gcp.logging.organization.exclusion",
+		"gcp.logging.organization.link",
+		"gcp.logging.organization.savedquery",
+		"gcp.logging.organization.sink",
+		"gcp.logging.organization.view",
+		"gcp.logging.savedquery",
+		"gcp.logging.view",
+		"gcp.logicalview",
+		"gcp.managedidentity",
+		"gcp.materializedview",
+		"gcp.namespace",
+		"gcp.networksecurity.organization.addressgroup",
+		"gcp.networksecurity.organization.firewallendpoint",
+		"gcp.networksecurity.organization.securityprofile",
+		"gcp.networksecurity.organization.securityprofilegroup",
+		"gcp.networksecurity.rule",
+		"gcp.osconfig.folder.policyorchestrator",
+		"gcp.osconfig.organization.policyorchestrator",
+		"gcp.proposal",
+		"gcp.schemabundle",
+		"gcp.scimtenant",
+		"gcp.servicelevelobjective",
+		"gcp.spanner.backup",
+		"gcp.spanner.session",
+		"gcp.tag",
+		"gcp.task",
+		"gcp.token",
+		"gcp.usercred",
+		"gcp.userworkloadssecret",
+		"gcp.version",
+	} {
+		want[n] = true
+	}
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, ty := range c.Types {
+		if len(ty.UnresolvedCreatePlaceholders()) > 0 {
+			got[ty.Name] = true
+		}
+	}
+	for n := range got {
+		if !want[n] {
+			ty, _ := c.Type(n)
+			t.Errorf("%s can no longer be created and used to be able to: %q needs %v",
+				n, ty.CreateTemplate(), ty.UnresolvedCreatePlaceholders())
+		}
+	}
+	for n := range want {
+		if !got[n] {
+			t.Errorf("%s can now be created; that is progress, so take it off this list", n)
+		}
+	}
+	t.Logf("%d of %d shipped types cannot build a create url", len(got), len(c.Types))
+}
