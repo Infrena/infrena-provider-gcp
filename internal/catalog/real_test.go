@@ -727,3 +727,65 @@ func TestTheTypesThatCannotBeCreatedAreExactlyTheseOnes(t *testing.T) {
 	}
 	t.Logf("%d of %d shipped types cannot build a create url", len(got), len(c.Types))
 }
+
+// TestNoSiblingGroupFoldsTogether. infrena resolves an attribute spelling by
+// folding case (strings.ToLower, and nothing else -- it does NOT fold
+// underscores) across declared names and aliases. Two spellings in one sibling
+// group that fold to the same key are an ambiguity: the host answers whichever
+// the map was walked to first.
+//
+// infrena refuses that at load -- top-level groups since forever, nested ones
+// from v0.14.2. This test exists anyway, and deliberately duplicates the host's
+// rule, because the host's refusal arrives in a USER'S hands at plugin load
+// while this one arrives here, when the generator changes. A collision would be
+// introduced by regenerating the catalog, never by a user, so this is the right
+// place to find it.
+//
+// It follows BOTH nesting edges. Fields is an object's attributes and Elem is a
+// list's element, and a walk following only Fields misses most of the corpus:
+// when Task 14a measured renamed attributes through Fields alone it found 43,
+// and through both it found 306, 263 of them inside a list. Two people made
+// that same omission independently.
+//
+// Measured 2026-09-23: 4321 sibling groups to depth 9, 0 collisions.
+func TestNoSiblingGroupFoldsTogether(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := 0
+	var check func(tyName, path string, as map[string]*Attr)
+	check = func(tyName, path string, as map[string]*Attr) {
+		if len(as) == 0 {
+			return
+		}
+		groups++
+		claimed := map[string]string{} // folded -> the spelling that claimed it
+		for name, a := range as {
+			for _, spelling := range append([]string{name}, a.Aliases...) {
+				folded := strings.ToLower(spelling)
+				if first, taken := claimed[folded]; taken && first != spelling {
+					t.Errorf("%s: %s%q and %s%q fold to the same name, so configuration naming it "+
+						"reaches whichever was walked to first", tyName, path, first, path, spelling)
+				}
+				claimed[folded] = spelling
+			}
+		}
+		for name, a := range as {
+			check(tyName, path+name+".", a.Fields)
+			if a.Elem != nil {
+				check(tyName, path+name+"[].", a.Elem.Fields)
+			}
+		}
+	}
+	for _, ty := range c.Types {
+		check(ty.Name, "", ty.Attributes)
+	}
+	// Non-vacuity: this walk must actually reach the nested corpus. If a future
+	// change stopped it descending, every assertion above would pass by never
+	// running. 4321 groups were measured; 2000 is a floor with room for drift.
+	if groups < 2000 {
+		t.Errorf("walked only %d sibling groups; the catalog had 4321 on 2026-09-23, so this "+
+			"test is no longer reaching the nested attributes it exists to check", groups)
+	}
+}
