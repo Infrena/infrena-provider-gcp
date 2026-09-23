@@ -20,7 +20,7 @@ Bucket ACLs can be managed authoritatively using the \[`storage_bucket_acl`\](ht
 | --- | --- | --- |
 | Create | yes | `POST b/{{bucket}}/acl` |
 | Read | yes | `GET b/{{bucket}}/acl/{{entity}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH b/{{bucket}}/acl/{{entity}}` |
 | Delete | yes | `DELETE b/{{bucket}}/acl/{{entity}}` |
 | Import | yes | by id, see below |
 

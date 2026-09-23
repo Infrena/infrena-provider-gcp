@@ -26,9 +26,9 @@
 | [`gcp.networksecurity.organization.firewallendpoint`](gcp.networksecurity.organization.firewallendpoint.md) | **no** | yes | yes | A Firewall endpoint is a Cloud Firewall resource that enables layer 7 advanced protection capabilities, such as intrusion prevention, in … |
 | [`gcp.networksecurity.organization.securityprofile`](gcp.networksecurity.organization.securityprofile.md) | **no** | yes | yes | A security profile defines the behavior associated to a profile type. |
 | [`gcp.networksecurity.organization.securityprofilegroup`](gcp.networksecurity.organization.securityprofilegroup.md) | **no** | yes | yes | A security profile group defines a container for security profiles. |
-| [`gcp.networksecurity.rule`](gcp.networksecurity.rule.md) | **no** | **no** | yes | The GatewaySecurityPolicyRule resource is in a nested collection within a GatewaySecurityPolicy and represents a traffic matching condition … |
+| [`gcp.networksecurity.rule`](gcp.networksecurity.rule.md) | **no** | yes | yes | The GatewaySecurityPolicyRule resource is in a nested collection within a GatewaySecurityPolicy and represents a traffic matching condition … |
 | [`gcp.networksecurity.securityprofile`](gcp.networksecurity.securityprofile.md) | yes | yes | yes | A security profile defines the behavior associated to a profile type. |
 | [`gcp.networksecurity.securityprofilegroup`](gcp.networksecurity.securityprofilegroup.md) | yes | yes | yes | A security profile group defines a container for security profiles. |
 | [`gcp.servertlspolicy`](gcp.servertlspolicy.md) | yes | yes | yes | ServerTlsPolicy is a resource that specifies how a server should authenticate incoming requests. |
 | [`gcp.tlsinspectionpolicy`](gcp.tlsinspectionpolicy.md) | yes | yes | yes | The TlsInspectionPolicy resource contains references to CA pools in Certificate Authority Service and associated metadata. |
-| [`gcp.urllist`](gcp.urllist.md) | yes | **no** | yes | UrlList proto helps users to set reusable, independently manageable lists of hosts, host patterns, URLs, URL patterns. |
+| [`gcp.urllist`](gcp.urllist.md) | yes | yes | yes | UrlList proto helps users to set reusable, independently manageable lists of hosts, host patterns, URLs, URL patterns. |

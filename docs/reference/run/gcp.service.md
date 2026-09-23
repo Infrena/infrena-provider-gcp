@@ -21,7 +21,7 @@ Service acts as a top-level container that manages a set of configurations and r
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/services` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

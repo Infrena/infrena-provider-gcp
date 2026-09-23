@@ -21,7 +21,7 @@ A policy orchestrator manages project-level and zone-level policy resources, suc
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/global/policyOrchestrators` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

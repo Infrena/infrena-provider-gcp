@@ -6,6 +6,6 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.environment`](gcp.environment.md) | yes | **no** | yes | An environment for running orchestration tasks. |
+| [`gcp.environment`](gcp.environment.md) | yes | yes | yes | An environment for running orchestration tasks. |
 | [`gcp.userworkloadsconfigmap`](gcp.userworkloadsconfigmap.md) | yes | **no** | yes | User workloads ConfigMap used by Airflow tasks that run with Kubernetes Executor or KubernetesPodOperator. |
 | [`gcp.userworkloadssecret`](gcp.userworkloadssecret.md) | **no** | **no** | yes | User workloads Secret used by Airflow tasks that run with Kubernetes executor or KubernetesPodOperator. |

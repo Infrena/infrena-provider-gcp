@@ -225,12 +225,17 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	if !ok {
 		return nil, fmt.Errorf("gcp: unknown type %q", desired.Type)
 	}
-	// 147 of the 233 types publish no update method at all, and
-	// Capabilities.Update is derived from exactly this field, so the host
+	// 64 of the 236 types publish no update method this provider can use,
+	// and Capabilities.Update is derived from exactly this field, so the host
 	// plans a replacement for them and never calls Update. Refusing here
 	// rather than defaulting to PATCH keeps a catalog or host regression
 	// from quietly patching a type whose API has no update method: nothing
 	// has been sent yet, so an error costs nothing.
+	//
+	// It used to be 154 of 235, because the verb came only from
+	// magic-modules and magic-modules leaves it off most resources. The
+	// generator now asks Discovery too (gen.discoveredUpdate), which is why
+	// buckets, networks and subnetworks are patched rather than replaced.
 	if ty.UpdateVerb == "" {
 		return nil, fmt.Errorf("gcp: %s: publishes no update method; every change to it replaces the resource", ty.Name)
 	}
@@ -257,12 +262,14 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	if err != nil {
 		return nil, err
 	}
-	// NOT every updatable type takes an updateMask. Measured across the 233
-	// generated types: 86 are updatable at all (they have an UpdateVerb, all
-	// of them PATCH), and only 71 of those use a mask -- gcp.firewall,
-	// gcp.connection, gcp.router and 12 others PATCH without one. Appending
-	// the parameter unconditionally sends a query argument those APIs never
-	// asked for.
+	// NOT every updatable type takes an updateMask. Measured across the 236
+	// generated types on 2026-09-23: 172 are updatable at all (they have an
+	// UpdateVerb, and it is PATCH for every one of them -- a PUT would
+	// replace the resource with BuildMask's partial body, so the generator
+	// refuses to derive one), and 135 of those use a mask. The other 37 --
+	// gcp.firewall, gcp.storage.bucket, gcp.network and gcp.router among
+	// them -- PATCH without one. Appending the parameter unconditionally
+	// sends a query argument those APIs never asked for.
 	if ty.UpdateMask {
 		reqURL += maskQuery(reqURL, mask)
 	}

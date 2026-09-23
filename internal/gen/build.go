@@ -915,6 +915,25 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		}
 	}
 
+	// UpdateVerb used to come from magic-modules and from nowhere else, which
+	// meant it usually came from nowhere: magic-modules relies on its own
+	// default when a resource's yaml omits `update_verb:`, and most omit it. A
+	// type with no verb is not merely unpatchable — patch.go turns it into
+	// "every change REPLACES the resource", and the generated reference then
+	// tells the user the API publishes no update method. Measured 2026-09-23:
+	// 154 shipping types were in that state and Google publishes a PATCH for at
+	// least 33 of them, gcp.storage.bucket, gcp.network, gcp.subnetwork,
+	// gcp.compute.instance and gcp.urlmap among them. Replacing a bucket takes
+	// its objects with it.
+	//
+	// So ask the collection. See discoveredUpdate for what it refuses, which is
+	// the more important half.
+	if t.UpdateVerb == "" && t.UpdateURL == "" {
+		if verb, masked := discoveredUpdate(col); verb != "" {
+			t.UpdateVerb, t.UpdateMask = verb, masked
+		}
+	}
+
 	// ImportFormat is the ID shape `infrena import` accepts, and Capabilities.Import
 	// is derived from it — so a type without one cannot be adopted at all.
 	// magic-modules supplies it for only 75 of the 233 types; the rest fall back
@@ -1886,4 +1905,54 @@ func idTemplateFromDelete(col disco.Collection) string {
 		return path
 	}
 	return m[1] + "/" + path
+}
+
+// discoveredUpdate derives an update method from a collection's own Discovery
+// entry, for the types magic-modules says nothing about. It returns the verb
+// and whether the method takes an updateMask query parameter, or "" to leave
+// the type non-updatable.
+//
+// What it REFUSES matters more than what it accepts, because the failure modes
+// are silent and destructive rather than loud:
+//
+//   - PUT is never accepted, only PATCH. BuildMask emits a PARTIAL body — just
+//     the attributes that changed — and PUT replaces the resource with the body
+//     it is handed, so a partial body against a PUT endpoint clears every field
+//     the diff left out. compute's instances collection publishes `update`
+//     (PUT) and no patch at all: accepting PUT would start silently wiping
+//     virtual machines. A PUT-only type keeps replacing instead, which is
+//     wasteful and honest rather than lossy and quiet.
+//
+//   - A patch whose request schema is not the resource's own is refused. That
+//     is the Pub/Sub shape: topics.patch takes UpdateTopicRequest{topic,
+//     updateMask}, so the resource is WRAPPED and the mask lives in the body,
+//     while Provider.Update sends the bare resource with the mask on the query
+//     string. Nothing in the catalog has this shape today and this is what
+//     keeps it that way. A patch that publishes no request schema at all is
+//     refused for the same reason: nothing said the body is the resource.
+//
+//   - A patch whose path differs from the collection's own `get` is refused,
+//     because Update addresses the resource through SelfLink and SelfLink is
+//     the get path. Deriving a verb for a patch that lives somewhere else would
+//     send it to the wrong url.
+//
+// The mask is read separately from the verb rather than implied by it: 15 of
+// the types that were already updatable PATCH without a mask, and sending a
+// query parameter an API never asked for is its own bug.
+func discoveredUpdate(col disco.Collection) (verb string, masked bool) {
+	patch := col.Methods["patch"]
+	get := col.Methods["get"]
+	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
+		return "", false
+	}
+	if patch.Path != get.Path {
+		return "", false
+	}
+	if patch.Request == nil || get.Response == nil || patch.Request.Ref != get.Response.Ref {
+		return "", false
+	}
+	if p := patch.Parameters["updateMask"]; p != nil && p.Location == "query" {
+		masked = true
+	}
+	return "PATCH", masked
 }

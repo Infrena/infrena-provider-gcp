@@ -6,4 +6,4 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.aclpolicy`](gcp.aclpolicy.md) | yes | **no** | yes | The ACL policy resource. |
+| [`gcp.aclpolicy`](gcp.aclpolicy.md) | yes | yes | yes | The ACL policy resource. |

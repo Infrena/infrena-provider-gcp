@@ -20,7 +20,7 @@ An HttpHealthCheck resource. This resource defines a template for how individual
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/global/httpHealthChecks` |
 | Read | yes | `GET projects/{project}/global/httpHealthChecks/{httpHealthCheck}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/httpHealthChecks/{httpHealthCheck}` |
 | Delete | yes | `DELETE projects/{project}/global/httpHealthChecks/{httpHealthCheck}` |
 | Import | yes | by id, see below |
 

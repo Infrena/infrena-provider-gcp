@@ -10,7 +10,7 @@
 | [`gcp.agentgateway`](gcp.agentgateway.md) | yes | yes | yes | AgentGateway represents the agent gateway resource. |
 | [`gcp.authzextension`](gcp.authzextension.md) | yes | yes | yes | AuthzExtension is a resource that allows traffic forwarding to a callout backend service to make an authorization decision. |
 | [`gcp.endpointpolicy`](gcp.endpointpolicy.md) | yes | yes | yes | EndpointPolicy is a resource that helps apply desired configuration on the endpoints that match specific criteria. |
-| [`gcp.extensionbinding`](gcp.extensionbinding.md) | yes | **no** | yes | `ExtensionBinding` is a resource representing the attachment of an extension to a service. |
+| [`gcp.extensionbinding`](gcp.extensionbinding.md) | yes | yes | yes | `ExtensionBinding` is a resource representing the attachment of an extension to a service. |
 | [`gcp.grpcroute`](gcp.grpcroute.md) | yes | yes | yes | GrpcRoute is the resource defining how gRPC traffic routed by a Mesh or Gateway resource is routed. |
 | [`gcp.httproute`](gcp.httproute.md) | yes | yes | yes | HttpRoute is the resource defining how HTTP traffic should be routed by a Mesh or Gateway resource. |
 | [`gcp.lbedgeextension`](gcp.lbedgeextension.md) | yes | yes | yes | LbEdgeExtension is a resource that lets the extension service influence the selection of backend services and Cloud CDN cache keys by … |
@@ -20,8 +20,8 @@
 | [`gcp.multicastconsumerassociation`](gcp.multicastconsumerassociation.md) | yes | yes | yes | Create a multicast consumer association in the specified location of the current project. |
 | [`gcp.multicastgroupconsumeractivation`](gcp.multicastgroupconsumeractivation.md) | yes | yes | yes | Create a multicast group consumer activation in the specified location of the current project. |
 | [`gcp.producerextension`](gcp.producerextension.md) | yes | **no** | yes | `ProducerExtension` is a resource representing producer defined configuration for their service extension. |
-| [`gcp.servicebinding`](gcp.servicebinding.md) | yes | **no** | yes | ServiceBinding is the resource that defines a Service Directory Service to be used in a BackendService resource. |
-| [`gcp.servicelbpolicy`](gcp.servicelbpolicy.md) | yes | **no** | yes | ServiceLbPolicy holds global load balancing and traffic distribution configuration that can be applied to a BackendService. |
+| [`gcp.servicebinding`](gcp.servicebinding.md) | yes | yes | yes | ServiceBinding is the resource that defines a Service Directory Service to be used in a BackendService resource. |
+| [`gcp.servicelbpolicy`](gcp.servicelbpolicy.md) | yes | yes | yes | ServiceLbPolicy holds global load balancing and traffic distribution configuration that can be applied to a BackendService. |
 | [`gcp.tcproute`](gcp.tcproute.md) | yes | yes | yes | TcpRoute is the resource defining how TCP traffic should be routed by a Mesh/Gateway resource. |
 | [`gcp.tlsroute`](gcp.tlsroute.md) | yes | yes | yes | TlsRoute defines how traffic should be routed based on SNI and other matching L3 attributes. |
 | [`gcp.version`](gcp.version.md) | **no** | **no** | yes | A single immutable version of a `WasmPlugin` resource. |

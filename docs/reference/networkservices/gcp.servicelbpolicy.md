@@ -21,7 +21,7 @@ ServiceLbPolicy holds global load balancing and traffic distribution configurati
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/serviceLbPolicies` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

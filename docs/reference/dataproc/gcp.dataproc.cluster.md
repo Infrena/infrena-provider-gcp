@@ -21,7 +21,7 @@ Describes the identifying information, config, and status of a cluster
 | --- | --- | --- |
 | Create | yes | `POST projects/{projectId}/regions/{region}/clusters` |
 | Read | yes | `GET projects/{projectId}/regions/{region}/clusters/{clusterName}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{projectId}/regions/{region}/clusters/{clusterName}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{projectId}/regions/{region}/clusters/{clusterName}` |
 | Import | yes | by id, see below |
 

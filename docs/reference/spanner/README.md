@@ -6,5 +6,5 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.spanner.backup`](gcp.spanner.backup.md) | **no** | **no** | yes | A backup of a Cloud Spanner database. |
+| [`gcp.spanner.backup`](gcp.spanner.backup.md) | **no** | yes | yes | A backup of a Cloud Spanner database. |
 | [`gcp.spanner.session`](gcp.spanner.session.md) | **no** | **no** | yes | A session in the Cloud Spanner API. |

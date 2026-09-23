@@ -20,7 +20,7 @@ Represents a SQL database on the Cloud SQL instance.
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/instances/{instance}/databases` |
 | Read | yes | `GET projects/{project}/instances/{instance}/databases/{database}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/instances/{instance}/databases/{database}` |
 | Delete | yes | `DELETE projects/{project}/instances/{instance}/databases/{database}` |
 | Import | yes | by id, see below |
 

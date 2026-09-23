@@ -20,7 +20,7 @@ The ObjectAccessControls resources represent the Access Control Lists (ACLs) for
 | --- | --- | --- |
 | Create | yes | `POST b/{{bucket}}/o/{{%object}}/acl` |
 | Read | yes | `GET b/{{bucket}}/o/{{%object}}/acl/{{entity}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH b/{{bucket}}/o/{{%object}}/acl/{{entity}}` |
 | Delete | yes | `DELETE b/{{bucket}}/o/{{%object}}/acl/{{entity}}` |
 | Import | yes | by id, see below |
 

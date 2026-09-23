@@ -21,7 +21,7 @@ A materialized view object that can be referenced in SQL queries.
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/materializedViews` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

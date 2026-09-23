@@ -20,7 +20,7 @@ Represents an Image resource. Google Compute Engine uses operating system images
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/global/images` |
 | Read | yes | `GET projects/{project}/global/images/{image}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/images/{image}` |
 | Delete | yes | `DELETE projects/{project}/global/images/{image}` |
 | Import | yes | by id, see below |
 

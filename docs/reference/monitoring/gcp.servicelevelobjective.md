@@ -20,7 +20,7 @@ A Service-Level Objective (SLO) describes a level of desired good service. It co
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/serviceLevelObjectives` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

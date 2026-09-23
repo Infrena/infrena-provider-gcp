@@ -7,7 +7,7 @@
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.certificate`](gcp.certificate.md) | yes | yes | yes | Certificate represents a HTTP-reachable backend for a Certificate. |
-| [`gcp.certificateissuanceconfig`](gcp.certificateissuanceconfig.md) | yes | **no** | yes | Certificate represents a HTTP-reachable backend for a Certificate. |
+| [`gcp.certificateissuanceconfig`](gcp.certificateissuanceconfig.md) | yes | yes | yes | Certificate represents a HTTP-reachable backend for a Certificate. |
 | [`gcp.certificatemap`](gcp.certificatemap.md) | yes | yes | yes | CertificateMap defines a collection of certificate configurations, which are usable by any associated target proxies |
 | [`gcp.certificatemapentry`](gcp.certificatemapentry.md) | yes | yes | yes | CertificateMapEntry is a list of certificate configurations, that have been issued for a particular hostname |
 | [`gcp.dnsauthorization`](gcp.dnsauthorization.md) | yes | yes | yes | DnsAuthorization represents a HTTP-reachable backend for a DnsAuthorization. |

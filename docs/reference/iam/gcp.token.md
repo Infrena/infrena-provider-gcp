@@ -20,7 +20,7 @@ Gemini Enterprise only. Represents a token for the WorkforcePoolProviderScimTena
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/tokens` needs `provider`, `scimTenant`, `workforcePool`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

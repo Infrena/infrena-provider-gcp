@@ -12,10 +12,10 @@
 | [`gcp.externalvpngateway`](gcp.externalvpngateway.md) | yes | **no** | yes | Represents a VPN gateway managed outside of GCP. |
 | [`gcp.firewall`](gcp.firewall.md) | yes | yes | yes | Each network has its own firewall controlling access to and from the instances. |
 | [`gcp.globalnetworkendpointgroup`](gcp.globalnetworkendpointgroup.md) | yes | **no** | yes | A global network endpoint group contains endpoints that reside outside of Google Cloud. |
-| [`gcp.globalpublicdelegatedprefix`](gcp.globalpublicdelegatedprefix.md) | yes | **no** | yes | A PublicDelegatedPrefix resource represents an IP block within a PublicAdvertisedPrefix that is configured within a single cloud scope … |
-| [`gcp.httphealthcheck`](gcp.httphealthcheck.md) | yes | **no** | yes | An HttpHealthCheck resource. |
-| [`gcp.httpshealthcheck`](gcp.httpshealthcheck.md) | yes | **no** | yes | An HttpsHealthCheck resource. |
-| [`gcp.image`](gcp.image.md) | yes | **no** | yes | Represents an Image resource. |
+| [`gcp.globalpublicdelegatedprefix`](gcp.globalpublicdelegatedprefix.md) | yes | yes | yes | A PublicDelegatedPrefix resource represents an IP block within a PublicAdvertisedPrefix that is configured within a single cloud scope … |
+| [`gcp.httphealthcheck`](gcp.httphealthcheck.md) | yes | yes | yes | An HttpHealthCheck resource. |
+| [`gcp.httpshealthcheck`](gcp.httpshealthcheck.md) | yes | yes | yes | An HttpsHealthCheck resource. |
+| [`gcp.image`](gcp.image.md) | yes | yes | yes | Represents an Image resource. |
 | [`gcp.instancegroupmanagerresizerequest`](gcp.instancegroupmanagerresizerequest.md) | yes | **no** | yes | InstanceGroupManagerResizeRequest represents a request to create a number of VMs: either immediately or by queuing the request for the … |
 | [`gcp.instancetemplate`](gcp.instancetemplate.md) | yes | **no** | yes | Resource that enables a convenient way to save a virtual machine (VM) instance's configuration that includes all of its properties and … |
 | [`gcp.instantsnapshot`](gcp.instantsnapshot.md) | yes | **no** | yes | Represents an instant snapshot resource. |
@@ -23,19 +23,19 @@
 | [`gcp.interconnectattachmentgroup`](gcp.interconnectattachmentgroup.md) | yes | yes | yes | An interconnect attachment group resource allows customers to create, analyze, and expand highly available deployments. |
 | [`gcp.interconnectgroup`](gcp.interconnectgroup.md) | yes | yes | yes | An interconnect group resource allows customers to create, analyze, and expand their redundant connections. |
 | [`gcp.licens`](gcp.licens.md) | yes | **no** | yes | Represents a License resource. |
-| [`gcp.network`](gcp.network.md) | yes | **no** | yes | Manages a VPC network or legacy network resource on GCP. |
+| [`gcp.network`](gcp.network.md) | yes | yes | yes | Manages a VPC network or legacy network resource on GCP. |
 | [`gcp.networkattachment`](gcp.networkattachment.md) | yes | yes | yes | A network attachment is a resource that lets a producer Virtual Private Cloud (VPC) network initiate connections to a consumer VPC network … |
 | [`gcp.networkedgesecurityservice`](gcp.networkedgesecurityservice.md) | yes | yes | yes | Google Cloud Armor network edge security service resource. |
 | [`gcp.networkendpointgroup`](gcp.networkendpointgroup.md) | yes | **no** | yes | Network endpoint groups (NEGs) are zonal resources that represent collections of IP address and port combinations for GCP resources within … |
 | [`gcp.networkfirewallpolicy`](gcp.networkfirewallpolicy.md) | yes | yes | yes | The Compute NetworkFirewallPolicy resource |
 | [`gcp.nodetemplate`](gcp.nodetemplate.md) | yes | **no** | yes | Represents a NodeTemplate resource. |
 | [`gcp.packetmirroring`](gcp.packetmirroring.md) | yes | yes | yes | Packet Mirroring mirrors traffic to and from particular VM instances. |
-| [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | **no** | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
-| [`gcp.publicdelegatedprefix`](gcp.publicdelegatedprefix.md) | yes | **no** | yes | Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYOIP). |
+| [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | yes | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
+| [`gcp.publicdelegatedprefix`](gcp.publicdelegatedprefix.md) | yes | yes | yes | Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYOIP). |
 | [`gcp.regionautoscaler`](gcp.regionautoscaler.md) | yes | **no** | yes | Represents an Autoscaler resource. |
 | [`gcp.regioncompositehealthcheck`](gcp.regioncompositehealthcheck.md) | yes | yes | yes | A composite health check resource specifies the health source resources and the health destination resource to which the aggregated health … |
 | [`gcp.regionhealthaggregationpolicy`](gcp.regionhealthaggregationpolicy.md) | yes | yes | yes | The Health Aggregation Policy specifies how to aggregate the service's constituent source health status to determine an aggregated health … |
-| [`gcp.regionhealthcheckservice`](gcp.regionhealthcheckservice.md) | yes | **no** | yes | Represents a Health-Check as a Service resource. |
+| [`gcp.regionhealthcheckservice`](gcp.regionhealthcheckservice.md) | yes | yes | yes | Represents a Health-Check as a Service resource. |
 | [`gcp.regionhealthsource`](gcp.regionhealthsource.md) | yes | yes | yes | A health source resource specifies the source resources and the health aggregation policy applied to the source resources to determine the … |
 | [`gcp.regioninstancegroupmanagerresizerequest`](gcp.regioninstancegroupmanagerresizerequest.md) | yes | **no** | yes | InstanceGroupManagerResizeRequest represents a request to create a number of VMs: either immediately or by queuing the request for the … |
 | [`gcp.regioninstancetemplate`](gcp.regioninstancetemplate.md) | yes | **no** | yes | Represents an Instance Template resource. |
@@ -50,19 +50,19 @@
 | [`gcp.regionsslpolicy`](gcp.regionsslpolicy.md) | yes | yes | yes | Represents a Regional SSL policy. |
 | [`gcp.regiontargethttpproxy`](gcp.regiontargethttpproxy.md) | yes | **no** | yes | Represents a RegionTargetHttpProxy resource, which is used by one or more forwarding rules to route incoming HTTP requests to a URL map. |
 | [`gcp.regiontargettcpproxy`](gcp.regiontargettcpproxy.md) | yes | **no** | yes | Represents a RegionTargetTcpProxy resource, which is used by one or more forwarding rules to route incoming TCP requests to a regional TCP … |
-| [`gcp.regionurlmap`](gcp.regionurlmap.md) | yes | **no** | yes | UrlMaps are used to route requests to a backend service based on rules that you define for the host and path of an incoming URL. |
+| [`gcp.regionurlmap`](gcp.regionurlmap.md) | yes | yes | yes | UrlMaps are used to route requests to a backend service based on rules that you define for the host and path of an incoming URL. |
 | [`gcp.resourcepolicy`](gcp.resourcepolicy.md) | yes | yes | yes | A policy that can be attached to a resource to specify or schedule actions on that resource. |
 | [`gcp.rolloutplan`](gcp.rolloutplan.md) | yes | **no** | yes | A RolloutPlan is the customer-defined strategy to divide a large-scale change into smaller increments, referred to as "waves". |
 | [`gcp.router`](gcp.router.md) | yes | yes | yes | Represents a Router resource. |
-| [`gcp.securitypolicy`](gcp.securitypolicy.md) | yes | **no** | yes | Represents a Google Cloud Armor security policy resource. |
+| [`gcp.securitypolicy`](gcp.securitypolicy.md) | yes | yes | yes | Represents a Google Cloud Armor security policy resource. |
 | [`gcp.sslcertificate`](gcp.sslcertificate.md) | yes | **no** | yes | An SslCertificate resource, used for HTTPS load balancing. |
-| [`gcp.subnetwork`](gcp.subnetwork.md) | yes | **no** | yes | A VPC network is a virtual version of the traditional physical networks that exist within and between physical data centers. |
+| [`gcp.subnetwork`](gcp.subnetwork.md) | yes | yes | yes | A VPC network is a virtual version of the traditional physical networks that exist within and between physical data centers. |
 | [`gcp.targetgrpcproxy`](gcp.targetgrpcproxy.md) | yes | yes | yes | Represents a Target gRPC Proxy resource. |
-| [`gcp.targethttpproxy`](gcp.targethttpproxy.md) | yes | **no** | yes | Represents a TargetHttpProxy resource, which is used by one or more global forwarding rule to route incoming HTTP requests to a URL map. |
+| [`gcp.targethttpproxy`](gcp.targethttpproxy.md) | yes | yes | yes | Represents a TargetHttpProxy resource, which is used by one or more global forwarding rule to route incoming HTTP requests to a URL map. |
 | [`gcp.targetpool`](gcp.targetpool.md) | yes | **no** | yes | Represents a Target Pool resource. |
 | [`gcp.targetsslproxy`](gcp.targetsslproxy.md) | yes | **no** | yes | Represents a TargetSslProxy resource, which is used by one or more global forwarding rule to route incoming SSL requests to a backend … |
 | [`gcp.targettcpproxy`](gcp.targettcpproxy.md) | yes | **no** | yes | Represents a TargetTcpProxy resource, which is used by one or more global forwarding rule to route incoming TCP requests to a Backend … |
 | [`gcp.targetvpngateway`](gcp.targetvpngateway.md) | yes | **no** | yes | Represents a Target VPN Gateway resource. |
-| [`gcp.urlmap`](gcp.urlmap.md) | yes | **no** | yes | UrlMaps are used to route requests to a backend service based on rules that you define for the host and path of an incoming URL. |
+| [`gcp.urlmap`](gcp.urlmap.md) | yes | yes | yes | UrlMaps are used to route requests to a backend service based on rules that you define for the host and path of an incoming URL. |
 | [`gcp.vpngateway`](gcp.vpngateway.md) | yes | **no** | yes | Represents a VPN gateway running in GCP. |
 | [`gcp.wiregroup`](gcp.wiregroup.md) | yes | yes | yes | The WireGroup resource represents a group of redundant wires between interconnects in two different metros. |

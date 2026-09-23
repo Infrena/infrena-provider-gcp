@@ -20,7 +20,7 @@ The DefaultObjectAccessControls resources represent the Access Control Lists (AC
 | --- | --- | --- |
 | Create | yes | `POST b/{{bucket}}/defaultObjectAcl` |
 | Read | yes | `GET b/{{bucket}}/defaultObjectAcl/{{entity}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH b/{{bucket}}/defaultObjectAcl/{{entity}}` |
 | Delete | yes | `DELETE b/{{bucket}}/defaultObjectAcl/{{entity}}` |
 | Import | yes | by id, see below |
 

@@ -20,7 +20,7 @@ UrlMaps are used to route requests to a backend service based on rules that you 
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/regions/{{region}}/urlMaps` |
 | Read | yes | `GET projects/{project}/regions/{region}/urlMaps/{urlMap}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/regions/{region}/urlMaps/{urlMap}` |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/urlMaps/{urlMap}` |
 | Import | yes | by id, see below |
 

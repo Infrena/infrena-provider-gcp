@@ -21,7 +21,7 @@ A Cloud Run Instance represents a single group of containers running in a region
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/instances` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

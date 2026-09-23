@@ -20,7 +20,7 @@ An object.
 | --- | --- | --- |
 | Create | yes | `POST b/{bucket}/o` |
 | Read | yes | `GET b/{bucket}/o/{object}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH b/{bucket}/o/{object}` |
 | Delete | yes | `DELETE b/{bucket}/o/{object}` |
 | Import | yes | by id, see below |
 

@@ -6,27 +6,27 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.logging.billingaccount.bucket`](gcp.logging.billingaccount.bucket.md) | **no** | **no** | yes | Describes a repository in which log entries are stored. |
-| [`gcp.logging.billingaccount.exclusion`](gcp.logging.billingaccount.exclusion.md) | **no** | **no** | yes | Specifies a set of log entries that are filtered out by a sink. |
+| [`gcp.logging.billingaccount.bucket`](gcp.logging.billingaccount.bucket.md) | **no** | yes | yes | Describes a repository in which log entries are stored. |
+| [`gcp.logging.billingaccount.exclusion`](gcp.logging.billingaccount.exclusion.md) | **no** | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
 | [`gcp.logging.billingaccount.link`](gcp.logging.billingaccount.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
 | [`gcp.logging.billingaccount.savedquery`](gcp.logging.billingaccount.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
-| [`gcp.logging.billingaccount.sink`](gcp.logging.billingaccount.sink.md) | **no** | **no** | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
-| [`gcp.logging.billingaccount.view`](gcp.logging.billingaccount.view.md) | **no** | **no** | yes | Describes a view over log entries in a bucket. |
-| [`gcp.logging.bucket`](gcp.logging.bucket.md) | yes | **no** | yes | Describes a repository in which log entries are stored. |
-| [`gcp.logging.exclusion`](gcp.logging.exclusion.md) | yes | **no** | yes | Specifies a set of log entries that are filtered out by a sink. |
-| [`gcp.logging.folder.bucket`](gcp.logging.folder.bucket.md) | **no** | **no** | yes | Describes a repository in which log entries are stored. |
-| [`gcp.logging.folder.exclusion`](gcp.logging.folder.exclusion.md) | **no** | **no** | yes | Specifies a set of log entries that are filtered out by a sink. |
+| [`gcp.logging.billingaccount.sink`](gcp.logging.billingaccount.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
+| [`gcp.logging.billingaccount.view`](gcp.logging.billingaccount.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
+| [`gcp.logging.bucket`](gcp.logging.bucket.md) | yes | yes | yes | Describes a repository in which log entries are stored. |
+| [`gcp.logging.exclusion`](gcp.logging.exclusion.md) | yes | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
+| [`gcp.logging.folder.bucket`](gcp.logging.folder.bucket.md) | **no** | yes | yes | Describes a repository in which log entries are stored. |
+| [`gcp.logging.folder.exclusion`](gcp.logging.folder.exclusion.md) | **no** | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
 | [`gcp.logging.folder.link`](gcp.logging.folder.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
 | [`gcp.logging.folder.savedquery`](gcp.logging.folder.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
-| [`gcp.logging.folder.sink`](gcp.logging.folder.sink.md) | **no** | **no** | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
-| [`gcp.logging.folder.view`](gcp.logging.folder.view.md) | **no** | **no** | yes | Describes a view over log entries in a bucket. |
+| [`gcp.logging.folder.sink`](gcp.logging.folder.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
+| [`gcp.logging.folder.view`](gcp.logging.folder.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
 | [`gcp.logging.link`](gcp.logging.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
-| [`gcp.logging.organization.bucket`](gcp.logging.organization.bucket.md) | **no** | **no** | yes | Describes a repository in which log entries are stored. |
-| [`gcp.logging.organization.exclusion`](gcp.logging.organization.exclusion.md) | **no** | **no** | yes | Specifies a set of log entries that are filtered out by a sink. |
+| [`gcp.logging.organization.bucket`](gcp.logging.organization.bucket.md) | **no** | yes | yes | Describes a repository in which log entries are stored. |
+| [`gcp.logging.organization.exclusion`](gcp.logging.organization.exclusion.md) | **no** | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
 | [`gcp.logging.organization.link`](gcp.logging.organization.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
 | [`gcp.logging.organization.savedquery`](gcp.logging.organization.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
-| [`gcp.logging.organization.sink`](gcp.logging.organization.sink.md) | **no** | **no** | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
-| [`gcp.logging.organization.view`](gcp.logging.organization.view.md) | **no** | **no** | yes | Describes a view over log entries in a bucket. |
+| [`gcp.logging.organization.sink`](gcp.logging.organization.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
+| [`gcp.logging.organization.view`](gcp.logging.organization.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
 | [`gcp.logging.savedquery`](gcp.logging.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
-| [`gcp.logging.sink`](gcp.logging.sink.md) | yes | **no** | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
-| [`gcp.logging.view`](gcp.logging.view.md) | **no** | **no** | yes | Describes a view over log entries in a bucket. |
+| [`gcp.logging.sink`](gcp.logging.sink.md) | yes | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
+| [`gcp.logging.view`](gcp.logging.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |

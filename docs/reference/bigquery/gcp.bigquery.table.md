@@ -20,7 +20,7 @@ A Table that belongs to a Dataset
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}` |
 | Read | yes | `GET projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}` |
 | Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}` |
 | Import | yes | by id, see below |
 
