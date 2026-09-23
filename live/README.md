@@ -106,7 +106,9 @@ lookups were made. Refusing is not the same as refusing first.
 | firewall rule | `gcp.firewall` | a compute-style operation await, and the only updatable type in reach: it PATCHes **without** an updateMask, which 15 of the 86 updatable types do | free |
 | e2-micro instance | `gcp.compute.instance` | **the compute await path against real GCP** | pennies |
 
-`TestLiveTagTypes` — a project of its own, because all three fail:
+`TestLiveTagTypes` — a project of its own, kept separate because all three
+failed together until task 18b and a shared failure told you nothing about
+which type caused it:
 
 | resource | type | why it is here | cost |
 |---|---|---|---|
@@ -115,17 +117,26 @@ lookups were made. Refusing is not the same as refusing first.
 | tag binding | `gcp.tagbinding` | `read_via: list_by_parent`, the only type in the catalog with no `get` at all | free |
 
 `TestLiveTagBindingOnASeededTag` seeds a tag key and value **directly through
-the API** and has infrena manage only the binding, because the tag key's
-broken create otherwise skips the binding before it is ever attempted. It
-**skips** today — see finding 8.
+the API** and has infrena manage only the binding, so a regression in the
+key cannot hide one in the binding a second time. It **passes** as of task
+18b, import of the real four-segment id included.
 
 The three tag types were in `TestLiveWorkflow` until the first live run.
 They fail their create (finding 3 below) and took the bucket, the firewall
 and the instance down with them, so no claim about any of those could be
 made at all. Separated, each failure says one thing.
 
-`gcp.serviceaccount` was in the brief's set and is **not here**: it cannot
-be created at all (finding 4 below).
+`TestLiveServiceAccount` — a project of its own, same reasoning:
+
+| resource | type | why it is here | cost |
+|---|---|---|---|
+| service account | `gcp.serviceaccount` | the create url that could not be built at all, and the live proof of task 18b's part B | free |
+
+Task 18 dropped `gcp.serviceaccount` because its create url
+(`{+name}/serviceAccounts`) could not be expanded from anything a user could
+write. 18b binds the placeholder from iam's own `pattern` for that method's
+`name` parameter, and **the account is now really created against Google**.
+The test still FAILS, for a different reason: see finding 11.
 
 One e2-micro in `us-central1`, and nothing larger. No GKE cluster — James
 was offered one and declined. The test asserts the instance's machine type
@@ -485,12 +496,47 @@ the key is being replaced; there is one defect here, not two.
 This is the same *shape* as finding 5 (compute not echoing
 `initializeParams`) — GCP answers in a form the configuration did not use —
 but the opposite direction: there the answer carries less than was sent,
-here it carries the same thing spelled canonically. `Reconcile` cannot fix
-it, because "projects/<id>" and "projects/<number>" are equal only to
-something that knows how to resolve a project id. **Needs a follow-up**: an
-id/number equivalence for the attributes that carry a project reference, or
-a normalisation at the point the create's answer is reconciled.
-`TestLiveTagTypes` fails on this today.
+here it carries the same thing spelled canonically.
+
+**FIXED in task 18b.** The provider resolves the project's number once
+(`cloudresourcemanager projects.get`, cached per provider) and reconcile
+then expresses GCP's answer in the spelling the configuration used, the same
+way it already puts an unordered list back into the reference's order. The
+lookup only happens once two `projects/<x>` names actually disagree, and if
+it fails the two stay different and the plan proposes a replacement the user
+can see. `TestLiveTagTypes` passes as of 2026-09-23.
+
+### 11. A create whose request schema is a WRAPPER orphans the resource
+
+Found by task 18b's live run, and only reachable once the create url could
+be built at all.
+
+iam's `serviceAccounts.create` takes a `CreateServiceAccountRequest` —
+`{accountId, serviceAccount}` — and answers with a `ServiceAccount`. The
+generator builds a type's attributes from the create method's REQUEST body,
+so `gcp.serviceaccount`'s schema describes the envelope and not the
+resource. Against Google on 2026-09-23:
+
+```
+x create sa: gcp returned attribute "displayName" on a gcp.serviceaccount,
+  which its own schema does not declare
+Declared: accountId, serviceAccount
+```
+
+The host drops a failed create's result, so **the account was real and
+tracked nowhere**. The suite's own sweep deleted it; nothing else would
+have.
+
+**13 of the 233 shipped types are in this position**, measured 2026-09-23:
+`gcp.container.cluster`, `gcp.container.nodepool`, `gcp.bigtableadmin.instance`,
+`gcp.bigtableadmin.table`, `gcp.iam.role`, `gcp.iam.organization.role`,
+`gcp.iam.serviceaccount.key`, `gcp.pubsub.snapshot`, `gcp.spanner.session`,
+`gcp.sslcert`, `gcp.task`, `gcp.feed`, `gcp.serviceaccount`. Every one of
+them orphans on create for the same reason.
+
+**Needs a follow-up.** The fix is to model the resource from what the create
+RETURNS and wrap the request body on the wire, which is a generator feature.
+Until then these thirteen creates leave real resources behind.
 
 ### What passes
 
@@ -502,9 +548,13 @@ create await works end to end: the instance's provider id names the
 instance, not the operation, which is the thing this project got wrong three
 times and the one thing only a live call could settle.
 
-As of task 18a, `TestLiveWorkflow` passes **in full**, including
-`destroy_removes_everything` — the compute delete's long poll ran for 1m45s
-where thirty seconds used to be the cliff. All three tag types create and
-read back; what remains failing is the tag binding's id shape (finding 8)
-and the tag key's `parent` normalisation (finding 10).
+As of task 18b, `TestLiveWorkflow`, `TestLiveTagTypes` and
+`TestLiveTagBindingOnASeededTag` all pass **in full**. Spec decision G6 —
+tagkey, tagvalue AND tagbinding at v1.0 — is satisfied end to end: the
+binding creates, reads back by listing the parent its own id names,
+imports at its real four-segment id, and destroys.
+
+`TestLiveServiceAccount` fails, and what it fails on has moved: the create
+url is built and Google makes the account, and the failure is now the
+wrapper-request defect (finding 11).
 
