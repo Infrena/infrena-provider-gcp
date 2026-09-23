@@ -2,6 +2,19 @@
 
 **Version:** `efbfaaa` (`v0.14.0-1-gefbfaaa`), branch `main`
 
+> **RESOLVED in infrena v0.14.1.** Kept as a record. **One correction to what this report claimed:**
+> the `cloud_run` → `cloudRun` example below is WRONG. `foldName` is `strings.ToLower` and nothing
+> more (`pkg/schema/alias.go:77`), so it folds case only, never underscores — `cloud_run` never
+> resolved at any depth, and v0.14.1 does not make it. I inferred underscore-folding from the
+> function's name instead of reading it.
+>
+> The asymmetry was real, but the mechanism was declared `Aliases`, not folding: this provider's
+> generator emits a snake_case alias for every camelCase attribute, and the nested ones were inert.
+> Measured on our own catalog: 1447 top-level aliases (which worked) and 9788 nested ones (which did
+> nothing until v0.14.1). What v0.14.1 fixes: case-only variants resolve at every depth, nested
+> `Aliases` work, and an unresolved nested key is reported with its full path instead of going out
+> on the wire.
+
 **What happened:**
 
 `ResourceDefinition.Canonical` (`pkg/schema/alias.go:22`) resolves a written attribute spelling —
@@ -46,12 +59,14 @@ composite value and is never checked. So an unresolved nested name is neither re
 rejected; it passes through to the provider, which puts it on the wire. Against GCP that means an
 unknown field reaching Google's API.
 
-For an attribute whose declared name is `cloudRun`:
+For an attribute whose declared name is `cloudRun` and which declares the alias `cloud_run`:
 
-- at top level, `cloud_run:` resolves — `foldName` matches it
+- at top level, `cloud_run:` resolves — the declared alias is consulted
 - nested inside another block, `cloud_run:` does not resolve and is sent as `cloud_run`
 
-Same file, same spelling convention, two different outcomes, no diagnostic.
+Same file, same spelling convention, two different outcomes, no diagnostic. Note this turns on the
+alias being DECLARED; a spelling that differs by more than case and is not declared as an alias
+resolves at no depth, because `foldName` lowercases and does nothing else.
 
 **What you expected to happen:**
 
