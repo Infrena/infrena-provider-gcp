@@ -31,13 +31,19 @@ resources:
   #
   #   labels is a free-form map, which is what drift is applied to.
   #
-  # NESTED KEYS ARE WRITTEN IN THE SCHEMA'S OWN SPELLING -- cloudRun, not
-  # cloud_run -- and that is not a preference. infrena canonicalises a
-  # TOP-LEVEL attribute name against the schema (`event_filters` is accepted
-  # and becomes `eventFilters`) and does not do the same at depth: a nested
-  # `cloud_run` is carried through to the plugin verbatim and would be sent to
-  # Google as a field it has never heard of. Written the schema's way it is
-  # correct either way. See the task report.
+  # NESTED KEYS ARE WRITTEN IN snake_case ON PURPOSE, and that is the point of
+  # this block rather than a style choice.
+  #
+  # Until infrena v0.14.1 this had to say the opposite: a nested `cloud_run`
+  # was carried to the plugin verbatim and would have reached Google as a field
+  # it has never heard of, because canonicalisation ran on TOP-LEVEL names only.
+  # v0.14.1 resolves a declared alias at any depth under `fields`, and protocol
+  # 6 adds `elem` so the same holds inside a repeated block.
+  #
+  # So `destination.cloud_run` below is the assertion: it only reaches the fake
+  # as `cloudRun` if the host resolved it, and the apply only succeeds if it
+  # did. Writing it the schema's way would have been correct either way, which
+  # is exactly why it proved nothing.
   bus:
     type: gcp.trigger
     name: e2e-trigger
@@ -47,7 +53,7 @@ resources:
       - attribute: type
         value: google.cloud.pubsub.topic.v1.messagePublished
     destination:
-      cloudRun:
+      cloud_run:
         service: e2e-service
         region: us-central1
     retryPolicy:
