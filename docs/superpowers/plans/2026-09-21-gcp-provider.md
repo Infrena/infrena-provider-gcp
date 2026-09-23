@@ -1364,7 +1364,7 @@ git -C /tmp/mm rev-parse HEAD > gen/mmv1.lock
 rm -rf gen/mmv1 && mkdir -p gen/mmv1
 # Copy ONLY the YAML. A literal `cp -r` also drags in BUILD.bazel and any other
 # non-YAML file upstream keeps beside the resources.
-(cd /tmp/mm/mmv1/products && find . -name '*.yaml' -exec install -D {} path/to/infrena-provider-gcp/gen/mmv1/products/{} \;)
+(cd /tmp/mm/mmv1/products && find . -name '*.yaml' -exec install -D {} gen/mmv1/products/{} \;)
 find gen/mmv1 -name '*.yaml' ! -name product.yaml | wc -l   # expect 942
 ```
 
