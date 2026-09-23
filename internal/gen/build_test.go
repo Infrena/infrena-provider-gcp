@@ -1584,3 +1584,41 @@ func bigQueryTableShape() *catalog.Type {
 		},
 	}
 }
+
+// TestAnIdShapeComesFromTheDeletePathWhenMagicModulesHasNone is part A.
+// cloudresourcemanager v3's tagBindings publishes create, delete and list
+// and NO get, and magic-modules' self_link for it is a LIST url. What the
+// generator fell back to -- the first import_format line,
+// "tagBindings/{{name}}" -- says the id is two segments, and a real tag
+// binding's name has four. The API says the shape itself: delete is
+// "v3/{+name}" with pattern "^tagBindings/.*$".
+func TestAnIdShapeComesFromTheDeletePathWhenMagicModulesHasNone(t *testing.T) {
+	col := disco.Collection{
+		Path: []string{"tagBindings"},
+		Methods: map[string]*disco.Method{
+			"delete": {Path: "v3/{+name}", Parameters: map[string]*disco.Parameter{
+				"name": {Location: "path", Required: true, Pattern: "^tagBindings/.*$"},
+			}},
+		},
+	}
+	if got := idTemplateFromDelete(col); got != "tagBindings/{+name}" {
+		t.Errorf("id template = %q, want %q -- reserved, so the name may carry slashes of "+
+			"its own, and anchored on the collection so a typo is refused rather than 404ed",
+			got, "tagBindings/{+name}")
+	}
+}
+
+// TestADeletePathWithNoAnchoringPatternIsNotWidened. Without the literal
+// collection segment the template is a bare "{+name}", which accepts any
+// string a user types. A wrong id that parses is worse than one that errors.
+func TestADeletePathWithNoAnchoringPatternIsNotWidened(t *testing.T) {
+	col := disco.Collection{Methods: map[string]*disco.Method{
+		"delete": {Path: "v3/{+name}", Parameters: map[string]*disco.Parameter{
+			"name": {Location: "path", Pattern: "^projects/[^/]+/widgets/[^/]+$"},
+		}},
+	}}
+	if got := idTemplateFromDelete(col); got != "{+name}" {
+		t.Errorf("id template = %q; only a \"^<collection>/.*$\" pattern says which literal "+
+			"segment anchors the name, and this one does not", got)
+	}
+}

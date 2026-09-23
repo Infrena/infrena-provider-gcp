@@ -48,7 +48,7 @@ func (p *Provider) readByListingParent(ctx context.Context, ty *catalog.Type, id
 		// everything.
 		return nil, fmt.Errorf("gcp: %s: read_via is %q but the catalog names no list field for it", ty.Name, ty.ReadVia)
 	}
-	parent, err := p.hierarchyParent(ty)
+	parent, err := p.listParent(ty, id)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +77,63 @@ func (p *Provider) readByListingParent(ctx context.Context, ty *catalog.Type, id
 			return nil, nil // listed the whole parent; it is not there
 		}
 	}
+}
+
+// listParent is the full resource name to list under when looking for id.
+//
+// THE ID ITSELF IS ASKED FIRST, and for gcp.tagbinding the id always
+// answers. A binding's name embeds the bound resource's own full name,
+// percent-escaped into a single segment:
+//
+//	tagBindings/%2F%2Fcloudresourcemanager.googleapis.com%2Fprojects%2F123456789012/tagValues/281479230039359
+//
+// so unescaping that segment gives back exactly the value
+// tagBindings.list's `parent` parameter takes.
+//
+// This changes what Read MEANS for the type, and deliberately. The parent
+// used to come from Settings.Project, so a tag bound to a BUCKET or an
+// INSTANCE -- which is most of what tag bindings are for -- was created
+// successfully and then never found again: the project's own listing does
+// not contain it, "not in the listing" is "believed absent", and the next
+// plan proposed creating it a second time while destroy forgot it. Reading
+// a resource under the parent ITS OWN ID NAMES is the only way that
+// converges, and it needs no new configuration.
+//
+// The settings-derived parent remains the fallback for an id that carries
+// no full resource name, which is every type that might later take this
+// path and does not spell its id the way CRM does.
+func (p *Provider) listParent(ty *catalog.Type, id string) (string, error) {
+	if parent := fullResourceNameIn(id); parent != "" {
+		return parent, nil
+	}
+	return p.hierarchyParent(ty)
+}
+
+// fullResourceNameIn returns the Cloud Asset Inventory full resource name a
+// provider id carries in one of its segments, or "".
+//
+// The test is the FORM, not the type: a segment that percent-decodes to
+// "//<host>/<something>" is a full resource name, and nothing else in a GCP
+// relative resource name looks like that -- a leading "//" cannot occur in a
+// relative name at all, since an empty path segment is not a thing GCP
+// names. So this recognises the shape wherever it appears rather than
+// knowing about tag bindings, and a segment that merely contains an escaped
+// slash is left alone.
+func fullResourceNameIn(id string) string {
+	for _, seg := range strings.Split(id, "/") {
+		if !strings.Contains(seg, "%2F") && !strings.Contains(seg, "%2f") {
+			continue
+		}
+		decoded, err := url.PathUnescape(seg)
+		if err != nil {
+			continue
+		}
+		if !strings.HasPrefix(decoded, "//") || strings.Count(decoded, "/") < 3 {
+			continue
+		}
+		return decoded
+	}
+	return ""
 }
 
 // hierarchyParent is the full resource name of the hierarchy node this
@@ -156,23 +213,19 @@ func listItems(body map[string]any, field string) []map[string]any {
 // THE ONE WE MATCHED BY, never one recomputed from the entry.
 //
 // stateFrom recomputes the id so that a rename GCP made underneath a
-// resource is noticed. There is nothing to notice here -- the entry was
-// found by matching this very id against the parent's listing, so it is
-// current by construction -- and recomputing it actively breaks the one type
-// that takes this path. gcp.tagbinding's self_link is "tagBindings/{{name}}"
-// (the generator derives it from the first import_format line, because
-// magic-modules' own self_link for the type is a LIST url), while the field
-// the API answers with is name = "tagBindings/abc", the whole relative name.
-// ProviderID overlays the body's fields on top of the id's own, so the
-// template's single-segment {{name}} placeholder receives "tagBindings/abc"
-// and escapes it: "tagBindings/tagBindings%2Fabc", an id that addresses
-// nothing and that a later Delete would send at the API verbatim.
+// resource is noticed. There is nothing to notice here: the entry was found
+// by matching this very id against the parent's listing, so it is current by
+// construction.
 //
-// That collision is not created here and is not repaired here either: it is
-// in ProviderID, and it is reachable from Create for the same type (a
-// long-running create answers with the TagBinding, name and all). This
-// function only declines to inherit it on a path that has a better answer
-// already in hand. Noted for whoever fixes ids.go.
+// It is no longer also a REPAIR. gcp.tagbinding's self_link used to be
+// "tagBindings/{{name}}" -- two segments, taken from magic-modules' first
+// import_format line, because its own self_link is a LIST url -- while a
+// real binding's name has four, and expanding one into the other produced
+// "tagBindings/tagBindings%2F...", an id addressing nothing. The id shape
+// now comes from the API's own delete path ("{+name}", pattern
+// "^tagBindings/.*$"), so ProviderID answers correctly for this type too and
+// this line is back to being the small optimisation its first sentence
+// describes.
 func (p *Provider) stateFromListing(ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
 	st, err := p.stateFrom(ty, current, idAttrs, body)
 	if err != nil {
