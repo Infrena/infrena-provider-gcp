@@ -7702,3 +7702,147 @@ git add internal/gcprov/names.go internal/gcprov/names_test.go \
         internal/catalog/real_test.go
 git commit -m "Translate between config names and wire names"
 ```
+
+---
+
+### Task 18a: Three ways a real resource gets orphaned
+
+**Why this exists.** Task 18's live run against real Google Cloud. All three
+defects have the same user-visible shape: **GCP does the thing, infrena reports
+failure, and the resource exists with nothing tracking it.** None was reachable
+from any test written against `internal/gcpfake`, because in each case the fake
+answers what we assumed rather than what Google sends.
+
+James chose to fix these three and to leave `gcp.tagbinding` and
+`gcp.serviceaccount` (both genuinely broken, both needing more than a fix) for a
+later task.
+
+#### A. A compute operation lasting more than 30 seconds always fails.
+
+`internal/gcprov/client.go` bounds a single round trip at `defaultTimeout` = 30s.
+Compute's `operations/{op}/wait` **blocks server-side for up to two minutes by
+design** — that is the whole point of a long poll, and `await.go` uses it
+deliberately to avoid one request per second against a shared quota.
+
+So the client kills the request at 30s, every time, for any operation that has
+not finished by then. Measured 3 of 3 on an e2-micro delete: the instance really
+was deleted, infrena reported failure and kept it in state.
+
+The fix is NOT to raise `defaultTimeout` globally — that would slow every
+ordinary call's failure detection. A request that is a published long-poll needs
+its own bound, derived from the type's own `TimeoutSeconds` the way `await.go`
+already bounds the whole operation. Make the distinction explicit at the call
+site rather than inferring it from the URL.
+
+#### B. `awaitLongRunning` refuses an answer it is already holding.
+
+`internal/gcprov/await.go`:
+
+```go
+	name, _ := op["name"].(string)
+	if name == "" {
+		return nil, fmt.Errorf("%s: operation has no name to poll", ty.Name)
+	}
+	...
+	for attempt := 0; ; attempt++ {
+		if done, _ := op["done"].(bool); done {
+```
+
+The `name` check runs BEFORE the loop's `done` check. Cloud Resource Manager
+answers `POST v3/tagBindings` with an operation that is **already done and
+carries no `name`**, because there is nothing to poll — captured verbatim from
+the wire:
+
+```json
+{"done": true,
+ "response": {"@type": ".../v3.TagBinding",
+   "name": "tagBindings/%2F%2Fcloudresourcemanager.googleapis.com%2Fprojects%2F123456789012/tagValues/281479230039359",
+   "parent": "//cloudresourcemanager.googleapis.com/projects/123456789012",
+   "tagValue": "tagValues/281479230039359"}}
+```
+
+A `name` is needed only to POLL. An operation that is already done is never
+polled. Check `done` first; require `name` only on the path that actually builds
+a poll URL.
+
+#### C. `ProviderID` prefixes a name that already carries its collection.
+
+Real 400 from CRM, on `gcp.tagkey`:
+
+```
+Invalid CRM resource name: 'tagKeys/tagKeys%2F281480152414347'
+```
+
+`self_link` is `tagKeys/{{name}}`. CRM's response `name` is ALREADY the full
+relative resource name, `tagKeys/281480152414347`. Expanding one into the other
+escapes the `/` and prefixes the collection a second time.
+
+This is the CRM v3 and `google.longrunning` convention generally: `name` IS the
+relative resource name, not a bare leaf. The provider currently assumes a leaf.
+
+The fix belongs in `ProviderID` (`internal/gcprov/ids.go`), not in the catalog:
+when the body's `name` already satisfies the type's `self_link` shape — same
+segment count, literal segments equal — it IS the id, and must be taken
+verbatim rather than expanded into the template. Only when it is a bare leaf
+does the template apply.
+
+Do NOT "fix" this by making the id parser lenient. A wrong id that parses is
+worse than one that errors — that lesson is written into `crud.go` already.
+
+**Files:**
+- Modify: `internal/gcprov/client.go` (A), `internal/gcprov/await.go` (B),
+  `internal/gcprov/ids.go` (C)
+- Test: the matching `_test.go` files, plus `live/live_test.go` if an assertion
+  there currently encodes the broken behaviour
+
+- [ ] **Step 1: Three failing tests, against the real shapes**
+
+One per defect, each using a body captured from the live run rather than an
+invented one. The verbatim CRM operation above is in Task 18's report; use it.
+For A, the fake must be able to hold a response open longer than the client's
+bound — check whether `internal/gcpfake` can already do that before adding a
+hook, since it grew several staging hooks during Tasks 13 and 14.
+
+Run them. Expected: three failures, each naming the defect. Record the exact
+output.
+
+- [ ] **Step 2: Fix A, B, C. Run. Expect green.**
+
+- [ ] **Step 3: Full suite and e2e**
+
+`go build ./... && go test ./...` and `go test -tags e2e ./e2e/`.
+
+- [ ] **Step 4: Sabotage**
+
+One per fix, each leaving the code compiling, each restored by re-applying.
+Note that this project has had sabotages PASS several times, each revealing an
+uncovered boundary — if one passes here, that is a finding, not a formality.
+
+- [ ] **Step 5: Re-run the live suite**
+
+This is the point of the task. The three defects were found against Google and
+must be confirmed fixed against Google, not against the fake.
+
+```bash
+export INFRENA_GCP_LIVE_PROJECT=example-project-1234
+export INFRENA_GCP_LIVE_SA=infrena-live@example-project-1234.iam.gserviceaccount.com
+go test -tags live -count=1 -v -timeout 45m ./live/
+```
+
+Expected: the compute-wait failure and the tag key failure both clear.
+`gcp.tagbinding` stays failing — its `self_link` has two segments and a real
+name has four, which is out of this task's scope and stays a named release
+blocker.
+
+**Cost discipline unchanged:** nothing larger than e2-micro, cleanup in reverse
+order even on failure, loud `CLEANUP FAILED` lines with resource ids. Verify the
+project is empty afterwards and say so.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add internal/gcprov/client.go internal/gcprov/await.go internal/gcprov/ids.go \
+        internal/gcprov/client_test.go internal/gcprov/await_test.go \
+        internal/gcprov/ids_test.go live/live_test.go live/README.md
+git commit -m "Stop three ways a real resource gets orphaned"
+```
