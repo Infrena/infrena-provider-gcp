@@ -1,0 +1,80 @@
+name: Bump infrena
+
+# infrena tags often until its first official release. This notices each tag and proposes it,
+# having already run the suites against it.
+#
+# Worth the daily schedule here: infrena went 0.14.0 -> 0.14.1 -> 0.14.2 -> 0.15.0 in a single day
+# on 2026-09-23, and 0.15.0 carried a protocol bump this plugin had to adopt deliberately.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: "off"
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: infrena-provider-gcp
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache-dependency-path: infrena-provider-gcp/go.sum
+      - name: Upgrade to infrena's newest release
+        id: bump
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          before="$(go list -m -f '{{.Version}}' github.com/infrena/infrena)"
+          go get github.com/infrena/infrena@upgrade
+          go mod tidy
+          after="$(go list -m -f '{{.Version}}' github.com/infrena/infrena)"
+          echo "before=$before" >> "$GITHUB_OUTPUT"
+          echo "after=$after" >> "$GITHUB_OUTPUT"
+          echo "changed=$([[ "$before" != "$after" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        if: steps.bump.outputs.changed == 'true'
+        with:
+          repository: infrena/infrena
+          path: infrena
+          ref: ${{ steps.bump.outputs.after }}
+      - name: Test against the new version
+        id: test
+        if: steps.bump.outputs.changed == 'true'
+        continue-on-error: true
+        working-directory: infrena-provider-gcp
+        run: |
+          set -euo pipefail
+          go vet ./... && go test -count=1 ./... && go test -tags e2e -count=1 ./e2e/
+      - name: Open the PR
+        if: steps.bump.outputs.changed == 'true'
+        working-directory: infrena-provider-gcp
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="bump-infrena-${{ steps.bump.outputs.after }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add go.mod go.sum
+          git commit -m "Move to infrena ${{ steps.bump.outputs.after }}" -- go.mod go.sum
+          git push origin "$branch"
+          if [[ "${{ steps.test.outcome }}" == success ]]; then
+            body="Upgraded from ${{ steps.bump.outputs.before }}. vet, the unit suite and the e2e suite passed against it."
+          else
+            body="Upgraded from ${{ steps.bump.outputs.before }}. The suites FAILED against it: see this workflow run.
+
+          If the manifest test failed, the plugin protocol changed. In this repository that means TWO lines in plugin.yaml move in this PR, not one: protocol: and the infrena: floor. The floor is not merely the oldest host that handshakes — a release whose Supported set lacks our protocol would install us per the manifest and then refuse us at the handshake, which is a manifest that lies. TestTheFloorAdmitsTheOldestHostThatWorks encodes that and will fail until both are right."
+          fi
+          gh pr create --title "infrena ${{ steps.bump.outputs.after }}" --body "$body"
