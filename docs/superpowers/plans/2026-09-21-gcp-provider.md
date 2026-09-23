@@ -7846,3 +7846,146 @@ git add internal/gcprov/client.go internal/gcprov/await.go internal/gcprov/ids.g
         internal/gcprov/ids_test.go live/live_test.go live/README.md
 git commit -m "Stop three ways a real resource gets orphaned"
 ```
+
+---
+
+### Task 18b: A type that cannot be created should not ship
+
+**Why this exists.** James asked for `gcp.tagbinding` and `gcp.serviceaccount`
+to be fixed after Task 18's live run. `gcp.serviceaccount` turned out to be one
+instance of a class: **38 of 233 types cannot build a create URL at all.** He
+then chose to fix the class rather than the instance.
+
+The live suite found exactly one of the 38, because a live suite finds what it
+exercises and serviceaccount was the only class member in its resource set. 195
+of 233 types have still never had a create attempted against real GCP.
+
+Measured on the current catalog: 195 build a create URL, 38 do not.
+
+#### A. `gcp.tagbinding` cannot be created or imported.
+
+`self_link` is `tagBindings/{{name}}` — two slash-separated segments. A real
+name, captured from the wire, has **four**:
+
+```
+tagBindings/%2F%2Fcloudresourcemanager.googleapis.com%2Fprojects%2F123456789012/tagValues/281479230039359
+```
+
+Google percent-escapes the parent's own slashes into ONE segment, then appends
+`tagValues/<id>` as two more. `ParseProviderID` refuses it before any API call
+("has more segments than gcp.tagbinding's id shape"), so import fails; create
+fails separately on the await ordering bug that Task 18a fixes.
+
+Spec decision G6 requires tagkey, tagvalue AND tagbinding at v1.0, so this is a
+release blocker.
+
+Also record, and do not quietly fix by widening scope: `readByListingParent`
+builds its parent from `Settings.Project`, so a tag bound to a BUCKET or an
+INSTANCE would be created and never readable. The binding's own id encodes its
+parent (percent-escaped, above), so deriving the parent from the id rather than
+from settings is the fix — but say in the report whether you did it, since it
+changes what `Read` means for this type.
+
+#### B. `{+name}` in a create path that means the PARENT. 3 types.
+
+`iam`'s `serviceAccounts.create` is `v1/{+name}/serviceAccounts` where the
+`name` parameter carries `pattern: ^projects/[^/]+$`, while the SAME
+collection's `get` is `v1/{+name}` with
+`pattern: ^projects/[^/]+/serviceAccounts/[^/]+$`.
+
+One placeholder spelling, two meanings, in one collection. This is byte for byte
+the class Task 13d fixed for container's operations, and the remedy is the same
+shape: Discovery publishes the pattern, so bind the placeholder from the pattern
+rather than from an attribute that happens to share its name.
+
+#### C. snake_case placeholders that resolve to NESTED attributes. 24 types.
+
+`gcp.bigquery.table`'s create URL is
+`projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}` — a
+magic-modules template in snake_case. Its attributes are Discovery camelCase,
+and there is no top-level `dataset_id` OR `datasetId`. The values live at
+`tableReference.datasetId` and `tableReference.tableId`.
+
+So the resolution is not a naming convention fix alone: a placeholder may name a
+field NESTED inside the resource. Resolve snake_case to camelCase AND search the
+attribute tree, not just the top level.
+
+**Resolve it in the GENERATOR, not at runtime.** Store the concrete attribute
+path the placeholder binds to, the same way Task 13a stored `PathPrefix` rather
+than re-deriving a version each call. A runtime search would re-answer the same
+question on every request and could answer it differently as attributes change.
+
+#### D. The remaining 11.
+
+Not classified. Classify them, report the breakdown, and fix what falls into a
+shared cause. If any is genuinely one-off, say so rather than forcing it into a
+general rule.
+
+#### E. The invariant that stops this recurring.
+
+The tier gate's own principle is that a type the generator cannot vouch for does
+not ship. A type whose create URL cannot be built is exactly that, and nothing
+checked it — which is why 38 shipped.
+
+Add a generator check and a catalog invariant test: every shipped type's create
+template must have every placeholder resolvable from that type's own attributes
+plus the instance scope settings (project, region, zone, location, parent). A
+type that fails goes to `gen/warnings.txt`, named, with the unresolvable
+placeholder.
+
+State the resulting type count in the report. If it is below 233, say exactly
+which types dropped and why — a type dropping because it was never usable is a
+correct outcome, not a regression, but it must be visible.
+
+**Files:**
+- Modify: `internal/gen/build.go` (B, C, E), `internal/catalog/catalog.go` (the
+  stored binding), `internal/gcprov/ids.go` (A)
+- Test: `internal/gen/build_test.go`, `internal/catalog/real_test.go`,
+  `internal/gcprov/ids_test.go`, `live/live_test.go`
+
+- [ ] **Step 1: The invariant test first, and watch it fail with 38**
+
+Write E's catalog invariant before any fix. Expected: FAIL naming 38 types.
+Record the exact list — it is the work queue for the rest of the task, and the
+count is how you know when you are done.
+
+- [ ] **Step 2: B, then C, then D, regenerating after each**
+
+After each, re-run Step 1's test and report the count dropping. A cause that
+does not reduce the count is not the cause you thought it was.
+
+- [ ] **Step 3: A — tagbinding's id shape**
+
+Separate from the create-URL work; it is an id-parsing fix, not a URL one.
+
+- [ ] **Step 4: Full suite, e2e, then sabotage**
+
+One sabotage per distinct fix. This project has had sabotages pass several
+times, each revealing an uncovered boundary — if one passes, that is a finding.
+
+- [ ] **Step 5: Live re-run**
+
+```bash
+export INFRENA_GCP_LIVE_PROJECT=example-project-1234
+export INFRENA_GCP_LIVE_SA=infrena-live@example-project-1234.iam.gserviceaccount.com
+go test -tags live -count=1 -v -timeout 45m ./live/
+```
+
+Add `gcp.serviceaccount` back to the live resource set — Task 18 dropped it
+because it could not be created, and the whole point of this task is that it now
+can. If `gcp.tagbinding` also passes end to end, G6 is finally satisfied; say so
+explicitly either way.
+
+Cost discipline unchanged: nothing larger than e2-micro, cleanup in reverse
+order even on failure, loud `CLEANUP FAILED` lines with resource ids, and verify
+the project is empty afterwards.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add internal/gen/build.go internal/catalog/catalog.go internal/gcprov/ids.go \
+        internal/gen/build_test.go internal/catalog/real_test.go \
+        internal/gcprov/ids_test.go internal/catalog/catalog.json.gz \
+        gen/warnings.txt live/live_test.go live/README.md
+git commit -m "Make every shipped type one that can actually be created"
+```
