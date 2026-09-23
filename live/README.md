@@ -39,26 +39,32 @@ go test -tags live -count=1 -v -timeout 15m -run TestWhetherGoogleSendsRetryAfte
 Set up once, by hand, and **not to be recreated by anything in this
 repository**.
 
+Every identifier below is a PLACEHOLDER. Substitute your own: nothing in this
+repository names a real project, and nothing should. The shapes matter, the
+values do not.
+
 | | |
 |---|---|
-| Project | `example-project-1234` (display name "My Project", created 2017) |
-| Project number | `123456789012` — a tag binding's parent needs the number, not the id |
-| Label | `infrena-live-tests=true` — **this is what the guard checks** |
-| Billing account | `012345-567890-ABCDEF` |
+| Project | `example-project-1234` — your own, empty, and not shared with anything you care about |
+| Project number | `123456789012` — the NUMBER, not the id: a tag binding's parent needs it |
+| Label | `infrena-live-tests=true` — **this is what the guard checks**, and it is the one value you must match exactly |
+| Billing account | `012345-567890-ABCDEF` — needed only if the project is not already billed |
 | Service account | `infrena-live@example-project-1234.iam.gserviceaccount.com` |
 | Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `iam.serviceAccountAdmin` |
 | APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage |
 
-A dormant project was reused because `gcloud projects create` returned
-`QuotaFailure: you have exceeded your allotted project quota` — the account
-holds eight projects. It was verified empty before use: the compute API had
-never been enabled and there were no buckets.
+If `gcloud projects create` returns `QuotaFailure: you have exceeded your
+allotted project quota`, reusing a dormant project works — but verify it is
+genuinely empty first. These tests create and destroy real infrastructure, and
+the guard's label check is the only thing standing between them and whatever
+else lives there. Confirm the compute API has never been enabled and that there
+are no buckets before pointing this at anything.
 
 **There is no key file and this suite must never create one.** It
 authenticates as the operator (Application Default Credentials from
 `gcloud auth application-default login`) and impersonates the service
-account, which works because `you@example.com` holds
-`roles/iam.serviceAccountTokenCreator` on it. The impersonation goes through
+account, which works because the operator running it holds
+`roles/iam.serviceAccountTokenCreator` on that service account. The impersonation goes through
 `gcpplugin.Instance.TokenSource`, the same code path the plugin child
 process uses, so a broken credential chain fails in the guard rather than
 halfway through an apply.
