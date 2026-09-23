@@ -2327,3 +2327,118 @@ func waitFor(t *testing.T, within time.Duration, cond func() bool, what string) 
 // so escaping it again is how "%2F" becomes "%252F" and the delete 404s on
 // a resource that exists.
 func urlQueryEscape(s string) string { return url.QueryEscape(s) }
+
+// TestLiveNetworkAndSubnetwork proves the 2026-09-23 rulings on compute/Network
+// and compute/Subnetwork against the real API.
+//
+// Both types were held back for this project's whole life on unruled
+// wire-affecting hooks -- four on Network, one on Subnetwork -- and the two
+// things anyone would most expect an infrastructure tool to manage were simply
+// absent from the catalog. The rulings say all five are the Terraform
+// provider's own bookkeeping: every one is gated on a convenience field with no
+// counterpart in the compute API (delete_default_routes_on_create,
+// bgp_always_compare_med, send_secondary_ip_range_if_empty), or manipulates a
+// Terraform-only field we never send.
+//
+// THAT IS AN ASSERTION ABOUT A REAL API AND THIS IS THE ONLY PLACE IT CAN BE
+// CHECKED. A ruling that is wrong is worse than no ruling: it ships a type that
+// looks supported and misbehaves, which is exactly what the tier gate exists to
+// prevent. If the hooks did reshape the wire, a create here fails or a second
+// plan is dirty.
+//
+// A custom subnet, not auto-created ones: autoCreateSubnetworks would have GCP
+// make a subnet per region behind our back, and the subnet below could then
+// collide with one of them.
+func TestLiveNetworkAndSubnetwork(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	netName := "infrena-net-" + n.run
+	subName := "infrena-sub-" + n.run
+	netPath := "projects/" + project + "/global/networks/" + netName
+	subPath := "projects/" + project + "/regions/" + region + "/subnetworks/" + subName
+	t.Logf("live run %s: creating %s and %s", n.run, netPath, subPath)
+
+	// The subnet first: a network cannot be deleted while one exists inside it.
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 10*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.subnetwork", subPath, g.computeURL(subPath))
+		g.deleteAndWait(t, ctx, "gcp.network", netPath, g.computeURL(netPath))
+	})
+
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", fmt.Sprintf(`project: infrena-gcp-live-net
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    impersonate_service_account: %[3]s
+resources:
+  net:
+    type: gcp.network
+    name: %[4]s
+    autoCreateSubnetworks: false
+  sub:
+    type: gcp.subnetwork
+    name: %[5]s
+    ipCidrRange: 10.184.0.0/24
+    network: ${net.selfLink}
+`, project, region, os.Getenv(saEnv), netName, subName))
+
+	r := run(t, dir, "apply", "live", "--auto-approve")
+	t.Logf("apply:\n%s", r.combined())
+	// exitChanges (2), not 0: infrena reports "I changed things" that way, so an
+	// apply that creates two resources succeeds with 2. Checking for 0 failed a
+	// run whose own output said "2 applied, 0 failed" -- my assertion encoding a
+	// convention I had not read, which is the third test defect of that shape
+	// today.
+	if r.ExitCode != exitChanges && r.ExitCode != exitOK {
+		t.Fatalf("apply failed; if the rulings are wrong this is where it shows:\n%s", r.combined())
+	}
+
+	for _, c := range []struct{ what, path string }{{"network", netPath}, {"subnetwork", subPath}} {
+		code, body, err := g.get(t.Context(), g.computeURL(c.path))
+		if err != nil || code != http.StatusOK {
+			t.Errorf("google does not have the %s after a successful apply: %d %s %v", c.what, code, body, err)
+		}
+	}
+
+	// The claim the hooks bear on most directly. If encoder/update_encoder or
+	// post_update were reshaping what this provider sends, the resource Google
+	// holds would differ from what was asked for and this plan would not be
+	// empty.
+	t.Run("a_second_plan_is_clean", func(t *testing.T) {
+		// planChanges reads the machine-readable report that --output writes,
+		// not the console text. Passing the console text made it try to open
+		// that text as a filename, and the test failed reporting "no such file
+		// or directory" on a plan that had in fact said "No changes".
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after a successful apply proposes %v, so something in the create "+
+				"did not survive the round trip -- which is what an unruled wire hook would do", changes)
+		}
+	})
+
+	t.Run("destroy_removes_both", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+		mustRun(t, dir, exitChanges, "apply", "live", "--auto-approve")
+		for _, c := range []struct{ what, path string }{{"subnetwork", subPath}, {"network", netPath}} {
+			deadline := time.Now().Add(120 * time.Second)
+			for {
+				code, _, err := g.get(t.Context(), g.computeURL(c.path))
+				if err != nil || code != http.StatusOK {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Errorf("CLEANUP FAILED: the %s is still there 120s after a destroy: %s", c.what, c.path)
+					break
+				}
+				time.Sleep(3 * time.Second)
+			}
+		}
+	})
+}
