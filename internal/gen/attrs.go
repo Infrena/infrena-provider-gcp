@@ -164,13 +164,13 @@ func ListFieldOf(d *disco.Document, col disco.Collection) string {
 //
 // Two rules beyond the obvious lower-to-upper boundary:
 //
-//   A run of capitals ends one character early when a lowercase follows, so
-//   "IPProtocol" splits IP|Protocol rather than IPP|rotocol.
+//	A run of capitals ends one character early when a lowercase follows, so
+//	"IPProtocol" splits IP|Protocol rather than IPP|rotocol.
 //
-//   ...except when that lowercase is a plural "s" or a version suffix ("v4",
-//   "v6"), which belong to the acronym: "internalIPs" is internal|IPs, and
-//   "IPv4Range" is IPv4|Range. Without this the first rule reintroduces the
-//   bug for exactly the names it was written to fix.
+//	...except when that lowercase is a plural "s" or a version suffix ("v4",
+//	"v6"), which belong to the acronym: "internalIPs" is internal|IPs, and
+//	"IPv4Range" is IPv4|Range. Without this the first rule reintroduces the
+//	bug for exactly the names it was written to fix.
 func snake(s string) string {
 	r := []rune(s)
 	var b strings.Builder
