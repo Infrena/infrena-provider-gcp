@@ -361,3 +361,70 @@ func TestAnInstanceWithNoQuotaProjectIsNotToldAboutOne(t *testing.T) {
 		t.Errorf("an instance that sets no quota project was told its problem is one:\n%s", err)
 	}
 }
+
+// TestClientOptionsTimeoutIsActuallyHonoured. The field was declared and
+// documented from Task 11 and NEVER READ until 2026-09-22: NewClient went
+// straight from "no HTTPClient" to defaultTimeout, so every Client in the
+// process ran at 30s whatever a caller asked for. Nothing noticed because
+// no test had ever set it -- TestNewClientDefaultsTheTimeoutWhenHTTPClientIsUnset
+// asserts the default and TestNewClientWrapsACallerSuppliedHTTPClientRatherThanReplacingIt
+// asserts the HTTPClient path, and between them they covered both sides of
+// the option that works and neither side of the one that did not.
+//
+// Found because the compute-wait test needs a round-trip bound short enough
+// to measure, and PASSED against the unfixed code.
+func TestClientOptionsTimeoutIsActuallyHonoured(t *testing.T) {
+	gcptest.Isolate(t)
+	c := NewClient(staticToken(), "https://example.invalid/", ClientOptions{Timeout: 2 * time.Second})
+	if c.httpClient.Timeout != 2*time.Second {
+		t.Errorf("Timeout = %v, want the caller's own 2s: ClientOptions.Timeout is not being read", c.httpClient.Timeout)
+	}
+}
+
+// TestDoLongPollOutlivesTheRoundTripBoundAndDoDoesNot pins both halves of
+// the distinction against one server that answers slowly: the SAME call is
+// cut off by Do and completes through DoLongPoll. Asserting only the second
+// would pass just as well if the bound had simply been raised for
+// everything, which is the fix this deliberately is not (see DoLongPoll).
+func TestDoLongPollOutlivesTheRoundTripBoundAndDoDoesNot(t *testing.T) {
+	gcptest.Isolate(t)
+	const roundTrip = 50 * time.Millisecond
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(6 * roundTrip)
+		_, _ = w.Write([]byte(`{"status":"DONE"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(staticToken(), srv.URL+"/", ClientOptions{Timeout: roundTrip, MaxAttempts: 1})
+
+	if _, err := c.Do(context.Background(), http.MethodPost, srv.URL+"/wait", nil); err == nil {
+		t.Error("an ordinary call was not cut off at the round-trip bound")
+	}
+
+	got, err := c.DoLongPoll(context.Background(), http.MethodPost, srv.URL+"/wait", nil, 5*time.Second)
+	if err != nil {
+		t.Fatalf("a long poll was cut off at the ordinary round-trip bound: %v", err)
+	}
+	if got["status"] != "DONE" {
+		t.Errorf("the long poll's answer was lost: %v", got)
+	}
+}
+
+// TestDoLongPollWithNoBoundIsAnOrdinaryCall. A bound of zero must not be
+// read as "no limit": granting an unbounded request is exactly the wedged
+// plugin defaultTimeout exists to prevent, and a caller passing zero has
+// asked for nothing in particular.
+func TestDoLongPollWithNoBoundIsAnOrdinaryCall(t *testing.T) {
+	gcptest.Isolate(t)
+	const roundTrip = 50 * time.Millisecond
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(6 * roundTrip)
+		_, _ = w.Write([]byte(`{"status":"DONE"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(staticToken(), srv.URL+"/", ClientOptions{Timeout: roundTrip, MaxAttempts: 1})
+	if _, err := c.DoLongPoll(context.Background(), http.MethodPost, srv.URL+"/wait", nil, 0); err == nil {
+		t.Error("a long poll with no bound was granted one anyway")
+	}
+}

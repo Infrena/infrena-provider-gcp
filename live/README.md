@@ -237,8 +237,12 @@ findings and only one of them is an answer.
 
 ## What this suite found that no fake could
 
-Nine, and every one of them was invisible to the 1,400-odd tests that came
-before, because every one of them lives where this provider meets Google.
+Eleven now — nine from the first run (task 18), two more from the re-run
+after three of them were fixed (task 18a). Every one of them was invisible
+to the 1,400-odd tests that came before, because every one of them lives
+where this provider meets Google. Findings 10 and 11 are there because
+fixing a defect is how you reach the next one: neither was observable while
+the create in front of it still failed.
 
 **1. compute reports a quota throttle as 403, so none of them were retried.**
 The Retry-After measurement above. **Fixed here**, in `internal/gcprov/errors.go`.
@@ -256,9 +260,23 @@ context deadline exceeded (Client.Timeout exceeded while awaiting headers)
 
 Reproduced 3/3 on instance delete, at 30.3s, 30.4s and 32.1s. The instance
 really was deleted every time; infrena reported the destroy as **failed**
-and left it in state. Not fixed here — it is a change to the client's
-timeout policy, outside this task's file list, and it needs its own test.
-`destroy_removes_everything` fails until it is.
+and left it in state.
+
+**FIXED in task 18a**, in `internal/gcprov/client.go` and `await.go`. A
+published long poll now gets its own round-trip bound, taken from the type's
+own `TimeoutSeconds` — the same bound `await.go` already puts on the whole
+operation, so a wait may take as long as the operation is allowed to and not
+a second longer. The 30s stays for every ordinary call, because it is there
+to notice a *hung* endpoint and a published long poll is not hung. Which
+requests get the longer bound is decided from the catalog fact that the type
+publishes a wait method, never from the url's shape. Confirmed against real
+Google on 2026-09-22: `destroy_removes_everything` passes, with the
+instance's delete taking **1m45s** through the wait.
+
+While writing its test, `ClientOptions.Timeout` turned out to have been
+**declared, documented and never read** since Task 11 — every Client in the
+process ran at the 30s default whatever a caller asked for. Nothing noticed
+because no test had ever set it. Also fixed, with a test.
 
 **3. The ProviderID defect reaches all three tag types, not just the binding.**
 It was reported against `gcp.tagbinding`. Live, `gcp.tagkey` fails first:
@@ -273,9 +291,21 @@ The create body carries `name: "tagKeys/281476..."`, `self_link` is
 prefix back into the result. **It orphans the resource**: the host drops a
 failed create's result, so the tag key is real and tracked nowhere. The
 sweep in this suite finds them by short name and deletes them, which is the
-only reason this project is not full of them. Spec decision G6 requires all
-three types at v1.0, so this is a release blocker. `TestLiveTagTypes` fails
-until it is fixed.
+only reason this project is not full of them.
+
+**FIXED in task 18a**, in `internal/gcprov/ids.go`. `ProviderID` now takes
+the body's own `name` verbatim when it already matches the type's
+`self_link` shape — same segment count, every literal segment equal, which
+is the same test `ParseProviderID` applies to an id a user typed, so nothing
+is accepted here that a later Read, Delete or Import would refuse. A bare
+leaf (`"web1"` against compute's six-segment template) still goes through
+the template, and so does a name in some other type's collection. The id
+parser was **not** loosened: a wrong id that parses is worse than one that
+errors.
+
+Confirmed against real Google on 2026-09-22: `gcp.tagkey` and
+`gcp.tagvalue` create and read back cleanly, with ids `tagKeys/281482587066023`
+and `tagValues/281483265184913`.
 
 **4. `gcp.serviceaccount` cannot be created at all.** Its create url is
 `{+name}/serviceAccounts`; the type declares only `accountId` and
@@ -339,15 +369,41 @@ Captured verbatim:
 `awaitLongRunning` reads `op["name"]` and errors on empty **before** it checks
 `done`, so it refuses an answer sitting in front of it. **This is a third
 orphan**: the binding is real, the host drops a failed create's result, and
-nothing tracks it. The fix is an ordering change — check `done` first — but it
-is in `await.go`, outside this task's file list.
+nothing tracks it.
+
+**FIXED in task 18a**, in `internal/gcprov/await.go`: a name is needed only
+to POLL, and an operation that is already done is never polled, so the two
+poll preconditions moved inside the loop, below the `done` check. Confirmed
+against real Google on 2026-09-22 — `Creating binding... done (0.9s)`.
+
+**11. The fix exposed a fourth orphan immediately behind it**, and that one
+is not about tag bindings at all. A `google.longrunning` `response` is a
+`google.protobuf.Any`, so it carries `"@type"` — the ENVELOPE'S
+discriminator, not a field of the resource. With the ordering fixed, the
+first create ever to reach that code path handed `@type` straight to the
+host, which refused the whole state:
+
+```
+x create binding: gcp returned attribute "@type" on a gcp.tagbinding,
+which its own schema does not declare
+```
+
+The binding was real (this suite's sweep had to delete it) and the create
+was reported as failed. **Every one of the 97 `AwaitLongRunning` types
+answers this way**, and any of them reaches it whenever the readback after a
+create loses the race with eventual consistency and `Create` falls back to
+`bestEffortState`. Also fixed in `await.go`: the Any envelope is unwrapped
+where it is opened, dropping `@type` and nothing else — an undeclared field
+arriving for any *other* reason is a real disagreement with the catalog and
+still surfaces.
 
 **Note what this means for the defect this was filed under.** The `ProviderID`
-mangling is *never reached* for a tag binding; the await fails first. It is
+mangling is *never reached* for a tag binding; the await failed first. It is
 confirmed for `gcp.tagkey` from a real 400
-(`Invalid CRM resource name: 'tagKeys/tagKeys%2F281480152414347'`), and the
-binding's own id shape is now known, but the mangling itself remains
-unobserved on this type.
+(`Invalid CRM resource name: 'tagKeys/tagKeys%2F281480152414347'`) and fixed
+there, but the binding's id is mangled for a **different** reason — its
+`self_link` has two segments and a real name has four (below), which the
+verbatim rule deliberately does not paper over.
 
 *Read.* Worse, and this is the part that makes the type unusable rather than
 merely broken. `gcp.tagbinding`'s `read_via` is `list_by_parent` — spec G6's
@@ -368,8 +424,15 @@ run against Google and cannot, for any real id.
 
 Two consequences worth stating plainly:
 
-- **`gcp.tagbinding` can neither be created nor imported today.** Every path
-  in and out of it fails before it does anything useful.
+- **`gcp.tagbinding` can be created but not addressed.** As of task 18a the
+  create itself succeeds; what it stores is
+  `tagBindings/tagBindings%2F%252F%252Fcloudresourcemanager.googleapis.com%252F...`,
+  a doubly-escaped id addressing nothing. The next plan reports the binding
+  as vanished and proposes recreating it, the destroy "forgets" it rather
+  than deleting it, and the tag value's own destroy then fails because a
+  binding it does not know about is still attached. Import still refuses the
+  real id outright. **Still a release blocker**, now for one reason (the
+  two-segment `self_link`) rather than three.
 - **`readByListingParent` is narrower than the type is, independently of the
   above.** It builds its parent from `Settings.Project`, so it can only ever
   list bindings on the configured *project*. A tag bound to a bucket or an
@@ -395,6 +458,40 @@ granting another role. Wrapped with `%w`, so `ClassifyError` and `isNotFound`
 still reach the `*APIError`, and it only fires when a quota project is actually
 configured.
 
+**10. `gcp.tagkey` never converges: Google answers `parent` with the project
+NUMBER.** Found on the task-18a re-run, and only reachable because finding 3
+was fixed — until then the create failed and there was no second plan to
+look at. The configuration says
+
+```yaml
+parent: projects/example-project-1234
+```
+
+and Cloud Resource Manager answers `parent: "projects/123456789012"`. Same
+project, canonical form, different string — and `parent` is ForceNew, so
+**every plan after a successful apply proposes destroying and recreating the
+tag key**:
+
+```
+the plan right after creating the tag types proposes a replace of tagkey
+  because of [parent [forces new]]
+the plan right after creating the tag types proposes a replace of tagvalue
+  because of [parent (known after apply) [forces new]]
+```
+
+The tag value follows only because its own `parent` is `${tagkey.name}` and
+the key is being replaced; there is one defect here, not two.
+
+This is the same *shape* as finding 5 (compute not echoing
+`initializeParams`) — GCP answers in a form the configuration did not use —
+but the opposite direction: there the answer carries less than was sent,
+here it carries the same thing spelled canonically. `Reconcile` cannot fix
+it, because "projects/<id>" and "projects/<number>" are equal only to
+something that knows how to resolve a project id. **Needs a follow-up**: an
+id/number equivalence for the attributes that carry a project reference, or
+a normalisation at the point the create's answer is reconciled.
+`TestLiveTagTypes` fails on this today.
+
 ### What passes
 
 `validate`, plan, apply, **a clean second plan**, drift detected and
@@ -404,4 +501,10 @@ reason**, and `import --as` producing a state that plans clean. The compute
 create await works end to end: the instance's provider id names the
 instance, not the operation, which is the thing this project got wrong three
 times and the one thing only a live call could settle.
+
+As of task 18a, `TestLiveWorkflow` passes **in full**, including
+`destroy_removes_everything` — the compute delete's long poll ran for 1m45s
+where thirty seconds used to be the cliff. All three tag types create and
+read back; what remains failing is the tag binding's id shape (finding 8)
+and the tag key's `parent` normalisation (finding 10).
 

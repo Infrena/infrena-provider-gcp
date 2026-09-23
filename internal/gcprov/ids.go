@@ -31,6 +31,9 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 	if raw, ok := body["selfLink"].(string); ok && raw != "" {
 		return reduceSelfLink(ty, raw)
 	}
+	if id, ok := nameIsAlreadyTheID(ty, body); ok {
+		return id, nil
+	}
 	merged := make(map[string]value.Value, len(attrs)+len(body))
 	for k, v := range attrs {
 		merged[k] = v
@@ -53,6 +56,53 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 		return "", fmt.Errorf("gcprov: %s: computing the provider id: %w", ty.Name, err)
 	}
 	return rel, nil
+}
+
+// nameIsAlreadyTheID reports whether body's own "name" IS the provider id
+// rather than the leaf to expand self_link's "{{name}}" with.
+//
+// THIS IS THE CLOUD RESOURCE MANAGER v3 AND google.longrunning CONVENTION,
+// and it is not a corner. Those APIs answer with `name` set to the full
+// RELATIVE RESOURCE NAME -- "tagKeys/281480152414347" -- while self_link is
+// "tagKeys/{{name}}". Expanding one into the other percent-escapes the id's
+// own separator and prefixes the collection a second time, so a real
+// gcp.tagkey create stored "tagKeys/tagKeys%2F281480152414347" and the
+// readback came back, from real Google on 2026-09-22 (task-18 finding 3):
+//
+//	Invalid CRM resource name: 'tagKeys/tagKeys%2F281480152414347' (400)
+//
+// An error after a successful create is dropped by the host, so the tag key
+// was real and tracked nowhere. The orphan rule again -- which is why this
+// belongs here, alongside createdID's and stateFrom's own fallbacks, rather
+// than in a per-type catalog exception.
+//
+// THE TEST IS THE TYPE'S OWN self_link SHAPE, NOT "does it contain a slash".
+// A name is taken verbatim only when it matches self_link segment for
+// segment: the same count, and every LITERAL segment equal. That is exactly
+// what parseAgainstTemplate decides for an id a user typed, so accepting a
+// name here accepts nothing ParseProviderID would later refuse -- the id
+// round-trips through Read, Delete and Import unchanged. Measured over the
+// 233 shipped types: every multi-segment self_link has at least one literal
+// segment, so there is always something anchoring the match; a bare leaf
+// ("web1" against compute's six-segment template) never matches and still
+// goes through the template, as does a name naming a different collection.
+//
+// The 88 types whose self_link is a bare "{+name}" match trivially and get
+// the identical answer either way -- reserved expansion does not escape "/"
+// -- so this changes nothing for them.
+//
+// DELIBERATELY BELOW selfLink. A body carrying both is compute-shaped, where
+// selfLink is the authoritative identity and `name` is the leaf; reversing
+// the order would reduce every compute id to its instance name.
+func nameIsAlreadyTheID(ty *catalog.Type, body map[string]any) (string, bool) {
+	name, _ := body["name"].(string)
+	if name == "" || ty.SelfLink == "" {
+		return "", false
+	}
+	if _, err := parseAgainstTemplate(ty, ty.SelfLink, name); err != nil {
+		return "", false
+	}
+	return name, true
 }
 
 // reduceSelfLink turns an ABSOLUTE selfLink GCP answered with (scheme, host

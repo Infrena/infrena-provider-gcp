@@ -165,3 +165,101 @@ func TestReduceSelfLinkTakesTheFirstAnchoredPrefix(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// TestACRMNameThatIsAlreadyARelativeResourceNameIsTheIDVerbatim. Cloud
+// Resource Manager v3 -- and google.longrunning generally -- answers with a
+// `name` that IS the full relative resource name, not the bare leaf
+// self_link's own "{{name}}" placeholder expects. Expanding one into the
+// other percent-escapes the id's own "/" and prefixes the collection a
+// second time.
+//
+// Measured against real Google on 2026-09-22 (task-18 finding 3): a
+// gcp.tagkey create answered with name "tagKeys/281480152414347", the
+// provider stored "tagKeys/tagKeys%2F281480152414347", and the readback came
+// back
+//
+//	Invalid CRM resource name: 'tagKeys/tagKeys%2F281480152414347' (400)
+//
+// An error after a successful create is dropped by the host, so the tag key
+// was real and tracked nowhere -- the orphan rule, for the third time in one
+// live run.
+func TestACRMNameThatIsAlreadyARelativeResourceNameIsTheIDVerbatim(t *testing.T) {
+	c := mustCatalog(t)
+	ty, ok := c.Type("gcp.tagkey")
+	if !ok {
+		t.Fatal("the embedded catalog no longer ships gcp.tagkey")
+	}
+	// The create's own response, as cloudresourcemanager v3 sends it: no
+	// selfLink anywhere, and `name` already carrying its collection.
+	body := map[string]any{
+		"name":           "tagKeys/281480152414347",
+		"parent":         "projects/123456789012",
+		"shortName":      "infrena-live",
+		"namespacedName": "123456789012/infrena-live",
+		"createTime":     "2026-09-22T11:04:19.123Z",
+	}
+	got, err := ProviderID(ty, body, attrs(map[string]string{
+		"parent": "projects/123456789012", "shortName": "infrena-live",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "tagKeys/281480152414347"; got != want {
+		t.Errorf("provider id = %q, want %q", got, want)
+	}
+	if contains(got, "%2F") {
+		t.Errorf("the id escaped a separator the name already carried: %q", got)
+	}
+	// And it must survive the round trip every later Read, Delete and Import
+	// makes: a verbatim id that ParseProviderID then refuses would move the
+	// failure rather than remove it.
+	if _, err := ParseProviderID(ty, got); err != nil {
+		t.Errorf("the id this create produced cannot be parsed back: %v", err)
+	}
+}
+
+// TestABareLeafNameStillGoesThroughTheSelfLinkTemplate is the other half of
+// the rule above, and the reason it is stated as "already satisfies the
+// type's self_link shape" rather than "contains a slash": the overwhelming
+// majority of APIs answer with a bare leaf, which must still be expanded
+// into the template. A rule that took every `name` verbatim would reduce
+// every compute id to its instance name.
+func TestABareLeafNameStillGoesThroughTheSelfLinkTemplate(t *testing.T) {
+	ty := widgetType()
+	got, err := ProviderID(ty, map[string]any{"name": "one"},
+		attrs(map[string]string{"project": "p", "region": "r", "name": "one"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "projects/p/locations/r/widgets/one"; got != want {
+		t.Errorf("provider id = %q, want %q", got, want)
+	}
+}
+
+// TestANameThatMatchesTheShapeOfAnotherTypeIsNotTakenVerbatim. The verbatim
+// rule must be anchored on the type's OWN literal segments, not on "it has
+// the right number of slashes": a body naming something in a different
+// collection has to fall through to the template rather than become this
+// resource's id. A wrong id that parses is worse than one that errors --
+// crud.go's outsideCreatedCollection exists for the same reason.
+func TestANameThatMatchesTheShapeOfAnotherTypeIsNotTakenVerbatim(t *testing.T) {
+	c := mustCatalog(t)
+	ty, ok := c.Type("gcp.tagkey")
+	if !ok {
+		t.Fatal("the embedded catalog no longer ships gcp.tagkey")
+	}
+	got, err := ProviderID(ty, map[string]any{"name": "tagValues/281479230039359"},
+		attrs(map[string]string{"name": "281480152414347"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == "tagValues/281479230039359" {
+		t.Errorf("a name in another type's collection became this type's id: %q", got)
+	}
+	if want := "tagKeys/tagValues%2F281479230039359"; got != want {
+		// Not a pretty id, but it is the template's own answer and it is
+		// this type's collection -- the point is only that the verbatim
+		// shortcut did not fire.
+		t.Errorf("provider id = %q, want the template's own expansion %q", got, want)
+	}
+}
