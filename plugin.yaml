@@ -3,23 +3,8 @@
 manifest: 2
 name: gcp
 version: 0.1.0
-# The protocol THIS RELEASE'S binary speaks: exactly the pluginproto.Version the infrena go.mod
-# requires. It changes in the same commit as that require.
 protocol: [6]
 platforms: [linux/amd64, linux/arm64, linux/arm, linux/386, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64]
 description: The GCP provider for infrena, serving resource types generated from Google's API Discovery documents.
-# The OLDEST infrena release this plugin works with, which is not the same number as go.mod's
-# require (that is the NEWEST host it is tested against).
-#
-# 0.15.0, because that is the first release speaking protocol 6, and protocol 6 is `elem` on a
-# schema attribute -- the only way to describe what a list's items look like. This catalog declares
-# 1901 elements carrying 1584 aliases, so on 0.14.x every one of them is ignored: a spelling inside
-# a repeated block resolves to nothing and an undeclared key there reaches Google rather than being
-# reported.
-#
-# Note this floor is NOT merely "the oldest release that handshakes". 0.14.2 would refuse us
-# outright, since its Supported list is [5 4 3 2 1] and we announce 6 -- so admitting it would mean
-# a manifest that says install-compatible and a run that says no. The floor and `protocol:` move in
-# one commit with go.mod's require for exactly that reason.
 infrena: ">= 0.15.0"
 source: https://github.com/infrena/infrena-provider-gcp
