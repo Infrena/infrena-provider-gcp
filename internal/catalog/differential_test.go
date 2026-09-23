@@ -129,8 +129,9 @@ func TestDifferentialAgainstInfrenasOwnValidator(t *testing.T) {
 	// corpus that SHOULD be refused.
 	var tested, agreeRefuse, disagree, skipped int
 	byShape := map[string]int{}
+	byMembers := map[string]int{}
 	for _, g := range groups {
-		if len(g.as) < 2 {
+		if len(g.as) == 0 {
 			skipped++
 			continue
 		}
@@ -138,10 +139,27 @@ func TestDifferentialAgainstInfrenasOwnValidator(t *testing.T) {
 		for n := range g.as {
 			names = append(names, n)
 		}
-		victim, collidesWith := names[0], names[1]
+		// A group collides when two SPELLINGS fold together, not when two
+		// MEMBERS do. A one-member group collides perfectly well if that
+		// member's own alias folds to its own name, and this test used to
+		// skip all 991 of them as "cannot collide" -- 315 of which carry a
+		// real alias, so 315 name/alias pairs went uncompared. The generator
+		// emits one alias per camelCase attribute, so a single member holding
+		// exactly one alias is among the commonest shapes here, not an exotic
+		// one. Found by infrena reading this test rather than by the test.
+		victim := names[0]
+		collidesWith := victim
+		if len(names) > 1 {
+			collidesWith = names[1]
+		}
 		probe := strings.ToUpper(collidesWith)
 		g.as[victim].Aliases = append(g.as[victim].Aliases, probe)
 
+		members := "multi-member"
+		if len(g.as) == 1 {
+			members = "single-member"
+		}
+		byMembers[members]++
 		shape := "top-level"
 		switch {
 		case strings.Contains(g.path, "[]."):
@@ -166,11 +184,16 @@ func TestDifferentialAgainstInfrenasOwnValidator(t *testing.T) {
 		a := g.as[victim]
 		a.Aliases = a.Aliases[:len(a.Aliases)-1]
 	}
-	t.Logf("groups: %d total, %d with a single member (cannot collide), %d tested",
-		len(groups), skipped, tested)
+	t.Logf("groups: %d total, %d empty, %d tested", len(groups), skipped, tested)
+	t.Logf("   multi-member %d, single-member %d (a lone member collides with its own alias)",
+		byMembers["multi-member"], byMembers["single-member"])
 	t.Logf("both refuse: %d    disagree: %d", agreeRefuse, disagree)
 	for _, k := range []string{"top-level", "nested under Fields", "behind an Elem"} {
 		t.Logf("   tested %-22s %d", k, byShape[k])
+	}
+	if byMembers["single-member"] == 0 {
+		t.Error("no single-member group was tested; those collide via their own alias and were " +
+			"wrongly excluded once already")
 	}
 	if byShape["behind an Elem"] == 0 {
 		t.Error("no group behind an Elem was tested, so this says nothing about the protocol 6 path")

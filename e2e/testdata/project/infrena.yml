@@ -44,6 +44,19 @@ resources:
   # as `cloudRun` if the host resolved it, and the apply only succeeds if it
   # did. Writing it the schema's way would have been correct either way, which
   # is exactly why it proved nothing.
+  #
+  # DO NOT READ THIS AS "infrena folds underscores". IT DOES NOT. Its foldName
+  # is strings.ToLower and has never been anything else, so `cloud_run` does not
+  # resolve to `cloudRun` by folding at any depth. It resolves because the
+  # generator DECLARES `cloud_run` as an alias of `cloudRun` -- one snake_case
+  # alias per camelCase attribute, 1447 at the top level and 9788 nested.
+  #
+  # The distinction is not pedantry. An attribute this generator did not emit an
+  # alias for accepts only exact and case-only spellings, so a snake_case
+  # spelling of it fails while the one below succeeds, and a reader who inferred
+  # underscore-folding from this passing test would have no idea why. That exact
+  # inference is a mistake already made once here, from reading a function's
+  # NAME instead of its six lines.
   bus:
     type: gcp.trigger
     name: e2e-trigger
