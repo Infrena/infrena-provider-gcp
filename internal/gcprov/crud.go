@@ -103,7 +103,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		// rest.
 		fmt.Fprintf(os.Stderr, "gcp: %s: created, but not yet readable; reporting the awaited identity\n",
 			desired.Type)
-		return p.bestEffortState(ty, desired, scoped, awaited)
+		return p.bestEffortState(ctx, ty, desired, scoped, awaited)
 	default:
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
 			desired.Type, readErr)
@@ -121,7 +121,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 // no other way to know it went through that exact path. Attributes are best
 // effort, not authoritative -- the next ordinary Read fills in whatever
 // awaited did not carry.
-func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredResource, scoped map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
+func (p *Provider) bestEffortState(ctx context.Context, ty *catalog.Type, desired *resource.DesiredResource, scoped map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
 	id, err := p.createdID(ty, awaited, scoped)
 	if err != nil {
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
@@ -142,7 +142,7 @@ func (p *Provider) bestEffortState(ty *catalog.Type, desired *resource.DesiredRe
 	// body carries the same server-added nested keys, reordered sets and
 	// whole-number floats a get does, and this state is what the next plan
 	// diffs configuration against.
-	for k, v := range ReconcileAttrs(ty.Attributes, desired.Attrs, schemaAttrs(ty.Attributes, awaited)) {
+	for k, v := range p.reconciler(ctx).attrs(ty.Attributes, desired.Attrs, schemaAttrs(ty.Attributes, awaited)) {
 		attrs[k] = v
 	}
 	return &resource.ResourceState{
@@ -350,7 +350,7 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 		if body == nil {
 			return nil, nil // believed absent
 		}
-		return p.stateFromListing(ty, current, attrs, body)
+		return p.stateFromListing(ctx, ty, current, attrs, body)
 	}
 
 	reqURL, err := p.itemURL(ty, "", current.ProviderID, attrs)
@@ -363,7 +363,7 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 		body, err := p.client.Do(ctx, http.MethodGet, reqURL, nil)
 		switch {
 		case err == nil:
-			return p.stateFrom(ty, current, attrs, body)
+			return p.stateFrom(ctx, ty, current, attrs, body)
 		case !isNotFound(err):
 			return nil, err
 		case time.Now().After(deadline):
@@ -410,7 +410,7 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 // instead of going through here. A silently wrong id would be worse than the
 // error it replaces, so the failure still goes to stderr, naming the type
 // and the reason.
-func (p *Provider) stateFrom(ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
+func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
 	id, err := ProviderID(ty, body, idAttrs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gcp: %s: the response's identity could not be reduced to a provider id (%v); "+
@@ -436,7 +436,7 @@ func (p *Provider) stateFrom(ty *catalog.Type, current *resource.ResourceState, 
 	// or a patch; the last observation, on a refresh), so it is the order and
 	// the shape the answer has to be expressed in for value.Equal to mean "no
 	// drift". See reconcile.go.
-	for k, v := range ReconcileAttrs(ty.Attributes, current.Attributes, schemaAttrs(ty.Attributes, body)) {
+	for k, v := range p.reconciler(ctx).attrs(ty.Attributes, current.Attributes, schemaAttrs(ty.Attributes, body)) {
 		attrs[k] = v
 	}
 	return &resource.ResourceState{

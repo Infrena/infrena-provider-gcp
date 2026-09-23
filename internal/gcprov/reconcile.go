@@ -31,6 +31,25 @@ const reservedLabelPrefix = "goog-"
 // here sees it, so this looks fields up by the same key configuration uses
 // and never by Canonical.
 func Reconcile(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	return reconciler{}.value(attr, reference, incoming)
+}
+
+// reconciler carries the facts reconciliation needs that are not in the
+// catalog: today, the two spellings this instance's project answers to.
+//
+// A struct rather than another parameter on five functions, because the
+// recursion runs through Fields and Elem at every depth and a project
+// reference can sit at any of them -- gcp.tagkey's `parent` is top-level,
+// but nothing says the next one will be.
+type reconciler struct {
+	// aliases resolves the two spellings this instance's project answers to,
+	// lazily: it is nil for the bare package-level Reconcile, and calling it
+	// can cost a request, so it is only called once a value is already known
+	// to be a project resource name that disagrees.
+	aliases func() ProjectAliases
+}
+
+func (r reconciler) value(attr *catalog.Attr, reference, incoming value.Value) value.Value {
 	if attr == nil || !incoming.Known {
 		return incoming
 	}
@@ -50,12 +69,53 @@ func Reconcile(attr *catalog.Attr, reference, incoming value.Value) value.Value 
 
 	switch {
 	case attr.Kind == value.KindMap && len(attr.Fields) > 0:
-		return reconcileObject(attr, reference, incoming)
+		return r.object(attr, reference, incoming)
 	case attr.Kind == value.KindList && attr.Elem != nil:
-		return reconcileList(attr, reference, incoming)
+		return r.list(attr, reference, incoming)
 	default:
-		return asDeclaredKind(attr, incoming)
+		return r.sameProjectSpelling(reference, asDeclaredKind(attr, incoming))
 	}
+}
+
+// sameProjectSpelling returns the REFERENCE's spelling of a project
+// reference when GCP answered with the other one.
+//
+// GCP canonicalises a project reference to the project NUMBER across many
+// APIs. A configuration says `parent: projects/example-project-1234` and
+// Cloud Resource Manager answers `parent: "projects/123456789012"` -- the
+// same project, in canonical form, as a different string. On gcp.tagkey
+// `parent` is ForceNew, so every plan after a successful apply proposed
+// destroying and recreating the tag key, forever. Task 18a's live re-run
+// found it, and only after its own defect C was fixed: until then the create
+// failed and there was no second plan to look at.
+//
+// THIS IS THE SAME JOB REORDERING AN UNORDERED LIST DOES. GCP's answer is
+// correct and spelled differently from what the configuration wrote, and
+// this function exists to express it the way the configuration did -- which
+// is what the doc comment on Reconcile says the whole file is for. It is
+// NOT a rewrite of the user's configuration, and it is not a lenient id
+// parser: both of those were considered and refused. It is the state, and
+// the state is what the plan compares.
+//
+// Nothing happens unless the provider actually resolved the number (see
+// ProjectAliases). An unresolved instance leaves the two unequal, and a plan
+// that proposes a replacement is a thing a user can see and ask about.
+func (r reconciler) sameProjectSpelling(reference, incoming value.Value) value.Value {
+	if reference.Kind != value.KindString || incoming.Kind != value.KindString {
+		return incoming
+	}
+	want, _ := reference.Raw.(string)
+	got, _ := incoming.Raw.(string)
+	if want == got || r.aliases == nil {
+		return incoming
+	}
+	if !looksLikeAProjectName(want) || !looksLikeAProjectName(got) {
+		return incoming
+	}
+	if !r.aliases().sameProject(want, got) {
+		return incoming
+	}
+	return value.Value{Kind: value.KindString, Known: true, Raw: want, Source: incoming.Source}
 }
 
 // ReconcileAttrs reconciles a whole response body's worth of values against
@@ -75,10 +135,14 @@ func Reconcile(attr *catalog.Attr, reference, incoming value.Value) value.Value 
 // anything else. Dropping the top-level ones as well would also throw away
 // what Import and Discover read a resource's own identity out of.
 func ReconcileAttrs(attrs map[string]*catalog.Attr, reference, incoming map[string]value.Value) map[string]value.Value {
+	return reconciler{}.attrs(attrs, reference, incoming)
+}
+
+func (r reconciler) attrs(attrs map[string]*catalog.Attr, reference, incoming map[string]value.Value) map[string]value.Value {
 	out := make(map[string]value.Value, len(incoming))
 	for name, v := range incoming {
 		a := attrs[name]
-		out[name] = withoutReservedLabels(a, Reconcile(a, reference[name], v))
+		out[name] = withoutReservedLabels(a, r.value(a, reference[name], v))
 	}
 	return out
 }
@@ -89,7 +153,7 @@ func ReconcileAttrs(attrs map[string]*catalog.Attr, reference, incoming map[stri
 // An undeclared key is one GCP added and we never modelled -- a fingerprint, an
 // etag, a server-assigned id. Keeping it means comparing it, and comparing it
 // means drift forever.
-func reconcileObject(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) value.Value {
 	in, ok := incoming.Raw.(map[string]value.Value)
 	if !ok {
 		// Kind and Raw disagree; there is no object here to walk. Copying is
@@ -103,7 +167,7 @@ func reconcileObject(attr *catalog.Attr, reference, incoming value.Value) value.
 		if !found {
 			continue
 		}
-		out[name] = Reconcile(field, ref[name], v)
+		out[name] = r.value(field, ref[name], v)
 	}
 	return value.Value{Kind: value.KindMap, Known: true, Raw: out, Source: incoming.Source}
 }
@@ -115,7 +179,7 @@ func reconcileObject(attr *catalog.Attr, reference, incoming value.Value) value.
 // plans a change forever. But reordering a list where order carries meaning --
 // a rule evaluation sequence, a priority list -- would silently rewrite the
 // user's intent. The catalog records which is which; never guess.
-func reconcileList(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+func (r reconciler) list(attr *catalog.Attr, reference, incoming value.Value) value.Value {
 	in, ok := incoming.Raw.([]value.Value)
 	if !ok {
 		return incoming
@@ -133,7 +197,7 @@ func reconcileList(attr *catalog.Attr, reference, incoming value.Value) value.Va
 		if i < len(ref) {
 			refItem = ref[i]
 		}
-		items[i] = Reconcile(attr.Elem, refItem, item)
+		items[i] = r.value(attr.Elem, refItem, item)
 	}
 	if !attr.Unordered {
 		return value.Value{Kind: value.KindList, Known: true, Raw: items, Source: incoming.Source}

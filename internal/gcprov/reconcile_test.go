@@ -545,3 +545,205 @@ func TestAPatchReadsBackInTheOrderItAsked(t *testing.T) {
 		}
 	}
 }
+
+// --- Task 18b C2: a project id and a project number are the same project.
+
+// seedProjectNumber makes the fake answer cloudresourcemanager's
+// projects.get for project "p" with the number GCP canonicalises it to.
+func seedProjectNumber(s *gcpfake.Server, number string) {
+	s.Seed("/v3/projects/p", map[string]any{
+		"name": "projects/" + number, "projectId": "p",
+	})
+}
+
+// readTagKey reads gcp.tagkey at id, with what the configuration asked for
+// as the state it is reconciled against.
+func readTagKey(t *testing.T, s *gcpfake.Server, id string, want map[string]value.Value) *resource.ResourceState {
+	t.Helper()
+	p := testProvider(t, s)
+	st, err := p.Read(context.Background(), &resource.ResourceState{
+		Type: "gcp.tagkey", ProviderID: id, Attributes: want,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("the tag key read as absent")
+	}
+	return st
+}
+
+// TestAProjectNumberAnswersToTheIdTheConfigurationWrote. Configuration says
+// `parent: projects/example-project-1234`; Cloud Resource Manager answers
+// `parent: "projects/123456789012"`. The same project, in canonical form, as
+// a different string -- and `parent` is ForceNew, so every plan after a
+// successful apply proposed destroying and recreating the tag key. Task 18a's
+// live re-run found it, and only because its own defect C was fixed first:
+// until then the create failed and there was no second plan to look at.
+func TestAProjectNumberAnswersToTheIdTheConfigurationWrote(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	seedProjectNumber(s, "123456789012")
+	s.Seed("/v3/tagKeys/281480152414347", map[string]any{
+		"name": "tagKeys/281480152414347", "parent": "projects/123456789012", "shortName": "env",
+	})
+
+	st := readTagKey(t, s, "tagKeys/281480152414347", attrs(map[string]string{
+		"parent": "projects/p", "shortName": "env",
+	}))
+	if got := st.Attributes["parent"].Raw; got != "projects/p" {
+		t.Errorf("parent = %q, want %q -- the same project, and parent is ForceNew, so the "+
+			"difference is a plan that proposes replacing the tag key forever", got, "projects/p")
+	}
+}
+
+// TestADifferentProjectIsStillADifferentProject. The equivalence is between
+// ONE id and ONE number, the pair this instance actually resolved. A number
+// standing in for an arbitrary id would silently accept a state naming a
+// project nobody configured.
+func TestADifferentProjectIsStillADifferentProject(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	seedProjectNumber(s, "123456789012")
+	s.Seed("/v3/tagKeys/1", map[string]any{
+		"name": "tagKeys/1", "parent": "projects/999999999999", "shortName": "env",
+	})
+
+	st := readTagKey(t, s, "tagKeys/1", attrs(map[string]string{"parent": "projects/p"}))
+	if got := st.Attributes["parent"].Raw; got != "projects/999999999999" {
+		t.Errorf("parent = %q; GCP answered with a project this instance never resolved, "+
+			"and reporting it as the configured one would hide a real difference", got)
+	}
+}
+
+// TestTheProjectNumberIsResolvedOnceAndOnlyWhenSomethingDisagrees. It costs a
+// Cloud Resource Manager request, so it must not happen per resource and
+// must not happen at all for the great majority of reads, which carry no
+// project resource name that disagrees.
+func TestTheProjectNumberIsResolvedOnceAndOnlyWhenSomethingDisagrees(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	seedProjectNumber(s, "123456789012")
+	for _, id := range []string{"1", "2", "3"} {
+		s.Seed("/v3/tagKeys/"+id, map[string]any{
+			"name": "tagKeys/" + id, "parent": "projects/123456789012", "shortName": "env",
+		})
+	}
+	p := testProvider(t, s)
+	for _, id := range []string{"1", "2", "3"} {
+		if _, err := p.Read(context.Background(), &resource.ResourceState{
+			Type: "gcp.tagkey", ProviderID: "tagKeys/" + id,
+			Attributes: attrs(map[string]string{"parent": "projects/p"}),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := countRequests(s, "/v3/projects/p"); n != 1 {
+		t.Errorf("the project number was looked up %d times across three reads, want 1", n)
+	}
+
+	// And a read whose strings disagree about something that is NOT a
+	// project resource name asks for nothing. This is the half that matters:
+	// a pair that merely AGREES never reaches the gate at all, so a test
+	// built on one would pass with the gate deleted -- which is exactly what
+	// happened when this was sabotaged, and is why the case below exists.
+	// Every reconciliation compares strings; without the gate essentially
+	// every resource this provider reads would cost a Cloud Resource Manager
+	// request.
+	s2 := gcpfake.New(t)
+	defer s2.Close()
+	seedProjectNumber(s2, "123456789012")
+	s2.Seed("/v3/tagKeys/9", map[string]any{
+		"name": "tagKeys/9", "parent": "projects/p",
+		"shortName": "environment", "description": "set by google",
+	})
+	p2 := testProvider(t, s2)
+	if _, err := p2.Read(context.Background(), &resource.ResourceState{
+		Type: "gcp.tagkey", ProviderID: "tagKeys/9",
+		Attributes: attrs(map[string]string{
+			"parent": "projects/p", "shortName": "env", "description": "set by me",
+		}),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := countRequests(s2, "/v3/projects/p"); n != 0 {
+		t.Errorf("a read whose only disagreements were ordinary strings still cost %d "+
+			"project-number lookups", n)
+	}
+}
+
+// TestAnUnresolvableProjectNumberLeavesTheTwoDifferent. A spurious
+// replacement plan the user can see beats a silent wrong equality: if the
+// lookup fails, the provider must not decide the two spellings are the same
+// because it could not check.
+func TestAnUnresolvableProjectNumberLeavesTheTwoDifferent(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	// No /v3/projects/p seeded: the lookup 404s.
+	s.Seed("/v3/tagKeys/1", map[string]any{
+		"name": "tagKeys/1", "parent": "projects/123456789012", "shortName": "env",
+	})
+	st := readTagKey(t, s, "tagKeys/1", attrs(map[string]string{"parent": "projects/p"}))
+	if got := st.Attributes["parent"].Raw; got != "projects/123456789012" {
+		t.Errorf("parent = %q; with no number resolved the provider cannot know the two "+
+			"spellings are one project, and must not pretend it does", got)
+	}
+}
+
+// TestSameProjectIsSymmetricAndNarrow pins the equivalence itself.
+func TestSameProjectIsSymmetricAndNarrow(t *testing.T) {
+	a := ProjectAliases{ID: "example-project-1234", Number: "123456789012"}
+	for _, tc := range []struct {
+		want, got string
+		same      bool
+	}{
+		{"projects/example-project-1234", "projects/123456789012", true},
+		{"projects/123456789012", "projects/example-project-1234", true},
+		{"projects/example-project-1234", "projects/999999999999", false},
+		{"projects/somewhere-else", "projects/123456789012", false},
+	} {
+		if got := a.sameProject(tc.want, tc.got); got != tc.same {
+			t.Errorf("sameProject(%q, %q) = %v, want %v", tc.want, tc.got, got, tc.same)
+		}
+	}
+	if (ProjectAliases{}).sameProject("projects/a", "projects/b") {
+		t.Error("an unresolved instance claimed two projects were the same")
+	}
+}
+
+// TestOnlyAProjectResourceNameTriggersTheLookup. Every reconciliation
+// compares strings; if any differing pair could be a project, the provider
+// would send a Cloud Resource Manager request for essentially every resource
+// it reads.
+func TestOnlyAProjectResourceNameTriggersTheLookup(t *testing.T) {
+	for _, tc := range []struct {
+		s  string
+		ok bool
+	}{
+		{"projects/example-project-1234", true},
+		{"projects/123456789012", true},
+		{"example-project-1234", false},
+		{"projects/p/locations/us-central1", false},
+		{"projects/", false},
+		{"web1", false},
+	} {
+		if got := looksLikeAProjectName(tc.s); got != tc.ok {
+			t.Errorf("looksLikeAProjectName(%q) = %v, want %v", tc.s, got, tc.ok)
+		}
+	}
+}
+
+// countRequests is how many times the fake was asked for path.
+func countRequests(s *gcpfake.Server, path string) int {
+	n := 0
+	for _, r := range s.Requests() {
+		if r.Path == path {
+			n++
+		}
+	}
+	return n
+}

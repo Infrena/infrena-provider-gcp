@@ -471,6 +471,13 @@ type Settings struct {
 	// without this a discovery test would send its search to the real
 	// cloudasset.googleapis.com.
 	AssetInventoryBaseURL string
+
+	// ResourceManagerBaseURL is where Cloud Resource Manager lives. Empty
+	// means ResourceManagerBaseURL, the real endpoint. It exists for exactly
+	// the reason AssetInventoryBaseURL does: resolving this instance's own
+	// project number is a question about the INSTANCE, so there is no
+	// catalog type whose APIBaseURL a test could rewrite to reach a fake.
+	ResourceManagerBaseURL string
 }
 
 // Provider is one configured GCP provider instance: the generic Client and
@@ -488,4 +495,8 @@ type Provider struct {
 	catalog *catalog.Catalog
 
 	settings Settings
+
+	// projectState caches the id/number pair this instance's project answers
+	// to, resolved at most once. See projects.go.
+	projectState
 }

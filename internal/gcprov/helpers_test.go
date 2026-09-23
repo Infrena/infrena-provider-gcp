@@ -243,6 +243,12 @@ func testProviderWithCatalog(t *testing.T, s *gcpfake.Server, c *catalog.Catalog
 			// redirect it and a discovery test would otherwise search the
 			// real cloudasset.googleapis.com. See Settings.AssetInventoryBaseURL.
 			AssetInventoryBaseURL: base,
+			// Same reason as above, for the project-number lookup the
+			// reconciler makes when two spellings of a project name
+			// disagree: it is a question about the INSTANCE, so no catalog
+			// type's APIBaseURL redirects it and a test would otherwise
+			// reach the real cloudresourcemanager.googleapis.com.
+			ResourceManagerBaseURL: base,
 		},
 	}
 }

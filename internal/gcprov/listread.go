@@ -226,8 +226,8 @@ func listItems(body map[string]any, field string) []map[string]any {
 // "^tagBindings/.*$"), so ProviderID answers correctly for this type too and
 // this line is back to being the small optimisation its first sentence
 // describes.
-func (p *Provider) stateFromListing(ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
-	st, err := p.stateFrom(ty, current, idAttrs, body)
+func (p *Provider) stateFromListing(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
+	st, err := p.stateFrom(ctx, ty, current, idAttrs, body)
 	if err != nil {
 		return nil, err
 	}
