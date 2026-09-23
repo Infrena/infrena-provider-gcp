@@ -1013,3 +1013,150 @@ func TestTheBestEffortStateIsKeyedBySchemaNameToo(t *testing.T) {
 			st.Attributes["type_value"])
 	}
 }
+
+// --- Task 18b: the create url is built from the bindings the generator stored.
+
+// nestedBindingCatalog is gcp.bigquery.table's shape, reduced: a create url
+// whose two id segments live NESTED under tableReference, with the binding
+// the generator stores for them.
+func nestedBindingCatalog() *catalog.Catalog {
+	return &catalog.Catalog{Types: []*catalog.Type{{
+		Name:           "gcp.table",
+		BaseURL:        "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		SelfLink:       "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		Scope:          catalog.ScopeGlobal,
+		TimeoutSeconds: 30,
+		CreateBindings: map[string]*catalog.CreateBinding{
+			"dataset_id": {Attr: "tableReference.datasetId"},
+			"table_id":   {Attr: "tableReference.tableId"},
+		},
+		Attributes: map[string]*catalog.Attr{
+			"tableReference": {Canonical: "tableReference", Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+				"datasetId": {Canonical: "datasetId", Kind: value.KindString},
+				"tableId":   {Canonical: "tableId", Kind: value.KindString},
+			}},
+			"description": {Canonical: "description", Kind: value.KindString},
+		},
+	}}}
+}
+
+// TestACreateURLIsBuiltFromANestedBinding. The values a magic-modules
+// template asks for by snake_case name are two levels down the attribute
+// tree, and nothing at the top level has either name. Without the stored
+// binding the create fails on `url template ... needs "dataset_id"` before a
+// byte is sent.
+func TestACreateURLIsBuiltFromANestedBinding(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProviderWithCatalog(t, s, nestedBindingCatalog())
+
+	// The fake answers this particular shape with a 400 (bigquery's create
+	// url addresses the ITEM, not a collection, so the fake finds no id to
+	// assign). That is beside the point: what is being asserted is the URL
+	// the POST went to, which is decided before anything is sent.
+	_, _ = p.Create(context.Background(), &resource.DesiredResource{
+		Type: "gcp.table",
+		Attrs: attrsMixed(map[string]any{
+			"tableReference": map[string]any{"datasetId": "ds", "tableId": "tb"},
+			"description":    "hello",
+		}),
+	})
+	req, ok := firstPost(s)
+	if !ok {
+		t.Fatal("nothing was POSTed")
+	}
+	if req.Path != "/projects/p/datasets/ds/tables/tb" {
+		t.Errorf("POSTed to %q, want /projects/p/datasets/ds/tables/tb -- the nested "+
+			"tableReference.datasetId and .tableId are what the url's snake_case "+
+			"placeholders name", req.Path)
+	}
+	// The body still carries tableReference: only the PLACEHOLDER names are
+	// kept out of the body, and "tableReference" is not one of them.
+	if !contains(string(req.Body), "tableReference") {
+		t.Errorf("tableReference was stripped from the request body: %s; GCP needs it there, "+
+			"and only a url placeholder's own name is excluded", req.Body)
+	}
+}
+
+// TestACreateURLIsBuiltFromAPatternTemplate is part B at the runtime end.
+// iam's "{+name}/serviceAccounts" means the PARENT PROJECT, and the binding
+// the generator took from Discovery's pattern expands to projects/{project},
+// whose own placeholder the instance supplies.
+func TestACreateURLIsBuiltFromAPatternTemplate(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	c := &catalog.Catalog{Types: []*catalog.Type{{
+		Name:           "gcp.sa",
+		PathPrefix:     "v1/",
+		BaseURL:        "{+name}/serviceAccounts",
+		SelfLink:       "{+name}",
+		Scope:          catalog.ScopeGlobal,
+		TimeoutSeconds: 30,
+		CreateBindings: map[string]*catalog.CreateBinding{
+			"name": {Template: "projects/{project}"},
+		},
+		Attributes: map[string]*catalog.Attr{
+			"accountId": {Canonical: "accountId", Kind: value.KindString},
+		},
+	}}}
+	p := testProviderWithCatalog(t, s, c)
+
+	_, _ = p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.sa",
+		Attrs: attrsMixed(map[string]any{"accountId": "bot"}),
+	})
+	req, ok := firstPost(s)
+	if !ok {
+		t.Fatal("nothing was POSTed")
+	}
+	if req.Path != "/v1/projects/p/serviceAccounts" {
+		t.Errorf("POSTed to %q, want /v1/projects/p/serviceAccounts -- {+name} here is the "+
+			"parent project, which is what Discovery's own pattern for the parameter says", req.Path)
+	}
+}
+
+// TestATypeThatCannotBuildItsCreateURLIsRefusedBeforeAnyRequest. 38 types
+// shipped claiming a create they could not perform. The refusal names the
+// fact, not the symptom, and above all it happens before anything is sent:
+// a half-expanded url ("projects/p/instances//sslCerts") is answered by GCP
+// with a 404 that names nothing.
+func TestATypeThatCannotBuildItsCreateURLIsRefusedBeforeAnyRequest(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	c := &catalog.Catalog{Types: []*catalog.Type{{
+		Name:           "gcp.orphan",
+		BaseURL:        "folders/{folder}/locations/{location}/buckets",
+		SelfLink:       "{+name}",
+		TimeoutSeconds: 30,
+		Attributes:     map[string]*catalog.Attr{"description": {Canonical: "description"}},
+	}}}
+	p := testProviderWithCatalog(t, s, c)
+
+	_, err := p.Create(context.Background(), &resource.DesiredResource{
+		Type:  "gcp.orphan",
+		Attrs: attrsMixed(map[string]any{"description": "x"}),
+	})
+	if err == nil {
+		t.Fatal("a type whose create url cannot be built reported success")
+	}
+	if !contains(err.Error(), "folder") || !contains(err.Error(), "cannot be created") {
+		t.Errorf("the refusal does not name the type's problem: %v", err)
+	}
+	if len(s.Requests()) != 0 {
+		t.Errorf("%d requests were sent for a type that cannot build its create url", len(s.Requests()))
+	}
+}
+
+// firstPost is the fake's first POST, which for a create is the create
+// itself -- the readback that follows is a GET.
+func firstPost(s *gcpfake.Server) (gcpfake.Request, bool) {
+	for _, r := range s.Requests() {
+		if r.Method == "POST" {
+			return r, true
+		}
+	}
+	return gcpfake.Request{}, false
+}

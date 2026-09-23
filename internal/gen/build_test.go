@@ -12,6 +12,7 @@ import (
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/disco"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 // buildFixture assembles a minimal input tree: one Discovery document, one
@@ -1315,5 +1316,271 @@ func TestHierarchyRootIsTheLiteralPathSegment(t *testing.T) {
 	// for one another.
 	if hierarchyRoot([]string{"folders", "x"}) == scopeSegment([]string{"folders", "x"}) {
 		t.Error("hierarchyRoot and scopeSegment now agree, so one of them is answering the wrong question")
+	}
+}
+
+// --- Task 18b: a type that cannot build a create url does not claim it can.
+
+// TestAReservedPlaceholderIsBoundFromItsDiscoveryPatternNotFromAnAttribute is
+// part B. iam's serviceAccounts.create is "v1/{+name}/serviceAccounts" where
+// `name` means the PARENT PROJECT, while the same collection's get is
+// "v1/{+name}" where the identical spelling means the service account. One
+// placeholder, two meanings, one collection -- and the only thing that tells
+// them apart is the pattern Discovery publishes for each method's own
+// parameter.
+func TestAReservedPlaceholderIsBoundFromItsDiscoveryPatternNotFromAnAttribute(t *testing.T) {
+	ty := &catalog.Type{
+		Name:     "gcp.serviceaccount",
+		BaseURL:  "{+name}/serviceAccounts",
+		SelfLink: "{+name}",
+		Attributes: map[string]*catalog.Attr{
+			// The trap: a nested attribute that DOES have this name, and is
+			// not what the url means.
+			"serviceAccount": {Canonical: "serviceAccount", Fields: map[string]*catalog.Attr{
+				"name": {Canonical: "name"},
+			}},
+		},
+	}
+	create := &disco.Method{Parameters: map[string]*disco.Parameter{
+		"name": {Location: "path", Required: true, Pattern: "^projects/[^/]+$"},
+	}}
+	got := createBindings(ty, create)
+	b := got["name"]
+	if b == nil {
+		t.Fatalf("no binding for {+name}: %v", got)
+	}
+	if b.Attr != "" {
+		t.Errorf("{+name} bound to the attribute %q; a reserved placeholder is a PATH, and "+
+			"serviceAccount.name is a field of the thing being created, not its parent", b.Attr)
+	}
+	if b.Template != "projects/{project}" {
+		t.Errorf("template = %q, want %q", b.Template, "projects/{project}")
+	}
+	ty.CreateBindings = got
+	if missing := ty.UnresolvedCreatePlaceholders(); len(missing) > 0 {
+		t.Errorf("still unresolved after binding: %v", missing)
+	}
+}
+
+// TestAReservedPlaceholderNeverBindsToAnAttributeThatSharesItsName is the
+// other half, and the one that would have shipped a wrong url rather than no
+// url. gcp.extensionbinding's create is "{+parent}/extensionBindings" and it
+// declares target.scope.parent -- a field of the resource the binding POINTS
+// AT. Binding the url to it would address the wrong collection.
+func TestAReservedPlaceholderNeverBindsToAnAttributeThatSharesItsName(t *testing.T) {
+	ty := &catalog.Type{
+		Name:     "gcp.extensionbinding",
+		BaseURL:  "{+parent}/extensionBindings",
+		SelfLink: "{+name}",
+		Attributes: map[string]*catalog.Attr{
+			"target": {Canonical: "target", Fields: map[string]*catalog.Attr{
+				"scope": {Canonical: "scope", Fields: map[string]*catalog.Attr{
+					"parent": {Canonical: "parent"},
+				}},
+			}},
+		},
+	}
+	if b := createBindings(ty, &disco.Method{})["parent"]; b != nil {
+		t.Errorf("{+parent} bound to %+v; nothing may bind a reserved placeholder to a leaf "+
+			"attribute that happens to share its name", b)
+	}
+}
+
+// TestASnakeCasePlaceholderBindsToTheNestedAttributeItNames is part C.
+// gcp.bigquery.table's create url is a magic-modules template in snake_case
+// and the values live two levels in, at tableReference.datasetId. Resolving
+// snake to camel WITHOUT searching the tree finds nothing; searching the tree
+// without resolving the case finds nothing either. Both, or neither.
+func TestASnakeCasePlaceholderBindsToTheNestedAttributeItNames(t *testing.T) {
+	ty := bigQueryTableShape()
+	got := createBindings(ty, nil)
+	for ph, want := range map[string]string{
+		"dataset_id": "tableReference.datasetId",
+		"table_id":   "tableReference.tableId",
+	} {
+		b := got[ph]
+		if b == nil {
+			t.Errorf("no binding for {{%s}}", ph)
+			continue
+		}
+		if b.Attr != want {
+			t.Errorf("{{%s}} bound to %q, want %q", ph, b.Attr, want)
+		}
+	}
+}
+
+// TestTheShallowestNestedMatchWins. gcp.bigquery.table has SIX attributes
+// whose camelCase name is datasetId. Five of them name some OTHER table's
+// dataset (a clone's source, a snapshot's base, a replica's). Only the
+// shallowest is the table's own, and "whichever the map walk reached first"
+// would pick a different one on different runs.
+func TestTheShallowestNestedMatchWins(t *testing.T) {
+	ty := bigQueryTableShape()
+	if got := findAttrPath(ty.Attributes, "dataset_id"); got != "tableReference.datasetId" {
+		t.Errorf("dataset_id resolved to %q, want tableReference.datasetId (the shallowest of six)", got)
+	}
+}
+
+// TestTwoEquallyShallowMatchesBindToNothing. With no way to choose, a
+// generator that picked one would be flipping a coin and writing the answer
+// into a committed file.
+func TestTwoEquallyShallowMatchesBindToNothing(t *testing.T) {
+	attrs := map[string]*catalog.Attr{
+		"a": {Canonical: "a", Fields: map[string]*catalog.Attr{"datasetId": {Canonical: "datasetId"}}},
+		"b": {Canonical: "b", Fields: map[string]*catalog.Attr{"datasetId": {Canonical: "datasetId"}}},
+	}
+	if got := findAttrPath(attrs, "dataset_id"); got != "" {
+		t.Errorf("an ambiguous placeholder bound to %q; two candidates at the same depth is not an answer", got)
+	}
+}
+
+// TestAMatchInsideAListIsNeverBound. A list has many elements and a url
+// segment cannot name which one. The walk goes THROUGH Elem on purpose --
+// catalog.Attr has two recursion edges and a walk following only Fields
+// under-reports this corpus sevenfold -- so the rejection is deliberate
+// rather than an accident of not looking.
+func TestAMatchInsideAListIsNeverBound(t *testing.T) {
+	attrs := map[string]*catalog.Attr{
+		"replicas": {Canonical: "replicas", Kind: value.KindList, Elem: &catalog.Attr{
+			Fields: map[string]*catalog.Attr{"datasetId": {Canonical: "datasetId"}},
+		}},
+	}
+	if got := findAttrPath(attrs, "dataset_id"); got != "" {
+		t.Errorf("bound to %q, which is inside a list; no url segment names one element", got)
+	}
+}
+
+// TestAnOutputOnlyAttributeCannotResolveAPlaceholder. infrena refuses
+// configuration that sets a computed attribute, so an attribute the
+// generator marked Output is one no user can ever supply -- and a check that
+// only asked whether the attribute EXISTS would call such a type creatable.
+// 6 of the 233 types are in exactly this position.
+func TestAnOutputOnlyAttributeCannotResolveAPlaceholder(t *testing.T) {
+	ty := &catalog.Type{
+		Name:       "gcp.automation",
+		BaseURL:    "automations?automationId={{name}}",
+		SelfLink:   "automations/{{name}}",
+		Attributes: map[string]*catalog.Attr{"name": {Canonical: "name", Output: true}},
+	}
+	missing := ty.UnresolvedCreatePlaceholders()
+	if len(missing) != 1 || missing[0] != "name" {
+		t.Errorf("unresolved = %v, want [name]: an Output attribute is one configuration may not set", missing)
+	}
+}
+
+// TestAUrlParameterThatRoundTripsThroughSelfLinkIsDeclared is the shared
+// cause behind part D and most of part C. A path or query parameter is not
+// in the request BODY, so the generator -- which takes attributes from the
+// body schema -- never declared it, and no configuration could supply it.
+func TestAUrlParameterThatRoundTripsThroughSelfLinkIsDeclared(t *testing.T) {
+	ty := &catalog.Type{
+		Name:       "gcp.sslcert",
+		BaseURL:    "projects/{project}/instances/{instance}/sslCerts",
+		SelfLink:   "projects/{project}/instances/{instance}/sslCerts/{sha1Fingerprint}",
+		Attributes: map[string]*catalog.Attr{"commonName": {Canonical: "commonName"}},
+	}
+	declareCreateURLParameters(ty, &disco.Method{Parameters: map[string]*disco.Parameter{
+		"instance": {Location: "path", Description: "Cloud SQL instance ID."},
+	}})
+	a := ty.Attributes["instance"]
+	if a == nil {
+		t.Fatal("{instance} was not declared; nothing else can supply a url path parameter")
+	}
+	if !a.Required || !a.ForceNew || a.Output {
+		t.Errorf("instance: required=%v forcenew=%v output=%v; it is part of the resource's "+
+			"own name, so a create cannot proceed without it and changing it names a different resource",
+			a.Required, a.ForceNew, a.Output)
+	}
+	if a.Description != "Cloud SQL instance ID." {
+		t.Errorf("description = %q; the API's own prose for the parameter is the only one there is", a.Description)
+	}
+	if missing := ty.UnresolvedCreatePlaceholders(); len(missing) > 0 {
+		t.Errorf("still unresolved: %v", missing)
+	}
+}
+
+// TestAUrlParameterMissingFromSelfLinkIsNotDeclared. self_link is the
+// provider-id template, so a placeholder absent from it is a value no later
+// Read recovers. Declared anyway, it would be set in configuration, absent
+// from the state read back, and every plan after a successful apply would
+// propose a change -- a type that never converges is worse than one that
+// refuses to be created.
+func TestAUrlParameterMissingFromSelfLinkIsNotDeclared(t *testing.T) {
+	ty := &catalog.Type{
+		Name:       "gcp.logging.folder.bucket",
+		BaseURL:    "folders/{folder}/locations/{location}/buckets",
+		SelfLink:   "{+name}",
+		Attributes: map[string]*catalog.Attr{},
+	}
+	declareCreateURLParameters(ty, &disco.Method{})
+	if _, declared := ty.Attributes["folder"]; declared {
+		t.Error("{folder} was declared although self_link cannot carry it back; the attribute " +
+			"would be set once and never read again")
+	}
+}
+
+// TestAnExistingAttributeIsNeverDeclaredOver. Where a create url's id
+// placeholder names an attribute Discovery already marks output-only, the
+// two sources are describing DIFFERENT things -- the id the user chooses and
+// the full resource name Google answers with. Declaring over it would put
+// two values under one key.
+func TestAnExistingAttributeIsNeverDeclaredOver(t *testing.T) {
+	ty := &catalog.Type{
+		Name:       "gcp.automation",
+		BaseURL:    "automations?automationId={{name}}",
+		SelfLink:   "automations/{{name}}",
+		Attributes: map[string]*catalog.Attr{"name": {Canonical: "name", Output: true, Description: "Output only."}},
+	}
+	declareCreateURLParameters(ty, &disco.Method{})
+	if a := ty.Attributes["name"]; a == nil || !a.Output {
+		t.Errorf("the output-only name was replaced: %+v", a)
+	}
+}
+
+// TestTemplateFromPattern covers the shapes the corpus actually contains,
+// including the two that must be REFUSED.
+func TestTemplateFromPattern(t *testing.T) {
+	for _, tc := range []struct{ pattern, want, why string }{
+		{"^projects/[^/]+$", "projects/{project}", "iam serviceAccounts.create: the parent project"},
+		{"^projects/[^/]+/locations/[^/]+$", "projects/{project}/locations/{location}",
+			"logging projects.locations.buckets.create"},
+		{"^projects/[^/]+/serviceAccounts/[^/]+$", "projects/{project}/serviceAccounts/{serviceAccount}",
+			"iam keys.create: parseable, but nothing supplies the second segment"},
+		{"^projects/[^/]+/instances/[^/]+/databases/[^/]+$",
+			"projects/{project}/instances/{instance}/databases/{database}",
+			"spanner: 'databases' must singularize to 'database', not 'databas'"},
+		{"^[^/]+/[^/]+/locations/[^/]+$", "",
+			"logging locations.buckets.create: it does not even say which hierarchy root it means"},
+		{"^projects/[^/]+/(agent|locations/[^/]+/agents)$", "",
+			"an alternation is not a path"},
+	} {
+		if got := templateFromPattern(tc.pattern); got != tc.want {
+			t.Errorf("templateFromPattern(%q) = %q, want %q -- %s", tc.pattern, got, tc.want, tc.why)
+		}
+	}
+}
+
+// bigQueryTableShape is gcp.bigquery.table's attribute tree reduced to the
+// six places a "datasetId" lives, taken from the real catalog: one is the
+// table's own, two are inside lists, three are deeper.
+func bigQueryTableShape() *catalog.Type {
+	ref := func() *catalog.Attr {
+		return &catalog.Attr{Canonical: "x", Fields: map[string]*catalog.Attr{
+			"datasetId": {Canonical: "datasetId"},
+			"tableId":   {Canonical: "tableId"},
+		}}
+	}
+	return &catalog.Type{
+		Name:     "gcp.bigquery.table",
+		BaseURL:  "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		SelfLink: "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+		Attributes: map[string]*catalog.Attr{
+			"tableReference":       ref(),
+			"cloneDefinition":      {Canonical: "cloneDefinition", Fields: map[string]*catalog.Attr{"baseTableReference": ref()}},
+			"snapshotDefinition":   {Canonical: "snapshotDefinition", Fields: map[string]*catalog.Attr{"baseTableReference": ref()}},
+			"tableReplicationInfo": {Canonical: "tableReplicationInfo", Fields: map[string]*catalog.Attr{"sourceTable": ref()}},
+			"replicas":             {Canonical: "replicas", Kind: value.KindList, Elem: ref()},
+			"tableConstraints":     {Canonical: "tableConstraints", Fields: map[string]*catalog.Attr{"foreignKeys": {Canonical: "foreignKeys", Kind: value.KindList, Elem: &catalog.Attr{Fields: map[string]*catalog.Attr{"referencedTable": ref()}}}}},
+		},
 	}
 }

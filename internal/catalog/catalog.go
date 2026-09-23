@@ -165,6 +165,13 @@ type Type struct {
 	// or no usable array property to name.
 	ListField string `json:"list_field,omitempty"`
 
+	// CreateBindings resolves the create template's placeholders that name
+	// neither an instance scope setting nor one of this type's own top-level
+	// attributes. Keyed by the placeholder's bare name (no "+", no "%").
+	// Empty for the great majority of types, whose placeholders need nothing
+	// resolved.
+	CreateBindings map[string]*CreateBinding `json:"create_bindings,omitempty"`
+
 	Attributes map[string]*Attr `json:"attributes"`
 }
 
@@ -251,7 +258,15 @@ func (c *Catalog) Definitions() []*schema.ResourceDefinition {
 			Description: t.Description,
 			Attributes:  make(map[string]schema.Attribute, len(t.Attributes)),
 			Capabilities: schema.Capabilities{
-				Create: t.CreateURL != "" || t.BaseURL != "",
+				// A url is not enough. A create url whose placeholders
+				// nothing can fill is a create that fails on string
+				// substitution, before a byte reaches Google -- 38 types
+				// shipped claiming a create they could not perform, and the
+				// live suite found exactly one of them because a live suite
+				// finds what it exercises. `infrena explain` is what a user
+				// reads to find out what a type can do, so this is where the
+				// answer has to be true.
+				Create: len(t.UnresolvedCreatePlaceholders()) == 0,
 				Read:   true,
 				Update: t.UpdateVerb != "",
 				Delete: true,
@@ -331,4 +346,159 @@ func (a *Attr) toSchema(topLevel bool) schema.Attribute {
 		}
 	}
 	return out
+}
+
+// CreateBinding says where one create-url placeholder's value comes from when
+// the placeholder does not simply name one of the type's own top-level
+// attributes.
+//
+// It is RESOLVED AT GENERATION TIME and stored, rather than searched for on
+// every request, for the same reason PathPrefix is (see Type.PathPrefix): a
+// runtime search re-answers the same question on every call and could answer
+// it differently as the attribute tree changes. Exactly one field is set.
+type CreateBinding struct {
+	// Attr is a dotted path into the resource's own attributes, e.g.
+	// "tableReference.datasetId" for gcp.bigquery.table's "{{dataset_id}}".
+	// A url template placeholder is not always a top-level attribute: a
+	// magic-modules template is written in snake_case against fields that
+	// Discovery spells in camelCase and sometimes NESTS one level down, so
+	// the value a create url needs can sit anywhere in the tree.
+	Attr string `json:"attr,omitempty"`
+
+	// Template is a url sub-template the placeholder expands to, e.g.
+	// "projects/{project}" for iam's "{+name}" in
+	// "v1/{+name}/serviceAccounts". Discovery publishes a `pattern` for each
+	// path parameter, and one placeholder spelling can mean two different
+	// things in one collection -- iam's serviceAccounts.create says
+	// `^projects/[^/]+$` for "name" while the same collection's get says
+	// `^projects/[^/]+/serviceAccounts/[^/]+$`. The pattern is the only
+	// thing that tells them apart, so the binding comes from the pattern
+	// rather than from an attribute that happens to share the placeholder's
+	// name.
+	Template string `json:"template,omitempty"`
+}
+
+// createScopeSettings are the placeholder names a provider instance's own
+// settings fill in for every type, whether or not the type declares them as
+// attributes -- see gcprov.Provider.withScope, which is the code that
+// actually supplies them. Only these four: nothing in the plugin's
+// configuration supplies a `parent`, which is why a type whose create url
+// needs one must bind it (from a Discovery pattern) or not ship.
+var createScopeSettings = map[string]bool{
+	"project": true, "region": true, "zone": true, "location": true,
+}
+
+// IsCreateScopeSetting reports whether a url placeholder is one a provider
+// instance's own settings fill in. Exported so the generator gate and this
+// package's own invariant ask the SAME question the runtime answers -- one
+// rule, three readers, rather than three copies that can drift.
+func IsCreateScopeSetting(name string) bool { return createScopeSettings[name] }
+
+// CreateTemplate is the url template a create POSTs to: create_url when the
+// type has one, base_url otherwise. The runtime and the generator must agree
+// about which collection a create goes to -- the provider id it stores is
+// checked against it -- so there is one answer, here.
+func (t *Type) CreateTemplate() string {
+	if t.CreateURL != "" {
+		return t.CreateURL
+	}
+	return t.BaseURL
+}
+
+// UnresolvedCreatePlaceholders names every placeholder in this type's create
+// template that nothing can fill: not an instance scope setting, not a
+// stored CreateBinding, and not one of the type's own SETTABLE attributes.
+// It returns them sorted, and nil for a type that can be created.
+//
+// "Settable" is the part that is easy to leave out and cannot be. An
+// attribute the generator marked Output becomes Computed-without-Optional in
+// the schema, and infrena refuses configuration that sets one
+// ("configuration may not set a computed attribute"). A placeholder bound to
+// one is bound to a value no user can ever supply, so the create url can
+// never be built -- measured on 2026-09-23: 6 of the 233 types bind their
+// new resource's own id to an Output `name` and would otherwise pass a check
+// that only asked whether the attribute EXISTS.
+func (t *Type) UnresolvedCreatePlaceholders() []string {
+	seen := map[string]bool{}
+	var out []string
+	// expanding holds the placeholders whose own binding template is
+	// currently being walked. A pattern-derived template can reintroduce the
+	// very name it resolves -- spanner's "{+database}" binds to
+	// "projects/{project}/instances/{instance}/databases/{database}", whose
+	// last segment is named after the "databases" in front of it -- and
+	// without this the inner "{database}" would resolve through the same
+	// binding again and the type would look as though it needed nothing.
+	// A placeholder may not be its own answer.
+	expanding := map[string]bool{}
+	var check func(tmpl string)
+	check = func(tmpl string) {
+		for _, name := range urlPlaceholders(tmpl) {
+			if createScopeSettings[name] {
+				continue
+			}
+			if b := t.CreateBindings[name]; b != nil && !expanding[name] {
+				if b.Template != "" {
+					expanding[name] = true
+					check(b.Template)
+					delete(expanding, name)
+				}
+				continue
+			}
+			if a := t.TopLevelAttr(name); a != nil && !a.Output {
+				continue
+			}
+			if !seen[name] {
+				seen[name] = true
+				out = append(out, name)
+			}
+		}
+	}
+	check(t.CreateTemplate())
+	sort.Strings(out)
+	return out
+}
+
+// TopLevelAttr finds the type's own attribute for a url placeholder: the one
+// keyed by that name, or the one whose wire name is that name (a url
+// template taken from a Discovery document spells a placeholder the way the
+// API does, not the way the schema key does -- see gcprov.wireAliases).
+func (t *Type) TopLevelAttr(name string) *Attr {
+	if a, ok := t.Attributes[name]; ok {
+		return a
+	}
+	for _, a := range t.Attributes {
+		if a.Canonical == name {
+			return a
+		}
+	}
+	return nil
+}
+
+// urlPlaceholders returns the placeholder names in a url template, in order,
+// in either spelling the catalog uses -- magic-modules' "{{x}}" or a
+// Discovery path's "{x}" -- with RFC 6570's reserved-expansion "+" and
+// magic-modules' "escape me" "%" stripped, exactly as gcprov.ExpandURL
+// strips them.
+func urlPlaceholders(tmpl string) []string {
+	var names []string
+	for i := 0; i < len(tmpl); {
+		if tmpl[i] != '{' {
+			i++
+			continue
+		}
+		openLen, closeSeq := 1, "}"
+		if i+1 < len(tmpl) && tmpl[i+1] == '{' {
+			openLen, closeSeq = 2, "}}"
+		}
+		rel := strings.Index(tmpl[i+openLen:], closeSeq)
+		if rel == -1 {
+			break
+		}
+		content := strings.TrimSpace(tmpl[i+openLen : i+openLen+rel])
+		content = strings.TrimPrefix(content, "+")
+		content = strings.TrimPrefix(content, "%")
+		names = append(names, content)
+		i += openLen + rel + len(closeSeq)
+	}
+	return names
 }

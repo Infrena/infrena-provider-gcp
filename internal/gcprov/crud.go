@@ -38,6 +38,20 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 	if !ok {
 		return nil, fmt.Errorf("gcp: unknown type %q", desired.Type)
 	}
+	// REFUSED HERE, BEFORE ANYTHING ELSE. A type whose create url has a
+	// placeholder nothing can fill cannot be created by this provider at
+	// all, and saying so by name beats the message ExpandURL would give for
+	// whichever placeholder it reached first -- that one names a symptom
+	// ("needs \"instance\", which is not set"), this one names the fact
+	// (nothing in the plugin ever supplies it, and no configuration can).
+	// gen/warnings.txt lists every such type, and `infrena explain` reports
+	// Create as unsupported for them, so this is the last of three places
+	// that agree rather than the only one that knows.
+	if blocked := ty.UnresolvedCreatePlaceholders(); len(blocked) > 0 {
+		return nil, fmt.Errorf("gcp: %s cannot be created by this plugin: its create url %q needs %s, "+
+			"which no provider setting and no attribute of the type supplies; it can still be read, "+
+			"imported and deleted", ty.Name, ty.CreateTemplate(), strings.Join(blocked, ", "))
+	}
 	collTmpl := createTemplate(ty)
 	// The instance's project (and region or zone) filled in, because almost no
 	// type declares them as attributes and the create url needs them -- see
@@ -46,7 +60,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 	// url does not name would otherwise be sent as a body field the API has
 	// never heard of.
 	scoped := p.withScope(desired.Attrs)
-	reqURL, err := p.expandedURL(ty, collTmpl, scoped)
+	reqURL, err := p.expandedURL(ty, collTmpl, withCreateBindings(ty, scoped))
 	if err != nil {
 		return nil, err // nothing sent yet: an ordinary error is safe here
 	}
@@ -256,10 +270,7 @@ func outsideCreatedCollection(ty *catalog.Type, id string, attrs map[string]valu
 // requestBody takes the template it was called with rather than re-deriving
 // one.
 func createTemplate(ty *catalog.Type) string {
-	if ty.CreateURL != "" {
-		return ty.CreateURL
-	}
-	return ty.BaseURL
+	return ty.CreateTemplate()
 }
 
 // pathPart is tmpl without its query string. A create_url's query carries
@@ -507,6 +518,89 @@ func (p *Provider) expandedURL(ty *catalog.Type, tmpl string, attrs map[string]v
 	return absURL(ty, rel), nil
 }
 
+// withCreateBindings returns attrs with one additional entry for every
+// create-url placeholder the catalog says does not simply name a top-level
+// attribute -- catalog.Type.CreateBindings, resolved by the GENERATOR and
+// stored, never searched for here.
+//
+// Two shapes, because a placeholder fails to name a top-level attribute for
+// two different reasons:
+//
+//   - Attr: the value is nested. gcp.bigquery.table's create url is
+//     "projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}" and
+//     the values live at tableReference.datasetId and tableReference.tableId.
+//     The dotted path is walked verbatim; a path that does not resolve --
+//     the user left the parent object out -- yields nothing, and ExpandURL
+//     then fails naming the placeholder, which is the message that helps.
+//
+//   - Template: the placeholder stands for a whole PATH, and Discovery's own
+//     `pattern` for it says which. iam's serviceAccounts.create is
+//     "v1/{+name}/serviceAccounts" where "name" means the parent project
+//     (`^projects/[^/]+$`), while the same collection's get uses the same
+//     spelling for the service account itself
+//     (`^projects/[^/]+/serviceAccounts/[^/]+$`). The sub-template is
+//     expanded against these same attrs, so its own "{project}" comes from
+//     the instance like any other.
+//
+// A value already present under the placeholder's own name WINS and nothing
+// is overwritten: a binding exists precisely because there was no such
+// attribute, and a type that later gains one should use it.
+func withCreateBindings(ty *catalog.Type, attrs map[string]value.Value) map[string]value.Value {
+	if len(ty.CreateBindings) == 0 {
+		return attrs
+	}
+	out := make(map[string]value.Value, len(attrs)+len(ty.CreateBindings))
+	for k, v := range attrs {
+		out[k] = v
+	}
+	// Two passes, because one binding's template can name another binding's
+	// placeholder. Map iteration order is random, so a single pass would
+	// resolve such a pair on some runs and not others -- the kind of
+	// difference that shows up once in a live run and never in a test.
+	for pass := 0; pass < 2; pass++ {
+		for name, b := range ty.CreateBindings {
+			if have, ok := out[name]; ok && have.Known {
+				continue
+			}
+			switch {
+			case b.Attr != "":
+				if v, ok := lookupPath(out, b.Attr); ok {
+					out[name] = v
+				}
+			case b.Template != "":
+				if rel, err := ExpandURL(b.Template, out); err == nil {
+					out[name] = value.String(rel, value.SourceProvider)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// lookupPath walks a dotted attribute path -- "tableReference.datasetId" --
+// through a tree of resolved values. It refuses to descend into a list: no
+// url segment can name WHICH element it meant, which is why the generator
+// never records a path through one (see gen.findAttrPath).
+func lookupPath(attrs map[string]value.Value, path string) (value.Value, bool) {
+	cur := attrs
+	parts := strings.Split(path, ".")
+	for i, part := range parts {
+		v, ok := cur[part]
+		if !ok || !v.Known {
+			return value.Value{}, false
+		}
+		if i == len(parts)-1 {
+			return v, true
+		}
+		next, ok := v.Raw.(map[string]value.Value)
+		if !ok {
+			return value.Value{}, false
+		}
+		cur = next
+	}
+	return value.Value{}, false
+}
+
 // absURL joins a relative, already-expanded resource path onto the API base.
 // The version lives in PathPrefix, never in the template (see
 // catalog.Type.PathPrefix).
@@ -654,7 +748,7 @@ func requestBody(ty *catalog.Type, tmpl string, attrs map[string]value.Value) ma
 // placeholderNamesRE matches one placeholder in any of the three forms a url
 // template uses -- "{{x}}", "{x}" or reserved "{+x}" -- capturing just the
 // name.
-var placeholderNamesRE = regexp.MustCompile(`\{\{([^{}]+)\}\}|\{\+?([^{}]+)\}`)
+var placeholderNamesRE = regexp.MustCompile(`\{\{\+?%?([^{}]+)\}\}|\{\+?%?([^{}]+)\}`)
 
 // placeholderNames returns the set of attribute names tmpl's own
 // placeholders reference.

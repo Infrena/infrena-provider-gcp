@@ -50,6 +50,18 @@ type Parameter struct {
 	Type     string `json:"type"`
 	Location string `json:"location"`
 	Required bool   `json:"required"`
+	// Pattern is the regular expression Discovery publishes for a path
+	// parameter's value, e.g. "^projects/[^/]+$". It is the ONLY thing that
+	// tells two identically spelled placeholders apart when one collection
+	// uses one spelling for two meanings: iam's serviceAccounts.create says
+	// `^projects/[^/]+$` for "name" while the same collection's get says
+	// `^projects/[^/]+/serviceAccounts/[^/]+$`. Empty for most parameters,
+	// and for every query parameter.
+	Pattern string `json:"pattern"`
+	// Description is the API's own prose for the parameter, which is the
+	// only description a url parameter has: it is not a body property, so
+	// nothing in the request schema documents it.
+	Description string `json:"description"`
 }
 
 // Method is one API method.
