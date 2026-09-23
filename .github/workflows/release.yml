@@ -1,0 +1,50 @@
+name: Release
+
+# Triggered by a version tag. Mirrors infrena's own release workflow: one runner cross-compiles
+# every platform, the version is stamped by -ldflags and nowhere else, and nothing is published
+# unless the tag, plugin.yaml's version and the binary's reported version agree.
+#
+# CI tests against the infrena release this plugin declares (go.mod's require, which plugin.yaml's
+# `infrena:` floor matches), and the archives are built against that same tagged module. ci.yml
+# also runs an advisory job against infrena main; it reports, but does not gate, a release.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create the release
+    env:
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+
+      - name: Verify the tag, the manifest and the binary agree
+        run: scripts/release-check "$GITHUB_REF_NAME"
+
+      - name: Build every platform in plugin.yaml
+        run: scripts/build-release "${GITHUB_REF_NAME#v}" dist
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum ./*.tar.gz ./*.zip > SHA256SUMS && cat SHA256SUMS
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag dist/*
