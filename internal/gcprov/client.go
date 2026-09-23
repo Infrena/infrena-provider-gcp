@@ -58,6 +58,14 @@ type ClientOptions struct {
 	MaxAttempts int
 	// Timeout bounds one HTTP round trip. Zero uses defaultTimeout. Ignored
 	// when HTTPClient is set with its own non-zero Timeout.
+	//
+	// It was declared, documented and NEVER READ until 2026-09-22: every
+	// Client in the process ran at defaultTimeout whatever this said, and
+	// nothing noticed because no test ever set it. Found while building
+	// TestAComputeWaitOutlivesTheOrdinaryRoundTripBound, which needs a
+	// round-trip bound short enough to measure -- the test passed against
+	// the unfixed code, which is what exposed the dead knob rather than the
+	// defect it was aimed at. NewClient now honours it; see there.
 	Timeout time.Duration
 	// HTTPClient, when set, supplies the base transport and timeout Do's
 	// requests run over (its Transport is wrapped with oauth2 auth; its
@@ -92,6 +100,13 @@ type limiterKey struct {
 // expected to do exactly that.
 type Client struct {
 	httpClient *http.Client
+	// longPollClient is httpClient with its round-trip bound REMOVED, for
+	// DoLongPoll. It shares the same (auth-wrapped) Transport, so it shares
+	// the connection pool and the token source too; only the Timeout field
+	// differs. A per-request context deadline is what bounds a long poll
+	// instead -- see DoLongPoll for why the fixed bound cannot be reused and
+	// why removing it here is not the same as having none.
+	longPollClient *http.Client
 	// base is used only when Do is given a relative url; every call this
 	// package's own CRUD code makes passes a full "https://...googleapis.com/..."
 	// url built from the catalog type's own api_base_url, so base exists
@@ -123,6 +138,11 @@ func NewClient(ts oauth2.TokenSource, base string, opts ClientOptions) *Client {
 		cp := *hc
 		hc = &cp // never mutate a *http.Client the caller still holds
 	}
+	// opts.Timeout second, so an HTTPClient carrying its own Timeout still
+	// wins (that is what its doc promises), and defaultTimeout last.
+	if hc.Timeout <= 0 {
+		hc.Timeout = opts.Timeout
+	}
 	if hc.Timeout <= 0 {
 		hc.Timeout = defaultTimeout
 	}
@@ -132,11 +152,18 @@ func NewClient(ts oauth2.TokenSource, base string, opts ClientOptions) *Client {
 	}
 	hc.Transport = &oauth2.Transport{Source: ts, Base: baseTransport}
 
+	// The same client, same Transport, with only the round-trip bound taken
+	// off. Copied AFTER the Transport is wrapped, so the long-poll client is
+	// authenticated identically rather than needing its own wrapping.
+	lp := *hc
+	lp.Timeout = 0
+
 	return &Client{
-		httpClient: hc,
-		base:       base,
-		opts:       opts,
-		limiters:   make(map[limiterKey]*limiter),
+		httpClient:     hc,
+		longPollClient: &lp,
+		base:           base,
+		opts:           opts,
+		limiters:       make(map[limiterKey]*limiter),
 	}
 }
 
@@ -171,6 +198,46 @@ func (c *Client) limiterFor(project, api string) *limiter {
 // mention only the method and url, which for every catalog type is a
 // resource path, never a credential.
 func (c *Client) Do(ctx context.Context, method, reqURL string, body any) (map[string]any, error) {
+	return c.do(ctx, method, reqURL, body, 0)
+}
+
+// DoLongPoll is Do for a request THE API ITSELF ANSWERS SLOWLY BY DESIGN:
+// compute's operations/{op}/wait blocks server-side for up to two minutes
+// and returns when the operation finishes, which is the entire point of the
+// method and the reason await.go uses it instead of one GET per second
+// against a quota the whole project shares.
+//
+// Do's round-trip bound is the wrong bound for such a request. 30s exists to
+// notice a HUNG endpoint -- one with nothing to read and no way out -- and a
+// published long poll is not hung, it is doing what it published. Measured
+// against real Google on 2026-09-22 (task-18 finding 2): every compute
+// operation that had not finished inside thirty seconds failed with
+// "context deadline exceeded (Client.Timeout exceeded while awaiting
+// headers)", 3 times out of 3 on an instance delete. The instance really was
+// deleted and infrena reported failure, which is the orphan rule seen from
+// the other end -- something real that state says is still there.
+//
+// bound is the request's own round-trip limit, and the caller supplies it
+// from the type's own TimeoutSeconds, exactly as await.go bounds the whole
+// operation. So a long poll may take as long as the operation it is waiting
+// on is allowed to take, and no longer: a hung wait still ends, at the same
+// moment the await itself would have given up anyway. Nothing becomes
+// unbounded.
+//
+// EXPLICIT AT THE CALL SITE, NEVER INFERRED FROM THE URL. A url ending in
+// "/wait" is a guess about a naming convention; whether the type publishes a
+// wait method is a fact the catalog records, and awaitComputeOperation
+// already reads it to decide the HTTP method. Deciding here instead would
+// give a longer bound to any endpoint whose path happened to look right.
+//
+// A bound of zero or less is Do: no caller should ask for a long poll with
+// no limit, and silently granting one would be the wedged plugin
+// defaultTimeout exists to prevent.
+func (c *Client) DoLongPoll(ctx context.Context, method, reqURL string, body any, bound time.Duration) (map[string]any, error) {
+	return c.do(ctx, method, reqURL, body, bound)
+}
+
+func (c *Client) do(ctx context.Context, method, reqURL string, body any, longPollBound time.Duration) (map[string]any, error) {
 	full := reqURL
 	if !strings.HasPrefix(full, "http://") && !strings.HasPrefix(full, "https://") {
 		full = c.base + full
@@ -195,7 +262,7 @@ func (c *Client) Do(ctx context.Context, method, reqURL string, body any) (map[s
 			return nil, err
 		}
 
-		result, err := c.doOnce(ctx, method, full, body)
+		result, err := c.doOnce(ctx, method, full, body, longPollBound)
 		if err == nil {
 			return result, nil
 		}
@@ -232,7 +299,22 @@ func sleepBeforeRetry(ctx context.Context, attempt int, lastErr error) error {
 }
 
 // doOnce sends one attempt: marshal, request, decode. It never retries.
-func (c *Client) doOnce(ctx context.Context, method, fullURL string, body any) (map[string]any, error) {
+//
+// longPollBound > 0 selects the long-poll client -- the one with no Timeout
+// of its own -- and bounds this attempt with a context deadline instead.
+// It has to be both: http.Client.Timeout is a ceiling the request context
+// cannot raise, so a longer deadline alone would still be cut off at 30s.
+func (c *Client) doOnce(ctx context.Context, method, fullURL string, body any, longPollBound time.Duration) (map[string]any, error) {
+	httpClient := c.httpClient
+	if longPollBound > 0 {
+		httpClient = c.longPollClient
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, longPollBound)
+		// Safe to cancel on return: the response body is read to completion
+		// below, before this function's only successful exit.
+		defer cancel()
+	}
+
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -253,7 +335,7 @@ func (c *Client) doOnce(ctx context.Context, method, fullURL string, body any) (
 		req.Header.Set("X-Goog-User-Project", c.opts.QuotaProject)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		// err may wrap the request (method, url, timeout) but never the
 		// Authorization header or body, which net/http never includes in a

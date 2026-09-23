@@ -59,18 +59,6 @@ func (p *Provider) await(ctx context.Context, ty *catalog.Type, resp map[string]
 // reserved expansion -- an operation name is a path containing "/" -- which
 // ExpandURL (Task 11) already handles unescaped.
 func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op map[string]any) (map[string]any, error) {
-	// op["name"], deliberately and unlike the compute-style path, which fills
-	// the same placeholder from the operation's selfLink instead: a
-	// google.longrunning.Operation's name IS its full relative resource name,
-	// which is exactly what operations.get takes. See operationResourcePath
-	// for what happens when the two are confused for each other.
-	name, _ := op["name"].(string)
-	if name == "" {
-		return nil, fmt.Errorf("%s: operation has no name to poll", ty.Name)
-	}
-	if ty.OperationPollPath == "" {
-		return nil, fmt.Errorf("%s: no operation poll path for a longrunning await", ty.Name)
-	}
 	for attempt := 0; ; attempt++ {
 		if done, _ := op["done"].(bool); done {
 			// An operation that completed with an error is not an await failure,
@@ -80,11 +68,34 @@ func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op ma
 				return nil, operationError(ty, e)
 			}
 			if r, ok := op["response"].(map[string]any); ok {
-				return r, nil
+				return unwrapAny(r), nil
 			}
 			// Done, no error, no response: a delete, or a create whose result
 			// must be read back. The caller decides which.
 			return nil, nil
+		}
+		// EVERYTHING A POLL NEEDS IS CHECKED ONLY ON THE PATH THAT POLLS.
+		// These two checks used to run before the loop, and refused an
+		// answer already in front of them: Cloud Resource Manager answers
+		// POST v3/tagBindings with an operation that is ALREADY DONE and
+		// carries NO name, because there is nothing to poll -- captured
+		// verbatim from real Google on 2026-09-22 (task-18 finding 8). The
+		// binding was created, this returned "operation has no name to
+		// poll", and the host dropped the failed create's result, leaving a
+		// real binding tracked nowhere. The orphan rule, for a third time.
+		//
+		// op["name"], deliberately and unlike the compute-style path, which
+		// fills the same placeholder from the operation's selfLink instead:
+		// a google.longrunning.Operation's name IS its full relative
+		// resource name, which is exactly what operations.get takes. See
+		// operationResourcePath for what happens when the two are confused
+		// for each other.
+		name, _ := op["name"].(string)
+		if name == "" {
+			return nil, fmt.Errorf("%s: operation has no name to poll", ty.Name)
+		}
+		if ty.OperationPollPath == "" {
+			return nil, fmt.Errorf("%s: no operation poll path for a longrunning await", ty.Name)
 		}
 		if err := p.sleepBackoff(ctx, attempt); err != nil {
 			return nil, fmt.Errorf("%s: waiting for %s: %w", ty.Name, name, err)
@@ -100,6 +111,47 @@ func (p *Provider) awaitLongRunning(ctx context.Context, ty *catalog.Type, op ma
 			return nil, err
 		}
 	}
+}
+
+// unwrapAny returns a google.longrunning.Operation's `response` as the plain
+// resource it holds, with the `@type` discriminator dropped.
+//
+// A longrunning response is a google.protobuf.Any, and "@type" is the
+// ENVELOPE'S field, not the resource's -- it names which message the
+// envelope carries, which the caller already knew. Everything else in the
+// map is the resource itself.
+//
+// MEASURED AGAINST REAL GOOGLE, 2026-09-22, and it is the orphan rule for a
+// FOURTH time. With the done-before-name ordering fixed above, a tag binding
+// create reaches this for the first time, and the host refuses the state
+// that comes out of it:
+//
+//	x create binding: gcp returned attribute "@type" on a gcp.tagbinding,
+//	which its own schema does not declare
+//
+// The binding was real -- this suite's sweep had to delete it -- and the
+// create was reported as failed, so nothing tracked it. Not a tag-binding
+// problem: EVERY one of the 97 AwaitLongRunning types answers this way, and
+// any of them reaches it whenever the readback after a create loses the race
+// with eventual consistency and Create falls back to bestEffortState.
+//
+// A copy, never a delete in place: op is the caller's map and the
+// response body is also what an error path may want to report verbatim.
+// Only "@type" is removed; a field the schema does not declare for any other
+// reason is still reported, because that is a real disagreement with the
+// catalog and silently dropping it would hide it.
+func unwrapAny(response map[string]any) map[string]any {
+	if _, ok := response["@type"]; !ok {
+		return response
+	}
+	out := make(map[string]any, len(response)-1)
+	for k, v := range response {
+		if k == "@type" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
 
 // awaitComputeOperation polls a compute-style operation until status is DONE.
@@ -156,7 +208,25 @@ func (p *Provider) awaitComputeOperation(ctx context.Context, ty *catalog.Type, 
 				return nil, fmt.Errorf("%s: waiting for operation: %w", ty.Name, err)
 			}
 		}
-		if op, err = p.client.Do(ctx, method, url, nil); err != nil {
+		// A PUBLISHED WAIT IS NOT AN ORDINARY REQUEST, and the difference is
+		// decided here, from the catalog fact that chose the method above --
+		// never inferred from the url's shape. compute's wait blocks
+		// server-side for up to two minutes; the client's ordinary
+		// round-trip bound is 30s; so before this every compute operation
+		// slower than thirty seconds failed while GCP went on to complete
+		// it (task-18 finding 2, measured 3/3 on an instance delete). The
+		// bound is the type's own TimeoutSeconds, the same one bounding the
+		// whole await above, so a wait can take as long as the operation is
+		// allowed to and not a second more. The no-wait GET poll returns
+		// immediately by design and keeps the ordinary bound: a GET that
+		// hangs really is a hung endpoint.
+		if waits {
+			op, err = p.client.DoLongPoll(ctx, method, url, nil,
+				time.Duration(ty.TimeoutSeconds)*time.Second)
+		} else {
+			op, err = p.client.Do(ctx, method, url, nil)
+		}
+		if err != nil {
 			return nil, err
 		}
 	}

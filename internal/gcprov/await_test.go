@@ -914,3 +914,164 @@ func valuesSubstitutedInto(tmpl, expanded string) (map[string]string, error) {
 	}
 	return out, nil
 }
+
+// TestAComputeWaitOutlivesTheOrdinaryRoundTripBound. compute's
+// operations/{op}/wait BLOCKS SERVER-SIDE FOR UP TO TWO MINUTES by design --
+// that is the whole point of the method, and awaitComputeOperation uses it
+// deliberately to avoid one request per second against a quota the whole
+// project shares. defaultTimeout bounds one ordinary round trip at 30s, so
+// before this fix every compute operation that had not finished inside
+// thirty seconds came back as
+//
+//	POST .../zones/us-central1-a/operations/operation-.../wait:
+//	context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+//
+// Measured 3/3 against real Google on 2026-09-22 (task-18 finding 2), on an
+// e2-micro delete at 30.3s, 30.4s and 32.1s. The instance really was deleted
+// every time and infrena reported the destroy as failed, which is the orphan
+// rule from the other end: something real, tracked as still existing.
+//
+// Scaled down here -- a 50ms ordinary bound and a wait the fake holds open
+// six times that -- so the test measures the RULE rather than the constant.
+// gcpfake needs no new hook for it: OnRequest already runs synchronously
+// inside the handler, before the response is written.
+func TestAComputeWaitOutlivesTheOrdinaryRoundTripBound(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.SeedComputeOperation("op-1", "/projects/p/zones/us-central1-a/instances/web1")
+	p := testProvider(t, s)
+
+	const roundTrip = 50 * time.Millisecond
+	p.client = NewClient(staticToken(), s.URL()+"/", ClientOptions{Timeout: roundTrip})
+	const waitPath = "/projects/p/zones/us-central1-a/operations/op-1/wait"
+	s.OnRequest(waitPath, func() { time.Sleep(6 * roundTrip) })
+
+	ty := &catalog.Type{
+		Name: "gcp.instance", Await: catalog.AwaitComputeOperation, Scope: catalog.ScopeZonal,
+		TimeoutSeconds:    30,
+		OperationWaitPath: "projects/{project}/zones/{zone}/operations/{operation}/wait",
+	}
+	op := map[string]any{"name": "op-1", "status": "RUNNING", "zone": "us-central1-a"}
+	got, err := p.await(context.Background(), ty, op)
+	if err != nil {
+		t.Fatalf("a wait the API held open longer than the ordinary round-trip bound failed: %v", err)
+	}
+	if got == nil {
+		t.Fatal("await returned nothing")
+	}
+	if link, _ := got["selfLink"].(string); !contains(link, "/instances/web1") {
+		t.Errorf("the await did not report the instance the operation targeted: %v", got)
+	}
+}
+
+// TestAnOrdinaryPollIsStillBoundAtTheOrdinaryTimeout is the other half: only
+// a PUBLISHED long poll gets the longer bound. The 7 of 65 compute-style
+// types whose API has no wait method (container, sqladmin) are polled with
+// an ordinary GET that returns immediately, and a GET that hangs is a hung
+// endpoint, not a slow answer -- it must still be cut off at the client's
+// own bound rather than wedging the plugin for the operation's whole budget.
+func TestAnOrdinaryPollIsStillBoundAtTheOrdinaryTimeout(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpCompute)
+	s.SeedComputeOperation("op-1", "/v1/projects/p/instances/db1")
+	p := testProvider(t, s)
+
+	const roundTrip = 50 * time.Millisecond
+	p.client = NewClient(staticToken(), s.URL()+"/", ClientOptions{Timeout: roundTrip, MaxAttempts: 1})
+	const pollPath = "/v1/projects/p/operations/op-1"
+	s.OnRequest(pollPath, func() { time.Sleep(6 * roundTrip) })
+
+	ty := &catalog.Type{
+		Name: "gcp.sqladmin.instance", Await: catalog.AwaitComputeOperation, TimeoutSeconds: 30,
+		OperationPollPath: "v1/projects/{project}/operations/{operation}",
+	}
+	op := map[string]any{"name": "op-1", "status": "RUNNING"}
+	if _, err := p.await(context.Background(), ty, op); err == nil {
+		t.Fatal("a hung ordinary poll was not cut off at the client's own bound")
+	}
+}
+
+// TestAnOperationThatIsAlreadyDoneIsNotRefusedForHavingNoName. A name is
+// needed only to POLL, and an operation that is already done is never
+// polled. awaitLongRunning checked `name` BEFORE the loop's `done` check, so
+// it refused an answer it was already holding.
+//
+// Cloud Resource Manager answers POST v3/tagBindings with exactly that:
+// done, no name, the created binding sitting in `response`. Captured
+// verbatim from the wire on 2026-09-22 (task-18 finding 8) -- the binding
+// really was created, infrena reported "operation has no name to poll", and
+// the host dropped the failed create's result. Third orphan of that run.
+func TestAnOperationThatIsAlreadyDoneIsNotRefusedForHavingNoName(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProvider(t, s)
+
+	ty, ok := p.catalog.Type("gcp.tagbinding")
+	if !ok {
+		t.Fatal("the embedded catalog no longer ships gcp.tagbinding")
+	}
+	const bindingName = "tagBindings/%2F%2Fcloudresourcemanager.googleapis.com%2Fprojects%2F123456789012/tagValues/281479230039359"
+	op := map[string]any{
+		"done": true,
+		"response": map[string]any{
+			"@type":    "type.googleapis.com/google.cloud.resourcemanager.v3.TagBinding",
+			"name":     bindingName,
+			"parent":   "//cloudresourcemanager.googleapis.com/projects/123456789012",
+			"tagValue": "tagValues/281479230039359",
+		},
+	}
+	got, err := p.await(context.Background(), ty, op)
+	if err != nil {
+		t.Fatalf("a finished operation carrying its own answer was refused: %v", err)
+	}
+	if got == nil {
+		t.Fatal("await returned nothing for an operation whose response was in front of it")
+	}
+	if name, _ := got["name"].(string); name != bindingName {
+		t.Errorf("the created binding was not reported back: %v", got)
+	}
+	// THE ENVELOPE IS NOT THE RESOURCE. A longrunning response is a
+	// google.protobuf.Any and "@type" is the Any's own discriminator; passing
+	// it through makes the host refuse the whole state --
+	// `gcp returned attribute "@type" on a gcp.tagbinding, which its own
+	// schema does not declare` -- which is a create reported as failed for a
+	// binding Google had already made. Measured live on 2026-09-22, only
+	// reachable once the ordering above was fixed.
+	if _, ok := got["@type"]; ok {
+		t.Errorf("the Any envelope's own @type reached the resource body: %v", got)
+	}
+	// And nothing was polled: there is no name to poll WITH, and an
+	// operation that is already done has nothing to poll FOR.
+	if n := len(s.Requests()); n != 0 {
+		t.Errorf("%d requests made awaiting an already-finished operation, want 0: %+v", n, s.Requests())
+	}
+}
+
+// TestAnUnfinishedOperationWithNoNameIsStillRefused. The ordering change
+// must not become a licence to poll nothing: an operation that is NOT done
+// and carries no name is unpollable, and saying so is the only honest
+// answer. This is the boundary the fix moves, so it is the one that needs
+// pinning from both sides.
+func TestAnUnfinishedOperationWithNoNameIsStillRefused(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProvider(t, s)
+
+	ty := &catalog.Type{
+		Name: "gcp.widget", Await: catalog.AwaitLongRunning, TimeoutSeconds: 30,
+		OperationPollPath: "v1/{+name}",
+	}
+	_, err := p.await(context.Background(), ty, map[string]any{"done": false})
+	if err == nil {
+		t.Fatal("an unfinished, unpollable operation was accepted")
+	}
+	if !contains(err.Error(), "no name to poll") {
+		t.Errorf("the refusal does not say what is missing: %v", err)
+	}
+}

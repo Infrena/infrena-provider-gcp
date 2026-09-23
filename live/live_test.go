@@ -969,11 +969,13 @@ resources:
 	t.Logf("apply:\n%s", r.combined())
 	if r.ExitCode != exitChanges {
 		t.Fatalf("applying the three tag types: exit %d.\n"+
-			"If this names \"Invalid CRM resource name: tagKeys/tagKeys%%2F...\" it is the "+
-			"ProviderID defect: the create body carries `name`, self_link is \"tagKeys/{{name}}\", "+
-			"and expanding one against the other escapes the id's own prefix back into the result. "+
-			"It reaches all three tag types, it orphans every resource it touches, and it has its "+
-			"own follow-up -- it is not fixed here.\n%s", r.ExitCode, r.combined())
+			"All three CREATED cleanly on 2026-09-22 once ProviderID stopped expanding a `name` "+
+			"that was already the relative resource name (task 18a), so a failure here is a "+
+			"regression rather than the known state. \"Invalid CRM resource name: "+
+			"tagKeys/tagKeys%%2F...\" means that fix has come undone; \"operation has no name to "+
+			"poll\" means the done-before-name ordering in awaitLongRunning has; and an "+
+			"undeclared \"@type\" means the longrunning Any envelope is reaching state again. "+
+			"Each one orphans what it touches.\n%s", r.ExitCode, r.combined())
 	}
 
 	state := stateOf(t, dir)
@@ -1022,18 +1024,20 @@ resources:
 // does with a tag binding, and it exists because TestLiveTagTypes cannot tell
 // us.
 //
-// THE PROBLEM IT SOLVES. gcp.tagkey fails its create first (the ProviderID
-// defect), infrena correctly skips everything that depended on it, and the
-// binding is never attempted at all:
+// THE PROBLEM IT SOLVED, and why it stays now that it is gone. Until task
+// 18a, gcp.tagkey failed its create first (the ProviderID defect), infrena
+// correctly skipped everything that depended on it, and the binding was never
+// attempted at all:
 //
 //	Creating tagkey... failed (0.9s)
 //	Creating binding... skipped
 //	Creating tagvalue... skipped
 //
 // So the run that was supposed to measure the binding measured nothing about
-// it. The defect has only ever been seen through sabotage against our own
-// fake, and a fake's answer to "what does the id come out as" is whatever the
-// fake was told to answer.
+// it. All three create cleanly as of 2026-09-22, but this test keeps its own
+// seeded key and value deliberately: it is the one place the binding is
+// measured with NOTHING else in the way, so a future regression in tagkey
+// cannot hide a regression in the binding a second time.
 //
 // THE TAG KEY AND VALUE ARE SEEDED DIRECTLY THROUGH THE API, not by infrena,
 // so the one broken create cannot hide the thing under test. They are free,
