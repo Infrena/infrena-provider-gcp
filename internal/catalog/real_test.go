@@ -3,9 +3,11 @@ package catalog
 import (
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 
@@ -841,4 +843,123 @@ func TestDefinitionsCarryListElements(t *testing.T) {
 		t.Error("no element field carries an alias, so the spellings inside a repeated block " +
 			"resolve to nothing and protocol 6 bought us nothing")
 	}
+}
+
+// TestNoAliasIsAMangledAcronym. snake() used to put an underscore before every
+// capital, which shattered every acronym GCP uses: IPProtocol became
+// "i_p_protocol", natIP "nat_i_p", IPv4Range "i_pv4_range". Twelve aliases were
+// wrong that way, on attributes people write -- IPProtocol is how a firewall
+// rule names its protocol.
+//
+// A one-letter word in a snake_case name is the signature. It is not a perfect
+// rule, and the corpus DOES hold two legitimate instances -- dataproc's
+// sparkRJob and mainRFileUri, where the R is the R language and a real
+// one-letter word. They are allowed by name below rather than by loosening the
+// rule, because loosening it to accept any single letter would accept every
+// shattered acronym it exists to catch.
+//
+// (An earlier version of this comment claimed the corpus had no legitimate
+// instance. It has two, and the test failed on them the first time it ran.)
+//
+// Caught before v0.1.0 was tagged. An alias is a compatibility commitment:
+// adding one later is additive, correcting a published one is not.
+func TestNoAliasIsAMangledAcronym(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oneLetter := regexp.MustCompile(`(^|_)[a-z](_|$)`)
+	// Real one-letter words, not shattered acronyms. See the doc comment.
+	allowed := map[string]bool{"spark_r_job": true, "main_r_file_uri": true}
+	checked := 0
+	var walk func(tyName, path string, as map[string]*Attr)
+	walk = func(tyName, path string, as map[string]*Attr) {
+		for name, a := range as {
+			for _, al := range a.Aliases {
+				checked++
+				if oneLetter.MatchString(al) && !allowed[al] {
+					t.Errorf("%s %s%s has alias %q, which looks like a shattered acronym",
+						tyName, path, name, al)
+				}
+			}
+			walk(tyName, path+name+".", a.Fields)
+			if a.Elem != nil {
+				walk(tyName, path+name+"[].", a.Elem.Fields)
+			}
+		}
+	}
+	for _, ty := range c.Types {
+		walk(ty.Name, "", ty.Attributes)
+	}
+	// Non-vacuity: 11,680 aliases were measured on 2026-09-23, and a walk that
+	// stopped descending would pass by checking almost nothing.
+	if checked < 8000 {
+		t.Errorf("only %d aliases were checked; the catalog had 11,680, so this walk is no "+
+			"longer reaching the attributes it exists to check", checked)
+	}
+}
+
+// TestTheCuratedAliasesAreStillThere. These are chosen by hand, in
+// gen/overlay.yaml, for attributes people write constantly where the mechanical
+// snake_case is not the word anyone says: nobody asks for an ip_cidr_range.
+//
+// They are pinned because a regeneration that silently stopped applying the
+// overlay would leave the catalog looking fine and quietly drop spellings users
+// had been told to write.
+func TestTheCuratedAliasesAreStillThere(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []struct{ ty, attr, alias string }{
+		{"gcp.subnetwork", "ipCidrRange", "cidr"},
+		{"gcp.network", "autoCreateSubnetworks", "auto_subnets"},
+		{"gcp.firewall", "sourceRanges", "sources"},
+		{"gcp.firewall", "destinationRanges", "destinations"},
+		{"gcp.firewall", "targetTags", "targets"},
+		{"gcp.compute.instance", "machineType", "machine"},
+		{"gcp.storage.bucket", "storageClass", "class"},
+		{"gcp.container.cluster", "initialNodeCount", "node_count"},
+	} {
+		ty, ok := c.Type(w.ty)
+		if !ok {
+			t.Errorf("%s is no longer in the catalog, so its curated aliases are gone with it", w.ty)
+			continue
+		}
+		a := ty.Attributes[w.attr]
+		if a == nil {
+			t.Errorf("%s has no attribute %q; the overlay names one that does not exist, "+
+				"which applies silently and gives the user nothing", w.ty, w.attr)
+			continue
+		}
+		if !slices.Contains(a.Aliases, w.alias) {
+			t.Errorf("%s.%s aliases = %v, missing the curated %q", w.ty, w.attr, a.Aliases, w.alias)
+		}
+		// The mechanical spelling must survive alongside it: a curated alias
+		// ADDS a word, it does not replace one.
+		if auto := snakeOf(w.attr); auto != w.alias && !slices.Contains(a.Aliases, auto) {
+			t.Errorf("%s.%s lost its generated alias %q when the curated one was added",
+				w.ty, w.attr, auto)
+		}
+	}
+}
+
+// snakeOf mirrors the generator's own conversion closely enough to spot a
+// dropped alias. It is deliberately not imported from internal/gen: this test
+// exists to check the catalog, and sharing the function would make it agree
+// with the generator by construction rather than by observation.
+func snakeOf(s string) string {
+	var b strings.Builder
+	rs := []rune(s)
+	for i, r := range rs {
+		if unicode.IsUpper(r) {
+			if i > 0 && !unicode.IsUpper(rs[i-1]) {
+				b.WriteByte('_')
+			}
+			b.WriteRune(unicode.ToLower(r))
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
