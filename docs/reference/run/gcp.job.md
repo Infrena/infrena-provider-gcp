@@ -21,7 +21,7 @@ Job represents the configuration of a single job, which references a container i
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/jobs` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}` |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

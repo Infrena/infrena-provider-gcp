@@ -6,4 +6,4 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.config`](gcp.config.md) | **no** | **no** | yes | An API Configuration is a combination of settings for both the Managed Service and Gateways serving this API Config. |
+| [`gcp.config`](gcp.config.md) | **no** | yes | yes | An API Configuration is a combination of settings for both the Managed Service and Gateways serving this API Config. |

@@ -20,7 +20,7 @@ Represents a Health-Check as a Service resource.
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/regions/{region}/healthCheckServices` |
 | Read | yes | `GET projects/{project}/regions/{region}/healthCheckServices/{healthCheckService}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/regions/{region}/healthCheckServices/{healthCheckService}` |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/healthCheckServices/{healthCheckService}` |
 | Import | yes | by id, see below |
 

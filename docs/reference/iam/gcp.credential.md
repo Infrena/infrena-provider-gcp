@@ -21,7 +21,7 @@ Represents an OauthClientCredential. Used to authenticate an OauthClient while a
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/credentials` needs `oauthClient`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

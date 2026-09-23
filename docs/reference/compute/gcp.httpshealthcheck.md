@@ -20,7 +20,7 @@ An HttpsHealthCheck resource. This resource defines a template for how individua
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/global/httpsHealthChecks` |
 | Read | yes | `GET projects/{project}/global/httpsHealthChecks/{httpsHealthCheck}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/httpsHealthChecks/{httpsHealthCheck}` |
 | Delete | yes | `DELETE projects/{project}/global/httpsHealthChecks/{httpsHealthCheck}` |
 | Import | yes | by id, see below |
 

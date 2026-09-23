@@ -6,4 +6,4 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.servicelevelobjective`](gcp.servicelevelobjective.md) | **no** | **no** | yes | A Service-Level Objective (SLO) describes a level of desired good service. |
+| [`gcp.servicelevelobjective`](gcp.servicelevelobjective.md) | **no** | yes | yes | A Service-Level Objective (SLO) describes a level of desired good service. |

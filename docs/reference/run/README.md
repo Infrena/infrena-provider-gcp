@@ -6,7 +6,7 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.job`](gcp.job.md) | yes | **no** | yes | Job represents the configuration of a single job, which references a container image that is run to completion. |
-| [`gcp.run.instance`](gcp.run.instance.md) | yes | **no** | yes | A Cloud Run Instance represents a single group of containers running in a region. |
-| [`gcp.service`](gcp.service.md) | yes | **no** | yes | Service acts as a top-level container that manages a set of configurations and revision templates which implement a network service. |
-| [`gcp.workerpool`](gcp.workerpool.md) | yes | **no** | yes | WorkerPool acts as a top-level container that manages a set of configurations and revision templates which implement a pull-based workload. |
+| [`gcp.job`](gcp.job.md) | yes | yes | yes | Job represents the configuration of a single job, which references a container image that is run to completion. |
+| [`gcp.run.instance`](gcp.run.instance.md) | yes | yes | yes | A Cloud Run Instance represents a single group of containers running in a region. |
+| [`gcp.service`](gcp.service.md) | yes | yes | yes | Service acts as a top-level container that manages a set of configurations and revision templates which implement a network service. |
+| [`gcp.workerpool`](gcp.workerpool.md) | yes | yes | yes | WorkerPool acts as a top-level container that manages a set of configurations and revision templates which implement a pull-based workload. |

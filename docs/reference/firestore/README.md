@@ -8,5 +8,5 @@
 | --- | --- | --- | --- | --- |
 | [`gcp.backupschedule`](gcp.backupschedule.md) | yes | yes | yes | A backup schedule for a Cloud Firestore Database. |
 | [`gcp.changestream`](gcp.changestream.md) | yes | yes | yes | A change stream resource for a Cloud Firestore Database. |
-| [`gcp.firestore.databas`](gcp.firestore.databas.md) | yes | **no** | yes | A Cloud Firestore Database. |
+| [`gcp.firestore.databas`](gcp.firestore.databas.md) | yes | yes | yes | A Cloud Firestore Database. |
 | [`gcp.usercred`](gcp.usercred.md) | **no** | **no** | yes | A Cloud Firestore User Creds. |

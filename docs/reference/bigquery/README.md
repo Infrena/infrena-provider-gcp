@@ -6,5 +6,5 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.bigquery.table`](gcp.bigquery.table.md) | yes | **no** | yes | A Table that belongs to a Dataset |
+| [`gcp.bigquery.table`](gcp.bigquery.table.md) | yes | yes | yes | A Table that belongs to a Dataset |
 | [`gcp.routine`](gcp.routine.md) | yes | **no** | yes | A user-defined function or a stored procedure that belongs to a Dataset |

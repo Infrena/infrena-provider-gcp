@@ -20,7 +20,7 @@ A unit of data that is returned by the DNS servers.
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/managedZones/{managedZone}/rrsets` |
 | Read | yes | `GET projects/{project}/managedZones/{managedZone}/rrsets/{name}/{type}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/managedZones/{managedZone}/rrsets/{name}/{type}` |
 | Delete | yes | `DELETE projects/{project}/managedZones/{managedZone}/rrsets/{name}/{type}` |
 | Import | yes | by id, see below |
 

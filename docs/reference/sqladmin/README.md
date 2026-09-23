@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | [`gcp.backuprun`](gcp.backuprun.md) | yes | **no** | yes | A BackupRun resource. |
 | [`gcp.bluegreendeployment`](gcp.bluegreendeployment.md) | yes | **no** | yes | A `BlueGreenDeployment` resource represents a Cloud SQL blue-green deployment setup. |
-| [`gcp.sqladmin.databas`](gcp.sqladmin.databas.md) | yes | **no** | yes | Represents a SQL database on the Cloud SQL instance. |
-| [`gcp.sqladmin.instance`](gcp.sqladmin.instance.md) | yes | **no** | yes | A Cloud SQL instance resource. |
+| [`gcp.sqladmin.databas`](gcp.sqladmin.databas.md) | yes | yes | yes | Represents a SQL database on the Cloud SQL instance. |
+| [`gcp.sqladmin.instance`](gcp.sqladmin.instance.md) | yes | yes | yes | A Cloud SQL instance resource. |
 | [`gcp.sslcert`](gcp.sslcert.md) | yes | **no** | yes | SslCerts insert request. |
 | [`gcp.user`](gcp.user.md) | yes | **no** | yes | A Cloud SQL user resource. |

@@ -6,5 +6,5 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.cloudasset.savedquery`](gcp.cloudasset.savedquery.md) | **no** | **no** | yes | A saved query which can be shared with others or used later. |
+| [`gcp.cloudasset.savedquery`](gcp.cloudasset.savedquery.md) | **no** | yes | yes | A saved query which can be shared with others or used later. |
 | [`gcp.feed`](gcp.feed.md) | **no** | **no** | yes | An asset feed used to export asset updates to a destinations. |

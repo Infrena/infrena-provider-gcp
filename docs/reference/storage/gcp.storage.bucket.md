@@ -20,7 +20,7 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | --- | --- | --- |
 | Create | yes | `POST b?project={{project}}` |
 | Read | yes | `GET b/{{name}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH b/{{name}}` |
 | Delete | yes | `DELETE b/{{name}}` |
 | Import | yes | by id, see below |
 

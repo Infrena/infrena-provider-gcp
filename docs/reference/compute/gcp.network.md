@@ -25,7 +25,7 @@ THE BOUNDED GAP, and it is deliberate: there is no `delete_default_routes_on_cre
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/global/networks` |
 | Read | yes | `GET projects/{project}/global/networks/{network}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/networks/{network}` |
 | Delete | yes | `DELETE projects/{project}/global/networks/{network}` |
 | Import | yes | by id, see below |
 

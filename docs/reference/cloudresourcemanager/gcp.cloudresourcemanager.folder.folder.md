@@ -21,7 +21,7 @@ A folder in an organization's resource hierarchy, used to organize that organiza
 | --- | --- | --- |
 | Create | yes | `POST folders` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

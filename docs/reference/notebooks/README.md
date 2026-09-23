@@ -6,4 +6,4 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.notebooks.instance`](gcp.notebooks.instance.md) | yes | **no** | yes | The definition of a notebook instance. |
+| [`gcp.notebooks.instance`](gcp.notebooks.instance.md) | yes | yes | yes | The definition of a notebook instance. |

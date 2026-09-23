@@ -20,7 +20,7 @@ A saved query which can be shared with others or used later.
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/savedQueries` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

@@ -20,7 +20,7 @@ Represents a TargetHttpProxy resource, which is used by one or more global forwa
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/global/targetHttpProxies` |
 | Read | yes | `GET projects/{project}/global/targetHttpProxies/{targetHttpProxy}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/targetHttpProxies/{targetHttpProxy}` |
 | Delete | yes | `DELETE projects/{project}/global/targetHttpProxies/{targetHttpProxy}` |
 | Import | yes | by id, see below |
 

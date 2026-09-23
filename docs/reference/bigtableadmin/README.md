@@ -6,12 +6,12 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.appprofile`](gcp.appprofile.md) | **no** | **no** | yes | A configuration object describing how Cloud Bigtable should treat traffic from a particular end user application. |
-| [`gcp.authorizedview`](gcp.authorizedview.md) | **no** | **no** | yes | An Authorized View of a Cloud Bigtable Table. |
-| [`gcp.bigtableadmin.backup`](gcp.bigtableadmin.backup.md) | **no** | **no** | yes | A backup of a Cloud Bigtable table. |
+| [`gcp.appprofile`](gcp.appprofile.md) | **no** | yes | yes | A configuration object describing how Cloud Bigtable should treat traffic from a particular end user application. |
+| [`gcp.authorizedview`](gcp.authorizedview.md) | **no** | yes | yes | An Authorized View of a Cloud Bigtable Table. |
+| [`gcp.bigtableadmin.backup`](gcp.bigtableadmin.backup.md) | **no** | yes | yes | A backup of a Cloud Bigtable table. |
 | [`gcp.bigtableadmin.cluster`](gcp.bigtableadmin.cluster.md) | **no** | **no** | yes | A resizable group of nodes in a particular cloud location, capable of serving all Tables in the parent Instance. |
 | [`gcp.bigtableadmin.instance`](gcp.bigtableadmin.instance.md) | yes | **no** | yes | A collection of Bigtable Tables and the resources that serve them. |
-| [`gcp.bigtableadmin.table`](gcp.bigtableadmin.table.md) | **no** | **no** | yes | A collection of user data indexed by row, column, and timestamp. |
-| [`gcp.logicalview`](gcp.logicalview.md) | **no** | **no** | yes | A SQL logical view object that can be referenced in SQL queries. |
-| [`gcp.materializedview`](gcp.materializedview.md) | **no** | **no** | yes | A materialized view object that can be referenced in SQL queries. |
-| [`gcp.schemabundle`](gcp.schemabundle.md) | **no** | **no** | yes | A named collection of related schemas. |
+| [`gcp.bigtableadmin.table`](gcp.bigtableadmin.table.md) | **no** | yes | yes | A collection of user data indexed by row, column, and timestamp. |
+| [`gcp.logicalview`](gcp.logicalview.md) | **no** | yes | yes | A SQL logical view object that can be referenced in SQL queries. |
+| [`gcp.materializedview`](gcp.materializedview.md) | **no** | yes | yes | A materialized view object that can be referenced in SQL queries. |
+| [`gcp.schemabundle`](gcp.schemabundle.md) | **no** | yes | yes | A named collection of related schemas. |
