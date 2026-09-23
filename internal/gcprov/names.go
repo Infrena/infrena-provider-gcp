@@ -82,9 +82,26 @@ func toSchema(attrs map[string]*catalog.Attr, name string) string {
 // wire-keyed JSON datum GCP accepts: what a create POSTs and what a patch
 // body carries. It recurses through Fields AND Elem, because 263 of the
 // corpus's 306 renamed attributes are only reachable through a list.
+// wireBody translates a level of a body into wire names, DROPPING attributes
+// GCP computes for itself.
+//
+// The Output filter has to be here rather than only at the top level, because
+// an API rejects a body that sets a server-computed field at ANY depth. 922
+// attributes below the top level are Output, across 101 types, and the host
+// does not stop one reaching us: infrena refuses a computed attribute only in
+// its top-level loop, and checkNestedKeys -- the only thing that walks deeper
+// -- checks that a key EXISTS and nothing else. So a nested computed field
+// written in configuration is accepted by the host and arrives here.
+//
+// The patch path has always done this (buildNested skips f.Output). The create
+// path did not, which is the asymmetry: the same field GCP would reject on a
+// POST was correctly withheld from a PATCH.
 func wireBody(attrs map[string]*catalog.Attr, vals map[string]value.Value) map[string]any {
 	out := make(map[string]any, len(vals))
 	for name, v := range vals {
+		if a := attrs[name]; a != nil && a.Output {
+			continue
+		}
 		out[toWire(attrs, name)] = wireValue(attrs[name], v)
 	}
 	return out
