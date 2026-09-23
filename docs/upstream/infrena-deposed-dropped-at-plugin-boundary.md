@@ -2,6 +2,14 @@
 
 **Version:** `efbfaaa` (`v0.14.0-1-gefbfaaa`), branch `main`
 
+> **RESOLVED in infrena v0.14.1.** Kept as a record. Confirmed on the engine side exactly as
+> reported, including the call-site table; `rebuild` carried 7 of `ResourceState`'s 10 fields. Fixed
+> with a DEEP clone rather than a plain assignment, matching `ResourceState.Clone`, because the
+> result is written to state while the carry is still live in the caller and a shared slice would
+> make an edit through either one an edit to both. The table-driven test suggested below was built:
+> it walks `ResourceState` by reflection and fails on any field that is neither on the wire nor
+> carried, so the next field added has to be classified rather than silently dropped.
+
 **What happened:**
 
 `ResourceState.Deposed` does not survive a round trip through the plugin boundary. An ordinary
