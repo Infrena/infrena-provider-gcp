@@ -345,6 +345,25 @@ func (a *Attr) toSchema(topLevel bool) schema.Attribute {
 			out.Fields[n] = f.toSchema(false)
 		}
 	}
+	// Elem describes what each element of a list looks like, and it is the only
+	// way to say it: Fields is "this map's known keys", which a list is not.
+	//
+	// Needs protocol 6. An older host ignores the key, and what it ignores is
+	// 1901 elements carrying 5841 of this catalog's aliases -- so on protocol 5
+	// a user writing the snake_case spelling this generator advertises inside a
+	// repeated block had it reach GCP verbatim, with no canonicalisation, no
+	// collision check and no "has no key". That is why the floor moves in the
+	// same commit as this.
+	//
+	// The ordinary conversion is reused deliberately. An element is not
+	// configured independently of the list holding it, so Required, Optional and
+	// Default mean nothing on one -- but they are IGNORED rather than refused,
+	// exactly as they already are on a map's nested keys, so there is no special
+	// branch here to drift out of step with the one above.
+	if a.Elem != nil {
+		elem := a.Elem.toSchema(false)
+		out.Elem = &elem
+	}
 	return out
 }
 

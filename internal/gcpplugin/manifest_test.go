@@ -68,12 +68,25 @@ func TestTheFloorAdmitsTheOldestHostThatWorks(t *testing.T) {
 		}
 		return m.Infrena.Allows(v)
 	}
-	if !admits("0.14.1") {
-		t.Error("the floor refuses 0.14.1, the oldest release that resolves nested aliases")
+	// THE FLOOR MUST REFUSE EVERY RELEASE THAT CANNOT SPEAK OUR PROTOCOL.
+	// plugin.yaml now declares protocol 6 (`elem`), and 0.14.2 is the last
+	// release whose Supported list is [5 4 3 2 1]. A host we admit here but
+	// that refuses us at the handshake is the worst of both: install says
+	// compatible, the run says no, and the manifest was the thing that lied.
+	//
+	// 0.15.0 is that release. Until it existed this test failed on purpose,
+	// which is the same gate as before: raising the floor is an act with a
+	// failing test attached, and it could not be satisfied by guessing because
+	// the version had to exist first.
+	if !admits("0.15.0") {
+		t.Error("the floor refuses 0.15.0, the first release speaking protocol 6")
+	}
+	if admits("0.14.2") {
+		t.Error("the floor admits 0.14.2, which speaks protocol 5 at most and would refuse this " +
+			"plugin at the handshake; set the floor to the first release shipping protocol 6")
 	}
 	if admits("0.14.0") {
-		t.Error("the floor admits 0.14.0, which speaks protocol 5 but silently ignores every " +
-			"nested alias this catalog declares")
+		t.Error("the floor admits 0.14.0, which does not speak protocol 5 either")
 	}
 	if admits("0.13.1") {
 		t.Error("the floor admits 0.13.1, which does not speak protocol 5")
