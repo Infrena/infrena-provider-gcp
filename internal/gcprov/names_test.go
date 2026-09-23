@@ -273,3 +273,76 @@ func TestWireAliasesOffersBothSpellingsToAUrlTemplate(t *testing.T) {
 		t.Errorf("provider id = %q, want %q", id, want)
 	}
 }
+
+// TestAListOfScalarsIsCarriedThroughUnchanged. 800 of the catalog's 1901 list
+// elements are plain strings and 5 are integers -- the second most common
+// element shape after a map. Both directions reach them: wireValue recurses
+// into a list whenever Elem is set, regardless of whether the element has any
+// Fields, and schemaValue does the same.
+//
+// For a scalar element the correct behaviour is to do NOTHING: there are no
+// keys to rename, and the value is the user's data. That is exactly the shape
+// that goes untested, because code which correctly does nothing is
+// indistinguishable from code that never runs -- until someone changes the
+// walk. Asserted here so a future edit that starts folding element VALUES the
+// way it folds element KEYS fails rather than silently mangling data.
+//
+// Written after infrena found the identical hole on its own side of this
+// boundary, from this catalog's Kind distribution.
+func TestAListOfScalarsIsCarriedThroughUnchanged(t *testing.T) {
+	ty := &catalog.Type{
+		Name: "gcp.widget",
+		Attributes: map[string]*catalog.Attr{
+			// A renamed sibling, so the test proves translation is RUNNING and
+			// merely leaving the scalar list alone, rather than passing because
+			// nothing was translated at all.
+			"type_value": {Canonical: "type", Kind: value.KindString},
+			"tags": {
+				Canonical: "tags", Kind: value.KindList,
+				Elem: &catalog.Attr{Kind: value.KindString},
+			},
+		},
+	}
+	original := []string{"b", "a", "type_value"} // one item spelled like a schema key
+	items := make([]value.Value, len(original))
+	for i, s := range original {
+		items[i] = value.String(s, value.SourceExplicit)
+	}
+
+	body := wireBody(ty.Attributes, map[string]value.Value{
+		"type_value": value.String("IPV4", value.SourceExplicit),
+		"tags":       value.List(items, value.SourceExplicit),
+	})
+
+	if _, renamed := body["type"]; !renamed {
+		t.Fatal("the renamed sibling did not translate, so this test proves nothing about lists")
+	}
+	got, ok := body["tags"].([]any)
+	if !ok {
+		t.Fatalf("tags came back as %T, not a list", body["tags"])
+	}
+	if len(got) != len(original) {
+		t.Fatalf("tags has %d items, sent %d", len(got), len(original))
+	}
+	for i, want := range original {
+		if got[i] != any(want) {
+			t.Errorf("tags[%d] = %v, want %q -- an element's value is data, not a name to fold",
+				i, got[i], want)
+		}
+	}
+
+	// And the inverse direction, on the same shape.
+	back := schemaAttrs(ty.Attributes, map[string]any{
+		"type": "IPV4",
+		"tags": []any{"b", "a", "type_value"},
+	})
+	list, ok := back["tags"].Raw.([]value.Value)
+	if !ok {
+		t.Fatalf("tags came back as %T, not a list", back["tags"].Raw)
+	}
+	for i, want := range original {
+		if s, _ := list[i].Raw.(string); s != want {
+			t.Errorf("schemaAttrs tags[%d] = %q, want %q", i, s, want)
+		}
+	}
+}
