@@ -439,6 +439,26 @@ func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *res
 	for k, v := range p.reconciler(ctx).attrs(ty.Attributes, current.Attributes, schemaAttrs(ty.Attributes, body)) {
 		attrs[k] = v
 	}
+	// A CREATE-ONLY ATTRIBUTE IS NEVER RETURNED BY A READ, because it is not
+	// part of the resource: accountId is how a service account is created,
+	// not a field a ServiceAccount has. Dropping it here would make state
+	// disagree with configuration about a value nobody can change, so every
+	// plan would propose replacing a resource that is exactly right.
+	//
+	// current.Attributes is the only place it can come from, and it is always
+	// available: the desired attributes on a create readback, the previous
+	// observation on a refresh.
+	for name, a := range ty.Attributes {
+		if !a.CreateOnly {
+			continue
+		}
+		if _, answered := attrs[name]; answered {
+			continue // the API does return it after all; believe the API
+		}
+		if prior, ok := current.Attributes[name]; ok {
+			attrs[name] = prior
+		}
+	}
 	return &resource.ResourceState{
 		Type:       current.Type,
 		ProviderID: id,
@@ -732,6 +752,13 @@ func collectionMatchesSelfLink(base, selfLink string) bool {
 func requestBody(ty *catalog.Type, tmpl string, attrs map[string]value.Value) map[string]any {
 	inURL := placeholderNames(tmpl)
 	body := make(map[string]any, len(attrs))
+	// The resource's own fields, when the API wraps them. Nil for the 216
+	// types whose create body IS the resource, and those take the path below
+	// exactly as before.
+	var resource map[string]any
+	if ty.CreateWrapper != "" {
+		resource = make(map[string]any, len(attrs))
+	}
 	for name, v := range attrs {
 		a := ty.Attributes[name]
 		if inURL[name] || (a != nil && inURL[a.Canonical]) {
@@ -740,7 +767,19 @@ func requestBody(ty *catalog.Type, tmpl string, attrs map[string]value.Value) ma
 		if a != nil && a.Output {
 			continue
 		}
-		body[toWire(ty.Attributes, name)] = wireValue(a, v)
+		wire, val := toWire(ty.Attributes, name), wireValue(a, v)
+		// A create-time parameter belongs at the top level beside the
+		// wrapper, not inside it: the API asks for
+		// {"accountId": x, "serviceAccount": {...}}, and accountId is not a
+		// field of a ServiceAccount at all.
+		if resource != nil && (a == nil || !a.CreateOnly) {
+			resource[wire] = val
+			continue
+		}
+		body[wire] = val
+	}
+	if resource != nil {
+		body[ty.CreateWrapper] = resource
 	}
 	return body
 }

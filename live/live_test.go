@@ -1090,9 +1090,15 @@ providers:
 resources:
   sa:
     type: gcp.serviceaccount
+    # accountId is a CREATE-TIME PARAMETER, not a field of a ServiceAccount:
+    # the API asks for {"accountId": x, "serviceAccount": {...}} and a read
+    # answers with the ServiceAccount alone. The attributes below are the
+    # RESOURCE's, which is what a read returns, and the provider puts them
+    # back inside the wrapper when it posts. Writing a "serviceAccount:" block
+    # here is what this configuration used to do, and it described the request
+    # rather than the resource.
     accountId: %[5]s
-    serviceAccount:
-      displayName: infrena live suite, run %[6]s
+    displayName: infrena live suite, run %[6]s
 `, project, region, zone, os.Getenv(saEnv), n.serviceAccount, n.run))
 
 	r := run(t, dir, "apply", "live", "--auto-approve")
