@@ -389,63 +389,63 @@ tier3	workflows/operations	no insert or create method
 # setting (project, region, zone, location), not a stored create
 # binding, and not a settable attribute of the type's own.
 
-nocreate	gcp.appprofile	{+parent}/appProfiles	needs instance
-nocreate	gcp.attachment	{+parent}/attachments	needs repository
-nocreate	gcp.authorizedview	{+parent}/authorizedViews	needs instance, table
-nocreate	gcp.bigtableadmin.backup	{+parent}/backups	needs cluster, instance
-nocreate	gcp.bigtableadmin.cluster	{+parent}/clusters	needs instance
+nocreate	gcp.appprofile	{+parent}/appProfiles?appProfileId={{appProfileId}}	needs instance
+nocreate	gcp.attachment	{+parent}/attachments?attachmentId={{attachmentId}}	needs repository
+nocreate	gcp.authorizedview	{+parent}/authorizedViews?authorizedViewId={{authorizedViewId}}	needs instance, table
+nocreate	gcp.bigtableadmin.backup	{+parent}/backups?backupId={{backupId}}	needs cluster, instance
+nocreate	gcp.bigtableadmin.cluster	{+parent}/clusters?clusterId={{clusterId}}	needs instance
 nocreate	gcp.bigtableadmin.table	{+parent}/tables	needs instance
-nocreate	gcp.cloudasset.savedquery	{+parent}/savedQueries	needs parent
+nocreate	gcp.cloudasset.savedquery	{+parent}/savedQueries?savedQueryId={{savedQueryId}}	needs parent
 nocreate	gcp.cloudresourcemanager.folder.capabilityconfig	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	needs folder
 nocreate	gcp.cloudresourcemanager.organization.capabilityconfig	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	needs organization
 nocreate	gcp.config	{+parent}/configs	needs api
 nocreate	gcp.credential	{+parent}/credentials	needs oauthClient
 nocreate	gcp.feed	{+parent}/feeds	needs parent
-nocreate	gcp.file.snapshot	{+parent}/snapshots	needs instance
+nocreate	gcp.file.snapshot	{+parent}/snapshots?snapshotId={{snapshotId}}	needs instance
 nocreate	gcp.iam.organization.role	{+parent}/roles	needs organization
 nocreate	gcp.iam.serviceaccount.key	{+name}/keys	needs serviceAccount
 nocreate	gcp.iam.workforcepool.provider	{+parent}/providers	needs workforcePool
 nocreate	gcp.iam.workforcepool.provider.key	{+parent}/keys	needs provider, workforcePool
 nocreate	gcp.iam.workloadidentitypool.provider	{+parent}/providers	needs workloadIdentityPool
 nocreate	gcp.iam.workloadidentitypool.provider.key	{+parent}/keys	needs provider, workloadIdentityPool
-nocreate	gcp.logging.billingaccount.bucket	{+parent}/buckets	needs billingAccount
+nocreate	gcp.logging.billingaccount.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs billingAccount
 nocreate	gcp.logging.billingaccount.exclusion	{+parent}/exclusions	needs billingAccount
-nocreate	gcp.logging.billingaccount.link	{+parent}/links	needs billingAccount, bucket
+nocreate	gcp.logging.billingaccount.link	{+parent}/links?linkId={{linkId}}	needs billingAccount, bucket
 nocreate	gcp.logging.billingaccount.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs billingAccount
 nocreate	gcp.logging.billingaccount.sink	{+parent}/sinks	needs billingAccount
-nocreate	gcp.logging.billingaccount.view	{+parent}/views	needs billingAccount, bucket
-nocreate	gcp.logging.folder.bucket	{+parent}/buckets	needs folder
+nocreate	gcp.logging.billingaccount.view	{+parent}/views?viewId={{viewId}}	needs billingAccount, bucket
+nocreate	gcp.logging.folder.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs folder
 nocreate	gcp.logging.folder.exclusion	{+parent}/exclusions	needs folder
-nocreate	gcp.logging.folder.link	{+parent}/links	needs bucket, folder
+nocreate	gcp.logging.folder.link	{+parent}/links?linkId={{linkId}}	needs bucket, folder
 nocreate	gcp.logging.folder.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs folder
 nocreate	gcp.logging.folder.sink	{+parent}/sinks	needs folder
-nocreate	gcp.logging.folder.view	{+parent}/views	needs bucket, folder
-nocreate	gcp.logging.link	{+parent}/links	needs bucket
-nocreate	gcp.logging.organization.bucket	{+parent}/buckets	needs organization
+nocreate	gcp.logging.folder.view	{+parent}/views?viewId={{viewId}}	needs bucket, folder
+nocreate	gcp.logging.link	{+parent}/links?linkId={{linkId}}	needs bucket
+nocreate	gcp.logging.organization.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs organization
 nocreate	gcp.logging.organization.exclusion	{+parent}/exclusions	needs organization
-nocreate	gcp.logging.organization.link	{+parent}/links	needs bucket, organization
+nocreate	gcp.logging.organization.link	{+parent}/links?linkId={{linkId}}	needs bucket, organization
 nocreate	gcp.logging.organization.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs organization
 nocreate	gcp.logging.organization.sink	{+parent}/sinks	needs organization
-nocreate	gcp.logging.organization.view	{+parent}/views	needs bucket, organization
-nocreate	gcp.logging.view	{+parent}/views	needs bucket
-nocreate	gcp.logicalview	{+parent}/logicalViews	needs instance
+nocreate	gcp.logging.organization.view	{+parent}/views?viewId={{viewId}}	needs bucket, organization
+nocreate	gcp.logging.view	{+parent}/views?viewId={{viewId}}	needs bucket
+nocreate	gcp.logicalview	{+parent}/logicalViews?logicalViewId={{logicalViewId}}	needs instance
 nocreate	gcp.managedidentity	{+parent}/managedIdentities	needs namespace, workloadIdentityPool
-nocreate	gcp.materializedview	{+parent}/materializedViews	needs instance
+nocreate	gcp.materializedview	{+parent}/materializedViews?materializedViewId={{materializedViewId}}	needs instance
 nocreate	gcp.namespace	{+parent}/namespaces	needs workloadIdentityPool
 nocreate	gcp.networksecurity.organization.addressgroup	{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}	needs organization
 nocreate	gcp.networksecurity.organization.firewallendpoint	{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	needs organization
 nocreate	gcp.networksecurity.organization.securityprofile	{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	needs organization
 nocreate	gcp.networksecurity.organization.securityprofilegroup	{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	needs organization
 nocreate	gcp.networksecurity.rule	{+parent}/rules	needs gatewaySecurityPolicy
-nocreate	gcp.osconfig.folder.policyorchestrator	{+parent}/policyOrchestrators	needs folder
-nocreate	gcp.osconfig.organization.policyorchestrator	{+parent}/policyOrchestrators	needs organization
+nocreate	gcp.osconfig.folder.policyorchestrator	{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}	needs folder
+nocreate	gcp.osconfig.organization.policyorchestrator	{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}	needs organization
 nocreate	gcp.proposal	{+parent}/proposals	needs singleTenantHsmInstance
-nocreate	gcp.schemabundle	{+parent}/schemaBundles	needs instance, table
+nocreate	gcp.schemabundle	{+parent}/schemaBundles?schemaBundleId={{schemaBundleId}}	needs instance, table
 nocreate	gcp.scimtenant	{+parent}/scimTenants	needs provider, workforcePool
-nocreate	gcp.servicelevelobjective	{+parent}/serviceLevelObjectives	needs parent
-nocreate	gcp.spanner.backup	{+parent}/backups	needs instance
+nocreate	gcp.servicelevelobjective	{+parent}/serviceLevelObjectives?serviceLevelObjectiveId={{serviceLevelObjectiveId}}	needs parent
+nocreate	gcp.spanner.backup	{+parent}/backups?backupId={{backupId}}	needs instance
 nocreate	gcp.spanner.session	{+database}/sessions	needs database, instance
-nocreate	gcp.tag	{+parent}/tags	needs package, repository
+nocreate	gcp.tag	{+parent}/tags?tagId={{tagId}}	needs package, repository
 nocreate	gcp.task	{+parent}/tasks	needs queue
 nocreate	gcp.token	{+parent}/tokens	needs provider, scimTenant, workforcePool
 nocreate	gcp.usercred	{+parent}/userCreds	needs database
