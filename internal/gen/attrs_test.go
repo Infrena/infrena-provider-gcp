@@ -801,7 +801,7 @@ func TestADiffSuppressNameBecomesAnEquivalence(t *testing.T) {
 	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{"portRange": str, "target": str}}
 	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
 		{Name: "portRange", DiffSuppressFunc: "PortRangeDiffSuppress"},
-		{Name: "target", DiffSuppressFunc: "tpgresource.CompareSelfLinkOrResourceName"},
+		{Name: "target", DiffSuppressFunc: "tpgresource.Base64DiffSuppress"},
 	}}
 	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
 	if err != nil {
@@ -812,5 +812,22 @@ func TestADiffSuppressNameBecomesAnEquivalence(t *testing.T) {
 	}
 	if got := attrs["target"].Equivalence; got != "" {
 		t.Errorf("target equivalence = %q for a suppress function with no rule written here", got)
+	}
+}
+
+// TestAListsEquivalenceReachesItsElements. The reconciler compares a list of
+// references element by element, so the rule the list carries must be on the
+// element too.
+func TestAListsEquivalenceReachesItsElements(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"healthChecks": {Type: "array", Items: &disco.Schema{Type: "string"}}}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "healthChecks", DiffSuppressFunc: "tpgresource.CompareSelfLinkRelativePaths"}}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := attrs["healthChecks"].Elem.Equivalence; got != catalog.EquivalenceSelfLink {
+		t.Errorf("healthChecks element equivalence = %q, want %q", got, catalog.EquivalenceSelfLink)
 	}
 }

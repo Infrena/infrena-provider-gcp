@@ -3,6 +3,7 @@ package gcprov
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena/pkg/value"
@@ -103,15 +104,52 @@ func sameByEquivalence(attr *catalog.Attr, reference, incoming value.Value) valu
 	if want == got {
 		return incoming
 	}
-	switch attr.Equivalence {
-	case catalog.EquivalencePortRange:
-		if portRange(want) == "" || portRange(want) != portRange(got) {
-			return incoming
-		}
-	default:
+	if !equivalent(attr.Equivalence, want, got) {
 		return incoming
 	}
 	return value.Value{Kind: value.KindString, Known: true, Raw: want, Source: incoming.Source}
+}
+
+// equivalent reports whether want and got are one value under the named rule.
+// An unknown rule makes nothing equivalent, which is the behaviour without one.
+func equivalent(rule, want, got string) bool {
+	switch rule {
+	case catalog.EquivalencePortRange:
+		return portRange(want) != "" && portRange(want) == portRange(got)
+	case catalog.EquivalenceSelfLink:
+		if !strings.Contains(want, "/") || !strings.Contains(got, "/") {
+			// A bare name against a path: the path must end in it.
+			return lastSegment(want) == lastSegment(got) && want != "" && got != ""
+		}
+		w, g := fromProjects(want), fromProjects(got)
+		return w != "" && w == g
+	case catalog.EquivalenceResourceName:
+		return want != "" && lastSegment(want) == lastSegment(got)
+	case catalog.EquivalenceCase:
+		return strings.EqualFold(want, got)
+	case catalog.EquivalenceDuration:
+		w, errW := time.ParseDuration(want)
+		g, errG := time.ParseDuration(got)
+		return errW == nil && errG == nil && w == g
+	}
+	return false
+}
+
+// fromProjects is a resource path from its "projects/" segment on, which is
+// what a full url, a versioned path and a relative name all share, or ""
+// when there is none.
+func fromProjects(s string) string {
+	if strings.HasPrefix(s, "projects/") {
+		return s
+	}
+	if i := strings.Index(s, "/projects/"); i >= 0 {
+		return s[i+1:]
+	}
+	return ""
+}
+
+func lastSegment(s string) string {
+	return s[strings.LastIndexByte(s, '/')+1:]
 }
 
 // portRange is a port or port range in its "low-high" form, or "" when s is

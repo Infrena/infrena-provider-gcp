@@ -496,7 +496,10 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			}
 			a.Fields = fields
 		case prop.Type == "array" && prop.Items != nil:
-			elem := &catalog.Attr{Canonical: name, Kind: KindOf(prop.Items)}
+			// A list of scalars compares element by element, so the list's
+			// equivalence is its elements' (a backend service's healthChecks,
+			// a list of references).
+			elem := &catalog.Attr{Canonical: name, Kind: KindOf(prop.Items), Equivalence: a.Equivalence}
 			if prop.Items.Type == "object" && len(prop.Items.Properties) > 0 {
 				// Same nil-aliases reasoning as the object branch above: no path
 				// notation exists to curate an alias for an array element's field.
@@ -534,4 +537,15 @@ var equivalences = map[string]string{
 	// answers "80-80", and portRange is ForceNew, so the rule was replaced
 	// on every plan (live run, 2026-09-24).
 	"PortRangeDiffSuppress": catalog.EquivalencePortRange,
+
+	// References. Configuration may hold a full url (what ${x.selfLink}
+	// resolves to), a relative path or a bare name, and Google answers with
+	// its own form; the three names differ only in how much of the path they
+	// compare, and the rule here compares the path from "projects/" on.
+	"tpgresource.CompareSelfLinkOrResourceName": catalog.EquivalenceSelfLink,
+	"tpgresource.CompareSelfLinkRelativePaths":  catalog.EquivalenceSelfLink,
+	"tpgresource.CompareSelfLinkCanonicalPaths": catalog.EquivalenceSelfLink,
+	"tpgresource.CompareResourceNames":          catalog.EquivalenceResourceName,
+	"tpgresource.CaseDiffSuppress":              catalog.EquivalenceCase,
+	"tpgresource.DurationDiffSuppress":          catalog.EquivalenceDuration,
 }
