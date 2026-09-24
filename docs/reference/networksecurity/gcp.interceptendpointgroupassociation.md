@@ -49,7 +49,7 @@ projects/{{project}}/locations/{{location}}/interceptEndpointGroupAssociations/{
 | `locationsDetails[]` | — | `map` | optional | — | — |
 | `locationsDetails[].location` | — | `string` | output only | force new | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
 | `locationsDetails[].state` | — | `string` | output only | — | Output only. The current state of the association in this location. |
-| `name` | — | `string` | output only | — | Immutable. Identifier. The resource name of this endpoint group association, for example: `projects/123456789/locations/global/interceptEndpointGroupAssociations/my-eg-association`. See … |
+| `name` | — | `string` | output only | force new | Immutable. Identifier. The resource name of this endpoint group association, for example: `projects/123456789/locations/global/interceptEndpointGroupAssociations/my-eg-association`. See … |
 | `network` | — | `string` | required | force new | Required. Immutable. The VPC network that is associated. for example: `projects/123456789/global/networks/my-network`. See https://google.aip.dev/124. |
 | `networkCookie` | `network_cookie` | `integer` | output only | — | Output only. Identifier used by the data-path. See the NSI GENEVE format for more details: https://docs.cloud.google.com/network-security-integration/docs/understand-geneve#network_id |
 | `reconciling` | — | `boolean` | output only | — | Output only. The current state of the resource does not match the user's intended state, and the system is working to reconcile them. This part of the normal operation (e.g. adding a new location to … |

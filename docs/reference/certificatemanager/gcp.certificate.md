@@ -74,7 +74,7 @@ projects/{{project}}/locations/{{location}}/certificates/{{name}}
 | `managed.provisioningIssue.reason` | — | `string` | output only | — | Output only. Reason for provisioning failures. |
 | `managed.state` | — | `string` | output only | — | Output only. State of the managed certificate resource. |
 | `managedIdentity` | `managed_identity` | `map` | optional | — | If set, contains configuration and state of a managed identity certificate. |
-| `managedIdentity.identity` | — | `string` | optional | — | Required. Immutable. SPIFFE ID of the Managed Identity used for this certificate. |
+| `managedIdentity.identity` | — | `string` | optional | force new | Required. Immutable. SPIFFE ID of the Managed Identity used for this certificate. |
 | `managedIdentity.provisioningIssue` | `provisioning_issue` | `map` | output only | — | Output only. Information about issues with provisioning a managed certificate. |
 | `managedIdentity.provisioningIssue.details` | — | `string` | output only | — | Output only. Human readable explanation about the issue. Provided to help address the configuration issues. Not guaranteed to be stable. For programmatic access use Reason enum. |
 | `managedIdentity.provisioningIssue.reason` | — | `string` | output only | — | Output only. Reason for provisioning failures. |
@@ -87,7 +87,7 @@ projects/{{project}}/locations/{{location}}/certificates/{{name}}
 | `selfManaged` | `self_managed` | `map` | optional | — | If set, defines data of a self-managed certificate. |
 | `selfManaged.pemCertificate` | `pem_certificate` | `string` | optional | — | Optional. Input only. The PEM-encoded certificate chain. Leaf certificate comes first, followed by intermediate ones if any. |
 | `selfManaged.pemPrivateKey` | `pem_private_key` | `string` | optional | — | Optional. Input only. The PEM-encoded private key of the leaf certificate. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last update timestamp of a Certificate. |
 | `usedBy` | `used_by` | `list` | output only | — | Output only. The list of resources that use this Certificate. |
 | `usedBy[]` | — | `map` | optional | — | — |

@@ -42,7 +42,7 @@ The GatewaySecurityPolicyRule resource is in a nested collection within a Gatewa
 | `createTime` | `create_time` | `string` | output only | — | Output only. Time when the rule was created. |
 | `description` | — | `string` | optional | — | Optional. Free-text description of the resource. |
 | `enabled` | — | `boolean` | optional | — | Required. Whether the rule is enforced. |
-| `name` | — | `string` | optional | — | Required. Immutable. Name of the resource. ame is the full resource name so projects/{project}/locations/{location}/gatewaySecurityPolicies/{gateway_security_policy}/rules/{rule} rule should match … |
+| `name` | — | `string` | optional | force new | Required. Immutable. Name of the resource. ame is the full resource name so projects/{project}/locations/{location}/gatewaySecurityPolicies/{gateway_security_policy}/rules/{rule} rule should match … |
 | `priority` | — | `integer` | optional | — | Required. Priority of the rule. Lower number corresponds to higher precedence. |
 | `sessionMatcher` | `session_matcher` | `string` | optional | — | Required. CEL expression for matching on session criteria. |
 | `tlsInspectionEnabled` | `tls_inspection_enabled` | `boolean` | optional | — | Optional. Flag to enable TLS inspection of traffic matching on , can only be true if the parent GatewaySecurityPolicy references a TLSInspectionConfig. |

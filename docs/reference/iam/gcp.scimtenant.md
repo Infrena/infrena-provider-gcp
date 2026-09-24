@@ -37,7 +37,7 @@ Gemini Enterprise only. Represents a SCIM tenant. Used for provisioning and mana
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `baseUri` | `base_uri` | `string` | output only | — | Output only. Gemini Enterprise only. Represents the base URI as defined in \[RFC 7644, Section 1.3\](https://datatracker.ietf.org/doc/html/rfc7644#section-1.3). Clients must use this as the root … |
-| `claimMapping` | `claim_mapping` | `map` | optional | opaque | Required. Immutable. Gemini Enterprise only. Maps SCIM attributes to Google attributes. This mapping is used to associate the attributes synced via SCIM with the Google Cloud attributes used in IAM … |
+| `claimMapping` | `claim_mapping` | `map` | optional | force new, opaque | Required. Immutable. Gemini Enterprise only. Maps SCIM attributes to Google attributes. This mapping is used to associate the attributes synced via SCIM with the Google Cloud attributes used in IAM … |
 | `description` | — | `string` | optional | — | Optional. Gemini Enterprise only. The description of the SCIM tenant. Cannot exceed 256 characters. |
 | `displayName` | `display_name` | `string` | optional | — | Optional. Gemini Enterprise only. The display name of the SCIM tenant. Cannot exceed 32 characters. |
 | `name` | — | `string` | optional | — | Identifier. Gemini Enterprise only. The resource name of the SCIM Tenant. Format: `locations/{location}/workforcePools/{workforce_pool}/providers/ {workforce_pool_provider}/scimTenants/{scim_tenant}` |

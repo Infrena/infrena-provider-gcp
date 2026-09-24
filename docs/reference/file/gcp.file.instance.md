@@ -81,7 +81,7 @@ A Filestore instance.
 | `networks[].network` | — | `string` | optional | — | The name of the Google Compute Engine \[VPC network\](https://cloud.google.com/vpc/docs/vpc) to which the instance is connected. |
 | `networks[].pscConfig` | `psc_config` | `map` | optional | — | Optional. Private Service Connect configuration. Should only be set when connect_mode is PRIVATE_SERVICE_CONNECT. |
 | `networks[].pscConfig.endpointProject` | `endpoint_project` | `string` | optional | — | Optional. Consumer service project in which the Private Service Connect endpoint would be set up. This is optional, and only relevant in case the network is a shared VPC. If this is not specified … |
-| `networks[].pscConfig.requestedIpAddress` | `requested_ip_address` | `string` | optional | — | Optional. Immutable. Optional: The desired IP address for the instance. If not specified, an IP will be automatically allocated. The IP must be from the subnetwork range configured in the Service … |
+| `networks[].pscConfig.requestedIpAddress` | `requested_ip_address` | `string` | optional | force new | Optional. Immutable. Optional: The desired IP address for the instance. If not specified, an IP will be automatically allocated. The IP must be from the subnetwork range configured in the Service … |
 | `networks[].reservedIpRange` | `reserved_ip_range` | `string` | optional | — | Optional, reserved_ip_range can have one of the following two types of values. * CIDR range value when using DIRECT_PEERING connect mode. * \[Allocated IP address … |
 | `performanceConfig` | `performance_config` | `map` | optional | — | Optional. Used to configure performance. |
 | `performanceConfig.fixedIops` | `fixed_iops` | `map` | optional | — | Choose a fixed provisioned IOPS value for the instance, which will remain constant regardless of instance capacity. Value must be a multiple of 1000. If the chosen value is outside the supported … |
@@ -94,7 +94,7 @@ A Filestore instance.
 | `performanceLimits.maxReadThroughputBps` | `max_read_throughput_bps` | `string` | output only | — | Output only. The maximum read throughput in bytes per second. |
 | `performanceLimits.maxWriteIops` | `max_write_iops` | `string` | output only | — | Output only. The maximum write IOPS. |
 | `performanceLimits.maxWriteThroughputBps` | `max_write_throughput_bps` | `string` | output only | — | Output only. The maximum write throughput in bytes per second. |
-| `protocol` | — | `string` | optional | — | Immutable. The protocol indicates the access protocol for all shares in the instance. This field is immutable and it cannot be changed after the instance has been created. Default value: `NFS_V3`. |
+| `protocol` | — | `string` | optional | force new | Immutable. The protocol indicates the access protocol for all shares in the instance. This field is immutable and it cannot be changed after the instance has been created. Default value: `NFS_V3`. |
 | `replication` | — | `map` | optional | — | Optional. Replication configuration. |
 | `replication.replicas` | — | `list` | optional | — | Optional. Replication configuration for the replica instance associated with this instance. Only a single replica is supported. |
 | `replication.replicas[]` | — | `map` | optional | — | — |
@@ -111,5 +111,5 @@ A Filestore instance.
 | `statusMessage` | `status_message` | `string` | output only | — | Output only. Additional information about the instance state, if available. |
 | `suspensionReasons` | `suspension_reasons` | `list` | output only | — | Output only. Field indicates all the reasons the instance is in "SUSPENDED" state. |
 | `suspensionReasons[]` | — | `string` | optional | — | — |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |
 | `tier` | — | `string` | optional | — | The service tier of the instance. |

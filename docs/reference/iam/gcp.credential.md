@@ -40,4 +40,4 @@ Represents an OauthClientCredential. Used to authenticate an OauthClient while a
 | `clientSecret` | `client_secret` | `string` | output only | — | Output only. The system-generated OAuth client secret. The client secret must be stored securely. If the client secret is leaked, you must delete and re-create the client credential. To learn more … |
 | `disabled` | — | `boolean` | optional | — | Optional. Whether the OauthClientCredential is disabled. You cannot use a disabled OauthClientCredential. |
 | `displayName` | `display_name` | `string` | optional | — | Optional. A user-specified display name of the OauthClientCredential. Cannot exceed 32 characters. |
-| `name` | — | `string` | optional | — | Immutable. Identifier. The resource name of the OauthClientCredential. Format: `projects/{project}/locations/{location}/oauthClients/{oauth_client}/credentials/{credential}` |
+| `name` | — | `string` | optional | force new | Immutable. Identifier. The resource name of the OauthClientCredential. Format: `projects/{project}/locations/{location}/oauthClients/{oauth_client}/credentials/{credential}` |

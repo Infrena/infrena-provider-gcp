@@ -45,11 +45,11 @@ A resizable group of nodes in a particular cloud location, capable of serving al
 | `clusterConfig.clusterAutoscalingConfig.autoscalingTargets` | `autoscaling_targets` | `map` | optional | — | Required. Autoscaling targets for this cluster. |
 | `clusterConfig.clusterAutoscalingConfig.autoscalingTargets.cpuUtilizationPercent` | `cpu_utilization_percent` | `integer` | optional | — | The cpu utilization that the Autoscaler should be trying to achieve. This number is on a scale from 0 (no utilization) to 100 (total utilization), and is limited between 10 and 80, otherwise it will … |
 | `clusterConfig.clusterAutoscalingConfig.autoscalingTargets.storageUtilizationGibPerNode` | `storage_utilization_gib_per_node` | `integer` | optional | — | The storage utilization that the Autoscaler should be trying to achieve. This number is limited between 2560 (2.5TiB) and 5120 (5TiB) for a SSD cluster and between 8192 (8TiB) and 16384 (16TiB) for … |
-| `defaultStorageType` | `default_storage_type` | `string` | optional | — | Immutable. The type of storage used by this cluster to serve its parent instance's tables, unless explicitly overridden. |
-| `encryptionConfig` | `encryption_config` | `map` | optional | — | Immutable. The encryption configuration for CMEK-protected clusters. |
+| `defaultStorageType` | `default_storage_type` | `string` | optional | force new | Immutable. The type of storage used by this cluster to serve its parent instance's tables, unless explicitly overridden. |
+| `encryptionConfig` | `encryption_config` | `map` | optional | force new | Immutable. The encryption configuration for CMEK-protected clusters. |
 | `encryptionConfig.kmsKeyName` | `kms_key_name` | `string` | optional | — | Describes the Cloud KMS encryption key that will be used to protect the destination Bigtable cluster. The requirements for this key are: 1) The Cloud Bigtable service account associated with the … |
-| `location` | — | `string` | optional | — | Immutable. The location where this cluster's nodes and storage reside. For best performance, clients should be located as close as possible to this cluster. Currently only zones are supported, so … |
+| `location` | — | `string` | optional | force new | Immutable. The location where this cluster's nodes and storage reside. For best performance, clients should be located as close as possible to this cluster. Currently only zones are supported, so … |
 | `name` | — | `string` | optional | — | The unique name of the cluster. Values are of the form `projects/{project}/instances/{instance}/clusters/a-z*`. |
-| `nodeScalingFactor` | `node_scaling_factor` | `string` | optional | — | Immutable. The node scaling factor of this cluster. |
+| `nodeScalingFactor` | `node_scaling_factor` | `string` | optional | force new | Immutable. The node scaling factor of this cluster. |
 | `serveNodes` | `serve_nodes` | `integer` | optional | — | The number of nodes in the cluster. If no value is set, Cloud Bigtable automatically allocates nodes based on your data footprint and optimized for 50% storage utilization. |
 | `state` | — | `string` | output only | — | Output only. The current state of the cluster. |

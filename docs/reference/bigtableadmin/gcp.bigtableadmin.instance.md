@@ -49,5 +49,5 @@ A collection of Bigtable Tables and the resources that serve them. All tables in
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `state` | — | `string` | output only | — | Output only. The current state of the instance. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: - "123/environment": "production", - "123/costCenter": "marketing" Tags and Labels (above) are both used … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: - "123/environment": "production", - "123/costCenter": "marketing" Tags and Labels (above) are both used … |
 | `type_value` | wire `type` | `string` | optional | — | The type of the instance. Defaults to `PRODUCTION`. |
