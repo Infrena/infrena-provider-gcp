@@ -16,8 +16,9 @@ func TestTheLockFieldIsReadFromWhatTheAPISays(t *testing.T) {
 		return map[string]*catalog.Attr{"fingerprint": {Canonical: "fingerprint", Description: desc}}
 	}
 	for desc, want := range map[string]string{
-		"An up-to-date fingerprint must be provided in order to update the Subnetwork, otherwise the request will fail with error 412 conditionNotMet.": "fingerprint",
-		"You must always provide an up-to-date fingerprint hash in order to update the instance.":                                                       "fingerprint",
+		"An up-to-date fingerprint must be provided in order to update the Subnetwork, otherwise the request will fail with error 412 conditionNotMet.":                                                                    "fingerprint",
+		"You must always provide an up-to-date fingerprint hash in order to update the instance.":                                                                                                                          "fingerprint",
+		"This field will be ignored when\ninserting a BackendService. An up-to-date fingerprint must be provided in\norder to update the BackendService, otherwise the request will fail with\nerror 412 conditionNotMet.": "fingerprint",
 		"A hash of the contents. Output only.": "",
 	} {
 		if got := lockFieldOf(fp(desc)); got != want {
@@ -63,5 +64,24 @@ func TestAnUpdateUrlNamingTheAPIsAddressIsRecognised(t *testing.T) {
 	}
 	if templateAddressesMethod("projects/{{project}}/subscriptions/{{name}}", patch) {
 		t.Error("a url for a different collection was taken as the patch's address")
+	}
+}
+
+// TestARestrictionIsReadInEveryShapeGoogleWritesIt. Each sentence is copied from
+// a pinned Discovery document. The forwarding rules' shape was missed until
+// 2026-09-24, which would have let a patch the API ignores stand in for a
+// replacement. The unrestricted sentences are there so a pattern that matches
+// every JSON merge patch description fails here, not in the catalog.
+func TestARestrictionIsReadInEveryShapeGoogleWritesIt(t *testing.T) {
+	for desc, want := range map[string]bool{
+		"Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.": true,
+		"Patches the specified network with the data included in the request. Only routingConfig can be modified.":                                                                                                                         true,
+		"Patches the specified TargetHttpsProxy resource with the data included in the request. This method supports PATCH semantics and usesJSON merge patch format and processing rules.":                                                false,
+		"Patches the specified SSL policy with the data included in the request.":                                                                                                                                                          false,
+	} {
+		col := disco.Collection{Methods: map[string]*disco.Method{"patch": {Description: desc}}}
+		if got, _ := restrictedPatch(col); got != want {
+			t.Errorf("restrictedPatch = %v, want %v, for %q", got, want, desc)
+		}
 	}
 }
