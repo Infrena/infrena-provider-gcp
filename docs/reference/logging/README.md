@@ -27,6 +27,6 @@
 | [`gcp.logging.organization.savedquery`](gcp.logging.organization.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
 | [`gcp.logging.organization.sink`](gcp.logging.organization.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
 | [`gcp.logging.organization.view`](gcp.logging.organization.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
-| [`gcp.logging.savedquery`](gcp.logging.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
+| [`gcp.logging.savedquery`](gcp.logging.savedquery.md) | yes | yes | yes | Describes a query that has been saved by a user. |
 | [`gcp.logging.sink`](gcp.logging.sink.md) | yes | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
 | [`gcp.logging.view`](gcp.logging.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |

@@ -1167,6 +1167,14 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// would be a different string.
 	t.CreateBindings = createBindings(t, create)
 	declareCreateURLParameters(t, create)
+	// Its complement, and only for the case it deliberately leaves refused: a
+	// placeholder that stays unresolved because an OUTPUT-ONLY attribute sits on
+	// its key. That function will not declare over one, and is right not to --
+	// one key cannot hold both the id the user chose and the full resource name
+	// Google answers with. Giving the id a key of its own is the way out, so
+	// this runs after, sees everything that function declared, and touches only
+	// what it left behind.
+	bindCreateQueryID(t, t.Attributes, create)
 
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err
