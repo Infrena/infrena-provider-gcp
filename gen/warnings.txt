@@ -109,14 +109,10 @@ tier3	cloudtasks/operations	no insert or create method
 tier3	composer/imageVersions	no insert or create method
 tier3	composer/operations	no insert or create method
 tier3	composer/workloads	no insert or create method
-tier2	compute/Address	unruled wire hooks: post_create
 tier2	compute/Disk	unruled wire hooks: custom_update, decoder, encoder, pre_delete, update_encoder
 tier3	compute/DiskType	magic-modules marks it exclude: true
 tier2	compute/FirewallPolicy	unruled wire hooks: post_create, post_delete, post_update
-tier2	compute/ForwardingRule	unruled wire hooks: post_create, pre_create
 tier3	compute/FutureReservation	min_version is beta, not ga
-tier2	compute/GlobalAddress	unruled wire hooks: post_create, pre_create
-tier2	compute/GlobalForwardingRule	unruled wire hooks: post_create, pre_create
 tier2	compute/GlobalVmExtensionPolicy	unruled wire hooks: post_delete, pre_delete, pre_update
 tier3	compute/InstanceGroup	magic-modules marks it exclude: true
 tier3	compute/InstanceGroupManager	magic-modules marks it exclude: true
@@ -456,6 +452,8 @@ nocreate	gcp.version	{+parent}/versions	needs wasmPlugin
 # loud and it settles.
 
 noupdate	gcp.certificateissuanceconfig	magic-modules marks the resource immutable and names no field it patches
+noupdate	gcp.forwardingrule	Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.
+noupdate	gcp.globalforwardingrule	Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.
 noupdate	gcp.publicadvertisedprefix	magic-modules marks the resource immutable and names no field it patches
 noupdate	gcp.publicdelegatedprefix	magic-modules marks the resource immutable and names no field it patches
 noupdate	gcp.servicebinding	magic-modules marks the resource immutable and names no field it patches

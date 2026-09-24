@@ -2,10 +2,11 @@
 
 # compute
 
-68 type(s). [Back to the index](../README.md).
+72 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
+| [`gcp.address`](gcp.address.md) | yes | **no** | yes | Represents an Address resource. |
 | [`gcp.autoscaler`](gcp.autoscaler.md) | yes | yes | yes | Represents an Autoscaler resource. |
 | [`gcp.backendbucket`](gcp.backendbucket.md) | yes | yes | yes | Backend buckets allow you to use Google Cloud Storage buckets with HTTP(S) load balancing. |
 | [`gcp.backendservice`](gcp.backendservice.md) | yes | yes | yes | A Backend Service defines a group of virtual machines that will serve traffic for load balancing. |
@@ -13,6 +14,9 @@
 | [`gcp.crosssitenetwork`](gcp.crosssitenetwork.md) | yes | yes | yes | Represents a cross-site-network resource. |
 | [`gcp.externalvpngateway`](gcp.externalvpngateway.md) | yes | **no** | yes | Represents a VPN gateway managed outside of GCP. |
 | [`gcp.firewall`](gcp.firewall.md) | yes | yes | yes | Each network has its own firewall controlling access to and from the instances. |
+| [`gcp.forwardingrule`](gcp.forwardingrule.md) | yes | **no** | yes | A ForwardingRule resource. |
+| [`gcp.globaladdress`](gcp.globaladdress.md) | yes | **no** | yes | Represents a Global Address resource. |
+| [`gcp.globalforwardingrule`](gcp.globalforwardingrule.md) | yes | **no** | yes | Represents a GlobalForwardingRule resource. |
 | [`gcp.globalnetworkendpointgroup`](gcp.globalnetworkendpointgroup.md) | yes | **no** | yes | A global network endpoint group contains endpoints that reside outside of Google Cloud. |
 | [`gcp.globalpublicdelegatedprefix`](gcp.globalpublicdelegatedprefix.md) | yes | yes | yes | A PublicDelegatedPrefix resource represents an IP block within a PublicAdvertisedPrefix that is configured within a single cloud scope … |
 | [`gcp.healthcheck`](gcp.healthcheck.md) | yes | yes | yes | Health Checks determine whether instances are responsive and able to do work. |
