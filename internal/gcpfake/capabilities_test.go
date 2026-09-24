@@ -566,3 +566,29 @@ func TestALockedResourceRefusesAStaleFingerprint(t *testing.T) {
 		t.Errorf("patch quoting the superseded fingerprint = %d, want 412", code)
 	}
 }
+
+// TestAnAIP133CreateAnswersWithTheFullName. A resource created with its id as a
+// query parameter comes back with `name` set to its full relative name, as
+// Google's AIP-133 APIs answer. The fake used to answer with no name at all,
+// so a schema calling the short name `name` looked as though it round-tripped.
+// Compute's insert, which names the resource in the body, keeps the name it
+// was sent.
+func TestAnAIP133CreateAnswersWithTheFullName(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+	post := func(path, body string) {
+		resp, err := http.Post(s.URL()+path, "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	post("/v1/projects/p/locations/l/triggers?triggerId=t1", `{"labels": {}}`)
+	if got, _ := s.Get("/v1/projects/p/locations/l/triggers/t1"); got["name"] != "projects/p/locations/l/triggers/t1" {
+		t.Errorf("AIP-133 create stored name %v, want the full relative name", got["name"])
+	}
+	post("/compute/v1/projects/p/global/networks", `{"name": "net1"}`)
+	if got, _ := s.Get("/compute/v1/projects/p/global/networks/net1"); got["name"] != "net1" {
+		t.Errorf("compute insert stored name %v, want the short name it was sent", got["name"])
+	}
+}

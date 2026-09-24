@@ -366,3 +366,40 @@ func TestNeitherACollidingFieldNorAnUnrelatedParameterIsTouched(t *testing.T) {
 		t.Errorf("requestId was taken for a resource id: template %q", req.CreateTemplate())
 	}
 }
+
+// TestAShortNamedTypeSendsItsIdFromName is gcp.target. Its create needs
+// "?targetId=", and the resource has an output-only targetId of its own, so a
+// second input under that key is refused. But its id template ends in
+// "/{{name}}", where `name` already IS the short id, so name fills the
+// parameter -- magic-modules' own shape for these types -- and there is
+// nothing to collide.
+func TestAShortNamedTypeSendsItsIdFromName(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{
+		"schemas/acme.json": createParamDoc(),
+		"mmv1/products/acme/Clash.yaml": `name: Clash
+description: its create id collides with a field of its own.
+base_url: projects/{{project}}/clashes
+self_link: projects/{{project}}/clashes/{{name}}
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.clash")
+	if !ok {
+		t.Fatal("gcp.clash missing")
+	}
+	if got, want := ty.CreateTemplate(), "projects/{{project}}/clashes?clashId={{name}}"; got != want {
+		t.Errorf("create template = %q, want %q", got, want)
+	}
+	if n := ty.Attributes["name"]; n == nil || n.Output {
+		t.Errorf("name = %+v, want the settable short id", n)
+	}
+	if id := ty.Attributes["clashId"]; id == nil || !id.Output || id.CreateOnly {
+		t.Errorf("the resource's own clashId was disturbed: %+v", id)
+	}
+}

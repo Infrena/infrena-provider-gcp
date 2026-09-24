@@ -19,7 +19,7 @@ The Cloud Deploy `Target` resource.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/targets` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/targets?targetId={{name}}` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/targets/{{name}}` |
 | Update | yes | `PATCH projects/{{project}}/locations/{{location}}/targets/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/targets/{{name}}` |
