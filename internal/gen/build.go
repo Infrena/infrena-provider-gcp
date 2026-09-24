@@ -984,8 +984,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			}
 		}
 	}
-	if t.UpdateVerb == "" && t.UpdateURL == "" {
-		if verb, masked := discoveredUpdate(col); verb != "" {
+	if t.UpdateVerb == "" {
+		if verb, masked := discoveredUpdate(col, t.UpdateURL); verb != "" {
 			allow := overlay.Patchable[name]
 			restricted, _ := restrictedPatch(col)
 			switch {
@@ -2036,13 +2036,24 @@ func idTemplateFromDelete(col disco.Collection) string {
 // converge and shows as drift nobody caused. The right answer is per-type: mark
 // the fields Google will not patch as ForceNew in gen/overlay.yaml, so each
 // field gets the behaviour the API actually gives it. Not done yet.
-func discoveredUpdate(col disco.Collection) (verb string, masked bool) {
+func discoveredUpdate(col disco.Collection, updateURL string) (verb string, masked bool) {
 	patch := col.Methods["patch"]
 	get := col.Methods["get"]
 	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
 		return "", false
 	}
-	if patch.Path != get.Path {
+	// Where the update will actually be SENT has to be where the patch method
+	// lives. With no update_url that is self_link, which is the get path, so
+	// the two paths must agree. With one, magic-modules has named the address
+	// itself and it is checked against the method directly -- which is the only
+	// way compute's autoscalers can ever be updatable, since their patch is
+	// published on the COLLECTION and names the resource in a query parameter,
+	// so its path never equals the get's.
+	if updateURL == "" {
+		if patch.Path != get.Path {
+			return "", false
+		}
+	} else if !updateURLMatchesPatch(updateURL, patch) {
 		return "", false
 	}
 	if patch.Request == nil || get.Response == nil {
