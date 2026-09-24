@@ -28,7 +28,7 @@ An environment for running orchestration tasks.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/environments/{environment}
 ```
 
 ## Attributes

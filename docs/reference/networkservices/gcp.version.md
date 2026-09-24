@@ -28,7 +28,7 @@ A single immutable version of a `WasmPlugin` resource. Defines the Wasm module u
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/wasmPlugins/{wasmPlugin}/versions/{version}
 ```
 
 ## Attributes

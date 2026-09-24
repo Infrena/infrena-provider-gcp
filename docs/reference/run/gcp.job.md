@@ -28,7 +28,7 @@ Job represents the configuration of a single job, which references a container i
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/jobs/{job}
 ```
 
 ## Attributes

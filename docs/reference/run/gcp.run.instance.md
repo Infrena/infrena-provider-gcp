@@ -28,7 +28,7 @@ A Cloud Run Instance represents a single group of containers running in a region
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/instances/{instance}
 ```
 
 ## Attributes

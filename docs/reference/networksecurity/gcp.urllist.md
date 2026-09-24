@@ -28,7 +28,7 @@ UrlList proto helps users to set reusable, independently manageable lists of hos
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/urlLists/{urlList}
 ```
 
 ## Attributes

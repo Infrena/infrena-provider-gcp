@@ -28,7 +28,7 @@ A representation of a session.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/sessions/{session}
 ```
 
 ## Attributes

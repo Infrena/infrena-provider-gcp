@@ -28,7 +28,7 @@ User workloads Secret used by Airflow tasks that run with Kubernetes executor or
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/environments/{environment}/userWorkloadsSecrets/{userWorkloadsSecret}
 ```
 
 ## Attributes

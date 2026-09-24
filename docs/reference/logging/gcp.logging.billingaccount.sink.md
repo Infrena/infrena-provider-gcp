@@ -28,7 +28,7 @@ Describes a sink used to export log entries to one of the following destinations
 ## Import id
 
 ```
-{+sinkName}
+billingAccounts/{billingAccount}/sinks/{sink}
 ```
 
 ## Attributes

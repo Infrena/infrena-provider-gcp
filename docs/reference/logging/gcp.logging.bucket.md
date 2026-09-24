@@ -28,7 +28,7 @@ Describes a repository in which log entries are stored.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/buckets/{bucket}
 ```
 
 ## Attributes

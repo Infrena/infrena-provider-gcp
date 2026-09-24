@@ -28,7 +28,7 @@ A Cloud Firestore User Creds.
 ## Import id
 
 ```
-{+name}
+projects/{project}/databases/{database}/userCreds/{userCred}
 ```
 
 ## Attributes

@@ -28,7 +28,7 @@ ServiceLbPolicy holds global load balancing and traffic distribution configurati
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/serviceLbPolicies/{serviceLbPolicy}
 ```
 
 ## Attributes

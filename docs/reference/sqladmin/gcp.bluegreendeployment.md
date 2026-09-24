@@ -27,7 +27,7 @@ A `BlueGreenDeployment` resource represents a Cloud SQL blue-green deployment se
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/blueGreenDeployments/{blueGreenDeployment}
 ```
 
 ## Attributes

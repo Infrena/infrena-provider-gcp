@@ -28,7 +28,7 @@ A named collection of related schemas.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/tables/{table}/schemaBundles/{schemaBundle}
 ```
 
 ## Attributes

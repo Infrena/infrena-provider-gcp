@@ -28,7 +28,7 @@
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/producerExtensions/{producerExtension}
 ```
 
 ## Attributes

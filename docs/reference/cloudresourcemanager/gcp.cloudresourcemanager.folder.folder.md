@@ -28,7 +28,7 @@ A folder in an organization's resource hierarchy, used to organize that organiza
 ## Import id
 
 ```
-{+name}
+folders/{folder}
 ```
 
 ## Attributes

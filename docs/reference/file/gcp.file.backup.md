@@ -28,7 +28,7 @@ A Filestore backup.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/backups/{backup}
 ```
 
 ## Attributes

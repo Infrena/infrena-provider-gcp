@@ -28,7 +28,7 @@ A representation of the ChannelConnection resource. A ChannelConnection is a res
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/channelConnections/{channelConnection}
 ```
 
 ## Attributes

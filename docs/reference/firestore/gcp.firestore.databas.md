@@ -28,7 +28,7 @@ A Cloud Firestore Database.
 ## Import id
 
 ```
-{+name}
+projects/{project}/databases/{database}
 ```
 
 ## Attributes

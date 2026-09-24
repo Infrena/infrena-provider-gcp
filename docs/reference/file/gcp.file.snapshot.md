@@ -28,7 +28,7 @@ A Filestore snapshot.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/instances/{instance}/snapshots/{snapshot}
 ```
 
 ## Attributes

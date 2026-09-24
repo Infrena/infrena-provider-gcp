@@ -1174,6 +1174,27 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		}
 	}
 
+	// After PathPrefix has stripped the version: before it, a Discovery-derived
+	// self_link still reads "v1/{+name}" and is not recognisably bare.
+	//
+	// A bare-capture self_link ("{+name}") tells a user nothing about what an
+	// id looks like, and it is what `infrena explain` and the generated
+	// reference show as the import format for 88 types. The API publishes the
+	// real shape as the path parameter's pattern, so show that instead.
+	//
+	// DOCUMENTATION ONLY, deliberately. ParseProviderID tries every template
+	// and self_link is always among them, and a bare capture fits every id, so
+	// nothing that parsed before stops parsing: identity is exactly as it was. Moving the structure into self_link
+	// itself would make identity REFUSE a name the capture accepts today, and a
+	// name refused after a create is a resource nothing tracks. Measured on
+	// 2026-09-23 that trade buys nothing else: no bare-capture type declares an
+	// attribute a structured id would recover.
+	if isBareCapture(t.SelfLink) && (t.ImportFormat == "" || t.ImportFormat == t.SelfLink) {
+		if shape := structuredIDTemplate(col, t.SelfLink); shape != "" {
+			t.ImportFormat = shape
+		}
+	}
+
 	// LAST, after PathPrefix has finished rewriting the templates: the
 	// bindings are keyed by the placeholders of the template as it is
 	// FINALLY stored, and a create url that still carried its version prefix
@@ -2069,4 +2090,55 @@ func discoveredUpdate(col disco.Collection, updateURL string) (verb string, mask
 		masked = true
 	}
 	return "PATCH", masked
+}
+
+// isBareCapture reports whether a url template names no literal segment at all
+// -- "{+name}", "{+sinkName}" -- and so says nothing about the id's shape.
+func isBareCapture(tmpl string) bool {
+	phs := templatePlaceholders(tmpl)
+	return len(phs) == 1 && phs[0].Reserved && tmpl == "{+"+phs[0].Name+"}"
+}
+
+// cleanIDPatternRE matches a path parameter pattern that is nothing but
+// literal/[^/]+ pairs: "^projects/[^/]+/instances/[^/]+/appProfiles/[^/]+$".
+// Anything else -- a generic parent ("^[^/]+/[^/]+/feeds/[^/]+$"), a
+// multi-segment tail ("^tagBindings/.*$") -- is not a shape a template can
+// name, and is left as the capture.
+var cleanIDPatternRE = regexp.MustCompile(`^\^(?:[A-Za-z][A-Za-z0-9-]*/\[\^/\]\+/?)+\$$`)
+
+// structuredIDTemplate is the id shape a bare-capture self_link stands for,
+// read from the collection's own get (or, failing that, delete) method: the
+// pattern Discovery publishes for that capture's path parameter, with each
+// [^/]+ named after the collection in front of it. "" when there is no such
+// pattern or it is not a clean chain, and when two segments would share a name
+// -- a template with a repeated placeholder is not one anyone could fill.
+func structuredIDTemplate(col disco.Collection, selfLink string) string {
+	phs := templatePlaceholders(selfLink)
+	if len(phs) != 1 {
+		return ""
+	}
+	name := phs[0].Name
+	for _, mn := range []string{"get", "delete"} {
+		m := col.Methods[mn]
+		if m == nil || !strings.HasSuffix(m.Path, "{+"+name+"}") {
+			continue
+		}
+		p := m.Parameters[name]
+		if p == nil || p.Location != "path" || !cleanIDPatternRE.MatchString(p.Pattern) {
+			return ""
+		}
+		segs := strings.Split(strings.ReplaceAll(strings.Trim(p.Pattern, "^$"), "[^/]+", "*"), "/")
+		seen := map[string]bool{}
+		var out []string
+		for i := 0; i+1 < len(segs); i += 2 {
+			n := singularSegment(segs[i])
+			if seen[n] {
+				return ""
+			}
+			seen[n] = true
+			out = append(out, segs[i], "{"+n+"}")
+		}
+		return strings.Join(out, "/")
+	}
+	return ""
 }

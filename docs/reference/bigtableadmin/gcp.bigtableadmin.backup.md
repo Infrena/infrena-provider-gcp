@@ -28,7 +28,7 @@ A backup of a Cloud Bigtable table.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/clusters/{cluster}/backups/{backup}
 ```
 
 ## Attributes
