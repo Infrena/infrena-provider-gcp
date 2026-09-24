@@ -42,6 +42,7 @@ func TestLiveDNSPolicyIsDestroyedWithItsNetworksAttached(t *testing.T) {
   policy:
     type: gcp.dns.policy
     name: %[3]s
+    description: created by the infrena live suite
     networks:
       - networkUrl: ${net.selfLink}
 `, liveProvider(project, sa), netName, polName)
@@ -65,4 +66,34 @@ func TestLiveDNSPolicyIsDestroyedWithItsNetworksAttached(t *testing.T) {
 
 	write(t, dir, "infrena.yml", cut(withPolicy, "resources:"))
 	applyOK(t, dir, "destroy the network")
+}
+
+// TestLiveProbeDNSDescriptionRequired asks whether Cloud DNS refuses a
+// response policy and a managed zone created without a description, as it
+// refuses a policy. Terraform always sends one, so nothing else has asked.
+// Logged, not asserted: each answer decides whether that type's ruling gets
+// `required: [description]`.
+func TestLiveProbeDNSDescriptionRequired(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	base := "https://dns.googleapis.com/dns/v1/projects/" + project
+	for _, c := range []struct {
+		what, collection, name string
+		body                   map[string]any
+	}{
+		{"response policy", "/responsePolicies", "infrena-probe-rp-" + n.run,
+			map[string]any{"responsePolicyName": "infrena-probe-rp-" + n.run}},
+		{"managed zone", "/managedZones", "infrena-probe-mz-" + n.run,
+			map[string]any{"name": "infrena-probe-mz-" + n.run, "dnsName": "infrena-probe-" + n.run + ".example.com.", "visibility": "private"}},
+	} {
+		code, raw, _, err := g.doRetry(t.Context(), http.MethodPost, base+c.collection, c.body)
+		t.Logf("PROBE %s created without a description: %d %v %s", c.what, code, err, raw)
+		if code < 300 {
+			url := base + c.collection + "/" + c.name
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 5*time.Minute)
+			g.deleteAndWait(t, ctx, c.what, url, url)
+			cancel()
+		}
+	}
 }

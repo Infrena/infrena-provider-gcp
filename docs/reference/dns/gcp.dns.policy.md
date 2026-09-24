@@ -11,7 +11,8 @@ A policy is a collection of DNS rules applied to one or more Virtual Private Clo
 | Service | dns |
 | Scope | global |
 | Asset type | `dns.googleapis.com/Policy` |
-| Tier | 1 (ruled: pre_delete (pre_delete/detach_network.tmpl) patches `networks` to empty before the delete, because Google refuses to delete a policy with networks attached. clear_before_delete does the same here, and it is needed: removing networks from configuration does not detach them.
+| Tier | 1 (ruled: description is required on evidence: Google refused a create without one on 2026-09-24 ("The 'entity.policy.description' parameter is required but was missing"), though Discovery calls it a string "for the user's convenience". Terraform never meets this because it always sends "Managed by Terraform"; this provider does not invent values, so configuration must write one.
+pre_delete (pre_delete/detach_network.tmpl) patches `networks` to empty before the delete, because Google refuses to delete a policy with networks attached. clear_before_delete does the same here, and it is needed: removing networks from configuration does not detach them.
 ) |
 | Mutation timeout | 60s |
 
@@ -45,7 +46,7 @@ projects/{project}/policies/{policy}
 | `alternativeNameServerConfig.targetNameServers[].ipv4Address` | `ipv4_address` | `string` | required | — | IPv4 address to forward queries to. |
 | `alternativeNameServerConfig.targetNameServers[].ipv6Address` | `ipv6_address` | `string` | optional | — | IPv6 address to forward to. Does not accept both fields (ipv4 & ipv6) being populated. Public preview as of November 2022. |
 | `alternativeNameServerConfig.targetNameServers[].kind` | — | `string` | output only | — | — |
-| `description` | — | `string` | optional | — | A mutable string of at most 1024 characters associated with this resource for the user's convenience. Has no effect on the policy's function. |
+| `description` | — | `string` | required | — | A mutable string of at most 1024 characters associated with this resource for the user's convenience. Has no effect on the policy's function. |
 | `dns64Config` | `dns64_config` | `map` | optional | force new | Configurations related to DNS64 for this policy. |
 | `dns64Config.kind` | — | `string` | output only | — | — |
 | `dns64Config.scope` | — | `map` | required | — | The scope to which DNS64 config will be applied to. |

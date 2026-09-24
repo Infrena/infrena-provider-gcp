@@ -679,3 +679,29 @@ func TestACreateURLCarryingAPreCreateTokenIsRefused(t *testing.T) {
 		t.Error("gcp.patchable shipped with a create url that sends PRE_CREATE_REPLACE_ME")
 	}
 }
+
+// TestARulingCanRequireAFieldGoogleInsistsOn. Cloud DNS refuses a policy
+// with no description, which no source says. The ruling's required list makes
+// configuration say it; a field the type lacks is refused, not ignored.
+func TestARulingCanRequireAFieldGoogleInsistsOn(t *testing.T) {
+	build := func(field string) *catalog.Type {
+		in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
+			"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\nself_link: projects/{{project}}/patchables/{{name}}\ncustom_code:\n  pre_delete: templates/terraform/pre_delete/detach.tmpl\n"})
+		overlay := "rulings:\n  acme/Patchable:\n    hooks: [pre_delete]\n    required: [" + field + "]\n    note: google refused a create without it\naliases: {}\ndiscover_default: []\n"
+		if err := os.WriteFile(in.OverlayPath, []byte(overlay), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Build(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, _ := res.Catalog.Type("gcp.patchable")
+		return ty
+	}
+	if ty := build("size"); ty == nil || !ty.Attributes["size"].Required {
+		t.Errorf("required [size] did not make size required: %+v", ty)
+	}
+	if ty := build("nosuchfield"); ty != nil {
+		t.Error("a ruling requiring a field the type does not have still shipped the type")
+	}
+}
