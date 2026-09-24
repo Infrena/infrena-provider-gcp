@@ -694,6 +694,21 @@ func (t *Type) DeleteAwaitKind() AwaitKind {
 	return t.Await
 }
 
-// EquivalencePortRange: a single port and the one-port range it names are
-// the same value, "80" and "80-80".
-const EquivalencePortRange = "port_range"
+// The equivalence rules gcprov knows. Each is written here from what its
+// magic-modules name says it does; none is copied.
+const (
+	// EquivalencePortRange: a single port and the one-port range it names
+	// are the same value, "80" and "80-80".
+	EquivalencePortRange = "port_range"
+	// EquivalenceSelfLink: two references to the same resource, however much
+	// of the url each carries -- "https://.../compute/v1/projects/p/global/
+	// networks/n", "projects/p/global/networks/n" -- or a bare name and a
+	// path ending in it.
+	EquivalenceSelfLink = "self_link"
+	// EquivalenceResourceName: the same last path segment.
+	EquivalenceResourceName = "resource_name"
+	// EquivalenceCase: equal but for case ("TCP" and "tcp").
+	EquivalenceCase = "case"
+	// EquivalenceDuration: the same length of time ("10s" and "10.000s").
+	EquivalenceDuration = "duration"
+)

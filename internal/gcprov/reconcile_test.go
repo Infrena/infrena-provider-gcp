@@ -953,3 +953,55 @@ func TestAPortRangeIsReportedAsItWasWritten(t *testing.T) {
 		}
 	}
 }
+
+// TestEachEquivalenceSaysSameOnlyForTheSameValue. Every rule has a case it
+// must call equal and one it must not: a rule that calls everything equal
+// hides real drift, which is worse than the replacement it was written to
+// stop.
+func TestEachEquivalenceSaysSameOnlyForTheSameValue(t *testing.T) {
+	const net = "https://www.googleapis.com/compute/v1/projects/p/global/networks/n"
+	for _, c := range []struct {
+		rule, want, got string
+		same            bool
+	}{
+		{catalog.EquivalenceSelfLink, "projects/p/global/networks/n", net, true},
+		{catalog.EquivalenceSelfLink, "n", net, true},
+		{catalog.EquivalenceSelfLink, "projects/p/global/networks/m", net, false},
+		{catalog.EquivalenceSelfLink, "projects/q/global/networks/n", net, false},
+		{catalog.EquivalenceSelfLink, "m", net, false},
+		{catalog.EquivalenceResourceName, "projects/p/locations/l/certificates/c", "//certificatemanager.googleapis.com/projects/1/locations/l/certificates/c", true},
+		{catalog.EquivalenceResourceName, "projects/p/locations/l/certificates/c", "projects/p/locations/l/certificates/d", false},
+		{catalog.EquivalenceCase, "tcp", "TCP", true},
+		{catalog.EquivalenceCase, "tcp", "UDP", false},
+		{catalog.EquivalenceDuration, "10s", "10.000s", true},
+		{catalog.EquivalenceDuration, "10s", "11s", false},
+		{catalog.EquivalencePortRange, "80", "80-80", true},
+		{"no-such-rule", "a", "a ", false},
+	} {
+		if got := equivalent(c.rule, c.want, c.got); got != c.same {
+			t.Errorf("%s: %q against %q = %v, want %v", c.rule, c.want, c.got, got, c.same)
+		}
+	}
+}
+
+// TestAListOfReferencesIsComparedElementByElement. A backend service's
+// healthChecks are a list of references, and the list's rule reaches each
+// element: written relative, answered as full urls, reported as written.
+func TestAListOfReferencesIsComparedElementByElement(t *testing.T) {
+	elem := &catalog.Attr{Canonical: "healthChecks", Kind: value.KindString, Equivalence: catalog.EquivalenceSelfLink}
+	attr := &catalog.Attr{Canonical: "healthChecks", Kind: value.KindList, Equivalence: catalog.EquivalenceSelfLink, Elem: elem}
+	s := func(v string) value.Value { return value.String(v, value.SourceProvider) }
+	list := func(vs ...string) value.Value {
+		out := make([]value.Value, len(vs))
+		for i, v := range vs {
+			out[i] = s(v)
+		}
+		return value.List(out, value.SourceProvider)
+	}
+	got := Reconcile(attr, list("projects/p/global/healthChecks/hc"),
+		list("https://www.googleapis.com/compute/v1/projects/p/global/healthChecks/hc"))
+	items, _ := got.Raw.([]value.Value)
+	if len(items) != 1 || items[0].Raw != "projects/p/global/healthChecks/hc" {
+		t.Errorf("reconciled list = %v, want the reference as it was written", got.Raw)
+	}
+}
