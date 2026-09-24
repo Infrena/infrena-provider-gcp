@@ -28,7 +28,7 @@ A Filestore instance.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/instances/{instance}
 ```
 
 ## Attributes

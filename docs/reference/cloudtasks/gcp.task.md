@@ -28,7 +28,7 @@ A unit of scheduled work.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/queues/{queue}/tasks/{task}
 ```
 
 ## Attributes

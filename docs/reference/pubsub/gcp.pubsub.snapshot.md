@@ -28,7 +28,7 @@ Request for the `CreateSnapshot` method.
 ## Import id
 
 ```
-{+snapshot}
+projects/{project}/snapshots/{snapshot}
 ```
 
 ## Attributes

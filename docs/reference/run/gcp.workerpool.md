@@ -28,7 +28,7 @@ WorkerPool acts as a top-level container that manages a set of configurations an
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/workerPools/{workerPool}
 ```
 
 ## Attributes

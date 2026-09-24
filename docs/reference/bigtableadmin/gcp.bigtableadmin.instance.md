@@ -28,7 +28,7 @@ A collection of Bigtable Tables and the resources that serve them. All tables in
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}
 ```
 
 ## Attributes

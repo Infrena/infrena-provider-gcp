@@ -28,7 +28,7 @@ A Dataproc workflow template resource.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/workflowTemplates/{workflowTemplate}
 ```
 
 ## Attributes

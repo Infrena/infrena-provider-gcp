@@ -28,7 +28,7 @@ Specifies a set of log entries that are filtered out by a sink. If your Google C
 ## Import id
 
 ```
-{+name}
+projects/{project}/exclusions/{exclusion}
 ```
 
 ## Attributes

@@ -28,7 +28,7 @@ Represents a namespace for a workload identity pool. Namespaces are used to segm
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/workloadIdentityPools/{workloadIdentityPool}/namespaces/{namespace}
 ```
 
 ## Attributes

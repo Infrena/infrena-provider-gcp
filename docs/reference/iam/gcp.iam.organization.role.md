@@ -28,7 +28,7 @@ A role in the Identity and Access Management API.
 ## Import id
 
 ```
-{+name}
+organizations/{organization}/roles/{role}
 ```
 
 ## Attributes

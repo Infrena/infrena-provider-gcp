@@ -28,7 +28,7 @@ Describes a link connected to an analytics enabled bucket.
 ## Import id
 
 ```
-{+name}
+billingAccounts/{billingAccount}/locations/{location}/buckets/{bucket}/links/{link}
 ```
 
 ## Attributes

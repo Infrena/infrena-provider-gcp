@@ -28,7 +28,7 @@ A materialized view object that can be referenced in SQL queries.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/materializedViews/{materializedView}
 ```
 
 ## Attributes

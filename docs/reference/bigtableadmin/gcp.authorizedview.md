@@ -28,7 +28,7 @@ An Authorized View of a Cloud Bigtable Table.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/tables/{table}/authorizedViews/{authorizedView}
 ```
 
 ## Attributes

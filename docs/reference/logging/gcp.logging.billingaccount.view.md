@@ -28,7 +28,7 @@ Describes a view over log entries in a bucket.
 ## Import id
 
 ```
-{+name}
+billingAccounts/{billingAccount}/locations/{location}/buckets/{bucket}/views/{view}
 ```
 
 ## Attributes

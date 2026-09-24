@@ -27,7 +27,7 @@ Gemini Enterprise only. Represents a token for the WorkforcePoolProviderScimTena
 ## Import id
 
 ```
-{+name}
+locations/{location}/workforcePools/{workforcePool}/providers/{provider}/scimTenants/{scimTenant}/tokens/{token}
 ```
 
 ## Attributes

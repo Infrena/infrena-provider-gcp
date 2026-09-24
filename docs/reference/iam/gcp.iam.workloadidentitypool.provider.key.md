@@ -28,7 +28,7 @@ Represents a public key configuration for your workload identity pool provider. 
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/workloadIdentityPools/{workloadIdentityPool}/providers/{provider}/keys/{key}
 ```
 
 ## Attributes

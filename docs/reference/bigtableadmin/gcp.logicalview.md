@@ -28,7 +28,7 @@ A SQL logical view object that can be referenced in SQL queries.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/logicalViews/{logicalView}
 ```
 
 ## Attributes

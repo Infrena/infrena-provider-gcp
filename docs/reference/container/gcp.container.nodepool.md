@@ -28,7 +28,7 @@ NodePool
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/clusters/{cluster}/nodePools/{nodePool}
 ```
 
 ## Attributes

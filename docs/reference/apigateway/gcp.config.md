@@ -28,7 +28,7 @@ An API Configuration is a combination of settings for both the Managed Service a
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/apis/{api}/configs/{config}
 ```
 
 ## Attributes

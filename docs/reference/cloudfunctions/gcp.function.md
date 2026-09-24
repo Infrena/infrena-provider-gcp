@@ -28,7 +28,7 @@ Describes a Cloud Function that contains user computation executed in response t
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/functions/{function}
 ```
 
 ## Attributes

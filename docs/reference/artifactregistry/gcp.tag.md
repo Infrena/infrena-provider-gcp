@@ -28,7 +28,7 @@ Tags point to a version and represent an alternative name that can be used to ac
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/repositories/{repository}/packages/{package}/tags/{tag}
 ```
 
 ## Attributes

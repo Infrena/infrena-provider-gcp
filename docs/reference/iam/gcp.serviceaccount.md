@@ -28,7 +28,7 @@ An IAM service account. A service account is an account for an application or a 
 ## Import id
 
 ```
-{+name}
+projects/{project}/serviceAccounts/{serviceAccount}
 ```
 
 ## Attributes

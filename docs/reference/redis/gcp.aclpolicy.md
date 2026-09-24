@@ -28,7 +28,7 @@ The ACL policy resource.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/aclPolicies/{aclPolicy}
 ```
 
 ## Attributes

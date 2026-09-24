@@ -28,7 +28,7 @@ The service account key create request.
 ## Import id
 
 ```
-{+name}
+projects/{project}/serviceAccounts/{serviceAccount}/keys/{key}
 ```
 
 ## Attributes

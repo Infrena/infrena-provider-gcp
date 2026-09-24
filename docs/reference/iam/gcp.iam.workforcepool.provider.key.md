@@ -27,7 +27,7 @@ Represents a public key configuration for a Workforce Pool Provider. The key can
 ## Import id
 
 ```
-{+name}
+locations/{location}/workforcePools/{workforcePool}/providers/{provider}/keys/{key}
 ```
 
 ## Attributes

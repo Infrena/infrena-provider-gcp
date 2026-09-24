@@ -28,7 +28,7 @@ Represents an OauthClientCredential. Used to authenticate an OauthClient while a
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/oauthClients/{oauthClient}/credentials/{credential}
 ```
 
 ## Attributes
