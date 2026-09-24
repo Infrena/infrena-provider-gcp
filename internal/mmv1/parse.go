@@ -167,6 +167,10 @@ type Resource struct {
 
 	// Product is the directory the file was found in, filled by LoadDir.
 	Product string `yaml:"-"`
+	// ProductBaseURL is the product's GA base_url from its product.yaml,
+	// filled by LoadDir: "https://secretmanager.{{location}}.rep.googleapis.
+	// com/v1/" for regional secrets, whose host depends on the location.
+	ProductBaseURL string `yaml:"-"`
 }
 
 // NestedQuery says where inside the parent's read the resource lives.

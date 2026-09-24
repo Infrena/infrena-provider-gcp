@@ -1275,3 +1275,26 @@ func TestAFullPathNameIsLeftAlone(t *testing.T) {
 		}
 	}
 }
+
+// TestARegionalTypeIsReachedAtItsRegionsEndpoint. A regional secret exists
+// only at secretmanager.<location>.rep.googleapis.com, and every url for one
+// names its location. A url that names none, and a type with no template,
+// keep the API's own host.
+func TestARegionalTypeIsReachedAtItsRegionsEndpoint(t *testing.T) {
+	regional := &catalog.Type{APIBaseURL: "https://secretmanager.googleapis.com/", PathPrefix: "v1/",
+		EndpointTemplate: "https://secretmanager.{location}.rep.googleapis.com/"}
+	global := &catalog.Type{APIBaseURL: "https://secretmanager.googleapis.com/", PathPrefix: "v1/"}
+	for _, c := range []struct {
+		ty        *catalog.Type
+		rel, want string
+	}{
+		{regional, "projects/p/locations/europe-west1/secrets/s", "https://secretmanager.europe-west1.rep.googleapis.com/v1/projects/p/locations/europe-west1/secrets/s"},
+		{regional, "projects/p/locations/us-central1/secrets?secretId=s", "https://secretmanager.us-central1.rep.googleapis.com/v1/projects/p/locations/us-central1/secrets?secretId=s"},
+		{regional, "projects/p/secrets/s", "https://secretmanager.googleapis.com/v1/projects/p/secrets/s"},
+		{global, "projects/p/locations/europe-west1/secrets/s", "https://secretmanager.googleapis.com/v1/projects/p/locations/europe-west1/secrets/s"},
+	} {
+		if got := absURL(c.ty, c.rel); got != c.want {
+			t.Errorf("absURL(%q) = %q, want %q", c.rel, got, c.want)
+		}
+	}
+}

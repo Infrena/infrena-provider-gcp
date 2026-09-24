@@ -20,6 +20,16 @@ type Document struct {
 	ServicePath string               `json:"servicePath"`
 	Schemas     map[string]*Schema   `json:"schemas"`
 	Resources   map[string]*Resource `json:"resources"`
+	// Endpoints are the API's other hosts: Secret Manager publishes one
+	// regional endpoint per location, secretmanager.<location>.rep.
+	// googleapis.com, which its regional secrets must be reached through.
+	Endpoints []Endpoint `json:"endpoints"`
+}
+
+// Endpoint is one of a Discovery document's location-specific hosts.
+type Endpoint struct {
+	EndpointURL string `json:"endpointUrl"`
+	Location    string `json:"location"`
 }
 
 // ResolvedBaseURL is where a method's path is joined onto.

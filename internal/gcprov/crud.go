@@ -656,7 +656,7 @@ func lookupPath(attrs map[string]value.Value, path string) (value.Value, bool) {
 // The version lives in PathPrefix, never in the template (see
 // catalog.Type.PathPrefix).
 func absURL(ty *catalog.Type, rel string) string {
-	return ty.APIBaseURL + ty.PathPrefix + rel
+	return baseURLFor(ty, rel) + ty.PathPrefix + rel
 }
 
 // itemURL returns the request url addressing ONE existing item: Read's GET
@@ -875,4 +875,23 @@ func shortNameFromOwnID(ty *catalog.Type, id string, attrs map[string]value.Valu
 // as a Discovery path does -- rather than a capture of the whole path.
 func selfLinkEndsInName(tmpl string) bool {
 	return strings.HasSuffix(tmpl, "/{{name}}") || strings.HasSuffix(tmpl, "/{name}")
+}
+
+// baseURLFor is the host a request for rel goes to: the type's regional
+// endpoint when it has one, filled with the location rel itself names, and
+// APIBaseURL otherwise. A regional secret is served only by its own region's
+// endpoint, and every url for one names that region.
+func baseURLFor(ty *catalog.Type, rel string) string {
+	if ty.EndpointTemplate == "" {
+		return ty.APIBaseURL
+	}
+	_, after, ok := strings.Cut("/"+strings.TrimPrefix(rel, "/"), "/locations/")
+	if !ok {
+		return ty.APIBaseURL
+	}
+	loc, _, _ := strings.Cut(after, "/")
+	if loc == "" || strings.ContainsAny(loc, "{}?") {
+		return ty.APIBaseURL
+	}
+	return strings.ReplaceAll(ty.EndpointTemplate, "{location}", loc)
 }
