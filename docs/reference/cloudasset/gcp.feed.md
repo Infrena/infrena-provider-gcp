@@ -20,7 +20,7 @@ An asset feed used to export asset updates to a destinations. An asset feed filt
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/feeds` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}` |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

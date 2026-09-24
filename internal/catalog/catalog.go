@@ -122,6 +122,24 @@ type Type struct {
 	// having to lie about what a read returns. See gen.resourceSchema.
 	CreateWrapper string `json:"create_wrapper,omitempty"`
 
+	// UpdateWrapper is the same idea on the update side, and it is NOT a
+	// variant spelling of the same body: pubsub's topics.patch takes
+	// UpdateTopicRequest{topic, updateMask}, so the resource is wrapped AND
+	// the field mask moves off the query string into the body. A type with an
+	// UpdateWrapper therefore never carries an updateMask query parameter --
+	// UpdateMask is false for all of them -- and the mask goes into
+	// UpdateMaskField instead.
+	//
+	// Eight collections in the pinned documents have this shape: the three
+	// pubsub types, three spanner types, cloudasset feeds and iam
+	// serviceAccounts. Sending the bare resource to any of them is rejected.
+	UpdateWrapper string `json:"update_wrapper,omitempty"`
+	// UpdateMaskField is the name of the mask field INSIDE an update wrapper.
+	// It is read from the request schema rather than assumed, because it is
+	// not always the same word: six of the eight say "updateMask" and
+	// spanner's instances and instancePartitions say "fieldMask".
+	UpdateMaskField string `json:"update_mask_field,omitempty"`
+
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`
 
