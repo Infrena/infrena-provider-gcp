@@ -844,3 +844,86 @@ func TestNothingIsCopiedFromAnUnmatchedListElement(t *testing.T) {
 		}
 	}
 }
+
+// diskAttrs is compute's disks[] as far as these tests need it: what a user
+// writes, what the server fills in, and the one input-only field.
+func diskAttrs(unordered bool) map[string]*catalog.Attr {
+	str := func() *catalog.Attr { return &catalog.Attr{Kind: value.KindString} }
+	return map[string]*catalog.Attr{"disks": {Kind: value.KindList, Unordered: unordered, Elem: &catalog.Attr{
+		Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+			"boot": {Kind: value.KindBool}, "autoDelete": {Kind: value.KindBool},
+			"initializeParams": {Kind: value.KindString, InputOnly: true},
+			"deviceName":       str(), "source": str(), "mode": str(), "interface": str(), "type_value": str(),
+		},
+	}}}
+}
+
+func asked() map[string]value.Value {
+	return map[string]value.Value{"disks": lst(obj(map[string]value.Value{
+		"boot": value.Bool(true, value.SourceExplicit), "autoDelete": value.Bool(true, value.SourceExplicit),
+		"initializeParams": s("debian-12"),
+	}))}
+}
+
+// googlesAnswer is what compute really returned on 2026-09-24: the disk the
+// user asked for, with five declared fields filled in that nobody set, and no
+// initializeParams at all.
+func googlesAnswer() map[string]value.Value {
+	return map[string]value.Value{"disks": lst(obj(map[string]value.Value{
+		"boot": value.Bool(true, value.SourceProvider), "autoDelete": value.Bool(true, value.SourceProvider),
+		"deviceName": s("persistent-disk-0"), "source": s("projects/p/zones/z/disks/vm"),
+		"mode": s("READ_WRITE"), "interface": s("SCSI"), "type_value": s("PERSISTENT"),
+	}))}
+}
+
+// TestAServerFilledNestedFieldIsNotDrift is the live failure, rebuilt from the
+// real answer. infrena's planner forgives an unconfigured key inside a
+// composite only when it is an empty collection, so these five made `disks`
+// differ, and disks forces replacement: the instance planned its own
+// replacement on every run. Carrying initializeParams forward alone did not
+// change that -- which only the live suite could show.
+func TestAServerFilledNestedFieldIsNotDrift(t *testing.T) {
+	got := ReconcileAttrs(diskAttrs(false), asked(), googlesAnswer())
+	if !got["disks"].Equal(asked()["disks"]) {
+		t.Errorf("disks still differs from what was asked:\n got  %v\n want %v", got["disks"], asked()["disks"])
+	}
+}
+
+// TestANestedFieldSomebodyConfiguredStillShowsDrift. Pruning is only of what
+// nobody asked for. A field configuration sets, changed outside infrena, must
+// still come back as it really is.
+func TestANestedFieldSomebodyConfiguredStillShowsDrift(t *testing.T) {
+	ref := asked()
+	d := ref["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	d["mode"] = s("READ_WRITE")
+	ans := googlesAnswer()
+	ans["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)["mode"] = s("READ_ONLY")
+	got := ReconcileAttrs(diskAttrs(false), ref, ans)
+	m := got["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	if !m["mode"].Equal(s("READ_ONLY")) {
+		t.Errorf("a configured nested field changed outside infrena was hidden: mode = %v", m["mode"])
+	}
+}
+
+// TestWithNoReferenceEverythingIsReported. An import or a discovery has
+// nothing to say what was asked for, so nothing may be taken to be the
+// server's choice.
+func TestWithNoReferenceEverythingIsReported(t *testing.T) {
+	got := ReconcileAttrs(diskAttrs(false), map[string]value.Value{}, googlesAnswer())
+	m := got["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	if _, kept := m["deviceName"]; !kept {
+		t.Error("with no reference, a server-filled nested field was dropped")
+	}
+}
+
+// TestNothingIsPrunedAgainstAnUnmatchedListElement. In an unordered list the
+// reference element is picked by position and may be a sibling, and pruning
+// against the wrong element could drop a field the right one sets -- a
+// change nobody could then see.
+func TestNothingIsPrunedAgainstAnUnmatchedListElement(t *testing.T) {
+	got := ReconcileAttrs(diskAttrs(true), asked(), googlesAnswer())
+	m := got["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	if _, kept := m["deviceName"]; !kept {
+		t.Error("a field was pruned against an unordered list's positional reference")
+	}
+}

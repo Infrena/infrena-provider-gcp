@@ -198,7 +198,8 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 		// the honest answer, the same one wireValue gives for the same case.
 		return incoming
 	}
-	ref, _ := reference.Raw.(map[string]value.Value)
+	ref, hasRef := reference.Raw.(map[string]value.Value)
+	hasRef = hasRef && reference.Known
 	out := make(map[string]value.Value, len(in))
 	for name, field := range attr.Fields {
 		v, found := in[name]
@@ -207,6 +208,31 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 				out[name] = carried
 			}
 			continue
+		}
+		// A DECLARED nested field the reference never set is the server's
+		// choice, and it is dropped the same as an undeclared one.
+		//
+		// infrena's planner forgives a key configuration does not mention only
+		// at the top level, where it can ask the schema whether the attribute
+		// is computed. Inside a composite it has no per-leaf schema, so it
+		// forgives nothing but an empty collection -- and a real compute disk
+		// comes back with deviceName, source, mode, interface and type filled
+		// in, which made every instance plan its own replacement. This is the
+		// nested form of infrena's own top-level rule: when configuration sets
+		// no value, the provider's choice is authoritative.
+		//
+		// Only against a real reference object. With none -- an import, a
+		// discovery -- there is nothing to say what was asked for, so
+		// everything is reported. And never inside an unordered list, where the
+		// reference element was picked by position and may be a sibling.
+		//
+		// The cost, accepted on 2026-09-24: an out-of-band change to a nested
+		// field nobody configured is no longer drift. One somebody configured
+		// still is.
+		if hasRef && !r.unmatched {
+			if _, asked := ref[name]; !asked {
+				continue
+			}
 		}
 		out[name] = r.value(field, ref[name], v)
 	}
