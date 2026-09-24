@@ -6,7 +6,7 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.autoscaler`](gcp.autoscaler.md) | yes | **no** | yes | Represents an Autoscaler resource. |
+| [`gcp.autoscaler`](gcp.autoscaler.md) | yes | yes | yes | Represents an Autoscaler resource. |
 | [`gcp.compute.instance`](gcp.compute.instance.md) | yes | **no** | yes | An instance is a virtual machine (VM) hosted on Google's infrastructure. |
 | [`gcp.crosssitenetwork`](gcp.crosssitenetwork.md) | yes | yes | yes | Represents a cross-site-network resource. |
 | [`gcp.externalvpngateway`](gcp.externalvpngateway.md) | yes | **no** | yes | Represents a VPN gateway managed outside of GCP. |
@@ -33,7 +33,7 @@
 | [`gcp.packetmirroring`](gcp.packetmirroring.md) | yes | yes | yes | Packet Mirroring mirrors traffic to and from particular VM instances. |
 | [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | yes | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
 | [`gcp.publicdelegatedprefix`](gcp.publicdelegatedprefix.md) | yes | yes | yes | Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYOIP). |
-| [`gcp.regionautoscaler`](gcp.regionautoscaler.md) | yes | **no** | yes | Represents an Autoscaler resource. |
+| [`gcp.regionautoscaler`](gcp.regionautoscaler.md) | yes | yes | yes | Represents an Autoscaler resource. |
 | [`gcp.regioncompositehealthcheck`](gcp.regioncompositehealthcheck.md) | yes | yes | yes | A composite health check resource specifies the health source resources and the health destination resource to which the aggregated health … |
 | [`gcp.regionhealthaggregationpolicy`](gcp.regionhealthaggregationpolicy.md) | yes | yes | yes | The Health Aggregation Policy specifies how to aggregate the service's constituent source health status to determine an aggregated health … |
 | [`gcp.regionhealthcheck`](gcp.regionhealthcheck.md) | yes | yes | yes | Health Checks determine whether instances are responsive and able to do work. |
