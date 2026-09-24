@@ -11,7 +11,8 @@ A Response Policy is a collection of selectors that apply to queries made agains
 | Service | dns |
 | Scope | global |
 | Asset type | `dns.googleapis.com/ResponsePolicy` |
-| Tier | 1 (ruled: pre_delete (pre_delete/response_policy_detach_network_gke.tmpl) patches `gkeClusters` and then `networks` to empty before the delete, for the same reason as dns/Policy.
+| Tier | 1 (ruled: description is required on evidence: the live probe on 2026-09-24 answered 400, "The 'entity.responsePolicy.description' parameter is required but was missing".
+pre_delete (pre_delete/response_policy_detach_network_gke.tmpl) patches `gkeClusters` and then `networks` to empty before the delete, for the same reason as dns/Policy.
 ) |
 | Mutation timeout | 60s |
 
@@ -37,7 +38,7 @@ projects/{{project}}/responsePolicies/{{response_policy_name}}
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `description` | — | `string` | optional | — | User-provided description for this Response Policy. |
+| `description` | — | `string` | required | — | User-provided description for this Response Policy. |
 | `gkeClusters` | `gke_clusters` | `list` | optional | — | The list of Google Kubernetes Engine clusters to which this response policy is applied. |
 | `gkeClusters[]` | — | `map` | optional | — | — |
 | `gkeClusters[].gkeClusterName` | `gke_cluster_name` | `string` | required | — | The resource name of the cluster to bind this response policy to. This should be specified in the format like: projects/*/locations/*/clusters/*. This is referenced from GKE … |

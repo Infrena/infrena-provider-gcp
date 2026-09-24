@@ -155,7 +155,13 @@ rulings:
 
   dns/ManagedZone:
     hooks: [pre_delete, update_encoder]
+    required: [description]
     note: >
+      description is required on evidence: the live probe on 2026-09-24
+      created a private zone without one and Google answered 400, "The
+      'entity.managedZone.description' parameter is required but was
+      missing". Terraform always sends "Managed by Terraform".
+
       Both hooks are Terraform's, and one of them exists only because
       magic-modules picked a different update method than this provider does.
 
@@ -668,7 +674,12 @@ rulings:
   dns/ResponsePolicy:
     hooks: [pre_delete]
     clear_before_delete: [gkeClusters, networks]
+    required: [description]
     note: >
+      description is required on evidence: the live probe on 2026-09-24
+      answered 400, "The 'entity.responsePolicy.description' parameter is
+      required but was missing".
+
       pre_delete (pre_delete/response_policy_detach_network_gke.tmpl) patches
       `gkeClusters` and then `networks` to empty before the delete, for the same
       reason as dns/Policy.

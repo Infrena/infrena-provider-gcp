@@ -11,7 +11,8 @@ A zone is a subtree of the DNS namespace under one administrative responsibility
 | Service | dns |
 | Scope | global |
 | Asset type | `dns.googleapis.com/ManagedZone` |
-| Tier | 1 (ruled: Both hooks are Terraform's, and one of them exists only because magic-modules picked a different update method than this provider does.
+| Tier | 1 (ruled: description is required on evidence: the live probe on 2026-09-24 created a private zone without one and Google answered 400, "The 'entity.managedZone.description' parameter is required but was missing". Terraform always sends "Managed by Terraform".
+Both hooks are Terraform's, and one of them exists only because magic-modules picked a different update method than this provider does.
 update_encoder (update_encoder/managed_dns_zone.go.tmpl) re-adds `nameServers`, `id` and `creationTime` -- all output-only fields -- to the update body, and its own comment says why: "The upstream update method requires the full ManagedZones object". That is dns.managedZones.UPDATE, a PUT full replace. This provider uses dns.managedZones.PATCH, which the Discovery document publishes at the same path with a partial ManagedZone body (both methods checked there, 2026-09-23). Under PATCH, naming an output-only field in the body is at best ignored and at worst rejected, so the hook is not merely unnecessary here, it would be wrong to apply.
 pre_delete (pre_delete/managed_dns_zone.go.tmpl) is gated on `force_destroy`, a Terraform-only convenience field with no counterpart in the DNS API. When set it pages through every record set in the zone and deletes each one -- skipping NS and SOA, which the API refuses -- before deleting the zone. We do not offer the field, so the hook has nothing to fire on, the same shape as compute/Network's post_create above.
 THE BOUNDED GAP, stated rather than discovered: deleting a zone that still holds records fails, with Google's own error. That is the API's own rule and it is loud, not silent; the fix is to remove the records first.
@@ -47,7 +48,7 @@ projects/{project}/managedZones/{managedZone}
 | `cloudLoggingConfig.enableLogging` | `enable_logging` | `boolean` | required | — | If set, enable query logging for this ManagedZone. False by default, making logging opt-in. |
 | `cloudLoggingConfig.kind` | — | `string` | output only | — | — |
 | `creationTime` | `creation_time` | `string` | output only | — | The time that this resource was created on the server. This is in RFC3339 text format. Output only. |
-| `description` | — | `string` | optional | — | A mutable string of at most 1024 characters associated with this resource for the user's convenience. Has no effect on the managed zone's function. |
+| `description` | — | `string` | required | — | A mutable string of at most 1024 characters associated with this resource for the user's convenience. Has no effect on the managed zone's function. |
 | `dnsName` | `dns_name` | `string` | required | force new | The DNS name of this managed zone, for instance "example.com.". |
 | `dnssecConfig` | `dnssec_config` | `map` | optional | — | DNSSEC configuration. |
 | `dnssecConfig.defaultKeySpecs` | `default_key_specs` | `list` | optional | — | Specifies parameters for generating initial DnsKeys for this ManagedZone. Can only be changed while the state is OFF. |
