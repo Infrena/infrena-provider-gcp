@@ -299,7 +299,7 @@ projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}
 | `externalDataConfiguration.timestampTargetPrecision[]` | — | `integer` | optional | — | — |
 | `friendlyName` | `friendly_name` | `string` | optional | — | Optional. A descriptive name for this table. |
 | `id` | — | `string` | output only | — | Output only. An opaque ID uniquely identifying the table. |
-| `kind` | — | `string` | optional | — | The type of resource ID. |
+| `kind` | — | `string` | output only | — | The type of resource ID. |
 | `labels` | — | `map` | optional | opaque | The labels associated with this table. You can use these to organize and group your tables. Label keys and values can be no longer than 63 characters, can only contain lowercase letters, numeric … |
 | `lastModifiedTime` | `last_modified_time` | `string` | output only | — | Output only. The time when this table was last modified, in milliseconds since the epoch. |
 | `location` | — | `string` | output only | — | Output only. The geographic location where the table resides. This value is inherited from the dataset. |

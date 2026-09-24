@@ -865,3 +865,44 @@ func TestAReferenceComparesAsOneInAnyForm(t *testing.T) {
 		t.Errorf("healthChecks element equivalence = %q, want self_link", got)
 	}
 }
+
+// TestTheKindConstantIsOutputOnly. Cloud DNS answers each network of a
+// policy with kind "dns#policyNetwork"; settable, and inside an unordered
+// list where nothing is pruned, it was drift on the plan after every create.
+// A field that merely happens to be called kind, with neither the constant
+// default nor the description, stays settable.
+func TestTheKindConstantIsOutputOnly(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"networks": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"kind":       {Type: "string", Default: "dns#policyNetwork"},
+			"networkUrl": {Type: "string"},
+		}}},
+		"kind": {Type: "string", Description: "Identifies what kind of resource this is. Value: the fixed string \"dns#policy\"."},
+	}}
+	other := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"kind":     {Type: "string", Description: "The workload kind: BATCH or SERVING."},
+		"category": {Type: "string", Default: "acme#widget", Description: "The kind of item this is."}}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, &mmv1.Resource{Name: "W"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !attrs["kind"].Output {
+		t.Error("the top-level kind constant is settable")
+	}
+	if !attrs["networks"].Elem.Fields["kind"].Output {
+		t.Error("networks[].kind, dns#policyNetwork, is settable")
+	}
+	if attrs["networks"].Elem.Fields["networkUrl"].Output {
+		t.Error("networkUrl became output-only")
+	}
+	o, err := BuildAttributes(&disco.Document{Name: "tiny"}, other, &mmv1.Resource{Name: "W"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o["kind"].Output {
+		t.Error("a field that is only called kind became output-only")
+	}
+	if o["category"].Output {
+		t.Error("a field not called kind became output-only for looking like the constant")
+	}
+}

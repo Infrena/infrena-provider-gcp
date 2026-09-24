@@ -43,7 +43,7 @@ Bucket ACLs can be managed authoritatively using the \[`storage_bucket_acl`\](ht
 | `entityId` | `entity_id` | `string` | optional | — | The ID for the entity, if any. |
 | `etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
 | `id` | — | `string` | optional | — | The ID of the access-control entry. |
-| `kind` | — | `string` | optional | — | The kind of item this is. For bucket access control entries, this is always storage#bucketAccessControl. |
+| `kind` | — | `string` | output only | — | The kind of item this is. For bucket access control entries, this is always storage#bucketAccessControl. |
 | `projectTeam` | `project_team` | `map` | optional | — | The project team associated with the entity, if any. |
 | `projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |
 | `projectTeam.team` | — | `string` | optional | — | The team. |
