@@ -85,3 +85,73 @@ func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string) {
 		a.ForceNew = true
 	}
 }
+
+// discoveredUpdateWrapper detects the AIP UpdateXRequest shape on a
+// collection's patch method: a request schema that is NOT the resource, but
+// holds it under one property, alongside the field mask.
+//
+// pubsub's topics.patch is the canonical one -- UpdateTopicRequest{topic,
+// updateMask} -- and it is why Provider.Update cannot simply send the
+// resource: the mask is a REQUIRED field of the body, not a query parameter,
+// so a bare resource with ?updateMask=... is rejected outright.
+//
+// This is resourceSchema's wrapper detection (build.go) pointed at patch
+// instead of create. It is deliberately a separate function rather than a flag
+// on that one: create reads its leftover properties as create-time PARAMETERS
+// and turns them into attributes, while the leftover here is the mask, which is
+// machinery rather than anything a user sets.
+//
+// AIP-134 is what it is detecting: Google's own standard says an update takes
+// UpdateXRequest{x, update_mask}. The eight collections that use it here are
+// not an oddity, they are the newer convention, and the older bare-body APIs
+// (compute and friends) are the ones out of step.
+//
+// It returns "" unless the shape resolves completely -- one property that refs
+// the resource, and exactly one field-mask property beside it. A partly-understood
+// envelope is refused, because a request sent in a shape we only half recognise
+// is a request we cannot predict the effect of.
+func discoveredUpdateWrapper(d *disco.Document, col disco.Collection) (wrapper, maskField string) {
+	patch, get := col.Methods["patch"], col.Methods["get"]
+	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
+		return "", ""
+	}
+	if patch.Path != get.Path || patch.Request == nil || get.Response == nil {
+		return "", ""
+	}
+	resourceRef := get.Response.Ref
+	if resourceRef == "" || patch.Request.Ref == resourceRef {
+		return "", "" // the bare-body case; discoveredUpdate handles it
+	}
+	raw := d.Schemas[patch.Request.Ref]
+	if raw == nil {
+		return "", ""
+	}
+	var masks []string
+	for _, name := range sortedKeys(raw.Properties) {
+		p := raw.Properties[name]
+		switch {
+		case p == nil:
+		case p.Ref == resourceRef:
+			if wrapper != "" {
+				return "", "" // two properties claim to be the resource
+			}
+			wrapper = name
+		case p.Format == "google-fieldmask":
+			// The protobuf google.protobuf.FieldMask type surviving into
+			// Discovery as a format. Keyed on that rather than on the field's
+			// NAME, because the name is not stable: six of the eight say
+			// "updateMask" and spanner's instances and instancePartitions say
+			// "fieldMask". All eight carry this format.
+			masks = append(masks, name)
+		default:
+			// Anything else in the envelope is a knob we would be silently
+			// leaving unset -- spanner's validateOnly, say. Leaving it unset is
+			// correct (it defaults), so it does not disqualify the shape, but it
+			// is why this function refuses anything it cannot name.
+		}
+	}
+	if wrapper == "" || len(masks) != 1 {
+		return "", ""
+	}
+	return wrapper, masks[0]
+}

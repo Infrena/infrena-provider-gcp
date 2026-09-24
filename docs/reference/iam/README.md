@@ -17,5 +17,5 @@
 | [`gcp.managedidentity`](gcp.managedidentity.md) | **no** | yes | yes | Represents a managed identity for a workload identity pool namespace. |
 | [`gcp.namespace`](gcp.namespace.md) | **no** | yes | yes | Represents a namespace for a workload identity pool. |
 | [`gcp.scimtenant`](gcp.scimtenant.md) | **no** | yes | yes | Gemini Enterprise only. |
-| [`gcp.serviceaccount`](gcp.serviceaccount.md) | yes | **no** | yes | An IAM service account. |
+| [`gcp.serviceaccount`](gcp.serviceaccount.md) | yes | yes | yes | An IAM service account. |
 | [`gcp.token`](gcp.token.md) | **no** | yes | yes | Gemini Enterprise only. |

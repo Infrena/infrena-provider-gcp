@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -681,5 +682,54 @@ func TestUrlIdentifyingUnionsAllThreeTemplates(t *testing.T) {
 			t.Errorf("urlIdentifying omits %q, so a patch could name a segment the url already "+
 				"carries: %v", want, got)
 		}
+	}
+}
+
+// TestAWrappedUpdateSendsTheMaskInTheBody is AIP-134's UpdateXRequest shape.
+// pubsub's topics.patch takes UpdateTopicRequest{topic, updateMask}: the
+// resource is WRAPPED and the field mask is a required field of the body, not
+// a query parameter. A bare resource with ?updateMask= is rejected outright,
+// which is why the generator refused to derive an update verb for these eight
+// collections until the runtime could send the right shape.
+//
+// The mask is keyed off the schema's own google-fieldmask format rather than
+// the field's name, because the name is not stable -- spanner's instances and
+// instancePartitions call it fieldMask while the other six say updateMask --
+// so UpdateMaskField is asserted here rather than assumed.
+func TestAWrappedUpdateSendsTheMaskInTheBody(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	path := "/v1/projects/p/locations/r/widgets/one"
+	s.Seed(path, map[string]any{"name": "one", "sizeGb": float64(10)})
+
+	ty := widgetType()
+	ty.UpdateWrapper = "widget"
+	ty.UpdateMaskField = "fieldMask"
+	ty.UpdateMask = true // must be ignored: the mask belongs in the body
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+	if _, err := p.Update(context.Background(), widgetState(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(20),
+	})); err != nil {
+		t.Fatal(err)
+	}
+	patch := requestOf(t, s, "PATCH", path)
+	if _, present := patch.Query["updateMask"]; present {
+		t.Errorf("a wrapped update also put the mask on the query string: %q", patch.Query.Get("updateMask"))
+	}
+	var sent map[string]any
+	if err := json.Unmarshal(patch.Body, &sent); err != nil {
+		t.Fatalf("patch body is not json: %v (%s)", err, patch.Body)
+	}
+	inner, ok := sent["widget"].(map[string]any)
+	if !ok {
+		t.Fatalf("body is not wrapped under %q: %s", ty.UpdateWrapper, patch.Body)
+	}
+	if inner["sizeGb"] != float64(20) {
+		t.Errorf("wrapped resource sizeGb = %v, want 20", inner["sizeGb"])
+	}
+	if got := sent["fieldMask"]; got != "sizeGb" {
+		t.Errorf("body fieldMask = %v, want \"sizeGb\"", got)
 	}
 }

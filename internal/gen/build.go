@@ -972,6 +972,19 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// So ask the collection. See discoveredUpdate for what it refuses, which is
 	// the more important half.
 	if t.UpdateVerb == "" && t.UpdateURL == "" {
+		// The envelope shape first, because discoveredUpdate refuses it by
+		// design and would otherwise leave these eight collections silently
+		// non-updatable.
+		if wrapper, maskField := discoveredUpdateWrapper(doc, col); wrapper != "" {
+			if restricted, _ := restrictedPatch(col); !restricted || overlay.Patchable[name] != nil {
+				t.UpdateVerb, t.UpdateWrapper, t.UpdateMaskField = "PATCH", wrapper, maskField
+				if allow := overlay.Patchable[name]; allow != nil {
+					applyPatchAllowlist(attrs, allow.Fields)
+				}
+			}
+		}
+	}
+	if t.UpdateVerb == "" && t.UpdateURL == "" {
 		if verb, masked := discoveredUpdate(col); verb != "" {
 			allow := overlay.Patchable[name]
 			restricted, _ := restrictedPatch(col)
@@ -2032,7 +2045,13 @@ func discoveredUpdate(col disco.Collection) (verb string, masked bool) {
 	if patch.Path != get.Path {
 		return "", false
 	}
-	if patch.Request == nil || get.Response == nil || patch.Request.Ref != get.Response.Ref {
+	if patch.Request == nil || get.Response == nil {
+		return "", false
+	}
+	// A request that is not the resource is the envelope shape, handled by
+	// discoveredUpdateWrapper and admitted only when it resolves cleanly. This
+	// function answers for the bare-body case only.
+	if patch.Request.Ref != get.Response.Ref {
 		return "", false
 	}
 	if p := patch.Parameters["updateMask"]; p != nil && p.Location == "query" {

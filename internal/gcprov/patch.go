@@ -270,7 +270,21 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	// gcp.firewall, gcp.storage.bucket, gcp.network and gcp.router among
 	// them -- PATCH without one. Appending the parameter unconditionally
 	// sends a query argument those APIs never asked for.
-	if ty.UpdateMask {
+	switch {
+	case ty.UpdateWrapper != "":
+		// AIP-134's UpdateXRequest shape: the resource is wrapped and the field
+		// mask travels IN THE BODY, not on the query string. pubsub's
+		// topics.patch takes UpdateTopicRequest{topic, updateMask} and rejects a
+		// bare Topic outright, so this is not a nicety.
+		//
+		// The mask is required and non-empty for every API that uses this shape,
+		// which costs nothing to honour: Update has already returned early above
+		// when nothing changed, so mask is never empty by the time it gets here.
+		body = map[string]any{
+			ty.UpdateWrapper:   body,
+			ty.UpdateMaskField: strings.Join(mask, ","),
+		}
+	case ty.UpdateMask:
 		reqURL += maskQuery(reqURL, mask)
 	}
 

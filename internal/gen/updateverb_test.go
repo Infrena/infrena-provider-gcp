@@ -18,7 +18,7 @@ import (
 //   - restricteds  PATCH Google documents as partial        -> NOT updatable, unless
 //     an overlay allowlist says
 //     which fields it takes
-//   - wrappeds     PATCH whose request is an envelope       -> NOT updatable
+//   - wrappeds     PATCH whose request is an AIP-134 envelope -> updatable, wrapped
 func updateVerbDoc() string {
 	return `{
   "name": "acme",
@@ -32,7 +32,7 @@ func updateVerbDoc() string {
     }},
     "UpdateThingRequest": {"id": "UpdateThingRequest", "type": "object", "properties": {
       "thing": {"$ref": "Thing", "description": "The updated thing."},
-      "updateMask": {"type": "string", "description": "Fields to update."}
+      "updateMask": {"type": "string", "format": "google-fieldmask", "description": "Fields to update."}
     }},
     "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
   },
@@ -150,14 +150,17 @@ func TestAPutOnlyCollectionStaysNonUpdatable(t *testing.T) {
 	}
 }
 
-// TestAWrappedPatchRequestStaysNonUpdatable is the Pub/Sub shape, found while
-// ruling the tier-2 backlog on 2026-09-23. pubsub's topics.patch takes
-// UpdateTopicRequest{topic, updateMask}, not Topic: the resource is wrapped and
-// the mask lives in the BODY. Provider.Update sends the bare resource with the
-// mask on the query string, so deriving a verb here would publish an update
-// that every such API rejects. Nothing in the catalog has this shape today and
-// this test is what keeps it that way.
-func TestAWrappedPatchRequestStaysNonUpdatable(t *testing.T) {
+// TestAWrappedPatchRequestIsSentAsAnEnvelope is AIP-134's UpdateXRequest
+// shape. pubsub's topics.patch takes UpdateTopicRequest{topic, updateMask}, so
+// the resource is wrapped and the mask is a REQUIRED field of the body rather
+// than a query parameter; a bare resource is rejected.
+//
+// This was refused outright until the runtime could send that shape, which is
+// what made Pub/Sub a P0 blocker. The mask field is found by its schema
+// FORMAT -- google-fieldmask, the protobuf FieldMask type surviving into
+// Discovery -- and not by its name, because six of the eight collections that
+// use this shape say "updateMask" and spanner's two say "fieldMask".
+func TestAWrappedPatchRequestIsSentAsAnEnvelope(t *testing.T) {
 	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
 	if err != nil {
 		t.Fatal(err)
@@ -166,8 +169,38 @@ func TestAWrappedPatchRequestStaysNonUpdatable(t *testing.T) {
 	if !ok {
 		t.Fatalf("gcp.wrapped missing; catalog has %d types", len(res.Catalog.Types))
 	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH: the envelope is understood now", ty.UpdateVerb)
+	}
+	if ty.UpdateWrapper != "thing" {
+		t.Errorf("UpdateWrapper = %q, want \"thing\"", ty.UpdateWrapper)
+	}
+	if ty.UpdateMaskField != "updateMask" {
+		t.Errorf("UpdateMaskField = %q, want \"updateMask\"", ty.UpdateMaskField)
+	}
+	if ty.UpdateMask {
+		t.Error("UpdateMask is set, so the mask would ALSO go on the query string")
+	}
+}
+
+// TestAnEnvelopeWithNoFieldMaskIsRefused. A request schema that is not the
+// resource and carries no google-fieldmask is a shape this provider does not
+// understand, and a request sent in a shape we only half recognise is one whose
+// effect we cannot predict.
+func TestAnEnvelopeWithNoFieldMaskIsRefused(t *testing.T) {
+	doc := strings.Replace(updateVerbDoc(),
+		`"updateMask": {"type": "string", "format": "google-fieldmask", "description": "Fields to update."}`,
+		`"updateMask": {"type": "string", "description": "Fields to update."}`, 1)
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": doc, "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.wrapped")
+	if !ok {
+		t.Fatalf("gcp.wrapped missing; catalog has %d types", len(res.Catalog.Types))
+	}
 	if ty.UpdateVerb != "" {
-		t.Errorf("UpdateVerb = %q, want empty: the patch body is an envelope, not the resource", ty.UpdateVerb)
+		t.Errorf("UpdateVerb = %q, want empty: nothing in the envelope says where the mask goes", ty.UpdateVerb)
 	}
 }
 

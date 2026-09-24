@@ -21,7 +21,7 @@ An IAM service account. A service account is an account for an application or a 
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/serviceAccounts` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+name}` |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 
