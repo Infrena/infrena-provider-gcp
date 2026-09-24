@@ -40,4 +40,4 @@ Request for the `CreateSnapshot` method.
 | `labels` | — | `map` | optional | opaque | Optional. See \[Creating and managing labels\](https://cloud.google.com/pubsub/docs/labels). |
 | `snapshot` | — | `string` | required | force new | The snapshot this gcp.pubsub.snapshot belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `subscription` | — | `string` | optional | — | Required. The subscription whose backlog the snapshot retains. Specifically, the created snapshot is guaranteed to retain: (a) The existing backlog on the subscription. More precisely, this is … |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" See … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" See … |

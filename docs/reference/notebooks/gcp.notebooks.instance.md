@@ -122,7 +122,7 @@ The definition of a notebook instance.
 | `upgradeHistory[]` | — | `map` | optional | — | — |
 | `upgradeHistory[].action` | — | `string` | optional | — | Optional. Action. Rolloback or Upgrade. |
 | `upgradeHistory[].containerImage` | `container_image` | `string` | optional | — | Optional. The container image before this instance upgrade. |
-| `upgradeHistory[].createTime` | `create_time` | `string` | optional | — | Immutable. The time that this instance upgrade history entry is created. |
+| `upgradeHistory[].createTime` | `create_time` | `string` | optional | force new | Immutable. The time that this instance upgrade history entry is created. |
 | `upgradeHistory[].framework` | — | `string` | optional | — | Optional. The framework of this notebook instance. |
 | `upgradeHistory[].snapshot` | — | `string` | optional | — | Optional. The snapshot of the boot disk of this notebook instance before upgrade. |
 | `upgradeHistory[].state` | — | `string` | output only | — | Output only. The state of this instance upgrade history entry. |

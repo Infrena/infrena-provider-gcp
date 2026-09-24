@@ -38,7 +38,7 @@ Represents a public key configuration for your workload identity pool provider. 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `expireTime` | `expire_time` | `string` | output only | — | Output only. Time after which the key will be permanently purged and cannot be recovered. Note that the key may get purged before this timestamp if the total limit of keys per provider is crossed. |
-| `keyData` | `key_data` | `map` | optional | — | Immutable. Public half of the asymmetric key. |
+| `keyData` | `key_data` | `map` | optional | force new | Immutable. Public half of the asymmetric key. |
 | `keyData.format` | — | `string` | output only | — | Output only. The format of the key. |
 | `keyData.key` | — | `string` | output only | — | Output only. The key data. The format of the key is represented by the format field. |
 | `keyData.keySpec` | `key_spec` | `string` | optional | — | Required. The specifications for the key. |

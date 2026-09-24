@@ -307,7 +307,7 @@ NodePool
 | `maxPodsConstraint.maxPodsPerNode` | `max_pods_per_node` | `string` | optional | — | Constraint enforced on the max num of pods per node. |
 | `name` | — | `string` | optional | — | The name of the node pool. |
 | `networkConfig` | `network_config` | `map` | optional | — | Networking configuration for this NodePool. If specified, it overrides the cluster-level defaults. |
-| `networkConfig.acceleratorNetworkProfile` | `accelerator_network_profile` | `string` | optional | — | Immutable. The accelerator network profile for the node pool. For now the only valid value is "auto". If specified, the network configuration of the nodes in this node pool will be managed by this … |
+| `networkConfig.acceleratorNetworkProfile` | `accelerator_network_profile` | `string` | optional | force new | Immutable. The accelerator network profile for the node pool. For now the only valid value is "auto". If specified, the network configuration of the nodes in this node pool will be managed by this … |
 | `networkConfig.additionalNodeNetworkConfigs` | `additional_node_network_configs` | `list` | optional | — | We specify the additional node networks for this node pool using this list. Each node network corresponds to an additional interface |
 | `networkConfig.additionalNodeNetworkConfigs[]` | — | `map` | optional | — | — |
 | `networkConfig.additionalNodeNetworkConfigs[].network` | — | `string` | optional | — | Name of the VPC where the additional interface belongs |
@@ -321,7 +321,7 @@ NodePool
 | `networkConfig.additionalPodNetworkConfigs[].subnetwork` | — | `string` | optional | — | Name of the subnetwork where the additional pod network belongs. |
 | `networkConfig.createPodRange` | `create_pod_range` | `boolean` | optional | — | Input only. Whether to create a new range for pod IPs in this node pool. Defaults are provided for `pod_range` and `pod_ipv4_cidr_block` if they are not specified. If neither `create_pod_range` or … |
 | `networkConfig.enablePrivateNodes` | `enable_private_nodes` | `boolean` | optional | — | Whether nodes have internal IP addresses only. If enable_private_nodes is not specified, then the value is derived from Cluster.NetworkConfig.default_enable_private_nodes |
-| `networkConfig.network` | — | `string` | optional | — | Optional. Immutable. The VPC network for the node pool. |
+| `networkConfig.network` | — | `string` | optional | force new | Optional. Immutable. The VPC network for the node pool. |
 | `networkConfig.networkPerformanceConfig` | `network_performance_config` | `map` | optional | — | Network bandwidth tier configuration. |
 | `networkConfig.networkPerformanceConfig.totalEgressBandwidthTier` | `total_egress_bandwidth_tier` | `string` | optional | — | Specifies the total network bandwidth tier for the NodePool. |
 | `networkConfig.networkTierConfig` | `network_tier_config` | `map` | output only | — | Output only. The network tier configuration for the node pool inherits from the cluster-level configuration and remains immutable throughout the node pool's lifecycle, including during upgrades. |

@@ -52,6 +52,6 @@ A backup of a Cloud Bigtable table.
 | `name` | — | `string` | optional | — | A globally unique identifier for the backup which cannot be changed. Values are of the form `projects/{project}/instances/{instance}/clusters/{cluster}/ backups/_a-zA-Z0-9*` The final segment of the … |
 | `sizeBytes` | `size_bytes` | `string` | output only | — | Output only. Size of the backup in bytes. |
 | `sourceBackup` | `source_backup` | `string` | output only | — | Output only. Name of the backup from which this backup was copied. If a backup is not created by copying a backup, this field will be empty. Values are of the form … |
-| `sourceTable` | `source_table` | `string` | optional | — | Required. Immutable. Name of the table from which this backup was created. This needs to be in the same instance as the backup. Values are of the form … |
+| `sourceTable` | `source_table` | `string` | optional | force new | Required. Immutable. Name of the table from which this backup was created. This needs to be in the same instance as the backup. Values are of the form … |
 | `startTime` | `start_time` | `string` | output only | — | Output only. `start_time` is the time that the backup was started (i.e. approximately the time the CreateBackup request is received). The row data in this backup will be no older than this timestamp. |
 | `state` | — | `string` | output only | — | Output only. The current state of the backup. |

@@ -41,7 +41,7 @@ A security profile defines the behavior associated to a profile type.
 | `customInterceptProfile` | `custom_intercept_profile` | `map` | optional | — | The custom TPPI configuration for the SecurityProfile. |
 | `customInterceptProfile.interceptEndpointGroup` | `intercept_endpoint_group` | `string` | required | — | Required. The target InterceptEndpointGroup. When a firewall rule with this security profile attached matches a packet, the packet will be intercepted to the location-local target in this group. |
 | `customMirroringProfile` | `custom_mirroring_profile` | `map` | optional | — | The custom Packet Mirroring v2 configuration for the SecurityProfile. |
-| `customMirroringProfile.mirroringEndpointGroup` | `mirroring_endpoint_group` | `string` | required | — | Required. Immutable. The target MirroringEndpointGroup. When a mirroring rule with this security profile attached matches a packet, a replica will be mirrored to the location-local target in this … |
+| `customMirroringProfile.mirroringEndpointGroup` | `mirroring_endpoint_group` | `string` | required | force new | Required. Immutable. The target MirroringEndpointGroup. When a mirroring rule with this security profile attached matches a packet, a replica will be mirrored to the location-local target in this … |
 | `description` | — | `string` | optional | — | Optional. An optional description of the profile. Max length 512 characters. |
 | `etag` | — | `string` | output only | — | Output only. This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels as key value pairs. |

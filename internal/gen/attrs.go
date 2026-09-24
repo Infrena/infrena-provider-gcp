@@ -357,9 +357,19 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		if sn := snake(name); sn != name && sn != alias {
 			a.Aliases = append(a.Aliases, sn)
 		}
+		// Immutability has two sources and either is enough. magic-modules'
+		// `immutable:` is a human transcription; Discovery's "Immutable." tag is
+		// the API's own declaration, carried in prose because Discovery has no
+		// field for it. Neither is complete: on 2026-09-23 the prose caught 48
+		// settable fields magic-modules had not marked, and magic-modules
+		// marks many the API never tags (an artifact registry repository's
+		// `format`). So they are ORed, never one in place of the other. A field
+		// changed that the API will not change must REPLACE the resource; sent
+		// as a patch it is refused, and the plan was wrong before it ran.
+		a.ForceNew = disco.Behaviors(prop)[disco.BehaviorImmutable]
 		if f := idx[name]; f != nil {
 			a.Required = f.Required
-			a.ForceNew = f.Immutable
+			a.ForceNew = a.ForceNew || f.Immutable
 			if f.Output {
 				a.Output = true
 			}

@@ -359,7 +359,7 @@ projects/{project}/instances/{instance}
 | `suspensionReason` | `suspension_reason` | `list` | optional | — | If the instance state is SUSPENDED, the reason for the suspension. |
 | `suspensionReason[]` | — | `string` | optional | — | — |
 | `switchTransactionLogsToCloudStorageEnabled` | `switch_transaction_logs_to_cloud_storage_enabled` | `boolean` | optional | — | Input only. Whether Cloud SQL is enabled to switch storing point-in-time recovery log files from a data disk to Cloud Storage. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys and tag values that are bound to this instance. You must represent each item in the map as: `"" : ""`. For example, a single resource can have the following … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys and tag values that are bound to this instance. You must represent each item in the map as: `"" : ""`. For example, a single resource can have the following … |
 | `upgradableDatabaseVersions` | `upgradable_database_versions` | `list` | output only | — | Output only. All database versions that are available for upgrade. |
 | `upgradableDatabaseVersions[]` | — | `map` | optional | — | — |
 | `upgradableDatabaseVersions[].displayName` | `display_name` | `string` | optional | — | The database version's display name. |

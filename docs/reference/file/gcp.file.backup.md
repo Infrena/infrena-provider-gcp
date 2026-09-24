@@ -42,7 +42,7 @@ A Filestore backup.
 | `description` | — | `string` | optional | — | A description of the backup with 2048 characters or less. Requests with longer descriptions will be rejected. |
 | `downloadBytes` | `download_bytes` | `string` | output only | — | Output only. Amount of bytes that will be downloaded if the backup is restored. This may be different than storage bytes, since sequential backups of the same disk will share storage. |
 | `fileSystemProtocol` | `file_system_protocol` | `string` | output only | — | Output only. The file system protocol of the source Filestore instance that this backup is created from. |
-| `kmsKey` | `kms_key` | `string` | optional | — | Immutable. KMS key name used for data encryption. |
+| `kmsKey` | `kms_key` | `string` | optional | force new | Immutable. KMS key name used for data encryption. |
 | `labels` | — | `map` | optional | opaque | Resource labels to represent user provided metadata. |
 | `name` | — | `string` | output only | — | Output only. The resource name of the backup, in the format `projects/{project_number}/locations/{location_id}/backups/{backup_id}`. |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. Reserved for future use. |
@@ -52,4 +52,4 @@ A Filestore backup.
 | `sourceInstanceTier` | `source_instance_tier` | `string` | output only | — | Output only. The service tier of the source Filestore instance that this backup is created from. |
 | `state` | — | `string` | output only | — | Output only. The backup state. |
 | `storageBytes` | `storage_bytes` | `string` | output only | — | Output only. The size of the storage used by the backup. As backups share storage, this number is expected to change with backup creation/deletion. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |

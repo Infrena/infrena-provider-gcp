@@ -47,5 +47,5 @@ A folder in an organization's resource hierarchy, used to organize that organiza
 | `name` | — | `string` | optional | — | Identifier. The resource name of the folder. Its format is `folders/{folder_id}`, for example: "folders/1234". |
 | `parent` | — | `string` | optional | — | Required. The folder's parent's resource name. Updates to the folder's parent must be performed using MoveFolder. |
 | `state` | — | `string` | output only | — | Output only. The lifecycle state of the folder. Updates to the state must be performed using DeleteFolder and UndeleteFolder. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this folder. Each item in the map must be expressed as " : ". For example: "123/environment" : "production", "123/costCenter" … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this folder. Each item in the map must be expressed as " : ". For example: "123/environment" : "production", "123/costCenter" … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Timestamp when the folder was last modified. |
