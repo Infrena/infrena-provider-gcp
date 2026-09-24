@@ -51,11 +51,11 @@ projects/{project}/regions/{region}/targetHttpsProxies/{targetHttpsProxy}
 | `region` | — | `string` | output only | force new | Output only. \[Output Only\] URL of the region where the regional TargetHttpsProxy resides. This field is not applicable to global TargetHttpsProxies. |
 | `selfLink` | `self_link` | `string` | output only | — | \[Output Only\] Server-defined URL for the resource. |
 | `serverTlsPolicy` | `server_tls_policy` | `string` | optional | refers to `gcp.sslpolicy.selfLink` | Optional. A URL referring to a networksecurity.ServerTlsPolicy resource that describes how the proxy should authenticate inbound traffic. serverTlsPolicy only applies to a globalTargetHttpsProxy … |
-| `sslCertificates` | `ssl_certificates` | `list` | optional | force new | URLs to SslCertificate resources that are used to authenticate connections between users and the load balancer. At least one SSL certificate must be specified. SslCertificates do not apply when the … |
+| `sslCertificates` | `ssl_certificates` | `list` | optional | — | URLs to SslCertificate resources that are used to authenticate connections between users and the load balancer. At least one SSL certificate must be specified. SslCertificates do not apply when the … |
 | `sslCertificates[]` | — | `string` | optional | — | — |
 | `sslPolicy` | `ssl_policy` | `string` | optional | refers to `gcp.regionsslpolicy.selfLink` | URL of SslPolicy resource that will be associated with the TargetHttpsProxy resource. If not set, the TargetHttpsProxy resource has no SSL policy configured. |
 | `tlsEarlyData` | `tls_early_data` | `string` | optional | force new | Specifies whether TLS 1.3 0-RTT Data ("Early Data") should be accepted for this service. Early Data allows a TLS resumption handshake to include the initial application payload (a HTTP request) … |
-| `urlMap` | `url_map` | `string` | required | force new, refers to `gcp.regionurlmap.selfLink` | A fully-qualified or valid partial URL to the UrlMap resource that defines the mapping from URL to the BackendService. For example, the following are all valid URLs for specifying a URL map: - … |
+| `urlMap` | `url_map` | `string` | required | refers to `gcp.regionurlmap.selfLink` | A fully-qualified or valid partial URL to the UrlMap resource that defines the mapping from URL to the BackendService. For example, the following are all valid URLs for specifying a URL map: - … |
 
 ## References
 

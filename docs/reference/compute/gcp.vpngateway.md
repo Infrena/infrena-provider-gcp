@@ -50,7 +50,7 @@ projects/{project}/regions/{region}/vpnGateways/{vpnGateway}
 | `region` | — | `string` | output only | — | Output only. \[Output Only\] URL of the region where the VPN gateway resides. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. \[Output Only\] Server-defined URL for the resource. |
 | `stackType` | `stack_type` | `string` | optional | force new | The stack type for this VPN gateway to identify the IP protocols that are enabled. Possible values are: IPV4_ONLY,IPV4_IPV6, IPV6_ONLY. If not specified,IPV4_ONLY is used if the gateway IP version … |
-| `vpnInterfaces` | `vpn_interfaces` | `list` | optional | — | The list of VPN interfaces associated with this VPN gateway. |
+| `vpnInterfaces` | `vpn_interfaces` | `list` | optional | force new | The list of VPN interfaces associated with this VPN gateway. |
 | `vpnInterfaces[]` | — | `map` | optional | — | — |
 | `vpnInterfaces[].id` | — | `integer` | output only | — | Output only. \[Output Only\] Numeric identifier for this VPN interface associated with the VPN gateway. |
 | `vpnInterfaces[].interconnectAttachment` | `interconnect_attachment` | `string` | optional | force new | URL of the VLAN attachment (interconnectAttachment) resource for this VPN gateway interface. When the value of this field is present, the VPN gateway is used for HA VPN over Cloud Interconnect; all … |

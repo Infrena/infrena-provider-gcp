@@ -49,7 +49,7 @@ projects/{project}/regions/{region}/subnetworks/{subnetwork}
 | `gatewayAddress` | `gateway_address` | `string` | output only | — | Output only. \[Output Only\] The gateway address for default routes to reach destination addresses outside this subnetwork. |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `internalIpv6Prefix` | `internal_ipv6_prefix` | `string` | optional | force new | The internal IPv6 address range that is owned by this subnetwork. |
-| `ipCidrRange` | `cidr`, `ip_cidr_range` | `string` | optional | force new | The range of internal addresses that are owned by this subnetwork. Provide this property when you create the subnetwork. For example,10.0.0.0/8 or 100.64.0.0/10. Ranges must be unique and … |
+| `ipCidrRange` | `cidr`, `ip_cidr_range` | `string` | optional | — | The range of internal addresses that are owned by this subnetwork. Provide this property when you create the subnetwork. For example,10.0.0.0/8 or 100.64.0.0/10. Ranges must be unique and … |
 | `ipCollection` | `ip_collection` | `string` | optional | force new | Reference to the source of IP, like a PublicDelegatedPrefix (PDP) for BYOIP. The PDP must be a sub-PDP in EXTERNAL_IPV6_SUBNETWORK_CREATION or INTERNAL_IPV6_SUBNETWORK_CREATION mode. Use one of the … |
 | `ipv6AccessType` | `ipv6_access_type` | `string` | optional | force new | The access type of IPv6 address this subnet holds. It's immutable and can only be specified during creation or the first time the subnet is updated into IPV4_IPV6 dual stack. |
 | `ipv6CidrRange` | `ipv6_cidr_range` | `string` | output only | — | Output only. \[Output Only\] This field is for internal use. |
@@ -67,7 +67,7 @@ projects/{project}/regions/{region}/subnetworks/{subnetwork}
 | `network` | — | `string` | required | force new, refers to `gcp.network.selfLink` | The URL of the network to which this subnetwork belongs, provided by the client when initially creating the subnetwork. This field can be set only at resource creation time. |
 | `params` | — | `map` | optional | force new | Input only. \[Input Only\] Additional params passed with the request, but not persisted as part of resource payload. |
 | `params.resourceManagerTags` | `resource_manager_tags` | `map` | optional | force new, opaque | Tag keys/values directly bound to this resource. Tag keys and values have the same definition as resource manager tags. The field is allowed for INSERT only. The keys/values to set on the resource … |
-| `privateIpGoogleAccess` | `private_ip_google_access` | `boolean` | optional | force new | Whether the VMs in this subnet can access Google services without assigned external IP addresses. This field can be both set at resource creation time and updated using setPrivateIpGoogleAccess. |
+| `privateIpGoogleAccess` | `private_ip_google_access` | `boolean` | optional | — | Whether the VMs in this subnet can access Google services without assigned external IP addresses. This field can be both set at resource creation time and updated using setPrivateIpGoogleAccess. |
 | `privateIpv6GoogleAccess` | `private_ipv6_google_access` | `string` | optional | — | This field is for internal use. This field can be both set at resource creation time and updated usingpatch. |
 | `purpose` | — | `string` | optional | force new | — |
 | `region` | — | `string` | optional | force new | URL of the region where the Subnetwork resides. This field can be set only at resource creation time. |

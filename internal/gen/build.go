@@ -328,7 +328,7 @@ func Build(in Inputs) (*Result, error) {
 		}
 		if restricted, says := restrictedPatch(b.p.col); restricted {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name, says})
-		} else if b.p.mm != nil && b.p.mm.Immutable && b.p.col.Methods["patch"] != nil {
+		} else if b.p.mm != nil && b.p.mm.Immutable && b.p.col.Methods["patch"] != nil && len(b.t.Setters) == 0 {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name,
 				"magic-modules marks the resource immutable and names no field it patches"})
 		}
@@ -1268,6 +1268,11 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err
 	}
+
+	// After self_link is final: a setter is admitted only on the address the
+	// resource is read at. See discoveredSetters.
+	t.Setters = discoveredSetters(doc, col, mm, t)
+	applySetters(t, mm)
 
 	return t, nil
 }

@@ -52,6 +52,10 @@ func BuildMask(ty *catalog.Type, current, desired map[string]value.Value) (map[s
 			// GCP owns it. A mask naming a read-only field fails the whole
 			// request, not just that field.
 			continue
+		case ty.SetterFor(a.Canonical) != nil:
+			// Changed through its own method (setLabels, setUrlMap), never
+			// through the resource's update. See Update.
+			continue
 		case inURL[name] || inURL[a.Canonical]:
 			// The url already says it: project, region/zone/location, name,
 			// and every type-specific id segment. See urlIdentifying. Either
@@ -236,16 +240,27 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	// magic-modules and magic-modules leaves it off most resources. The
 	// generator now asks Discovery too (gen.discoveredUpdate), which is why
 	// buckets, networks and subnetworks are patched rather than replaced.
-	if ty.UpdateVerb == "" {
+	if ty.UpdateVerb == "" && len(ty.Setters) == 0 {
 		return nil, fmt.Errorf("gcp: %s: publishes no update method; every change to it replaces the resource", ty.Name)
 	}
 
 	body, mask := BuildMask(ty, current.Attributes, desired.Attrs)
-	if len(mask) == 0 {
+	setters := changedSetters(ty, current.Attributes, desired.Attrs)
+	if len(mask) == 0 && len(setters) == 0 {
 		// Nothing changed. Sending an empty patch would be a request against
 		// a project-wide quota for no effect, and some APIs reject it
 		// outright.
 		return current, nil
+	}
+	if len(mask) > 0 && ty.UpdateVerb == "" {
+		// The generator makes every field no setter carries ForceNew on a
+		// type with no update verb, so the host plans a replacement for
+		// them and this is unreachable. Refused before anything is sent if
+		// it ever is reached.
+		return nil, fmt.Errorf("gcp: %s: %s can only change by replacing the resource", ty.Name, strings.Join(mask, ", "))
+	}
+	if len(mask) == 0 {
+		return p.updateThroughSetters(ctx, ty, current, desired, setters, false, nil)
 	}
 
 	attrs, err := ParseProviderID(ty, current.ProviderID)
@@ -316,6 +331,36 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	if awaitErr != nil {
 		fmt.Fprintf(os.Stderr, "gcp: %s: update reported a failure, reading back what exists: %v\n",
 			ty.Name, awaitErr)
+	}
+	return p.updateThroughSetters(ctx, ty, current, desired, setters, true, awaitErr)
+}
+
+// updateThroughSetters sends the setters Update found changed, then reads
+// the resource back. patched says whether the resource's own update already
+// went out: until something has been sent, a failure is still "nothing
+// happened" and may be returned; after, it is reported and the truthful read
+// is returned instead (see Update's orphan rule). The first failure stops the
+// rest, so a lock copied from the observation is never sent stale twice.
+func (p *Provider) updateThroughSetters(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, desired *resource.DesiredResource, setters []*catalog.Setter, patched bool, awaitErr error) (*resource.ResourceState, error) {
+	for _, s := range setters {
+		if err := ctx.Err(); err != nil {
+			if !patched {
+				return nil, err
+			}
+			break
+		}
+		sent, err := p.callSetter(ctx, ty, s, current.ProviderID, current.Attributes, desired.Attrs)
+		if err != nil && !sent && !patched {
+			return nil, err
+		}
+		patched = patched || sent
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gcp: %s: %s failed, reading back what exists: %v\n", ty.Name, s.Method, err)
+			if awaitErr == nil {
+				awaitErr = err
+			}
+			break
+		}
 	}
 
 	st, readErr := p.readAfterPatch(ctx, ty, current, desired.Attrs)

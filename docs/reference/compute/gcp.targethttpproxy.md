@@ -37,13 +37,13 @@ projects/{project}/global/targetHttpProxies/{targetHttpProxy}
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
-| `description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
+| `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
 | `fingerprint` | — | `string` | output only | — | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a TargetHttpProxy. An up-to-date … |
-| `httpKeepAliveTimeoutSec` | `http_keep_alive_timeout_sec` | `integer` | optional | — | Specifies how long to keep a connection open, after completing a response, while there is no matching traffic (in seconds). If an HTTP keep-alive is not specified, a default value (610 seconds) will … |
+| `httpKeepAliveTimeoutSec` | `http_keep_alive_timeout_sec` | `integer` | optional | force new | Specifies how long to keep a connection open, after completing a response, while there is no matching traffic (in seconds). If an HTTP keep-alive is not specified, a default value (610 seconds) will … |
 | `id` | — | `string` | output only | — | \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of resource. Always compute#targetHttpProxy for target HTTP proxies. |
-| `name` | — | `string` | required | — | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
-| `proxyBind` | `proxy_bind` | `boolean` | optional | — | This field only applies when the forwarding rule that references this target proxy has a loadBalancingScheme set toINTERNAL_SELF_MANAGED. When this field is set to true, Envoy proxies set up inbound … |
+| `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
+| `proxyBind` | `proxy_bind` | `boolean` | optional | force new | This field only applies when the forwarding rule that references this target proxy has a loadBalancingScheme set toINTERNAL_SELF_MANAGED. When this field is set to true, Envoy proxies set up inbound … |
 | `region` | — | `string` | output only | — | Output only. \[Output Only\] URL of the region where the regional Target HTTP Proxy resides. This field is not applicable to global Target HTTP Proxies. |
 | `selfLink` | `self_link` | `string` | output only | — | \[Output Only\] Server-defined URL for the resource. |
 | `urlMap` | `url_map` | `string` | required | refers to `gcp.urlmap.selfLink` | URL to the UrlMap resource that defines the mapping from URL to the BackendService. |

@@ -38,7 +38,7 @@ projects/{project}/zones/{zone}/instantSnapshots/{instantSnapshot}
 | --- | --- | --- | --- | --- | --- |
 | `architecture` | — | `string` | output only | — | Output only. \[Output Only\] The architecture of the instant snapshot. Valid values are ARM64 or X86_64. |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
-| `description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
+| `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
 | `diskSizeGb` | `disk_size_gb` | `string` | output only | — | Output only. \[Output Only\] Size of the source disk, specified in GB. |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Alwayscompute#instantSnapshot for InstantSnapshot resources. |
