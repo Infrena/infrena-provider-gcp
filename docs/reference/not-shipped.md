@@ -17,7 +17,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 67 |
+| [unruled wire hooks](#unruled-wire-hooks) | 65 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
@@ -27,7 +27,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**367** types did not ship. **62** more ship without a create.
+**365** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -349,8 +349,6 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `pubsub/Schema` | 2 | update_encoder |
 | `redis/Cluster` | 2 | decoder, encoder |
 | `redis/Instance` | 2 | decoder, encoder, pre_delete |
-| `secretmanager/Secret` | 2 | pre_delete, pre_update |
-| `secretmanager/Secret` | 2 | pre_delete, pre_update |
 | `spanner/BackupSchedule` | 2 | decoder, encoder, pre_update |
 | `spanner/Instance` | 2 | decoder, encoder, post_create, pre_delete, pre_update, update_encoder |
 | `spanner/InstanceConfig` | 2 | decoder, encoder, update_encoder |

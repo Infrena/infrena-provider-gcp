@@ -249,6 +249,8 @@
   "run/job": "gcp.job",
   "run/service": "gcp.service",
   "run/workerpool": "gcp.workerpool",
+  "secretmanager/regionalsecret": "gcp.regionalsecret",
+  "secretmanager/secret": "gcp.secret",
   "spanner/backup": "gcp.spanner.backup",
   "spanner/session": "gcp.spanner.session",
   "sqladmin/backuprun": "gcp.backuprun",
