@@ -109,7 +109,764 @@ rulings:
       generator does not count them: the first two are Terraform schema and Go
       declarations, the third belongs to a different tool entirely.
 
-aliases: {}
+
+  # P0 of the tier-2 backlog, worked 2026-09-23. Every template named below was
+  # READ at the pinned mmv1 commit (2d08a4a7b218c0c9d6c3ba236eae45193d386f44),
+  # not inferred from its name -- which mattered twice: `update_encoder/pubsub_topic`
+  # turned out to be a request envelope, and `update_encoder/managed_dns_zone`
+  # turned out to exist only because magic-modules updates via PUT.
+  #
+  # ONE of the nine candidates ships. The other eight are blocked, and not one of
+  # them is blocked on judgement -- each hit a distinct limitation recorded below,
+  # and the largest of them is not a tier-2 problem at all (see UPDATE VERB).
+
+  artifactregistry/Repository:
+    hooks: [encoder, pre_update]
+    note: >
+      One hook is scope resolution this provider already performs, and the
+      other hand-writes mask paths that buildNested produces natively.
+
+      encoder (encoders/location_from_region.go.tmpl) defaults `location` from
+      the provider's `region` when the resource does not set it. `location` is
+      a URL segment here (projects/*/locations/*/repositories), not a body
+      field, and filling scope segments from instance configuration is what
+      gcprov.Provider.withScope does for every type. Same job, done earlier.
+
+      pre_update (update_encoder/artifact_registry_repository_update.go.tmpl,
+      wired as pre_update) re-expands `remoteRepositoryConfig` into the body
+      and then appends two DEEP mask paths by hand --
+      remoteRepositoryConfig.upstreamCredentials.usernamePasswordCredentials.username
+      and .passwordSecretVersion -- before rewriting the updateMask query
+      parameter. Terraform needs this because its own diff does not reach that
+      far down a nested block. BuildMask's buildNested recurses through every
+      declared Fields level and emits exactly these dotted paths for the leaves
+      that changed (internal/gcprov/patch.go), and the mask goes on the query
+      string the same way, so the generic path reaches the same request.
+
+      Unblocks gcp.artifactregistry.rule, gcp.artifactregistry.tag and
+      gcp.attachment, all three of which ship and all three of which hang off a
+      repository.
+
+  # The three below were written and verified on 2026-09-23 and then held back,
+  # because both APIs publish a patch that magic-modules does not declare and the
+  # generator only read magic-modules, so all three would have shipped with the
+  # host REPLACING them on every change. A replaced DNS zone takes its records
+  # with it. gen.discoveredUpdate fixed that; these are the rulings it unblocked.
+
+  dns/ManagedZone:
+    hooks: [pre_delete, update_encoder]
+    required: [description]
+    note: >
+      description is required on evidence: the live probe on 2026-09-24
+      created a private zone without one and Google answered 400, "The
+      'entity.managedZone.description' parameter is required but was
+      missing". Terraform always sends "Managed by Terraform".
+
+      Both hooks are Terraform's, and one of them exists only because
+      magic-modules picked a different update method than this provider does.
+
+      update_encoder (update_encoder/managed_dns_zone.go.tmpl) re-adds
+      `nameServers`, `id` and `creationTime` -- all output-only fields -- to the
+      update body, and its own comment says why: "The upstream update method
+      requires the full ManagedZones object". That is dns.managedZones.UPDATE,
+      a PUT full replace. This provider uses dns.managedZones.PATCH, which the
+      Discovery document publishes at the same path with a partial ManagedZone
+      body (both methods checked there, 2026-09-23). Under PATCH, naming an
+      output-only field in the body is at best ignored and at worst rejected, so
+      the hook is not merely unnecessary here, it would be wrong to apply.
+
+      pre_delete (pre_delete/managed_dns_zone.go.tmpl) is gated on
+      `force_destroy`, a Terraform-only convenience field with no counterpart in
+      the DNS API. When set it pages through every record set in the zone and
+      deletes each one -- skipping NS and SOA, which the API refuses -- before
+      deleting the zone. We do not offer the field, so the hook has nothing to
+      fire on, the same shape as compute/Network's post_create above.
+
+      THE BOUNDED GAP, stated rather than discovered: deleting a zone that still
+      holds records fails, with Google's own error. That is the API's own rule
+      and it is loud, not silent; the fix is to remove the records first.
+
+      THE ONE THING THAT LOOKED UNKNOWN, AND WAS NOT. dns.managedZones CREATE
+      returns a ManagedZone, so the type's await strategy is None -- but its
+      PATCH returns an Operation, and await is a property of the TYPE, not of
+      the method. Nothing can be corrupted by that, because Update discards
+      what await returns and reads its own state back. The question was only
+      whether that read could come before the patch had landed.
+
+      Google's own description answers it. The dns v1 Operation is "a
+      successful mutation performed on a Cloud DNS resource" -- an audit
+      record of a change already made -- and it carries zoneContext.newValue,
+      "the post-operation ManagedZone resource". Its PENDING/DONE status is
+      about propagation to the authoritative name servers ("the request to
+      update the authoritative servers has been sent, but the servers might
+      not be updated yet"), not about the zone resource. So the read-back sees
+      the patched zone, and name-server propagation is not something a plan
+      should wait on. Settled from the documentation on 2026-09-23; not yet
+      observed against a real zone.
+
+      Unblocks gcp.resourcerecordset, which ships today and has nowhere to put a
+      record.
+
+  compute/HealthCheck:
+    hooks: [encoder]
+    note: >
+      One hook, doing two convenience jobs, both of which this provider asks the
+      user to do explicitly instead.
+
+      encoder (encoders/health_check_type.tmpl) looks at which of the seven
+      per-protocol blocks the configuration set -- http, https, http2, tcp, ssl,
+      grpc, grpc_tls -- and from that DERIVES the required top-level `type`
+      field. It also defaults the nested `port` to 80 or 443 when neither a port
+      nor a port_name was given.
+
+      `type` is an ordinary settable enum on the compute v1 HealthCheck message
+      (checked against the Discovery document: not readOnly, enum GRPC,
+      GRPC_WITH_TLS, HTTP, HTTP2, HTTPS, INVALID, SSL, TCP), so this provider
+      exposes it directly and the user writes it. The port defaults the hook
+      applies are the API's OWN documented defaults -- compute's HTTPHealthCheck
+      says "The default value is 80" in the Discovery document itself -- so
+      omitting the port leaves Google applying the same number the hook would
+      have sent.
+
+      THE BOUNDED GAP: `type` must be set in configuration. Terraform infers it;
+      we do not. Omitting it produces Google's own required-field error at create
+      time, which is loud and names the field. Inferring it would mean the
+      generator writing per-resource Go, which is the thing the tier gate exists
+      to keep out.
+
+      Needed for any load balancer: backend services reference health checks.
+
+  compute/RegionHealthCheck:
+    hooks: [encoder]
+    note: >
+      The regional twin of compute/HealthCheck, and the same template --
+      encoders/health_check_type.tmpl, one file referenced by both resources. The
+      reasoning above applies unchanged: `type` is a settable enum the user
+      writes, and the port defaults the hook applies are the API's own. Ruled
+      separately because a ruling names ONE resource's hooks, not because
+      anything differs.
+
+  # The last four P0 candidates, ruled 2026-09-23 once the generator could
+  # express what each one needs: a create verb other than POST, an update
+  # envelope, an update url checked against the API, and an id supplied as a
+  # create-time query parameter. Every hook template was read at the pinned
+  # mmv1 commit, and each type was generated and inspected before its note was
+  # written, so these describe what ships rather than what was expected.
+
+  pubsub/Topic:
+    hooks: [encoder, update_encoder]
+    note: >
+      Both hooks describe request shapes the generator now builds from the API
+      itself, so neither is left to hand-written code.
+
+      encoder (encoders/no_send_name.go.tmpl) deletes `name` from the create
+      body. A topic is created with a PUT to its own path, `v1/{+name}`, and
+      requestBody already leaves out every field the create url names, so
+      `name` is never in the body to begin with.
+
+      update_encoder (update_encoder/pubsub_topic.tmpl) wraps the topic,
+      `newObj["topic"] = obj`. That is AIP-134's UpdateTopicRequest{topic,
+      updateMask}, confirmed in the pubsub v1 Discovery document, with the mask
+      REQUIRED and in the body. The generator detects the envelope from the
+      patch request schema and finds the mask by its google-fieldmask format,
+      and the runtime sends exactly that shape.
+
+      THE BOUNDED GAP, stated rather than discovered: `name` is the FULL
+      resource name, "projects/<project>/topics/<topic>", in configuration as
+      on the wire. That is what the API's create path and every response use,
+      so state and configuration agree and nothing drifts. magic-modules models
+      it as the short name and rebuilds the path, which is also why its
+      update_url is not used: it names the same address as the API's own patch
+      method, so the update goes there, spelled the API's way.
+
+  pubsub/Subscription:
+    hooks: [encoder, pre_update, update_encoder]
+    note: >
+      The same two request shapes as pubsub/Topic -- a PUT create to the
+      subscription's own path, which keeps `name` out of the body, and
+      UpdateSubscriptionRequest{subscription, updateMask} as the update -- plus
+      one hook about the mask.
+
+      pre_update (pre_update/pubsub_subscription.go.tmpl) adds `bigqueryConfig`
+      to the update mask WHENEVER a BigQuery config is set, changed or not, "so
+      that the bigquery service account email can be updated properly".
+      BuildMask names only what changed, so an update that leaves
+      bigqueryConfig alone does not resend it.
+
+      THE BOUNDED GAP: a BigQuery subscription whose writer service account
+      Google rotates is not nudged by an unrelated update. Setting or changing
+      bigqueryConfig still sends it in full, which is the case the field
+      exists for. And `name` is the full resource name, as for pubsub/Topic.
+
+  bigquery/Dataset:
+    hooks: [update_encoder]
+    note: >
+      One hook, and the generic path already does what it does.
+
+      update_encoder (update_encoder/bigquery_dataset.go.tmpl) drops `access`
+      from the update body unless the ACL itself changed, because BigQuery
+      replaces the whole list with whatever it is sent and re-sending an
+      unchanged copy clobbers entries BigQuery maintains itself. BuildMask omits
+      every attribute whose value did not change, so `access` is only ever sent
+      when it did.
+
+      Held back until the update verb could be derived: Dataset.yaml declares
+      an update_url and no update_verb, and magic-modules' own default for that
+      is PUT, which with a partial body would clear every field left out. The
+      url is now checked against datasets.patch (same path, and its
+      accessPolicyVersion query parameter is one patch declares) and the type
+      PATCHes. Unblocks gcp.bigquery.table and gcp.routine, which ship already.
+
+      THE BOUNDED GAP: deleting a dataset that still holds tables fails with
+      Google's own error, since deleteContents is never sent. That is loud, and
+      it is the API's rule; the fix is to remove the tables first.
+
+  cloudkms/KeyRing:
+    hooks: [encoder, decoder]
+    note: >
+      Both hooks serve Terraform's naming convention, and one is the opposite of
+      what this provider wants.
+
+      encoder (encoders/send_nil_body.go.tmpl) is literally `return nil, nil`:
+      the create sends no body. KeyRing has exactly two properties in the
+      cloudkms v1 Discovery document, `name` and `createTime`, both readOnly,
+      so the body this provider sends is `{}` -- the same empty KeyRing.
+
+      decoder (decoders/kms.go.tmpl) overwrites the `name` Google returns with
+      the short name the user typed, and its own comment says it does so only
+      because a Terraform linter demands a field be set. Provider ids here are
+      relative resource names, so the full name Google returns is the value
+      wanted; not applying this is correct, not a tolerated gap.
+
+      Held back until it could be created: the id travels in a `keyRingId`
+      query parameter, and `name` -- the only candidate -- is output-only. The
+      generator now gives a query-carried id its own create-only attribute, so
+      configuration sets `keyRingId` and the full `name` comes back from Google.
+      A key ring has no update method; everything settable is set at creation.
+
+  # P1, the load balancer, ruled 2026-09-24. Every template below was read at
+  # the pinned mmv1 commit (2d08a4a7b218c0c9d6c3ba236eae45193d386f44). The
+  # first six are the ones whose hooks are Terraform's own bookkeeping. The
+  # last four (Address, GlobalAddress, ForwardingRule, GlobalForwardingRule)
+  # waited on labels, which compute changes only through setLabels, until the
+  # generator learned magic-modules' per-field setters.
+  compute/BackendService:
+    hooks: [decoder, encoder, post_create, post_update]
+    note: >
+      encoder (encoders/backend_service.go.tmpl) does two things, both caused by
+      Terraform's schema, not the API. It nulls maxUtilization on any backend
+      whose group is a network endpoint group, because Terraform's schema gives
+      that field a default and the API rejects it for NEGs; this provider has no
+      schema defaults, so the field goes out only if the user writes it, and
+      then Google's own validation error names it. It also deletes the cdnPolicy
+      TTLs under USE_ORIGIN_HEADERS, because Terraform sends a zero for an
+      unset TTL; this provider never sends an unset field.
+
+      decoder (decoders/backend_service.go.tmpl) drops consistentHash from a
+      read when localityLbPolicy is not MAGLEV or RING_HASH. Google keeps a
+      stale consistentHash after the policy changes, and Terraform's next
+      whole-object update would send it back and be refused. Our patch sends
+      only the fields the diff changed, so a stale consistentHash is never
+      sent unless the user changes it.
+
+      post_create and post_update (the same template,
+      compute_backend_service_security_policy.go.tmpl) call setSecurityPolicy
+      and setEdgeSecurityPolicy when security_policy or edge_security_policy
+      changed. Discovery marks both fields "[Output Only]", so here they are
+      output-only and the hook has nothing to act on.
+
+      THE BOUNDED GAP: a Cloud Armor policy cannot be attached from this type.
+      It shows in state once attached some other way. Attaching one needs a
+      setSecurityPolicy call, which is the same missing piece as setLabels.
+
+  compute/RegionBackendService:
+    hooks: [decoder, encoder, post_create]
+    note: >
+      The regional twin of compute/BackendService, with different templates.
+
+      encoder (encoders/region_backend_service.go.tmpl) strips the capacity
+      fields (capacityScaler, maxConnections*, maxRate*, maxUtilization) from
+      every backend when the scheme is not a managed one. Terraform's schema
+      defaults them, and the API refuses them for EXTERNAL and INTERNAL
+      schemes. This provider has no defaults, so they go out only if written,
+      and Google's error names the field. The part that sets subsetting to NONE
+      is inside a TargetVersionName != ga guard, so it is not in the GA
+      provider this catalog mirrors.
+
+      decoder (decoders/region_backend_service.go.tmpl) is the same
+      consistentHash drop as the global one, which our changed-fields-only
+      patch does not need. Its subsetting half is behind the same beta guard.
+
+      post_create (compute_region_backend_service_security_policy.go.tmpl)
+      calls setSecurityPolicy. Unlike the global type, magic-modules names
+      that method on the field itself (update_url), so this provider calls it
+      too: on update, and after a create the insert ignored it on. Discovery's
+      "[Output Only]" on securityPolicy means only that the insert and patch
+      ignore it. So a Cloud Armor policy CAN be attached here, and cannot on
+      the global type.
+
+  compute/BackendBucket:
+    hooks: [encoder, post_create, post_update]
+    note: >
+      encoder (encoders/compute_backend_bucket.go.tmpl) is the cdnPolicy TTL
+      deletion from compute/BackendService, with FORCE_CACHE_ALL also dropping
+      maxTtl. It exists because Terraform sends zeros for unset TTLs, and this
+      provider does not send unset fields.
+
+      post_create and post_update
+      (compute_backend_bucket_security_policy.go.tmpl) call
+      setEdgeSecurityPolicy. edgeSecurityPolicy is "[Output Only]" in
+      Discovery, so the same bounded gap as compute/BackendService applies. The
+      API publishes no fingerprint for a backend bucket, so its patch carries
+      no lock.
+
+  compute/TargetHttpsProxy:
+    hooks: [decoder, encoder, update_encoder]
+    note: >
+      encoder and update_encoder (one template,
+      encoders/compute_target_https_proxy.go.tmpl) rename Terraform's
+      certificate_manager_certificates onto the API's sslCertificates. That
+      field is Terraform's invention: the API has one list, sslCertificates,
+      holding either kind of certificate, and that is the field this provider
+      exposes. The decoder (decoders/compute_target_https_proxy.go.tmpl) is
+      the reverse rename on read.
+
+      The encoder also sends serverTlsPolicy as null when it is not
+      configured, so that removing it from a Terraform configuration detaches
+      it. This provider does not remove what configuration stops mentioning
+      (BuildMask's never-removes rule, the same everywhere), so detaching a
+      server TLS policy is not possible from configuration. That is the
+      provider's general behaviour, not a gap specific to this type.
+
+  compute/RegionTargetHttpsProxy:
+    hooks: [decoder, encoder, update_encoder]
+    note: >
+      The regional twin of compute/TargetHttpsProxy. Its templates
+      (compute_region_target_https_proxy.go.tmpl) do the same certificate
+      rename and the same serverTlsPolicy null, so the reasoning above
+      applies unchanged.
+
+  compute/SslPolicy:
+    hooks: [update_encoder]
+    note: >
+      update_encoder (update_encoder/ssl_policy.tmpl) copies the current
+      fingerprint into the update, which this provider already does for every
+      type whose fingerprint says it is required (LockField), and sends
+      customFeatures as null when the list is empty. Clearing customFeatures
+      by writing an empty list therefore sends [] rather than null. Google
+      requires the list empty whenever the profile is not CUSTOM, and whether
+      it treats [] the same as null is not verified.
+
+  compute/Address:
+    hooks: [post_create]
+    note: >
+      post_create (post_create/labels.tmpl) calls setLabels after the insert,
+      because compute's labels "can only be added or modified by the
+      setLabels method". This provider does the same thing generically:
+      magic-modules names setLabels as the labels field's update_url, so it
+      is a setter here, and a create whose read-back is missing configured
+      labels calls it (gcprov.setAfterCreate). A later label change calls it
+      too. addresses publish no patch at all, so every other change replaces
+      the address, which is what the API does with it anyway.
+
+  compute/GlobalAddress:
+    hooks: [post_create, pre_create]
+    note: >
+      post_create is the same labels.tmpl as compute/Address, handled the same
+      way.
+
+      pre_create (pre_create/compute_global_address.go.tmpl) sets networkTier
+      to PREMIUM unless addressType is INTERNAL. Discovery's own description
+      of the field says "global external IP addresses are always Premium
+      Tier", so leaving it unset gets the same tier from Google. Terraform
+      sends it because its schema would otherwise record no value.
+
+  compute/ForwardingRule:
+    hooks: [post_create, pre_create]
+    note: >
+      post_create is labels.tmpl, handled as on compute/Address. target also
+      has a setter (setTarget), so pointing a forwarding rule at a new target
+      is an update, not a replacement.
+
+      pre_create (pre_create/compute_forwarding_rule.go.tmpl) removes labels
+      from the insert when the target is a Private Service Connect service
+      attachment, because Google refuses labels on those creates. THE BOUNDED
+      GAP: a PSC forwarding rule configured with labels fails its create with
+      Google's own error. Leave labels off it.
+
+      Its patch is restricted in prose ("Currently, you can only patch the
+      network_tier field"), so without a patchable: list every field no setter
+      carries replaces the rule. Terraform patches allowGlobalAccess and
+      allowPscGlobalAccess as well; which list is right is open and will be
+      settled live.
+
+  compute/GlobalForwardingRule:
+    hooks: [post_create, pre_create]
+    note: >
+      The global twin. post_create is labels.tmpl and target has setTarget, as
+      on compute/ForwardingRule.
+
+      pre_create (pre_create/compute_global_forwarding_rule.go.tmpl) removes
+      labels from the insert when the target is a PSC service attachment or
+      one of the Google API bundles "all-apis" and "vpc-sc". The same bounded
+      gap as the regional rule applies: labels on those fail the create
+      loudly.
+
+      Its patch carries the same prose restriction as the regional one, so
+      the same rule applies, and the same open question about what
+      Terraform additionally patches.
+
+  # P2, ruled 2026-09-24: the one-hook types, plus cloudtasks/Queue and
+  # monitoring/Service, which unblock gcp.task and the service-level
+  # objective type. Every template read at the pinned mmv1 commit. Held
+  # back: iam/WorkforcePool (soft delete), dataproc/Batch (server-added
+  # properties on an immutable type), binaryauthorization/Policy (a
+  # singleton whose delete is a PUT of the default).
+  logging/Metric:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  monitoring/Group:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  monitoring/MetricDescriptor:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  monitoring/AlertPolicy:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name_set_project.go.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  dataproc/SessionTemplate:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/set_id_name_with_slashes.go.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  compute/StoragePool:
+    hooks: [pre_delete]
+    note: >
+      pre_delete (pre_delete/compute_storage_pool.go.tmpl) refuses to delete when
+      `deletion_protection` is set, a Terraform-only field.
+
+  memcache/Instance:
+    hooks: [pre_delete]
+    note: >
+      pre_delete (pre_delete/memcache_instance.go.tmpl) refuses to delete when
+      `deletion_protection` is set, a Terraform-only field.
+
+  compute/TargetInstance:
+    hooks: [post_create]
+    note: >
+      post_create (post_create/compute_target_instance_security_policy.go.tmpl)
+      sets a security policy, but the whole body sits inside a
+      `TargetVersionName != "ga"` guard, so the GA provider this catalog mirrors
+      has no such hook.
+
+  compute/Interconnect:
+    hooks: [post_create]
+    note: >
+      post_create (post_create/labels.tmpl) calls setLabels after the insert.
+      magic-modules names setLabels as the labels field's update_url, so it is a
+      setter here and a create whose read-back lacks the labels calls it
+      (gcprov.setAfterCreate). Note what this type is: creating one orders a
+      physical dedicated interconnect.
+
+  cloudtasks/Queue:
+    hooks: [post_create, post_update]
+    note: >
+      post_create and post_update (cloud_tasks_queue_state.go.tmpl) call :pause
+      or :resume when Terraform's `desired_state` field changes. That field is
+      Terraform's; the API's `state` is output-only, so THE BOUNDED GAP is that a
+      queue cannot be paused from configuration here.
+
+  monitoring/Service:
+    hooks: [custom_import, encoder]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses
+      `terraform import`'s id argument, which infrena does not use.
+
+      encoder (encoders/monitoring_service.go.tmpl) sets `custom: {}` when absent,
+      because only CUSTOM services can be created and the block has no fields,
+      and removes `name`, because the id is the serviceId query parameter. The
+      generator already sends the id as serviceId. THE BOUNDED GAP: write
+      `custom: {}` in configuration; Google's own error names it otherwise.
+
+  compute/Route:
+    hooks: [decoder]
+    note: >
+      decoder (decoders/route.tmpl) splits nextHopInstance into Terraform's
+      `next_hop_instance_zone` field and a relative link. We have no such field,
+      and the self_link equivalence reports nextHopInstance as written when
+      Google answers with a full url. The tgc_decoder beside it belongs to a
+      different tool.
+
+  bigquery/Job:
+    hooks: [encoder]
+    note: >
+      encoder (encoders/bigquery_job.go.tmpl) fills jobReference's project from
+      the provider's project. THE BOUNDED GAP: write jobReference.projectId in
+      configuration; the API's error names it otherwise.
+
+  cloudbuild/Repository:
+    hooks: [encoder]
+    note: >
+      encoder (encoders/cloudbuildv2_repository.go.tmpl) derives project and
+      location from Terraform's parent_connection field and writes the short name
+      back. Nothing reaches the body; it is Terraform's own id bookkeeping.
+
+  pubsub/Schema:
+    hooks: [update_encoder]
+    note: >
+      update_encoder (update_encoder/pubsub_schema.tmpl) wraps the body for a
+      schema commit, a new revision. This provider does not commit revisions: a
+      schema has no patch, so any change replaces it.
+
+  bigquery/RowAccessPolicy:
+    hooks: [pre_delete]
+    note: >
+      pre_delete (pre_delete/bigquery_row_access_policy.go.tmpl) always sends
+      force=true. THE BOUNDED GAP: without it, Google refuses to delete a table's
+      LAST row access policy, because that would widen access. The refusal is
+      loud and names the reason.
+
+  compute/NodeGroup:
+    hooks: [pre_create]
+    note: >
+      pre_create (pre_create/compute_node_group_url_replace.go.tmpl) fills the
+      initialNodeCount query parameter from Terraform's initial_size or the
+      autoscaling policy's minimum, in a create url magic-modules spells with
+      the token PRE_CREATE_REPLACE_ME. The generator refuses a create url
+      carrying that token, so this type does not ship until the parameter can
+      be filled; the ruling records what the hook does.
+
+  dns/Policy:
+    hooks: [pre_delete]
+    clear_before_delete: [networks]
+    required: [description]
+    note: >
+      description is required on evidence: Google refused a create without
+      one on 2026-09-24 ("The 'entity.policy.description' parameter is
+      required but was missing"), though Discovery calls it a string "for
+      the user's convenience". Terraform never meets this because it always
+      sends "Managed by Terraform"; this provider does not invent values, so
+      configuration must write one.
+
+      pre_delete (pre_delete/detach_network.tmpl) patches `networks` to empty
+      before the delete, because Google refuses to delete a policy with networks
+      attached. clear_before_delete does the same here, and it is needed:
+      removing networks from configuration does not detach them.
+
+  dns/ResponsePolicy:
+    hooks: [pre_delete]
+    clear_before_delete: [gkeClusters, networks]
+    required: [description]
+    note: >
+      description is required on evidence: the live probe on 2026-09-24
+      answered 400, "The 'entity.responsePolicy.description' parameter is
+      required but was missing".
+
+      pre_delete (pre_delete/response_policy_detach_network_gke.tmpl) patches
+      `gkeClusters` and then `networks` to empty before the delete, for the same
+      reason as dns/Policy.
+
+  # Secret Manager, ruled 2026-09-24 with the names James chose on the same
+  # day: projects.secrets is gcp.secret and projects.locations.secrets is
+  # gcp.regionalsecret. Held until both could ship, because regional secrets
+  # are served only by their region's endpoint
+  # (secretmanager.<location>.rep.googleapis.com), which the runtime can now
+  # reach (catalog.Type.EndpointTemplate), and because the regional
+  # collection was paired with the wrong magic-modules resource until
+  # preferExactCollection. Templates read at the pinned mmv1 commit.
+  secretmanager/Secret:
+    hooks: [pre_delete, pre_update]
+    note: >
+      pre_delete (pre_delete/secret_manager_secret.go.tmpl) refuses to delete
+      when `deletion_protection` is set, a Terraform-only field the v1 Secret
+      message does not have. Nothing to act on here.
+
+      pre_update (pre_update/secret_manager_secret.go.tmpl) re-masks
+      `replication` for Terraform's own automatic-to-auto schema upgrade, and
+      drops `expireTime` from the body when only `ttl` changed, because
+      Terraform sends the whole object and the API takes only one of the two.
+      This provider sends only the fields the diff changed, so `expireTime`
+      is never in the body unless it changed, and it has no replication
+      schema to upgrade.
+
+      A secret here is the container. Its value lives in secret versions,
+      which Discovery publishes no create method for (addVersion), so they do
+      not ship.
+
+  secretmanager/RegionalSecret:
+    hooks: [pre_delete, pre_update]
+    note: >
+      Paired with projects.locations.secrets through product_aliases and
+      preferExactCollection: magic-modules keeps it in its own product,
+      secretmanagerregional, whose base_url puts it on
+      secretmanager.{{location}}.rep.googleapis.com. That host is checked
+      against all 50 endpoints the Discovery document lists before the
+      catalog carries it.
+
+      pre_delete (pre_delete/regional_secret.go.tmpl) is the same
+      `deletion_protection` guard as the global secret's. pre_update
+      (pre_update/secret_manager_regional_secret.go.tmpl) is only the
+      `ttl`/`expireTime` half of the global one, with the same reasoning.
+
+
+# patchable: the types whose API publishes a PATCH that only accepts SOME of the
+# resource's fields. Discovery cannot say that -- it publishes the whole
+# resource as the request schema and limits it in PROSE on the method -- so the
+# generator refuses to derive an update verb for such a type until an entry here
+# names the fields the API really takes. Everything else settable becomes
+# ForceNew, which means a change to it REPLACES the resource, which is what the
+# API does with it anyway.
+#
+# It is an allowlist rather than a list of exclusions on purpose: a field added
+# upstream then defaults to replacement, which is destructive but loud and
+# convergent, rather than to a patch the API quietly ignores, which is neither.
+# See internal/gen/patchlimits.go. Types left out of this map are named in
+# gen/warnings.txt as `noupdate` rows, each quoting Google's own sentence.
+patchable:
+  gcp.network:
+    fields: [routingConfig]
+    note: >
+      compute.networks.patch, read from the pinned Discovery document on
+      2026-09-23: "Patches the specified network with the data included in the
+      request. Only routingConfig can be modified."
+
+      The type declares five settable, non-ForceNew attributes -- IPv4Range,
+      enableUlaInternalIpv6, mtu, networkFirewallPolicyEnforcementOrder and
+      routingConfig -- and exactly one of them is in that sentence. The other
+      four now replace the network, which is what changing them has always done
+      here and what the API forces either way.
+
+  gcp.image:
+    fields: [family, description]
+    note: >
+      compute.images.patch, same document and date: "Only the following fields
+      can be modified: family, description, deprecation status."
+
+      `deprecated` (the deprecation status) is readOnly in Discovery, so it is
+      output-only here and cannot be listed. `labels` is deliberately NOT
+      listed: compute changes image labels through a separate setLabels method,
+      not through patch, so a label change replaces the image until somebody
+      implements that call.
+
+  gcp.forwardingrule:
+    fields: [allowGlobalAccess, allowPscGlobalAccess]
+    note: >
+      compute.forwardingRules.patch says "Currently, you can only patch the
+      network_tier field", and that understates it: the live suite's probe on
+      2026-09-24 patched a global forwarding rule's description and Google
+      applied it. Listed here only what has a source: allowGlobalAccess and
+      allowPscGlobalAccess, because magic-modules patches exactly those two
+      per field (update_url with PATCH on ForwardingRule.yaml), which
+      Terraform users exercise in production. networkTier, the one field
+      Google's sentence names, is NOT listed: magic-modules marks it
+      immutable, either source's immutable makes a field ForceNew here, and
+      listing it would claim a patch that never happens. description is NOT listed for the regional rule: the probe
+      patched a global one, and the regional patch has not been asked. labels
+      and target are not here because setters change them (setLabels,
+      setTarget). Everything else replaces the rule.
+
+  gcp.globalforwardingrule:
+    fields: [description, loadBalancingScheme, externalManagedBackendBucketMigrationState, externalManagedBackendBucketMigrationTestingPercentage]
+    note: >
+      compute.globalForwardingRules.patch carries the same "only the
+      network_tier field" sentence as the regional one, and it is wrong the
+      same way. description is listed on live evidence: the probe on
+      2026-09-24 patched it, with the fingerprint, and Google applied it.
+      loadBalancingScheme and the two backend bucket migration fields are
+      listed because magic-modules patches exactly those per field
+      (GlobalForwardingRule.yaml), for the EXTERNAL to EXTERNAL_MANAGED
+      migration Google documents on those fields. networkTier is not listed,
+      for the regional rule's reason. labels and target change through
+      setLabels and setTarget.
+
+  gcp.subnetwork:
+    fields: [secondaryIpRanges, role, stackType, privateIpv6GoogleAccess, logConfig]
+    one_field_per_patch: true
+    note: >
+      ONE FIELD PER PATCH, on evidence: the live suite on 2026-09-24 sent a
+      patch changing secondaryIpRanges and logConfig together and Google
+      answered 400, "Only one field at a time can be modified in the request.
+      The modified fields were: [secondaryIpRanges, logConfig]." Nothing in
+      the Discovery text says so. Each changed field now goes in a patch of
+      its own, with the fingerprint re-read between them.
+
+      compute.subnetworks.patch, read from the pinned Discovery document on
+      2026-09-23: "Only certain fields can be updated with a patch request as
+      indicated in the field descriptions. You must specify the current
+      fingerprint of the subnetwork resource being patched."
+
+      The field descriptions name four: secondaryIpRanges and role ("can be
+      updated with a patch request"), stackType and privateIpv6GoogleAccess
+      ("can be both set at resource creation time and updated using patch").
+      privateIpGoogleAccess is updated by a separate method,
+      setPrivateIpGoogleAccess, and ipCidrRange by expandIpCidrRange; since
+      2026-09-24 both are setters (magic-modules names them per field), so
+      neither needs to be on this list. ipv6AccessType is "immutable
+      and can only be specified during creation or the first time the subnet
+      is updated into IPV4_IPV6 dual stack", a transition this list does not
+      try to model.
+
+      logConfig is listed on evidence rather than on Google's text, which says
+      nothing either way: magic-modules patches it with the fingerprint, and
+      the live probe on 2026-09-24 (TestLiveProbes) sent exactly that patch to
+      a real subnetwork and Google applied it -- flow logs on, at the interval
+      sent. Turning flow logs on and off is the commonest subnetwork change
+      there is, and until this it planned a replacement.
+
+      This entry was held back until 2026-09-23 because of the fingerprint,
+      not the field list. Every update needs the current one, and the update
+      body carries only changed fields, so it never did. catalog.Type.LockField
+      now names it and Update copies it from the observation it was handed.
+
+# Curated aliases: the short word people actually say, for attributes they write
+# constantly. The generator already emits a snake_case alias for EVERY camelCase
+# attribute (11,680 of them), so this file is only for the cases where the
+# mechanical spelling is not the natural one -- ip_cidr_range is correct and
+# nobody says it.
+#
+# TOP LEVEL ONLY. The format below is type -> attribute -> alias, with no path
+# notation, so a nested attribute cannot be given one here. That is a real
+# limit, not an oversight: infrena resolves nested aliases from v0.14.1 and
+# element aliases from v0.15.0, so a nested curated alias would work if this
+# file could express one.
+#
+# AN ALIAS IS A ONE-WAY COMMITMENT. Adding one later is additive; correcting or
+# removing a published one breaks whoever wrote it. Kept deliberately small for
+# that reason, and every entry below is a word that appears in Google's own
+# documentation prose for the same field.
+aliases:
+  gcp.subnetwork:
+    ipCidrRange: cidr
+  gcp.network:
+    autoCreateSubnetworks: auto_subnets
+  gcp.firewall:
+    sourceRanges: sources
+    destinationRanges: destinations
+    targetTags: targets
+  gcp.compute.instance:
+    machineType: machine
+  gcp.storage.bucket:
+    storageClass: class
+  gcp.container.cluster:
+    initialNodeCount: node_count
 
 # product_aliases: Discovery API name -> every vendored magic-modules product
 # directory that also carries resources for it. mmv1's directory names
@@ -125,6 +882,11 @@ product_aliases:
   sqladmin: [sql]
   iam: [iam2, iam3, iambeta, iamworkforcepool]
   cloudbuild: [cloudbuildv2]
+  # Regional secrets are their own magic-modules product, served from
+  # secretmanager.{location}.rep.googleapis.com, and Discovery has one
+  # document for both. preferExactCollection pairs projects.locations.secrets
+  # with RegionalSecret, whose base_url walks that collection.
+  secretmanager: [secretmanagerregional]
 
 # The types `discover` scans when an instance names none. Unlike AWS this is not
 # a cost measure — Cloud Asset Inventory returns a whole project in a few calls —

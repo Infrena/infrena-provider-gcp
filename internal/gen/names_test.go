@@ -33,32 +33,34 @@ func TestNamesAreShortWhenUniqueAndQualifiedWhenNot(t *testing.T) {
 // TestAnAssignedNameNeverMoves is the whole point of the lock. A short name already
 // given to one type must stay with it even when a new GCP type would now make the
 // resource segment ambiguous — the newcomer takes the qualified form.
+// "widget", not "instance": instance is a generic word (genericWords) and is
+// qualified from the start, which is a different rule from this one.
 func TestAnAssignedNameNeverMoves(t *testing.T) {
 	lock := NewLock()
-	first := []Candidate{{Service: "compute", Resource: "instance"}}
+	first := []Candidate{{Service: "compute", Resource: "widget"}}
 	got, err := Assign(first, lock)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got[first[0]] != "gcp.instance" {
-		t.Fatalf("first pass gave %q, want gcp.instance", got[first[0]])
+	if got[first[0]] != "gcp.widget" {
+		t.Fatalf("first pass gave %q, want gcp.widget", got[first[0]])
 	}
 
-	// A new release of GCP adds sqladmin instances. Without the lock, the naive rule
+	// A new release of GCP adds sqladmin widgets. Without the lock, the naive rule
 	// would now qualify BOTH and silently rename a released type.
 	second := []Candidate{
-		{Service: "compute", Resource: "instance"},
-		{Service: "sqladmin", Resource: "instance"},
+		{Service: "compute", Resource: "widget"},
+		{Service: "sqladmin", Resource: "widget"},
 	}
 	got2, err := Assign(second, lock)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got2[second[0]] != "gcp.instance" {
-		t.Errorf("compute instance renamed to %q; a released name must never move", got2[second[0]])
+	if got2[second[0]] != "gcp.widget" {
+		t.Errorf("compute widget renamed to %q; a released name must never move", got2[second[0]])
 	}
-	if got2[second[1]] != "gcp.sqladmin.instance" {
-		t.Errorf("newcomer got %q, want gcp.sqladmin.instance", got2[second[1]])
+	if got2[second[1]] != "gcp.sqladmin.widget" {
+		t.Errorf("newcomer got %q, want gcp.sqladmin.widget", got2[second[1]])
 	}
 }
 
@@ -136,5 +138,36 @@ func TestAnUnresolvableClashLeavesTheLockUnchanged(t *testing.T) {
 	}
 	if _, ok := lock.Names["a.b/c"]; ok {
 		t.Errorf("the candidate resolved before the failing one leaked into the lock: %v", lock.Names)
+	}
+}
+
+// TestAGenericWordIsQualifiedEvenUncontested. Left to the short-unless-
+// contested rule, a Memcache instance became gcp.instance for good. A word
+// on the list is always qualified, an ordinary word keeps its short name, and
+// a generic name already in the lock does not move.
+func TestAGenericWordIsQualifiedEvenUncontested(t *testing.T) {
+	lock := NewLock()
+	lock.Names["pubsub/topic"] = "gcp.topic"
+	lock.Names["eventarc/channel"] = "gcp.channel"
+	cands := []Candidate{
+		{Service: "memcache", Resource: "instance"},
+		{Service: "dns", Resource: "responsepolicy"},
+		{Service: "eventarc", Resource: "channel"},
+	}
+	got, err := Assign(cands, lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		cand Candidate
+		want string
+	}{
+		{cands[0], "gcp.memcache.instance"},
+		{cands[1], "gcp.responsepolicy"},
+		{cands[2], "gcp.channel"},
+	} {
+		if got[c.cand] != c.want {
+			t.Errorf("%s/%s named %q, want %q", c.cand.Service, c.cand.Resource, got[c.cand], c.want)
+		}
 	}
 }

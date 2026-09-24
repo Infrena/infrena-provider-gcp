@@ -72,7 +72,11 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		return nil, err
 	}
 
-	resp, err := p.client.Do(ctx, http.MethodPost, reqURL, body)
+	verb := ty.CreateVerb
+	if verb == "" {
+		verb = http.MethodPost
+	}
+	resp, err := p.client.Do(ctx, verb, reqURL, body)
 	if err != nil {
 		// The POST itself failed, so nothing was created. Safe to error.
 		return nil, err
@@ -87,7 +91,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 	st, readErr := p.readAfterCreate(ctx, ty, desired.Attrs, scoped, awaited)
 	switch {
 	case st != nil:
-		return st, nil
+		return p.setAfterCreate(ctx, ty, st, desired.Attrs), nil
 	case awaitErr != nil:
 		// Nothing exists AND the operation failed: the create genuinely did
 		// not happen, so the error is the truth and returning it orphans
@@ -145,6 +149,7 @@ func (p *Provider) bestEffortState(ctx context.Context, ty *catalog.Type, desire
 	for k, v := range p.reconciler(ctx).attrs(ty.Attributes, desired.Attrs, schemaAttrs(ty.Attributes, awaited)) {
 		attrs[k] = v
 	}
+	shortNameFromOwnID(ty, id, attrs)
 	return &resource.ResourceState{
 		Type:       ty.Name,
 		ProviderID: id,
@@ -459,6 +464,7 @@ func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *res
 			attrs[name] = prior
 		}
 	}
+	shortNameFromOwnID(ty, id, attrs)
 	return &resource.ResourceState{
 		Type:       current.Type,
 		ProviderID: id,
@@ -485,6 +491,9 @@ func (p *Provider) Delete(ctx context.Context, current *resource.ResourceState) 
 	if err := ctx.Err(); err != nil {
 		return err // last chance to stop before anything is destroyed
 	}
+	if err := p.clearBeforeDelete(ctx, ty, current, attrs); err != nil {
+		return err
+	}
 	resp, err := p.client.Do(ctx, http.MethodDelete, reqURL, nil)
 	if isNotFound(err) {
 		return nil
@@ -492,11 +501,36 @@ func (p *Provider) Delete(ctx context.Context, current *resource.ResourceState) 
 	if err != nil {
 		return err
 	}
-	_, err = p.await(ctx, ty, resp)
+	_, err = p.awaitAs(ctx, ty, ty.DeleteAwaitKind(), resp)
 	if isNotFound(err) {
-		return nil
+		return p.confirmGone(ctx, ty, current.ProviderID, attrs, err)
 	}
 	return err
+}
+
+// confirmGone decides what a NOT_FOUND during a delete's wait means, by
+// asking. It is ambiguous: the operation can finish NOT_FOUND because the
+// resource was already gone, which is success, but a 404 on the POLL of the
+// operation (an operation Google has expired, a poll url that addresses
+// nothing) says nothing about the resource at all. Reported as success, that
+// second case tells infrena a delete happened that did not, and infrena then
+// drops the Deposed record that is the only handle on a replaced object.
+//
+// So read the resource: gone is success, anything else returns the
+// original error. Uncancellable and bounded, like every read after a
+// mutation was sent.
+func (p *Provider) confirmGone(ctx context.Context, ty *catalog.Type, id string, attrs map[string]value.Value, awaitErr error) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Duration(ty.TimeoutSeconds)*time.Second)
+	defer cancel()
+	getURL, err := p.itemURL(ty, "", id, attrs)
+	if err != nil {
+		return awaitErr
+	}
+	if _, err := p.client.Do(ctx, http.MethodGet, getURL, nil); isNotFound(err) {
+		return nil
+	}
+	return fmt.Errorf("gcp: %s: the delete's operation could not be followed, and %s is still there: %w",
+		ty.Name, id, awaitErr)
 }
 
 // Import adopts an existing resource by its provider id.
@@ -625,7 +659,7 @@ func lookupPath(attrs map[string]value.Value, path string) (value.Value, bool) {
 // The version lives in PathPrefix, never in the template (see
 // catalog.Type.PathPrefix).
 func absURL(ty *catalog.Type, rel string) string {
-	return ty.APIBaseURL + ty.PathPrefix + rel
+	return baseURLFor(ty, rel) + ty.PathPrefix + rel
 }
 
 // itemURL returns the request url addressing ONE existing item: Read's GET
@@ -801,4 +835,116 @@ func placeholderNames(tmpl string) map[string]bool {
 		out[strings.TrimSpace(name)] = true
 	}
 	return out
+}
+
+// shortNameFromOwnID reports `name` the way this type's schema means it, when
+// Google answers with the full resource name instead.
+//
+// Where a type's id template ends in "/{{name}}" -- magic-modules' model, and
+// the create sends that short name as its "?<resource>Id=" -- `name` in this
+// schema IS the short name. But AIP-133 APIs answer with `name` set to the
+// FULL relative resource name. Reported as it came back, state and
+// configuration disagree on a field that is part of the url, so every plan
+// after a create proposes a replacement. 37 shipping types have this shape:
+// Eventarc triggers and channels, the networkservices and networksecurity
+// families, Certificate Manager, Cloud Deploy.
+//
+// It fires only when the answer names THIS resource: the same collection and
+// the same last segment as the resource's own provider id. That is the whole
+// test, so a name pointing anywhere else is left as Google sent it, and a
+// project NUMBER in the answer where the id has the project's name does not
+// defeat it. A type whose `name` is the full path (a Pub/Sub topic, whose id
+// template is "{+topic}") or is Google's to set is never touched.
+func shortNameFromOwnID(ty *catalog.Type, id string, attrs map[string]value.Value) {
+	a := ty.Attributes["name"]
+	if a == nil || a.Output || !selfLinkEndsInName(ty.SelfLink) {
+		return
+	}
+	v, ok := attrs["name"]
+	full, isString := v.Raw.(string)
+	if !ok || !v.Known || !isString || !strings.Contains(full, "/") {
+		return
+	}
+	got, want := strings.Split(full, "/"), strings.Split(id, "/")
+	if len(got) < 2 || len(want) < 2 ||
+		got[len(got)-1] != want[len(want)-1] || got[len(got)-2] != want[len(want)-2] {
+		return
+	}
+	attrs["name"] = value.Value{Kind: v.Kind, Known: true, Raw: got[len(got)-1], Source: v.Source}
+}
+
+// selfLinkEndsInName reports whether an id template's last segment is the
+// bare `name` placeholder -- "{{name}}" as magic-modules writes it, "{name}"
+// as a Discovery path does -- rather than a capture of the whole path.
+func selfLinkEndsInName(tmpl string) bool {
+	return strings.HasSuffix(tmpl, "/{{name}}") || strings.HasSuffix(tmpl, "/{name}")
+}
+
+// baseURLFor is the host a request for rel goes to: the type's regional
+// endpoint when it has one, filled with the location rel itself names, and
+// APIBaseURL otherwise. A regional secret is served only by its own region's
+// endpoint, and every url for one names that region.
+func baseURLFor(ty *catalog.Type, rel string) string {
+	if ty.EndpointTemplate == "" {
+		return ty.APIBaseURL
+	}
+	_, after, ok := strings.Cut("/"+strings.TrimPrefix(rel, "/"), "/locations/")
+	if !ok {
+		return ty.APIBaseURL
+	}
+	loc, _, _ := strings.Cut(after, "/")
+	if loc == "" || strings.ContainsAny(loc, "{}?") {
+		return ty.APIBaseURL
+	}
+	return strings.ReplaceAll(ty.EndpointTemplate, "{location}", loc)
+}
+
+// clearBeforeDelete patches each of ty.ClearBeforeDelete to empty, when the
+// resource holds anything in it, and waits for each. A Cloud DNS policy
+// refuses deletion while networks are attached; the clearing patch is what
+// Terraform's pre_delete sends. A failure here returns before the DELETE, so
+// state still records the resource, which does still exist.
+func (p *Provider) clearBeforeDelete(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, attrs map[string]value.Value) error {
+	if len(ty.ClearBeforeDelete) == 0 || ty.UpdateVerb == "" {
+		return nil
+	}
+	reqURL, err := p.itemURL(ty, ty.UpdateURL, current.ProviderID, attrs)
+	if err != nil {
+		return err
+	}
+	for _, f := range ty.ClearBeforeDelete {
+		name, a := attrByCanonical(ty, f)
+		if a == nil || isEmpty(current.Attributes[name]) {
+			continue
+		}
+		body := map[string]any{f: nil}
+		if ty.LockField != "" {
+			if la, v := lockValue(ty, current.Attributes); v.Known {
+				body[ty.LockField] = wireValue(la, v)
+			}
+		}
+		resp, err := p.sendPatch(ctx, ty, reqURL, body, []string{f})
+		if err != nil {
+			return fmt.Errorf("gcp: %s: clearing %s before the delete: %w", ty.Name, f, err)
+		}
+		if _, err := p.await(ctx, ty, resp); err != nil {
+			return fmt.Errorf("gcp: %s: clearing %s before the delete: %w", ty.Name, f, err)
+		}
+	}
+	return nil
+}
+
+// isEmpty reports whether v holds nothing: absent, unknown, or an empty list
+// or map.
+func isEmpty(v value.Value) bool {
+	if !v.Known || v.Kind == value.KindInvalid {
+		return true
+	}
+	switch raw := v.Raw.(type) {
+	case []value.Value:
+		return len(raw) == 0
+	case map[string]value.Value:
+		return len(raw) == 0
+	}
+	return false
 }

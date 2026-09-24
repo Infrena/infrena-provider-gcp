@@ -28,7 +28,6 @@ tier3	apigateway/Api	min_version is beta, not ga
 tier3	apigateway/Gateway	min_version is beta, not ga
 tier3	apigateway/locations	no insert or create method
 tier3	apigateway/operations	no insert or create method
-tier2	artifactregistry/Repository	unruled wire hooks: encoder, pre_update
 tier3	artifactregistry/aptArtifacts	no insert or create method
 tier3	artifactregistry/dockerImages	no insert or create method
 tier3	artifactregistry/files	no insert or create method
@@ -46,9 +45,6 @@ tier3	artifactregistry/projects	no insert or create method
 tier3	artifactregistry/pythonPackages	no insert or create method
 tier3	artifactregistry/versions	no insert or create method
 tier3	artifactregistry/yumArtifacts	no insert or create method
-tier2	bigquery/Dataset	unruled wire hooks: update_encoder
-tier2	bigquery/Job	unruled wire hooks: encoder
-tier2	bigquery/RowAccessPolicy	unruled wire hooks: pre_delete
 tier3	bigquery/models	no insert or create method
 tier3	bigquery/projects	no insert or create method
 tier3	bigquery/tabledata	no insert or create method
@@ -68,7 +64,6 @@ tier3	cloudasset/assets	no insert or create method
 tier3	cloudasset/effectiveIamPolicies	no insert or create method
 tier3	cloudasset/operations	no insert or create method
 tier3	cloudasset/v1	no insert or create method
-tier2	cloudbuild/Repository	unruled wire hooks: encoder
 tier3	cloudbuild/locations	no insert or create method
 tier3	cloudbuild/operations	no insert or create method
 tier3	clouddeploy/automationRuns	no insert or create method
@@ -84,7 +79,6 @@ tier2	cloudkms/CryptoKey	unruled wire hooks: custom_delete, custom_import, decod
 tier2	cloudkms/CryptoKeyVersion	unruled wire hooks: custom_delete, custom_import, pre_update
 tier3	cloudkms/EkmConnection	no delete method
 tier3	cloudkms/KeyHandle	no delete method
-tier2	cloudkms/KeyRing	unruled wire hooks: decoder, encoder
 tier3	cloudkms/ekmConfig	no insert or create method
 tier3	cloudkms/folders	no insert or create method
 tier3	cloudkms/importJobs	no delete method
@@ -106,56 +100,40 @@ tier3	cloudresourcemanager/v3	no insert or create method
 tier2	cloudscheduler/Job	unruled wire hooks: encoder, post_create, post_update, update_encoder
 tier3	cloudscheduler/locations	no insert or create method
 tier3	cloudscheduler/operations	no insert or create method
-tier2	cloudtasks/Queue	unruled wire hooks: post_create, post_update
 tier3	cloudtasks/locations	no insert or create method
 tier3	cloudtasks/operations	no insert or create method
 tier3	composer/imageVersions	no insert or create method
 tier3	composer/operations	no insert or create method
 tier3	composer/workloads	no insert or create method
-tier2	compute/Address	unruled wire hooks: post_create
-tier2	compute/BackendBucket	unruled wire hooks: encoder, post_create, post_update
-tier2	compute/BackendService	unruled wire hooks: decoder, encoder, post_create, post_update
 tier2	compute/Disk	unruled wire hooks: custom_update, decoder, encoder, pre_delete, update_encoder
 tier3	compute/DiskType	magic-modules marks it exclude: true
 tier2	compute/FirewallPolicy	unruled wire hooks: post_create, post_delete, post_update
-tier2	compute/ForwardingRule	unruled wire hooks: post_create, pre_create
 tier3	compute/FutureReservation	min_version is beta, not ga
-tier2	compute/GlobalAddress	unruled wire hooks: post_create, pre_create
-tier2	compute/GlobalForwardingRule	unruled wire hooks: post_create, pre_create
 tier2	compute/GlobalVmExtensionPolicy	unruled wire hooks: post_delete, pre_delete, pre_update
-tier2	compute/HealthCheck	unruled wire hooks: encoder
 tier3	compute/InstanceGroup	magic-modules marks it exclude: true
 tier3	compute/InstanceGroupManager	magic-modules marks it exclude: true
-tier2	compute/Interconnect	unruled wire hooks: post_create
 tier2	compute/InterconnectAttachment	unruled wire hooks: post_create, pre_delete
 tier3	compute/MachineImage	min_version is beta, not ga
 tier3	compute/MachineType	magic-modules marks it exclude: true
-tier2	compute/NodeGroup	unruled wire hooks: pre_create
+tier3	compute/NodeGroup	create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill
 tier2	compute/OrganizationSecurityPolicy	unruled wire hooks: post_create, post_delete, post_update
 tier3	compute/PreviewFeature	no insert or create method
 tier3	compute/Region	magic-modules marks it exclude: true
 tier3	compute/RegionBackendBucket	min_version is beta, not ga
-tier2	compute/RegionBackendService	unruled wire hooks: decoder, encoder, post_create
 tier3	compute/RegionCommitment	no delete method
 tier2	compute/RegionDisk	unruled wire hooks: custom_update, decoder, encoder, pre_delete, update_encoder
 tier3	compute/RegionDiskType	magic-modules marks it exclude: true
-tier2	compute/RegionHealthCheck	unruled wire hooks: encoder
 tier3	compute/RegionInstanceGroupManager	magic-modules marks it exclude: true
-tier2	compute/RegionTargetHttpsProxy	unruled wire hooks: decoder, encoder, update_encoder
 tier2	compute/Reservation	unruled wire hooks: decoder, pre_update, update_encoder
-tier2	compute/Route	unruled wire hooks: decoder
 tier2	compute/ServiceAttachment	unruled wire hooks: encoder, update_encoder
 tier2	compute/Snapshot	unruled wire hooks: decoder, pre_create
-tier2	compute/SslPolicy	unruled wire hooks: update_encoder
-tier2	compute/StoragePool	unruled wire hooks: pre_delete
 tier3	compute/StoragePoolType	magic-modules marks it exclude: true
-tier2	compute/TargetHttpsProxy	unruled wire hooks: decoder, encoder, update_encoder
-tier2	compute/TargetInstance	unruled wire hooks: post_create
 tier2	compute/VpnTunnel	unruled wire hooks: encoder, post_create
 tier3	compute/Zone	magic-modules marks it exclude: true
 tier2	compute/ZoneVmExtensionPolicy	unruled wire hooks: pre_update
 tier3	compute/acceleratorTypes	no insert or create method
 tier3	compute/advice	no insert or create method
+tier1	compute/gcp.targethttpsproxy.serverTlsPolicy	reference to gcp.servertlspolicy.selfLink dropped: gcp.servertlspolicy has no attribute "selfLink"
 tier3	compute/globalFrontendSettings	no insert or create method
 tier3	compute/globalOperations	no insert or create method
 tier3	compute/globalOrganizationOperations	no insert or create method
@@ -193,7 +171,7 @@ tier3	container/well-known	no insert or create method
 tier3	container/zones	no insert or create method
 tier1	dataproc/AutoscalingPolicy	legacy alias of gcp.dataproc.autoscalingpolicy (projects.locations.autoscalingPolicies)
 tier2	dataproc/Batch	unruled wire hooks: decoder
-tier2	dataproc/SessionTemplate	unruled wire hooks: custom_import
+tier3	dataproc/SessionTemplate	self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates
 tier3	dataproc/jobs	no insert or create method
 tier3	dataproc/nodeGroups	no delete method
 tier3	dataproc/operations	no insert or create method
@@ -201,9 +179,6 @@ tier3	dataproc/operations	no insert or create method
 tier3	dataproc/sparkApplications	no insert or create method
 tier3	dataproc/sparkApplications	no insert or create method
 tier1	dataproc/workflowTemplates	legacy alias of gcp.dataproc.workflowtemplate (projects.locations.workflowTemplates)
-tier2	dns/ManagedZone	unruled wire hooks: pre_delete, update_encoder
-tier2	dns/Policy	unruled wire hooks: pre_delete
-tier2	dns/ResponsePolicy	unruled wire hooks: pre_delete
 tier3	dns/changes	no delete method
 tier3	dns/dnsKeys	no insert or create method
 tier3	dns/managedZoneOperations	no insert or create method
@@ -239,7 +214,6 @@ tier3	iam/subjects	no insert or create method
 tier2	logging/LogScope	unruled wire hooks: encoder
 tier2	logging/LogScope	unruled wire hooks: encoder
 tier2	logging/LogScope	unruled wire hooks: encoder
-tier2	logging/Metric	unruled wire hooks: custom_import
 tier3	logging/billingAccounts	no insert or create method
 tier1	logging/buckets	legacy alias of gcp.logging.bucket (projects.locations.buckets)
 tier3	logging/entries	no insert or create method
@@ -275,14 +249,13 @@ tier3	logging/recentQueries	no insert or create method
 tier1	logging/sinks	legacy alias of gcp.logging.sink (projects.sinks)
 tier3	logging/v2	no insert or create method
 tier1	logging/views	legacy alias of gcp.logging.view (projects.locations.buckets.views)
-tier2	memcache/Instance	unruled wire hooks: pre_delete
 tier3	memcache/locations	no insert or create method
 tier3	memcache/operations	no insert or create method
-tier2	monitoring/AlertPolicy	unruled wire hooks: custom_import
-tier2	monitoring/Group	unruled wire hooks: custom_import
-tier2	monitoring/MetricDescriptor	unruled wire hooks: custom_import
+tier3	monitoring/AlertPolicy	self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates
+tier3	monitoring/Group	self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates
+tier3	monitoring/MetricDescriptor	self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates
 tier2	monitoring/NotificationChannel	unruled wire hooks: custom_import, decoder, encoder
-tier2	monitoring/Service	unruled wire hooks: custom_import, encoder
+tier3	monitoring/Service	self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates
 tier2	monitoring/UptimeCheckConfig	unruled wire hooks: custom_delete, custom_import, encoder
 tier3	monitoring/alerts	no insert or create method
 tier3	monitoring/collectdTimeSeries	no delete method
@@ -291,8 +264,8 @@ tier3	monitoring/monitoredResourceDescriptors	no insert or create method
 tier3	monitoring/notificationChannelDescriptors	no insert or create method
 tier3	monitoring/snoozes	no delete method
 tier3	monitoring/timeSeries	no insert or create method
-tier3	monitoring/timeSeries	no delete method
 tier3	monitoring/timeSeries	no insert or create method
+tier3	monitoring/timeSeries	no delete method
 tier3	monitoring/uptimeCheckIps	no insert or create method
 tier3	networksecurity/AuthorizationPolicy	min_version is beta, not ga
 tier3	networksecurity/SacAttachment	min_version is beta, not ga
@@ -314,10 +287,7 @@ tier3	notebooks/operations	no insert or create method
 tier3	osconfig/operations	no insert or create method
 tier3	osconfig/operations	no insert or create method
 tier3	osconfig/operations	no insert or create method
-tier2	pubsub/Schema	unruled wire hooks: update_encoder
 tier3	pubsub/Subscription	no insert or create method
-tier2	pubsub/Subscription	unruled wire hooks: encoder, pre_update, update_encoder
-tier2	pubsub/Topic	unruled wire hooks: encoder, update_encoder
 tier3	pubsub/snapshots	no insert or create method
 tier2	redis/Cluster	unruled wire hooks: decoder, encoder
 tier2	redis/Instance	unruled wire hooks: decoder, encoder, pre_delete
@@ -336,8 +306,6 @@ tier3	run/revisions	no insert or create method
 tier3	run/revisions	no insert or create method
 tier3	run/sourceUploads	no insert or create method
 tier3	run/tasks	no insert or create method
-tier2	secretmanager/Secret	unruled wire hooks: pre_delete, pre_update
-tier2	secretmanager/Secret	unruled wire hooks: pre_delete, pre_update
 tier3	secretmanager/locations	no insert or create method
 tier3	secretmanager/versions	no insert or create method
 tier3	secretmanager/versions	no insert or create method
@@ -397,68 +365,78 @@ tier3	workflows/operations	no insert or create method
 # setting (project, region, zone, location), not a stored create
 # binding, and not a settable attribute of the type's own.
 
-nocreate	gcp.appprofile	{+parent}/appProfiles	needs instance
-nocreate	gcp.attachment	{+parent}/attachments	needs repository
-nocreate	gcp.authorizedview	{+parent}/authorizedViews	needs instance, table
-nocreate	gcp.automation	projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations?automationId={{name}}	needs name
-nocreate	gcp.bigtableadmin.backup	{+parent}/backups	needs cluster, instance
-nocreate	gcp.bigtableadmin.cluster	{+parent}/clusters	needs instance
+nocreate	gcp.appprofile	{+parent}/appProfiles?appProfileId={{appProfileId}}	needs instance
+nocreate	gcp.attachment	{+parent}/attachments?attachmentId={{attachmentId}}	needs repository
+nocreate	gcp.authorizedview	{+parent}/authorizedViews?authorizedViewId={{authorizedViewId}}	needs instance, table
+nocreate	gcp.bigtableadmin.backup	{+parent}/backups?backupId={{backupId}}	needs cluster, instance
+nocreate	gcp.bigtableadmin.cluster	{+parent}/clusters?clusterId={{clusterId}}	needs instance
 nocreate	gcp.bigtableadmin.table	{+parent}/tables	needs instance
-nocreate	gcp.cloudasset.savedquery	{+parent}/savedQueries	needs parent
+nocreate	gcp.cloudasset.savedquery	{+parent}/savedQueries?savedQueryId={{savedQueryId}}	needs parent
 nocreate	gcp.cloudresourcemanager.folder.capabilityconfig	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	needs folder
 nocreate	gcp.cloudresourcemanager.organization.capabilityconfig	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	needs organization
 nocreate	gcp.config	{+parent}/configs	needs api
 nocreate	gcp.credential	{+parent}/credentials	needs oauthClient
-nocreate	gcp.deploypolicy	projects/{{project}}/locations/{{location}}/deployPolicies?deployPolicyId={{name}}	needs name
 nocreate	gcp.feed	{+parent}/feeds	needs parent
-nocreate	gcp.file.snapshot	{+parent}/snapshots	needs instance
+nocreate	gcp.file.snapshot	{+parent}/snapshots?snapshotId={{snapshotId}}	needs instance
 nocreate	gcp.iam.organization.role	{+parent}/roles	needs organization
 nocreate	gcp.iam.serviceaccount.key	{+name}/keys	needs serviceAccount
 nocreate	gcp.iam.workforcepool.provider	{+parent}/providers	needs workforcePool
 nocreate	gcp.iam.workforcepool.provider.key	{+parent}/keys	needs provider, workforcePool
 nocreate	gcp.iam.workloadidentitypool.provider	{+parent}/providers	needs workloadIdentityPool
 nocreate	gcp.iam.workloadidentitypool.provider.key	{+parent}/keys	needs provider, workloadIdentityPool
-nocreate	gcp.logging.billingaccount.bucket	{+parent}/buckets	needs billingAccount
+nocreate	gcp.logging.billingaccount.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs billingAccount
 nocreate	gcp.logging.billingaccount.exclusion	{+parent}/exclusions	needs billingAccount
-nocreate	gcp.logging.billingaccount.link	{+parent}/links	needs billingAccount, bucket
-nocreate	gcp.logging.billingaccount.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}	needs billingAccount, name
+nocreate	gcp.logging.billingaccount.link	{+parent}/links?linkId={{linkId}}	needs billingAccount, bucket
+nocreate	gcp.logging.billingaccount.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs billingAccount
 nocreate	gcp.logging.billingaccount.sink	{+parent}/sinks	needs billingAccount
-nocreate	gcp.logging.billingaccount.view	{+parent}/views	needs billingAccount, bucket
-nocreate	gcp.logging.folder.bucket	{+parent}/buckets	needs folder
+nocreate	gcp.logging.billingaccount.view	{+parent}/views?viewId={{viewId}}	needs billingAccount, bucket
+nocreate	gcp.logging.folder.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs folder
 nocreate	gcp.logging.folder.exclusion	{+parent}/exclusions	needs folder
-nocreate	gcp.logging.folder.link	{+parent}/links	needs bucket, folder
-nocreate	gcp.logging.folder.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}	needs folder, name
+nocreate	gcp.logging.folder.link	{+parent}/links?linkId={{linkId}}	needs bucket, folder
+nocreate	gcp.logging.folder.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs folder
 nocreate	gcp.logging.folder.sink	{+parent}/sinks	needs folder
-nocreate	gcp.logging.folder.view	{+parent}/views	needs bucket, folder
-nocreate	gcp.logging.link	{+parent}/links	needs bucket
-nocreate	gcp.logging.organization.bucket	{+parent}/buckets	needs organization
+nocreate	gcp.logging.folder.view	{+parent}/views?viewId={{viewId}}	needs bucket, folder
+nocreate	gcp.logging.link	{+parent}/links?linkId={{linkId}}	needs bucket
+nocreate	gcp.logging.organization.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs organization
 nocreate	gcp.logging.organization.exclusion	{+parent}/exclusions	needs organization
-nocreate	gcp.logging.organization.link	{+parent}/links	needs bucket, organization
-nocreate	gcp.logging.organization.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}	needs name, organization
+nocreate	gcp.logging.organization.link	{+parent}/links?linkId={{linkId}}	needs bucket, organization
+nocreate	gcp.logging.organization.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs organization
 nocreate	gcp.logging.organization.sink	{+parent}/sinks	needs organization
-nocreate	gcp.logging.organization.view	{+parent}/views	needs bucket, organization
-nocreate	gcp.logging.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}	needs name
-nocreate	gcp.logging.view	{+parent}/views	needs bucket
-nocreate	gcp.logicalview	{+parent}/logicalViews	needs instance
+nocreate	gcp.logging.organization.view	{+parent}/views?viewId={{viewId}}	needs bucket, organization
+nocreate	gcp.logging.view	{+parent}/views?viewId={{viewId}}	needs bucket
+nocreate	gcp.logicalview	{+parent}/logicalViews?logicalViewId={{logicalViewId}}	needs instance
 nocreate	gcp.managedidentity	{+parent}/managedIdentities	needs namespace, workloadIdentityPool
-nocreate	gcp.materializedview	{+parent}/materializedViews	needs instance
+nocreate	gcp.materializedview	{+parent}/materializedViews?materializedViewId={{materializedViewId}}	needs instance
 nocreate	gcp.namespace	{+parent}/namespaces	needs workloadIdentityPool
 nocreate	gcp.networksecurity.organization.addressgroup	{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}	needs organization
 nocreate	gcp.networksecurity.organization.firewallendpoint	{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	needs organization
 nocreate	gcp.networksecurity.organization.securityprofile	{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	needs organization
 nocreate	gcp.networksecurity.organization.securityprofilegroup	{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	needs organization
 nocreate	gcp.networksecurity.rule	{+parent}/rules	needs gatewaySecurityPolicy
-nocreate	gcp.osconfig.folder.policyorchestrator	{+parent}/policyOrchestrators	needs folder
-nocreate	gcp.osconfig.organization.policyorchestrator	{+parent}/policyOrchestrators	needs organization
+nocreate	gcp.osconfig.folder.policyorchestrator	{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}	needs folder
+nocreate	gcp.osconfig.organization.policyorchestrator	{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}	needs organization
 nocreate	gcp.proposal	{+parent}/proposals	needs singleTenantHsmInstance
-nocreate	gcp.schemabundle	{+parent}/schemaBundles	needs instance, table
+nocreate	gcp.schemabundle	{+parent}/schemaBundles?schemaBundleId={{schemaBundleId}}	needs instance, table
 nocreate	gcp.scimtenant	{+parent}/scimTenants	needs provider, workforcePool
-nocreate	gcp.servicelevelobjective	{+parent}/serviceLevelObjectives	needs parent
-nocreate	gcp.spanner.backup	{+parent}/backups	needs instance
+nocreate	gcp.servicelevelobjective	{+parent}/serviceLevelObjectives?serviceLevelObjectiveId={{serviceLevelObjectiveId}}	needs parent
+nocreate	gcp.spanner.backup	{+parent}/backups?backupId={{backupId}}	needs instance
 nocreate	gcp.spanner.session	{+database}/sessions	needs database, instance
-nocreate	gcp.tag	{+parent}/tags	needs package, repository
+nocreate	gcp.tag	{+parent}/tags?tagId={{tagId}}	needs package, repository
 nocreate	gcp.task	{+parent}/tasks	needs queue
 nocreate	gcp.token	{+parent}/tokens	needs provider, scimTenant, workforcePool
 nocreate	gcp.usercred	{+parent}/userCreds	needs database
 nocreate	gcp.userworkloadssecret	{+parent}/userWorkloadsSecrets	needs environment
 nocreate	gcp.version	{+parent}/versions	needs wasmPlugin
+
+# Types that SHIP and are REPLACED rather than patched, with the API's own
+# sentence saying why. Google publishes the whole resource as the patch
+# request schema and then limits it in prose, which Discovery cannot carry.
+# A patch that silently drops the field you changed never converges, so
+# these are refused until a `patchable:` entry in gen/overlay.yaml names
+# the fields the API really takes. Replacement is destructive, but it is
+# loud and it settles.
+
+noupdate	gcp.certificateissuanceconfig	magic-modules marks the resource immutable and names no field it patches
+noupdate	gcp.publicadvertisedprefix	magic-modules marks the resource immutable and names no field it patches
+noupdate	gcp.publicdelegatedprefix	magic-modules marks the resource immutable and names no field it patches
+noupdate	gcp.servicebinding	magic-modules marks the resource immutable and names no field it patches

@@ -1160,3 +1160,166 @@ func firstPost(s *gcpfake.Server) (gcpfake.Request, bool) {
 	}
 	return gcpfake.Request{}, false
 }
+
+// TestARefreshKeepsAnInputOnlyFieldGCPNeverReturns goes through Read and the
+// reconciler the runtime ACTUALLY builds (projects.go), not the package-level
+// ReconcileAttrs. That distinction nearly shipped wrong: the first version of
+// the carry-forward was gated on a flag only ReconcileAttrs set, so the unit
+// tests passed and production would have dropped the field.
+//
+// The fake is SEEDED with a body that lacks the field rather than created
+// through, because the fake stores whatever it is sent and would hand the
+// field straight back -- the one behaviour Google does not have, and the one
+// that would make this test pass with the feature deleted.
+func TestARefreshKeepsAnInputOnlyFieldGCPNeverReturns(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty := widgetType()
+	ty.Attributes["bootImage"] = &catalog.Attr{Canonical: "bootImage", Kind: value.KindString, InputOnly: true}
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+	const id = "projects/p/locations/r/widgets/one"
+	s.Seed("/v1/"+id, map[string]any{"name": "one", "sizeGb": float64(10)})
+
+	st, err := p.Read(context.Background(), &resource.ResourceState{
+		Type: "gcp.widget", ProviderID: id,
+		Attributes: map[string]value.Value{
+			"name":      value.String("one", value.SourceExplicit),
+			"bootImage": value.String("debian-12", value.SourceExplicit),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("the seeded resource read as absent")
+	}
+	if got := st.Attributes["bootImage"]; !got.Equal(value.String("debian-12", value.SourceExplicit)) {
+		t.Errorf("bootImage after a refresh = %v, want it carried forward; missing, every plan would propose changing it", got)
+	}
+}
+
+// shortNamed is a type whose schema means the SHORT name by `name` -- its id
+// template ends in "/{{name}}" -- created by AIP-133's "?widgetId={{name}}".
+func shortNamed() *catalog.Type {
+	ty := widgetType()
+	ty.CreateURL = "projects/{{project}}/locations/{{region}}/widgets?widgetId={{name}}"
+	return ty
+}
+
+// TestAFullNameForThisResourceIsReportedAsTheShortOne. AIP-133 APIs answer a
+// create with `name` set to the FULL relative resource name. For a type whose
+// schema calls the short name `name`, reporting that as it came back makes
+// state and configuration disagree on a field in the url, and every plan after
+// a create proposes a replacement -- 37 shipping types, Eventarc triggers
+// among them. The fake now answers the way Google does, which is why this can
+// be tested at all.
+func TestAFullNameForThisResourceIsReportedAsTheShortOne(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{shortNamed()}})
+	st, err := p.Create(context.Background(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(10),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, _ := s.Get("/v1/projects/p/locations/r/widgets/one")
+	if stored["name"] != "projects/p/locations/r/widgets/one" {
+		t.Fatalf("the fake answered name %v; this test needs the full name Google sends", stored["name"])
+	}
+	if got := st.Attributes["name"]; !got.Equal(value.String("one", got.Source)) {
+		t.Errorf("state name after create = %v, want the short name configuration wrote", got)
+	}
+	read, err := p.Read(context.Background(), st)
+	if err != nil || read == nil {
+		t.Fatalf("read: %v", err)
+	}
+	if got := read.Attributes["name"]; !got.Equal(value.String("one", got.Source)) {
+		t.Errorf("state name after a refresh = %v, want the short name", got)
+	}
+}
+
+// TestOnlyThisResourcesOwnNameIsShortened. The rule fires on the same
+// collection and the same last segment as the resource's own id, and nowhere
+// else -- including where the answer spells the project by NUMBER, which is
+// still this resource.
+func TestOnlyThisResourcesOwnNameIsShortened(t *testing.T) {
+	ty := shortNamed()
+	for full, want := range map[string]string{
+		"projects/p/locations/r/widgets/one":         "one",
+		"projects/123456789/locations/r/widgets/one": "one",
+		"projects/p/locations/r/widgets/other":       "projects/p/locations/r/widgets/other",
+		"projects/p/locations/r/gadgets/one":         "projects/p/locations/r/gadgets/one",
+	} {
+		attrs := map[string]value.Value{"name": value.String(full, value.SourceProvider)}
+		shortNameFromOwnID(ty, "projects/p/locations/r/widgets/one", attrs)
+		if got, _ := attrs["name"].Raw.(string); got != want {
+			t.Errorf("%s: got %q, want %q", full, got, want)
+		}
+	}
+}
+
+// TestAFullPathNameIsLeftAlone. Where the schema's `name` IS the full path --
+// a Pub/Sub topic, id template "{+topic}" -- or is Google's to set, there is no
+// short name to report, and the full one is the value configuration holds.
+func TestAFullPathNameIsLeftAlone(t *testing.T) {
+	topic := &catalog.Type{SelfLink: "{+topic}", Attributes: map[string]*catalog.Attr{"name": {Kind: value.KindString}}}
+	job := &catalog.Type{SelfLink: "projects/{{project}}/jobs/{{name}}", Attributes: map[string]*catalog.Attr{"name": {Kind: value.KindString, Output: true}}}
+	for _, ty := range []*catalog.Type{topic, job} {
+		attrs := map[string]value.Value{"name": value.String("projects/p/x/one", value.SourceProvider)}
+		shortNameFromOwnID(ty, "projects/p/x/one", attrs)
+		if got, _ := attrs["name"].Raw.(string); got != "projects/p/x/one" {
+			t.Errorf("self_link %q: name shortened to %q", ty.SelfLink, got)
+		}
+	}
+}
+
+// TestARegionalTypeIsReachedAtItsRegionsEndpoint. A regional secret exists
+// only at secretmanager.<location>.rep.googleapis.com, and every url for one
+// names its location. A url that names none, and a type with no template,
+// keep the API's own host.
+func TestARegionalTypeIsReachedAtItsRegionsEndpoint(t *testing.T) {
+	regional := &catalog.Type{APIBaseURL: "https://secretmanager.googleapis.com/", PathPrefix: "v1/",
+		EndpointTemplate: "https://secretmanager.{location}.rep.googleapis.com/"}
+	global := &catalog.Type{APIBaseURL: "https://secretmanager.googleapis.com/", PathPrefix: "v1/"}
+	for _, c := range []struct {
+		ty        *catalog.Type
+		rel, want string
+	}{
+		{regional, "projects/p/locations/europe-west1/secrets/s", "https://secretmanager.europe-west1.rep.googleapis.com/v1/projects/p/locations/europe-west1/secrets/s"},
+		{regional, "projects/p/locations/us-central1/secrets?secretId=s", "https://secretmanager.us-central1.rep.googleapis.com/v1/projects/p/locations/us-central1/secrets?secretId=s"},
+		{regional, "projects/p/secrets/s", "https://secretmanager.googleapis.com/v1/projects/p/secrets/s"},
+		{global, "projects/p/locations/europe-west1/secrets/s", "https://secretmanager.googleapis.com/v1/projects/p/locations/europe-west1/secrets/s"},
+	} {
+		if got := absURL(c.ty, c.rel); got != c.want {
+			t.Errorf("absURL(%q) = %q, want %q", c.rel, got, c.want)
+		}
+	}
+}
+
+// TestACreateAnsweredWithoutASelfLinkStillHasAnID. Cloud DNS answers a create
+// with the resource and no selfLink, and a DNS policy's id template, from
+// Discovery, ends in {policy} while the resource calls it name. The policy
+// was created on real Google and Create failed computing its id, which is a
+// resource nothing tracks. The last placeholder takes the resource's name.
+func TestACreateAnsweredWithoutASelfLinkStillHasAnID(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty := widgetType()
+	ty.SelfLink = "projects/{project}/locations/{region}/widgets/{widget}"
+	ty.ImportFormat = ty.SelfLink
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+	st, err := p.Create(context.Background(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "two", "sizeGb": int64(10),
+	}))
+	if err != nil {
+		t.Fatalf("Create failed for a resource that was created: %v", err)
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/two" {
+		t.Errorf("provider id = %q, want projects/p/locations/r/widgets/two", st.ProviderID)
+	}
+}

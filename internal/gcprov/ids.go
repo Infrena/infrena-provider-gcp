@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -51,11 +52,41 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 	// "type_value". Without this, the fallback createdID leans on when an
 	// operation's target cannot be reduced fails for that type, turning a
 	// successful create into an error the host drops. See wireAliases.
-	rel, err := ExpandURL(ty.SelfLink, wireAliases(ty.Attributes, merged))
+	// After wireAliases, so a placeholder an attribute fills under its wire
+	// spelling (rrsets' {type}, the schema's type_value) counts as filled.
+	aliased := wireAliases(ty.Attributes, merged)
+	fillLastFromName(ty.SelfLink, aliased)
+	rel, err := ExpandURL(ty.SelfLink, aliased)
 	if err != nil {
 		return "", fmt.Errorf("gcprov: %s: computing the provider id: %w", ty.Name, err)
 	}
 	return rel, nil
+}
+
+// lastPlaceholderRE is a template's final placeholder, in either spelling.
+var lastPlaceholderRE = regexp.MustCompile(`\{\{?\+?([A-Za-z0-9_]+)\}?\}$`)
+
+// fillLastFromName gives a self_link's final placeholder the resource's own
+// name when nothing else has, which is what that placeholder names. Discovery
+// spells it after the collection ("projects/{project}/policies/{policy}")
+// while the resource calls it name, and an API that answers with no selfLink
+// -- Cloud DNS -- then left a created policy with no provider id: Create
+// failed after the policy existed (live run, 2026-09-24).
+func fillLastFromName(tmpl string, merged map[string]value.Value) {
+	m := lastPlaceholderRE.FindStringSubmatch(tmpl)
+	if m == nil || m[1] == "name" {
+		return
+	}
+	if v, ok := merged[m[1]]; ok && v.Known {
+		return
+	}
+	name, ok := merged["name"]
+	if !ok || !name.Known {
+		return
+	}
+	if s, ok := name.Raw.(string); ok && s != "" {
+		merged[m[1]] = value.String(lastPathSegment(s), value.SourceProvider)
+	}
 }
 
 // nameIsAlreadyTheID reports whether body's own "name" IS the provider id

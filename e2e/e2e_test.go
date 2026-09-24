@@ -193,7 +193,13 @@ func start(t *testing.T) *cloud {
 	}
 	dir := t.TempDir()
 	write(t, dir, "infrena.yml", string(body))
-	return &cloud{fake: gcpfake.New(t), dir: dir}
+	fake := gcpfake.New(t)
+	// The only resource the fixture MUTATES is an Eventarc trigger, and Eventarc
+	// answers every create, patch and delete with a google.longrunning.Operation.
+	// The compute resources some tests seed are read and discovered, never
+	// changed, so this is the one shape the fake ever needs to speak.
+	fake.SetOperationStyle(gcpfake.OpLongRunning)
+	return &cloud{fake: fake, dir: dir}
 }
 
 // run executes the real infrena binary against the fake.

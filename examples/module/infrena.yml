@@ -1,0 +1,63 @@
+# The same module called twice, plus a firewall rule reading one of its outputs.
+#
+# A module is how "a network and its subnetwork" stops being two resources you
+# copy and becomes one thing with a name. Everything here that differs between
+# the two calls is an input; everything that does not lives in the module.
+project: gcp-module-example
+
+infrena: ">= 0.15.0"
+
+# See examples/network/infrena.yml for why `gcp_project` must carry a
+# `default:`.
+variables:
+  gcp_project:
+    type: string
+    default: my-gcp-project
+  gcp_region:
+    type: string
+    default: us-central1
+
+environments:
+  dev: {}
+
+# Modules under `modules/` are found automatically; this lists it anyway so
+# that the one place a reader looks for "where does module.vpc come from" has
+# an answer. A module from elsewhere -- a git URL, say -- must be listed.
+modules:
+  - ./modules/vpc
+
+providers:
+  - plugin: gcp
+    project: ${var.gcp_project}
+    region: ${var.gcp_region}
+
+resources:
+  # `modules/vpc/` becomes `module.vpc`. A directory name becomes an identifier
+  # by turning `-` into `_`, so `modules/app-stack/` would be
+  # `module.app_stack`.
+  frontend:
+    type: module.vpc
+    name: example-frontend
+    cidr: 10.184.0.0/24
+
+  backend:
+    type: module.vpc
+    name: example-backend
+    cidr: 10.185.0.0/24
+    private_google_access: false
+
+  # An output is read off the call exactly like an attribute is read off a
+  # resource, and creates the same real ordering: this firewall waits for the
+  # frontend module's network.
+  allow_ssh:
+    type: gcp.firewall
+    name: example-frontend-allow-ssh
+    network: ${frontend.self_link}
+    direction: INGRESS
+    priority: 65000
+    sourceRanges:
+      - 10.128.0.0/20
+    allowed:
+      - IPProtocol: tcp
+        ports:
+          - "22"

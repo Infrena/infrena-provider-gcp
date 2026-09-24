@@ -1,0 +1,60 @@
+# Every key the parser learned on 2026-09-24, each set to a value its zero
+# value is not, so a key read into the wrong field or not at all fails.
+name: Gadget
+description: exercises the lifecycle keys.
+base_url: projects/{{project}}/gadgets
+immutable: true
+read_verb: POST
+delete_verb: PATCH
+exclude_delete: true
+exclude_read: true
+read_query_params: '?view=FULL'
+mutex: gadgets/{{project}}
+id_format: projects/{{project}}/gadgets/{{name}}
+exclude_resource: true
+nested_query:
+  keys:
+    - parent
+    - gadgets
+  is_list_of_ids: true
+  modify_by_patch: true
+parameters:
+  - name: zone
+    type: String
+    url_param_only: true
+properties:
+  - name: labels
+    type: KeyValueLabels
+    update_url: projects/{{project}}/gadgets/{{name}}/setLabels
+    update_verb: POST
+    update_id: labels
+    fingerprint_name: labelFingerprint
+  - name: password
+    type: String
+    sensitive: true
+    write_only: true
+    client_side: true
+  - name: size
+    type: Integer
+    min_version: beta
+    default_from_api: true
+    ignore_read: true
+    send_empty_value: true
+    custom_expand: templates/terraform/custom_expand/size.go.tmpl
+    custom_flatten: templates/terraform/custom_flatten/size.go.tmpl
+    update_mask_fields:
+      - config.size
+      - config.unit
+  - name: tags
+    type: Array
+    item_type:
+      type: String
+  - name: rules
+    type: Array
+    item_type:
+      type: NestedObject
+      properties:
+        - name: priority
+          type: Integer
+          immutable: true
+          api_name: rank

@@ -1,0 +1,707 @@
+package gen
+
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/infrena/infrena-provider-gcp/internal/catalog"
+)
+
+// updateVerbDoc is one Discovery document carrying six collections that differ
+// only in how they publish an update. None of them has a magic-modules resource,
+// which is the point: these are the types whose update verb has to come from
+// Discovery or from nowhere.
+//
+//   - patchables   PATCH with an updateMask query parameter -> updatable, masked
+//   - unmaskeds    PATCH with no updateMask parameter       -> updatable, unmasked
+//   - putonlies    PUT only                                 -> NOT updatable
+//   - elsewheres   PATCH at a path the get does not use     -> NOT updatable
+//   - restricteds  PATCH Google documents as partial        -> NOT updatable, unless
+//     an overlay allowlist says
+//     which fields it takes
+//   - wrappeds     PATCH whose request is an AIP-134 envelope -> updatable, wrapped
+func updateVerbDoc() string {
+	return `{
+  "name": "acme",
+  "version": "v1",
+  "rootUrl": "https://acme.googleapis.com/",
+  "servicePath": "",
+  "schemas": {
+    "Thing": {"id": "Thing", "type": "object", "properties": {
+      "name": {"type": "string", "description": "The name."},
+      "size": {"type": "integer", "format": "int64", "description": "How big."}
+    }},
+    "UpdateThingRequest": {"id": "UpdateThingRequest", "type": "object", "properties": {
+      "thing": {"$ref": "Thing", "description": "The updated thing."},
+      "updateMask": {"type": "string", "format": "google-fieldmask", "description": "Fields to update."}
+    }},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {
+    "projects": {"resources": {
+      "patchables": {"methods": {
+        "get": {"id": "a.p.get", "path": "projects/{project}/patchables/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.p.insert", "path": "projects/{project}/patchables", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.p.delete", "path": "projects/{project}/patchables/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "patch": {"id": "a.p.patch", "path": "projects/{project}/patchables/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"},
+          "parameters": {"updateMask": {"type": "string", "location": "query"}}}
+      }},
+      "unmaskeds": {"methods": {
+        "get": {"id": "a.u.get", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.u.insert", "path": "projects/{project}/unmaskeds", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.u.delete", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "patch": {"id": "a.u.patch", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}
+      }},
+      "putonlies": {"methods": {
+        "get": {"id": "a.o.get", "path": "projects/{project}/putonlies/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.o.insert", "path": "projects/{project}/putonlies", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.o.delete", "path": "projects/{project}/putonlies/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "update": {"id": "a.o.update", "path": "projects/{project}/putonlies/{id}", "httpMethod": "PUT", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}
+      }},
+      "elsewheres": {"methods": {
+        "get": {"id": "a.e.get", "path": "projects/{project}/elsewheres/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.e.insert", "path": "projects/{project}/elsewheres", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.e.delete", "path": "projects/{project}/elsewheres/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "patch": {"id": "a.e.patch", "path": "projects/{project}/elsewheres/{id}:updateConfig", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}
+      }},
+      "restricteds": {"methods": {
+        "get": {"id": "a.r.get", "path": "projects/{project}/restricteds/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.r.insert", "path": "projects/{project}/restricteds", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.r.delete", "path": "projects/{project}/restricteds/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "patch": {"id": "a.r.patch", "path": "projects/{project}/restricteds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"},
+          "description": "Patches the specified thing with the data included in the request. Only size can be modified."}
+      }},
+      "wrappeds": {"methods": {
+        "get": {"id": "a.w.get", "path": "projects/{project}/wrappeds/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.w.insert", "path": "projects/{project}/wrappeds", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.w.delete", "path": "projects/{project}/wrappeds/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "patch": {"id": "a.w.patch", "path": "projects/{project}/wrappeds/{id}", "httpMethod": "PATCH", "request": {"$ref": "UpdateThingRequest"}, "response": {"$ref": "Operation"}}
+      }}
+    }}
+  }
+}`
+}
+
+// TestTheUpdateVerbComesFromDiscoveryWhenMagicModulesIsSilent is the whole of
+// the defect this file exists for. UpdateVerb used to be read from
+// magic-modules and from nowhere else, and magic-modules leaves `update_verb:`
+// off most resources because it has its own default. The type then shipped with
+// no update path at all, which patch.go turns into "every change replaces the
+// resource" -- measured on 2026-09-23 as 154 shipping types, including
+// gcp.storage.bucket, gcp.network, gcp.subnetwork and gcp.compute.instance,
+// every one of which Google publishes a PATCH for. Replacing a bucket takes its
+// objects with it.
+func TestTheUpdateVerbComesFromDiscoveryWhenMagicModulesIsSilent(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.patchable")
+	if !ok {
+		t.Fatalf("gcp.patchable missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH: the collection publishes one and nothing else supplies it", ty.UpdateVerb)
+	}
+	if !ty.UpdateMask {
+		t.Error("UpdateMask = false, but the patch method declares an updateMask query parameter")
+	}
+}
+
+// TestAPatchWithNoUpdateMaskParameterIsStillUpdatable guards the half of the
+// derivation that is easy to collapse into the other: the mask is a separate
+// fact from the verb. Fifteen of the catalog's already-updatable types PATCH
+// without one, so deriving "PATCH implies a mask" would send a query parameter
+// those APIs never asked for.
+func TestAPatchWithNoUpdateMaskParameterIsStillUpdatable(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.unmasked")
+	if !ok {
+		t.Fatalf("gcp.unmasked missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH", ty.UpdateVerb)
+	}
+	if ty.UpdateMask {
+		t.Error("UpdateMask = true, but the patch method declares no updateMask parameter")
+	}
+}
+
+// TestAPutOnlyCollectionStaysNonUpdatable is the guard that makes the whole
+// change safe, and it is not a detail. BuildMask emits a PARTIAL body -- only
+// the attributes that changed. PUT replaces the resource with the body it is
+// given, so sending a partial body to a PUT endpoint clears every field the
+// diff left out. compute's instances collection publishes `update` (PUT) and no
+// patch at all, so a derivation that accepted PUT would quietly start wiping
+// virtual machines.
+func TestAPutOnlyCollectionStaysNonUpdatable(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.putonly")
+	if !ok {
+		t.Fatalf("gcp.putonly missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "" {
+		t.Errorf("UpdateVerb = %q, want empty: a PUT takes a whole resource and BuildMask sends a diff", ty.UpdateVerb)
+	}
+}
+
+// TestAWrappedPatchRequestIsSentAsAnEnvelope is AIP-134's UpdateXRequest
+// shape. pubsub's topics.patch takes UpdateTopicRequest{topic, updateMask}, so
+// the resource is wrapped and the mask is a REQUIRED field of the body rather
+// than a query parameter; a bare resource is rejected.
+//
+// This was refused outright until the runtime could send that shape, which is
+// what made Pub/Sub a P0 blocker. The mask field is found by its schema
+// FORMAT -- google-fieldmask, the protobuf FieldMask type surviving into
+// Discovery -- and not by its name, because six of the eight collections that
+// use this shape say "updateMask" and spanner's two say "fieldMask".
+func TestAWrappedPatchRequestIsSentAsAnEnvelope(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.wrapped")
+	if !ok {
+		t.Fatalf("gcp.wrapped missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH: the envelope is understood now", ty.UpdateVerb)
+	}
+	if ty.UpdateWrapper != "thing" {
+		t.Errorf("UpdateWrapper = %q, want \"thing\"", ty.UpdateWrapper)
+	}
+	if ty.UpdateMaskField != "updateMask" {
+		t.Errorf("UpdateMaskField = %q, want \"updateMask\"", ty.UpdateMaskField)
+	}
+	if ty.UpdateMask {
+		t.Error("UpdateMask is set, so the mask would ALSO go on the query string")
+	}
+}
+
+// TestAnEnvelopeWithNoFieldMaskIsRefused. A request schema that is not the
+// resource and carries no google-fieldmask is a shape this provider does not
+// understand, and a request sent in a shape we only half recognise is one whose
+// effect we cannot predict.
+func TestAnEnvelopeWithNoFieldMaskIsRefused(t *testing.T) {
+	doc := strings.Replace(updateVerbDoc(),
+		`"updateMask": {"type": "string", "format": "google-fieldmask", "description": "Fields to update."}`,
+		`"updateMask": {"type": "string", "description": "Fields to update."}`, 1)
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": doc, "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.wrapped")
+	if !ok {
+		t.Fatalf("gcp.wrapped missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "" {
+		t.Errorf("UpdateVerb = %q, want empty: nothing in the envelope says where the mask goes", ty.UpdateVerb)
+	}
+}
+
+// TestMagicModulesStillWinsWhenItDeclaresAnUpdateVerb keeps the derivation
+// additive. The 86 types that were updatable before this change got their verb
+// and their mask from magic-modules, and those are human-curated decisions that
+// a Discovery guess must not overwrite -- several of them deliberately PATCH
+// without a mask, and one names an update_url the collection's own patch path
+// does not.
+// The fixture is built so the two sources DISAGREE, which is the only way this
+// test can fail: magic-modules declares a mask, and the `unmaskeds` collection
+// it matches publishes a patch with no updateMask parameter. If the derivation
+// ever runs in front of magic-modules, the mask silently flips to false. An
+// earlier version of this test used a collection with no patch method at all
+// and passed under exactly the sabotage it existed to catch.
+func TestMagicModulesStillWinsWhenItDeclaresAnUpdateVerb(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{
+		"schemas/acme.json": updateVerbDoc(),
+		"mmv1/products/acme/Unmasked.yaml": `name: Unmasked
+description: magic-modules says masked; Discovery says otherwise.
+base_url: projects/{{project}}/unmaskeds
+self_link: projects/{{project}}/unmaskeds/{{name}}
+update_verb: PATCH
+update_mask: true
+properties:
+  - name: name
+    type: String
+    required: true
+`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.unmasked")
+	if !ok {
+		t.Fatalf("gcp.unmasked missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH from magic-modules", ty.UpdateVerb)
+	}
+	if !ty.UpdateMask {
+		t.Error("UpdateMask = false: the Discovery derivation overwrote a human-curated magic-modules decision")
+	}
+}
+
+// TestAPatchAtADifferentPathStaysNonUpdatable covers the guard that had no
+// coverage at all until a deliberate sabotage of it passed. Update addresses
+// the resource through SelfLink, and SelfLink is the collection's `get` path
+// (build.go fills it from there whenever magic-modules supplies none). A patch
+// published somewhere else — Google's ":verb" custom-method shape, for instance
+// — is a different endpoint, and deriving a verb from it would send every
+// update to a url the method does not live at.
+func TestAPatchAtADifferentPathStaysNonUpdatable(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.elsewhere")
+	if !ok {
+		t.Fatalf("gcp.elsewhere missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "" {
+		t.Errorf("UpdateVerb = %q, want empty: the patch lives at %q, not at the resource's own path",
+			ty.UpdateVerb, "projects/{project}/elsewheres/{id}:updateConfig")
+	}
+}
+
+// overlayWith writes a fixture whose overlay carries an extra block, so the
+// `patchable:` map can be exercised through the real LoadOverlay rather than by
+// constructing an Overlay in memory -- the yaml spelling is half of what this
+// feature is.
+func overlayWith(t *testing.T, extra string) Inputs {
+	t.Helper()
+	in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""})
+	if err := os.WriteFile(in.OverlayPath, []byte("rulings: {}\naliases: {}\ndiscover_default: []\n"+extra), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
+// TestARestrictedPatchIsRefusedWithoutAnAllowlist is the guard that keeps this
+// provider from trading a convergent failure for a non-convergent one. Google
+// publishes the whole resource as the patch request schema and then limits it
+// in prose: compute.networks.patch accepts only routingConfig, while
+// gcp.network declares five settable non-ForceNew attributes. Deriving a verb
+// from the schema alone gives four fields a patch the API drops on the floor,
+// so the plan proposes the same change for ever. Replacement is destructive and
+// loud; a patch that does nothing is neither.
+func TestARestrictedPatchIsRefusedWithoutAnAllowlist(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.restricted")
+	if !ok {
+		t.Fatalf("gcp.restricted missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "" {
+		t.Errorf("UpdateVerb = %q, want empty: the API says only some fields are patchable", ty.UpdateVerb)
+	}
+	var found bool
+	for _, u := range res.Unpatchable {
+		if u.Type == "gcp.restricted" {
+			found = true
+			if !strings.Contains(u.Says, "Only size can be modified") {
+				t.Errorf("the record does not quote the API: %q", u.Says)
+			}
+		}
+	}
+	if !found {
+		t.Error("gcp.restricted was refused an update and recorded nowhere; a silent refusal is indistinguishable from an API with no patch")
+	}
+}
+
+// TestAnAllowlistAdmitsTheTypeAndForceNewsTheRest is the other half: a human
+// read what the API says and wrote the fields down, so the listed field is
+// patched and every other settable one replaces the resource -- which is what
+// the API does with it anyway.
+func TestAnAllowlistAdmitsTheTypeAndForceNewsTheRest(t *testing.T) {
+	res, err := Build(overlayWith(t, `
+patchable:
+  gcp.restricted:
+    fields: [size]
+    note: the fixture's patch description says only size can be modified
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.restricted")
+	if !ok {
+		t.Fatalf("gcp.restricted missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Fatalf("UpdateVerb = %q, want PATCH once a human listed the fields", ty.UpdateVerb)
+	}
+	size, name := ty.Attributes["size"], ty.Attributes["name"]
+	if size == nil || name == nil {
+		t.Fatalf("fixture attributes missing: size=%v name=%v", size, name)
+	}
+	if size.ForceNew {
+		t.Error("size is ForceNew, but it is the one field the API does patch")
+	}
+	if !name.ForceNew {
+		t.Error("name is not ForceNew, so a change to it would be sent as a patch the API drops")
+	}
+	for _, u := range res.Unpatchable {
+		if u.Type == "gcp.restricted" {
+			t.Error("gcp.restricted is still recorded as replaced-not-patched after an allowlist admitted it")
+		}
+	}
+}
+
+// TestAPatchableEntryWithoutASourceIsRefused. A list of field names with
+// nothing behind it cannot be reviewed, and this one governs whether a change
+// replaces a resource -- the same reason a ruling's note is mandatory.
+func TestAPatchableEntryWithoutASourceIsRefused(t *testing.T) {
+	for name, extra := range map[string]string{
+		"no note":   "\npatchable:\n  gcp.restricted:\n    fields: [size]\n",
+		"no fields": "\npatchable:\n  gcp.restricted:\n    note: says nothing about which fields\n",
+	} {
+		if _, err := Build(overlayWith(t, extra)); err == nil {
+			t.Errorf("%s: accepted, want a refusal", name)
+		}
+	}
+}
+
+// collectionPatchDoc publishes compute's autoscaler shape: the patch lives on
+// the COLLECTION and names the resource in a query parameter, so its path is
+// not the get's and never can be.
+func collectionPatchDoc() string {
+	return `{
+  "name": "acme", "version": "v1", "rootUrl": "https://acme.googleapis.com/", "servicePath": "",
+  "schemas": {
+    "Scaler": {"id": "Scaler", "type": "object", "properties": {
+      "name": {"type": "string", "description": "The name."},
+      "size": {"type": "integer", "format": "int64", "description": "How big."}
+    }},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {"projects": {"resources": {"scalers": {"methods": {
+    "get": {"id": "a.s.get", "path": "projects/{project}/scalers/{scaler}", "httpMethod": "GET", "response": {"$ref": "Scaler"}},
+    "insert": {"id": "a.s.insert", "path": "projects/{project}/scalers", "httpMethod": "POST", "request": {"$ref": "Scaler"}, "response": {"$ref": "Operation"}},
+    "delete": {"id": "a.s.delete", "path": "projects/{project}/scalers/{scaler}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+    "patch": {"id": "a.s.patch", "path": "projects/{project}/scalers", "httpMethod": "PATCH", "request": {"$ref": "Scaler"}, "response": {"$ref": "Operation"},
+      "parameters": {"scaler": {"type": "string", "location": "query", "description": "Name of the scaler to patch."}}}
+  }}}}}
+}`
+}
+
+func scalerFixture(t *testing.T, updateURL string) Inputs {
+	t.Helper()
+	return writeRefFixture(t, map[string]string{
+		"schemas/acme.json": collectionPatchDoc(),
+		"mmv1/products/acme/Scaler.yaml": `name: Scaler
+description: patched on the collection, named by a query parameter.
+base_url: projects/{{project}}/scalers
+self_link: projects/{{project}}/scalers/{{name}}
+update_url: '` + updateURL + `'
+properties:
+  - name: name
+    type: String
+  - name: size
+    type: Integer
+`,
+	})
+}
+
+// TestADeclaredUpdateUrlIsAcceptedWhenItMatchesThePatch. magic-modules defaults
+// update_verb to PUT, so a resource declaring an update_url and no verb wrote
+// that url for a PUT, and pairing it with an inferred PATCH would be a guess.
+// Checking it against the method turns the guess into a question the documents
+// answer -- and for compute's two autoscalers the answer matters, because their
+// patch is published on the collection and that url is the only address a PATCH
+// can go to.
+func TestADeclaredUpdateUrlIsAcceptedWhenItMatchesThePatch(t *testing.T) {
+	res, err := Build(scalerFixture(t, "projects/{{project}}/scalers?scaler={{name}}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.scaler")
+	if !ok {
+		t.Fatalf("gcp.scaler missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH: the declared url is exactly where the patch lives", ty.UpdateVerb)
+	}
+}
+
+// TestADeclaredUpdateUrlIsRefusedWhenThePatchDoesNotAgree covers both halves of
+// the check. A url naming a query parameter the patch never declares, and a url
+// whose path is not the patch's, are each a different request from the one the
+// API publishes.
+func TestADeclaredUpdateUrlIsRefusedWhenThePatchDoesNotAgree(t *testing.T) {
+	for name, url := range map[string]string{
+		"undeclared query parameter": "projects/{{project}}/scalers?autoscaler={{name}}",
+		"a path the patch is not at": "projects/{{project}}/otherthings?scaler={{name}}",
+	} {
+		res, err := Build(scalerFixture(t, url))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		ty, ok := res.Catalog.Type("gcp.scaler")
+		if !ok {
+			t.Fatalf("%s: gcp.scaler missing", name)
+		}
+		if ty.UpdateVerb != "" {
+			t.Errorf("%s: UpdateVerb = %q, want empty", name, ty.UpdateVerb)
+		}
+	}
+}
+
+// TestAnImmutableResourcePatchesOnlyWhatItNames. magic-modules' resource-level
+// `immutable:` says nothing changes in place except the fields that name their
+// own update. Both collections here publish a PATCH, as compute's proxies and
+// prefixes do. One resource names a field it patches, so that field is
+// patched and the rest replace. The other names only methods of its own, a
+// PATCH to updateSize (compute's instance does this with
+// updateShieldedInstanceConfig) and a POST to setLabels. Neither is the update
+// this provider sends, so it is replaced on any change and the warnings file
+// says why.
+func TestAnImmutableResourcePatchesOnlyWhatItNames(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{
+		"schemas/acme.json": updateVerbDoc(),
+		"mmv1/products/acme/Patchable.yaml": `name: Patchable
+base_url: projects/{{project}}/patchables
+self_link: projects/{{project}}/patchables/{{name}}
+immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: size
+    type: Integer
+    update_url: projects/{{project}}/patchables/{{name}}
+    update_verb: PATCH
+`,
+		"mmv1/products/acme/Unmasked.yaml": `name: Unmasked
+base_url: projects/{{project}}/unmaskeds
+self_link: projects/{{project}}/unmaskeds/{{name}}
+immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: size
+    type: Integer
+    update_url: projects/{{project}}/unmaskeds/{{name}}/updateSize
+    update_verb: PATCH
+  - name: labels
+    type: KeyValueLabels
+    update_url: projects/{{project}}/unmaskeds/{{name}}/setLabels
+    update_verb: POST
+`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, ok := res.Catalog.Type("gcp.patchable")
+	if !ok {
+		t.Fatalf("gcp.patchable missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if p.UpdateVerb != "PATCH" {
+		t.Errorf("gcp.patchable UpdateVerb = %q, want PATCH for the one field it names", p.UpdateVerb)
+	}
+	if p.Attributes["size"].ForceNew {
+		t.Error("size is ForceNew, but magic-modules patches it")
+	}
+	if !p.Attributes["name"].ForceNew {
+		t.Error("name is not ForceNew on an immutable resource that does not patch it")
+	}
+	u, ok := res.Catalog.Type("gcp.unmasked")
+	if !ok {
+		t.Fatalf("gcp.unmasked missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if u.UpdateVerb != "" {
+		t.Errorf("gcp.unmasked UpdateVerb = %q, want none: its only updates are its own methods", u.UpdateVerb)
+	}
+	var recorded bool
+	for _, r := range res.Unpatchable {
+		recorded = recorded || r.Type == "gcp.unmasked"
+		if r.Type == "gcp.patchable" {
+			t.Error("gcp.patchable is recorded as replaced, but it patches size")
+		}
+	}
+	if !recorded {
+		t.Error("gcp.unmasked lost its update and nothing records why")
+	}
+}
+
+// TestAnImmutableResourceWithASetterIsNotRecordedAsReplaced. Once Discovery
+// confirms the setter, the type is updatable through it (compute's global
+// target HTTP proxy through setUrlMap), and the warnings file must not tell a
+// reader every change replaces it.
+func TestAnImmutableResourceWithASetterIsNotRecordedAsReplaced(t *testing.T) {
+	doc := strings.Replace(updateVerbDoc(),
+		`"patch": {"id": "a.u.patch", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}`,
+		`"patch": {"id": "a.u.patch", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "setSize": {"id": "a.u.setSize", "path": "projects/{project}/unmaskeds/{id}/setSize", "httpMethod": "POST", "request": {"$ref": "SizeReference"}, "response": {"$ref": "Operation"}}`, 1)
+	doc = strings.Replace(doc, `"Operation": {`, `"SizeReference": {"id": "SizeReference", "type": "object", "properties": {"size": {"type": "integer", "format": "int64"}}},
+    "Operation": {`, 1)
+	res, err := Build(writeRefFixture(t, map[string]string{
+		"schemas/acme.json": doc,
+		"mmv1/products/acme/Unmasked.yaml": `name: Unmasked
+base_url: projects/{{project}}/unmaskeds
+self_link: projects/{{project}}/unmaskeds/{{name}}
+immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: size
+    type: Integer
+    update_url: projects/{{project}}/unmaskeds/{{name}}/setSize
+    update_verb: POST
+`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, ok := res.Catalog.Type("gcp.unmasked")
+	if !ok {
+		t.Fatalf("gcp.unmasked missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if u.SetterFor("size") == nil {
+		t.Fatalf("the fixture's setSize was not admitted (setters %+v), so this test proves nothing", u.Setters)
+	}
+	for _, r := range res.Unpatchable {
+		if r.Type == "gcp.unmasked" {
+			t.Errorf("gcp.unmasked is recorded as replaced on every change, but setSize updates it: %q", r.Says)
+		}
+	}
+}
+
+// TestADeleteIsAwaitedByItsOwnAnswer. A type's Await is read from its
+// create, and sqladmin's sslCerts create answers with the resource while its
+// delete answers with an operation. The catalog records the delete's own
+// kind, only where it differs, and gives the type the longer timeout that
+// kind needs.
+func TestADeleteIsAwaitedByItsOwnAnswer(t *testing.T) {
+	doc := strings.Replace(updateVerbDoc(),
+		`"delete": {"id": "a.p.delete", "path": "projects/{project}/patchables/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}`,
+		`"delete": {"id": "a.p.delete", "path": "projects/{project}/patchables/{id}", "httpMethod": "DELETE", "response": {"$ref": "ComputeOp"}}`, 1)
+	doc = strings.Replace(doc, `"Operation": {`, `"ComputeOp": {"id": "ComputeOp", "type": "object", "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}, "operationType": {"type": "string"}}},
+    "Operation": {`, 1)
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": doc, "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, ok := res.Catalog.Type("gcp.patchable")
+	if !ok {
+		t.Fatalf("gcp.patchable missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if p.Await != catalog.AwaitNone {
+		t.Fatalf("the fixture is wrong: create await = %v, want none", p.Await)
+	}
+	if got := p.DeleteAwaitKind(); got != catalog.AwaitComputeOperation {
+		t.Errorf("delete await = %v, want the compute operation its delete answers with", got)
+	}
+	if p.TimeoutSeconds < 600 {
+		t.Errorf("timeout = %ds, too short for the compute operation its delete waits on", p.TimeoutSeconds)
+	}
+	u, _ := res.Catalog.Type("gcp.unmasked")
+	if u == nil || u.DeleteAwait != nil {
+		t.Errorf("gcp.unmasked records a delete await although its delete answers like its create: %+v", u)
+	}
+}
+
+// TestOneFieldPerPatchReachesTheCatalog. The overlay is the only source: the
+// subnetwork's refusal of a two-field patch is in no Discovery text.
+func TestOneFieldPerPatchReachesTheCatalog(t *testing.T) {
+	for _, flag := range []bool{true, false} {
+		extra := "patchable:\n  gcp.restricted:\n    fields: [size, name]\n    note: the live suite saw a two-field patch refused\n"
+		if flag {
+			extra = "patchable:\n  gcp.restricted:\n    fields: [size, name]\n    one_field_per_patch: true\n    note: the live suite saw a two-field patch refused\n"
+		}
+		res, err := Build(overlayWith(t, extra))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, ok := res.Catalog.Type("gcp.restricted")
+		if !ok {
+			t.Fatal("gcp.restricted missing")
+		}
+		if ty.PatchOneField != flag {
+			t.Errorf("one_field_per_patch: %v in the overlay, PatchOneField = %v in the catalog", flag, ty.PatchOneField)
+		}
+	}
+}
+
+// TestClearBeforeDeleteReachesTheCatalogAndIsChecked. The ruling names the
+// fields; the catalog carries them; a field the type does not have is a
+// build error, not a patch of a field Google has never heard of.
+func TestClearBeforeDeleteReachesTheCatalogAndIsChecked(t *testing.T) {
+	build := func(field string) (*catalog.Type, []Warning) {
+		in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
+			"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\nself_link: projects/{{project}}/patchables/{{name}}\ncustom_code:\n  pre_delete: templates/terraform/pre_delete/detach.tmpl\n"})
+		overlay := "rulings:\n  acme/Patchable:\n    hooks: [pre_delete]\n    clear_before_delete: [" + field + "]\n    note: detaches before delete\naliases: {}\ndiscover_default: []\n"
+		if err := os.WriteFile(in.OverlayPath, []byte(overlay), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Build(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, _ := res.Catalog.Type("gcp.patchable")
+		return ty, res.Warnings
+	}
+	if ty, _ := build("size"); ty == nil || len(ty.ClearBeforeDelete) != 1 || ty.ClearBeforeDelete[0] != "size" {
+		t.Errorf("clear_before_delete [size] reached the catalog as %+v", ty)
+	}
+	ty, warnings := build("nosuchfield")
+	if ty != nil {
+		t.Error("a ruling clearing a field the type does not have still shipped the type")
+	}
+	var named bool
+	for _, w := range warnings {
+		named = named || strings.Contains(w.Reason, "nosuchfield")
+	}
+	if !named {
+		t.Error("the refusal does not name the field")
+	}
+}
+
+// TestACreateURLCarryingAPreCreateTokenIsRefused. compute's NodeGroup create
+// url carries "PRE_CREATE_REPLACE_ME" for its pre_create hook to fill.
+// Shipped, every create would send the token itself.
+func TestACreateURLCarryingAPreCreateTokenIsRefused(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
+		"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\ncreate_url: projects/{{project}}/patchables?count=PRE_CREATE_REPLACE_ME\nself_link: projects/{{project}}/patchables/{{name}}\n"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := res.Catalog.Type("gcp.patchable"); ok {
+		t.Error("gcp.patchable shipped with a create url that sends PRE_CREATE_REPLACE_ME")
+	}
+}
+
+// TestARulingCanRequireAFieldGoogleInsistsOn. Cloud DNS refuses a policy
+// with no description, which no source says. The ruling's required list makes
+// configuration say it; a field the type lacks is refused, not ignored.
+func TestARulingCanRequireAFieldGoogleInsistsOn(t *testing.T) {
+	build := func(field string) *catalog.Type {
+		in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
+			"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\nself_link: projects/{{project}}/patchables/{{name}}\ncustom_code:\n  pre_delete: templates/terraform/pre_delete/detach.tmpl\n"})
+		overlay := "rulings:\n  acme/Patchable:\n    hooks: [pre_delete]\n    required: [" + field + "]\n    note: google refused a create without it\naliases: {}\ndiscover_default: []\n"
+		if err := os.WriteFile(in.OverlayPath, []byte(overlay), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Build(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, _ := res.Catalog.Type("gcp.patchable")
+		return ty
+	}
+	if ty := build("size"); ty == nil || !ty.Attributes["size"].Required {
+		t.Errorf("required [size] did not make size required: %+v", ty)
+	}
+	if ty := build("nosuchfield"); ty != nil {
+		t.Error("a ruling requiring a field the type does not have still shipped the type")
+	}
+}

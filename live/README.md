@@ -50,8 +50,8 @@ values do not.
 | Label | `infrena-live-tests=true` — **this is what the guard checks**, and it is the one value you must match exactly |
 | Billing account | `012345-567890-ABCDEF` — needed only if the project is not already billed |
 | Service account | `infrena-live@example-project-1234.iam.gserviceaccount.com` |
-| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `iam.serviceAccountAdmin` |
-| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage |
+| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin`, `dns.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
+| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager, dns |
 
 If `gcloud projects create` returns `QuotaFailure: you have exceeded your
 allotted project quota`, reusing a dormant project works — but verify it is
@@ -59,6 +59,11 @@ genuinely empty first. These tests create and destroy real infrastructure, and
 the guard's label check is the only thing standing between them and whatever
 else lives there. Confirm the compute API has never been enabled and that there
 are no buckets before pointing this at anything.
+
+**A role granted moments ago may not work yet.** IAM takes a few minutes to propagate. A run straight
+after a grant can fail with `PERMISSION_DENIED` on the very permission you just granted, and its cleanup
+reports `CLEANUP FAILED` for the same reason even though nothing was created. Wait, confirm the service
+account can list the resource type, then rerun.
 
 **There is no key file and this suite must never create one.** It
 authenticates as the operator (Application Default Credentials from
@@ -161,14 +166,17 @@ Google directly, finds tag resources by listing rather than from state, and
 when it cannot delete something it prints `CLEANUP FAILED:` with the
 resource id and the url. A silent cleanup failure spends money forever.
 
-### It depends on a resource the provider cannot manage
+### It borrows the project's `default` network
 
-`gcp.firewall`'s `network` is REQUIRED and **`gcp.network` does not ship** —
-compute's `Network` needs four hook rulings the tier gate has not been given,
-and `Subnetwork` one. So the rule references the project's auto-created
-`default` VPC by self link rather than managing it. That is a consequence of
-the tier gate, not an oversight, and it is why the suite cannot be written
-without something somebody else made.
+`gcp.firewall`'s `network` is REQUIRED, and the rule references the project's
+auto-created `default` VPC by self link rather than a network the suite makes.
+
+This used to be forced: `gcp.network` did not ship until compute's `Network` and
+`Subnetwork` hooks were ruled (see `gen/overlay.yaml`). It ships now, so this is
+a choice. Borrowing the default network keeps the suite to one fewer resource to
+create, wait on and clean up, and a leaked VPC is the most expensive thing this
+suite could leave behind. It also means discovery has a Google-made network to
+flag as system-owned, which the discover test asserts.
 
 ## `Retry-After`: measured, not inherited
 
