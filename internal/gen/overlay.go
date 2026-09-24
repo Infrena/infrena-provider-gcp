@@ -26,6 +26,11 @@ type Ruling struct {
 	// clear them (a field removed from configuration keeps its value here),
 	// so without this such a resource could never be destroyed.
 	ClearBeforeDelete []string `yaml:"clear_before_delete"`
+	// Required names fields the API refuses a create without although no
+	// source says so: Cloud DNS policies need a description, which Terraform
+	// hides by always sending "Managed by Terraform". Evidence, never
+	// assumed; the note cites it.
+	Required []string `yaml:"required"`
 }
 
 // Patchable is a human decision about a type whose API patches only SOME of

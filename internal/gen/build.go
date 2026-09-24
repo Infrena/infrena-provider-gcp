@@ -1204,6 +1204,15 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.OperationParamPatterns = operationParamPatterns(doc, t.OperationPollPath)
 	}
 
+	if ruling != nil {
+		for _, f := range ruling.Required {
+			a := attrs[f]
+			if a == nil || a.Output {
+				return nil, fmt.Errorf("required names %q, which is not a settable attribute of this type", f)
+			}
+			a.Required = true
+		}
+	}
 	if ruling != nil && len(ruling.ClearBeforeDelete) > 0 {
 		for _, f := range ruling.ClearBeforeDelete {
 			if a := attrs[f]; a == nil || a.Output {

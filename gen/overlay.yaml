@@ -651,7 +651,15 @@ rulings:
   dns/Policy:
     hooks: [pre_delete]
     clear_before_delete: [networks]
+    required: [description]
     note: >
+      description is required on evidence: Google refused a create without
+      one on 2026-09-24 ("The 'entity.policy.description' parameter is
+      required but was missing"), though Discovery calls it a string "for
+      the user's convenience". Terraform never meets this because it always
+      sends "Managed by Terraform"; this provider does not invent values, so
+      configuration must write one.
+
       pre_delete (pre_delete/detach_network.tmpl) patches `networks` to empty
       before the delete, because Google refuses to delete a policy with networks
       attached. clear_before_delete does the same here, and it is needed:
