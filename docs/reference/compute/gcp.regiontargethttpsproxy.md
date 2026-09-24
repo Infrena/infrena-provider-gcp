@@ -37,25 +37,25 @@ projects/{project}/regions/{region}/targetHttpsProxies/{targetHttpsProxy}
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `authorizationPolicy` | `authorization_policy` | `string` | optional | — | Optional. A URL referring to a networksecurity.AuthorizationPolicy resource that describes how the proxy should authorize inbound traffic. If left blank, access will not be restricted by an … |
-| `certificateMap` | `certificate_map` | `string` | optional | — | URL of a certificate map that identifies a certificate map associated with the given target proxy. This field can only be set for Global external Application Load Balancer or Classic Application Load … |
+| `authorizationPolicy` | `authorization_policy` | `string` | optional | force new | Optional. A URL referring to a networksecurity.AuthorizationPolicy resource that describes how the proxy should authorize inbound traffic. If left blank, access will not be restricted by an … |
+| `certificateMap` | `certificate_map` | `string` | optional | force new | URL of a certificate map that identifies a certificate map associated with the given target proxy. This field can only be set for Global external Application Load Balancer or Classic Application Load … |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
-| `fingerprint` | — | `string` | optional | — | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a TargetHttpsProxy. An up-to-date … |
-| `httpKeepAliveTimeoutSec` | `http_keep_alive_timeout_sec` | `integer` | optional | — | Specifies how long to keep a connection open, after completing a response, while there is no matching traffic (in seconds). If an HTTP keep-alive is not specified, a default value (610 seconds) will … |
+| `fingerprint` | — | `string` | optional | force new | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a TargetHttpsProxy. An up-to-date … |
+| `httpKeepAliveTimeoutSec` | `http_keep_alive_timeout_sec` | `integer` | optional | force new | Specifies how long to keep a connection open, after completing a response, while there is no matching traffic (in seconds). If an HTTP keep-alive is not specified, a default value (610 seconds) will … |
 | `id` | — | `string` | output only | — | \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of resource. Alwayscompute#targetHttpsProxy for target HTTPS proxies. |
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
-| `proxyBind` | `proxy_bind` | `boolean` | optional | — | This field only applies when the forwarding rule that references this target proxy has a loadBalancingScheme set toINTERNAL_SELF_MANAGED. When this field is set to true, Envoy proxies set up inbound … |
-| `quicOverride` | `quic_override` | `string` | optional | — | Specifies the QUIC override policy for this TargetHttpsProxy resource. This setting determines whether the load balancer attempts to negotiate QUIC with clients. You can specify NONE, ENABLE … |
+| `proxyBind` | `proxy_bind` | `boolean` | optional | force new | This field only applies when the forwarding rule that references this target proxy has a loadBalancingScheme set toINTERNAL_SELF_MANAGED. When this field is set to true, Envoy proxies set up inbound … |
+| `quicOverride` | `quic_override` | `string` | optional | force new | Specifies the QUIC override policy for this TargetHttpsProxy resource. This setting determines whether the load balancer attempts to negotiate QUIC with clients. You can specify NONE, ENABLE … |
 | `region` | — | `string` | output only | force new | Output only. \[Output Only\] URL of the region where the regional TargetHttpsProxy resides. This field is not applicable to global TargetHttpsProxies. |
 | `selfLink` | `self_link` | `string` | output only | — | \[Output Only\] Server-defined URL for the resource. |
 | `serverTlsPolicy` | `server_tls_policy` | `string` | optional | refers to `gcp.sslpolicy.selfLink` | Optional. A URL referring to a networksecurity.ServerTlsPolicy resource that describes how the proxy should authenticate inbound traffic. serverTlsPolicy only applies to a globalTargetHttpsProxy … |
-| `sslCertificates` | `ssl_certificates` | `list` | optional | — | URLs to SslCertificate resources that are used to authenticate connections between users and the load balancer. At least one SSL certificate must be specified. SslCertificates do not apply when the … |
+| `sslCertificates` | `ssl_certificates` | `list` | optional | force new | URLs to SslCertificate resources that are used to authenticate connections between users and the load balancer. At least one SSL certificate must be specified. SslCertificates do not apply when the … |
 | `sslCertificates[]` | — | `string` | optional | — | — |
 | `sslPolicy` | `ssl_policy` | `string` | optional | refers to `gcp.regionsslpolicy.selfLink` | URL of SslPolicy resource that will be associated with the TargetHttpsProxy resource. If not set, the TargetHttpsProxy resource has no SSL policy configured. |
-| `tlsEarlyData` | `tls_early_data` | `string` | optional | — | Specifies whether TLS 1.3 0-RTT Data ("Early Data") should be accepted for this service. Early Data allows a TLS resumption handshake to include the initial application payload (a HTTP request) … |
-| `urlMap` | `url_map` | `string` | required | refers to `gcp.regionurlmap.selfLink` | A fully-qualified or valid partial URL to the UrlMap resource that defines the mapping from URL to the BackendService. For example, the following are all valid URLs for specifying a URL map: - … |
+| `tlsEarlyData` | `tls_early_data` | `string` | optional | force new | Specifies whether TLS 1.3 0-RTT Data ("Early Data") should be accepted for this service. Early Data allows a TLS resumption handshake to include the initial application payload (a HTTP request) … |
+| `urlMap` | `url_map` | `string` | required | force new, refers to `gcp.regionurlmap.selfLink` | A fully-qualified or valid partial URL to the UrlMap resource that defines the mapping from URL to the BackendService. For example, the following are all valid URLs for specifying a URL map: - … |
 
 ## References
 

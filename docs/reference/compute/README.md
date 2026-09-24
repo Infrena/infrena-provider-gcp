@@ -33,8 +33,8 @@
 | [`gcp.networkfirewallpolicy`](gcp.networkfirewallpolicy.md) | yes | yes | yes | The Compute NetworkFirewallPolicy resource |
 | [`gcp.nodetemplate`](gcp.nodetemplate.md) | yes | **no** | yes | Represents a NodeTemplate resource. |
 | [`gcp.packetmirroring`](gcp.packetmirroring.md) | yes | yes | yes | Packet Mirroring mirrors traffic to and from particular VM instances. |
-| [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | yes | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
-| [`gcp.publicdelegatedprefix`](gcp.publicdelegatedprefix.md) | yes | yes | yes | Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYOIP). |
+| [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | **no** | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
+| [`gcp.publicdelegatedprefix`](gcp.publicdelegatedprefix.md) | yes | **no** | yes | Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYOIP). |
 | [`gcp.regionautoscaler`](gcp.regionautoscaler.md) | yes | yes | yes | Represents an Autoscaler resource. |
 | [`gcp.regionbackendservice`](gcp.regionbackendservice.md) | yes | yes | yes | A Region Backend Service defines a regionally-scoped group of virtual machines that will serve traffic for load balancing. |
 | [`gcp.regioncompositehealthcheck`](gcp.regioncompositehealthcheck.md) | yes | yes | yes | A composite health check resource specifies the health source resources and the health destination resource to which the aggregated health … |
@@ -65,7 +65,7 @@
 | [`gcp.sslpolicy`](gcp.sslpolicy.md) | yes | yes | yes | Represents a SSL policy. |
 | [`gcp.subnetwork`](gcp.subnetwork.md) | yes | yes | yes | A VPC network is a virtual version of the traditional physical networks that exist within and between physical data centers. |
 | [`gcp.targetgrpcproxy`](gcp.targetgrpcproxy.md) | yes | yes | yes | Represents a Target gRPC Proxy resource. |
-| [`gcp.targethttpproxy`](gcp.targethttpproxy.md) | yes | yes | yes | Represents a TargetHttpProxy resource, which is used by one or more global forwarding rule to route incoming HTTP requests to a URL map. |
+| [`gcp.targethttpproxy`](gcp.targethttpproxy.md) | yes | **no** | yes | Represents a TargetHttpProxy resource, which is used by one or more global forwarding rule to route incoming HTTP requests to a URL map. |
 | [`gcp.targethttpsproxy`](gcp.targethttpsproxy.md) | yes | yes | yes | Represents a TargetHttpsProxy resource, which is used by one or more global forwarding rule to route incoming HTTPS requests to a URL map. |
 | [`gcp.targetpool`](gcp.targetpool.md) | yes | **no** | yes | Represents a Target Pool resource. |
 | [`gcp.targetsslproxy`](gcp.targetsslproxy.md) | yes | **no** | yes | Represents a TargetSslProxy resource, which is used by one or more global forwarding rule to route incoming SSL requests to a backend … |

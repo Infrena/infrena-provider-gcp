@@ -20,7 +20,7 @@
 | [`gcp.multicastconsumerassociation`](gcp.multicastconsumerassociation.md) | yes | yes | yes | Create a multicast consumer association in the specified location of the current project. |
 | [`gcp.multicastgroupconsumeractivation`](gcp.multicastgroupconsumeractivation.md) | yes | yes | yes | Create a multicast group consumer activation in the specified location of the current project. |
 | [`gcp.producerextension`](gcp.producerextension.md) | yes | **no** | yes | `ProducerExtension` is a resource representing producer defined configuration for their service extension. |
-| [`gcp.servicebinding`](gcp.servicebinding.md) | yes | yes | yes | ServiceBinding is the resource that defines a Service Directory Service to be used in a BackendService resource. |
+| [`gcp.servicebinding`](gcp.servicebinding.md) | yes | **no** | yes | ServiceBinding is the resource that defines a Service Directory Service to be used in a BackendService resource. |
 | [`gcp.servicelbpolicy`](gcp.servicelbpolicy.md) | yes | yes | yes | ServiceLbPolicy holds global load balancing and traffic distribution configuration that can be applied to a BackendService. |
 | [`gcp.tcproute`](gcp.tcproute.md) | yes | yes | yes | TcpRoute is the resource defining how TCP traffic should be routed by a Mesh/Gateway resource. |
 | [`gcp.tlsroute`](gcp.tlsroute.md) | yes | yes | yes | TlsRoute defines how traffic should be routed based on SNI and other matching L3 attributes. |

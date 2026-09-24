@@ -451,3 +451,81 @@ func TestADeclaredUpdateUrlIsRefusedWhenThePatchDoesNotAgree(t *testing.T) {
 		}
 	}
 }
+
+// TestAnImmutableResourcePatchesOnlyWhatItNames. magic-modules' resource-level
+// `immutable:` says nothing changes in place except the fields that name their
+// own update. Both collections here publish a PATCH, as compute's proxies and
+// prefixes do. One resource names a field it patches, so that field is
+// patched and the rest replace. The other names only methods of its own, a
+// PATCH to updateSize (compute's instance does this with
+// updateShieldedInstanceConfig) and a POST to setLabels. Neither is the update
+// this provider sends, so it is replaced on any change and the warnings file
+// says why.
+func TestAnImmutableResourcePatchesOnlyWhatItNames(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{
+		"schemas/acme.json": updateVerbDoc(),
+		"mmv1/products/acme/Patchable.yaml": `name: Patchable
+base_url: projects/{{project}}/patchables
+self_link: projects/{{project}}/patchables/{{name}}
+immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: size
+    type: Integer
+    update_url: projects/{{project}}/patchables/{{name}}
+    update_verb: PATCH
+`,
+		"mmv1/products/acme/Unmasked.yaml": `name: Unmasked
+base_url: projects/{{project}}/unmaskeds
+self_link: projects/{{project}}/unmaskeds/{{name}}
+immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: size
+    type: Integer
+    update_url: projects/{{project}}/unmaskeds/{{name}}/updateSize
+    update_verb: PATCH
+  - name: labels
+    type: KeyValueLabels
+    update_url: projects/{{project}}/unmaskeds/{{name}}/setLabels
+    update_verb: POST
+`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, ok := res.Catalog.Type("gcp.patchable")
+	if !ok {
+		t.Fatalf("gcp.patchable missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if p.UpdateVerb != "PATCH" {
+		t.Errorf("gcp.patchable UpdateVerb = %q, want PATCH for the one field it names", p.UpdateVerb)
+	}
+	if p.Attributes["size"].ForceNew {
+		t.Error("size is ForceNew, but magic-modules patches it")
+	}
+	if !p.Attributes["name"].ForceNew {
+		t.Error("name is not ForceNew on an immutable resource that does not patch it")
+	}
+	u, ok := res.Catalog.Type("gcp.unmasked")
+	if !ok {
+		t.Fatalf("gcp.unmasked missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if u.UpdateVerb != "" {
+		t.Errorf("gcp.unmasked UpdateVerb = %q, want none: its only updates are its own methods", u.UpdateVerb)
+	}
+	var recorded bool
+	for _, r := range res.Unpatchable {
+		recorded = recorded || r.Type == "gcp.unmasked"
+		if r.Type == "gcp.patchable" {
+			t.Error("gcp.patchable is recorded as replaced, but it patches size")
+		}
+	}
+	if !recorded {
+		t.Error("gcp.unmasked lost its update and nothing records why")
+	}
+}

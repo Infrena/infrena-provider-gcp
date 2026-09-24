@@ -328,6 +328,9 @@ func Build(in Inputs) (*Result, error) {
 		}
 		if restricted, says := restrictedPatch(b.p.col); restricted {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name, says})
+		} else if b.p.mm != nil && b.p.mm.Immutable && b.p.col.Methods["patch"] != nil {
+			unpatchable = append(unpatchable, Unpatchable{b.t.Name,
+				"magic-modules marks the resource immutable and names no field it patches"})
 		}
 	}
 	sort.Slice(unpatchable, func(i, j int) bool { return unpatchable[i].Type < unpatchable[j].Type })
@@ -1022,6 +1025,21 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 				// Left non-updatable on purpose: see patchlimits.go. Recorded
 				// as a noupdate row in gen/warnings.txt by Build.
 			}
+		}
+	}
+	// magic-modules' resource-level `immutable:` says the same thing a
+	// restricted patch says, as data rather than prose: nothing changes in
+	// place except the fields that name their own update. Discovery still
+	// publishes a PATCH for every one of these, so without this the proxies
+	// and prefixes shipped patching fields the API does not change there
+	// (a target HTTPS proxy's urlMap goes through setUrlMap). A human
+	// `patchable:` list, where one exists, has already decided and wins.
+	if mm != nil && mm.Immutable && t.UpdateVerb != "" && overlay.Patchable[name] == nil {
+		if fields := immutableResourcePatchFields(mm); len(fields) > 0 {
+			applyPatchAllowlist(attrs, fields)
+		} else {
+			t.UpdateVerb, t.UpdateMask, t.UpdateURL = "", false, ""
+			t.UpdateWrapper, t.UpdateMaskField = "", ""
 		}
 	}
 
@@ -2223,4 +2241,36 @@ func structuredIDTemplate(col disco.Collection, selfLink string) string {
 		return strings.Join(out, "/")
 	}
 	return ""
+}
+
+// immutableResourcePatchFields names the top-level fields of an immutable
+// magic-modules resource that it updates with a PATCH to the resource itself:
+// the only fields such a resource changes in place through the update this
+// provider sends. A field updated through its own method (setUrlMap,
+// setLabels) is not one of them, and neither is NOOP, which magic-modules
+// uses for a field another field's update carries.
+func immutableResourcePatchFields(mm *mmv1.Resource) []string {
+	var out []string
+	for _, f := range mm.Properties {
+		if !strings.EqualFold(f.UpdateVerb, http.MethodPatch) || !addressesTheResource(f.UpdateURL) {
+			continue
+		}
+		name := f.Name
+		if f.ApiName != "" {
+			name = f.ApiName
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+// addressesTheResource reports whether an update_url names the resource
+// itself rather than one of its methods: its last segment is a placeholder
+// ("{{name}}"), not a literal verb ("setUrlMap", "updateShieldedInstanceConfig").
+func addressesTheResource(tmpl string) bool {
+	if i := strings.IndexByte(tmpl, '?'); i >= 0 {
+		tmpl = tmpl[:i]
+	}
+	last := tmpl[strings.LastIndexByte(tmpl, '/')+1:]
+	return strings.HasPrefix(last, "{{") && strings.HasSuffix(last, "}}") && !strings.Contains(last, ":")
 }
