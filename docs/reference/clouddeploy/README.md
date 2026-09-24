@@ -6,8 +6,8 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.automation`](gcp.automation.md) | **no** | yes | yes | An `Automation` enables the automation of manually driven actions for a Delivery Pipeline, which includes Release promotion amongst … |
+| [`gcp.automation`](gcp.automation.md) | yes | yes | yes | An `Automation` enables the automation of manually driven actions for a Delivery Pipeline, which includes Release promotion amongst … |
 | [`gcp.customtargettype`](gcp.customtargettype.md) | yes | yes | yes | A Cloud Deploy `CustomTargetType` defines a type of custom target that can be referenced in a Cloud Deploy `Target` in order to facilitate … |
 | [`gcp.deliverypipeline`](gcp.deliverypipeline.md) | yes | yes | yes | A DeliveryPipeline defines a pipeline through which a Skaffold configuration can progress. |
-| [`gcp.deploypolicy`](gcp.deploypolicy.md) | **no** | yes | yes | A `DeployPolicy` inhibits manual or DeployPolicy-driven actions within a Delivery Pipeline or Target. |
+| [`gcp.deploypolicy`](gcp.deploypolicy.md) | yes | yes | yes | A `DeployPolicy` inhibits manual or DeployPolicy-driven actions within a Delivery Pipeline or Target. |
 | [`gcp.target`](gcp.target.md) | yes | yes | yes | The Cloud Deploy `Target` resource. |

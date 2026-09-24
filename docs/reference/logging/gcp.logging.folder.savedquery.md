@@ -19,7 +19,7 @@ Describes a query that has been saved by a user.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}` needs `folder`, `name`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` needs `folder`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
 | Update | yes | `PATCH {{parent}}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
@@ -33,7 +33,7 @@ Describes a query that has been saved by a user.
 
 ## Attributes
 
-209 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+210 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -244,5 +244,6 @@ Describes a query that has been saved by a user.
 | `opsAnalyticsQuery.queryBuilder.resourceNames[]` | — | `string` | optional | — | — |
 | `opsAnalyticsQuery.queryBuilder.searchTerm` | `search_term` | `string` | optional | — | The plain text search to use for the query. There is no support for multiple search terms. This uses the SEARCH functionality in BigQuery. For example, a search_term = 'ERROR' would result in the … |
 | `opsAnalyticsQuery.sqlQueryText` | `sql_query_text` | `string` | required | — | Optional. A Log Analytics SQL query in text format.If both sql_query_text and query_builder fields are set, then the sql_query_text will be used, if its non-empty. At least one of the two fields must … |
+| `savedQueryId` | — | `string` | optional | force new, create only | Optional. The ID to use for the saved query, which will become the final component of the saved query's resource name.If the saved_query_id is not provided, the system will generate an alphanumeric … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the saved query was last updated. |
 | `visibility` | — | `string` | required | — | Required. The visibility status of this query, which determines its ownership. |

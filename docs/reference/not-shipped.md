@@ -24,9 +24,9 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [no get method](#no-get-method) | 2 |
 | [Patches the specified subnetwork with the data included in the request. Only certain fields can be updated with a patch request as indicated in the field descriptions. You must specify the current fingerprint of the subnetwork resource being patched.](#patches-the-specified-subnetwork-with-the-data-included-in-the-request-only-certain-fields-can-be-updated-with-a-patch-request-as-indicated-in-the-field-descriptions-you-must-specify-the-current-fingerprint-of-the-subnetwork-resource-being-patched) | 1 |
-| [shipped, but cannot be created](#shipped-but-cannot-be-created) | 65 |
+| [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**377** types did not ship. **65** more ship without a create.
+**377** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -470,7 +470,6 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.appprofile` | `{+parent}/appProfiles` | instance |
 | `gcp.attachment` | `{+parent}/attachments` | repository |
 | `gcp.authorizedview` | `{+parent}/authorizedViews` | instance, table |
-| `gcp.automation` | `projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations?automationId={{name}}` | name |
 | `gcp.bigtableadmin.backup` | `{+parent}/backups` | cluster, instance |
 | `gcp.bigtableadmin.cluster` | `{+parent}/clusters` | instance |
 | `gcp.bigtableadmin.table` | `{+parent}/tables` | instance |
@@ -479,7 +478,6 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.cloudresourcemanager.organization.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | organization |
 | `gcp.config` | `{+parent}/configs` | api |
 | `gcp.credential` | `{+parent}/credentials` | oauthClient |
-| `gcp.deploypolicy` | `projects/{{project}}/locations/{{location}}/deployPolicies?deployPolicyId={{name}}` | name |
 | `gcp.feed` | `{+parent}/feeds` | parent |
 | `gcp.file.snapshot` | `{+parent}/snapshots` | instance |
 | `gcp.iam.organization.role` | `{+parent}/roles` | organization |
@@ -491,23 +489,22 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.logging.billingaccount.bucket` | `{+parent}/buckets` | billingAccount |
 | `gcp.logging.billingaccount.exclusion` | `{+parent}/exclusions` | billingAccount |
 | `gcp.logging.billingaccount.link` | `{+parent}/links` | billingAccount, bucket |
-| `gcp.logging.billingaccount.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}` | billingAccount, name |
+| `gcp.logging.billingaccount.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | billingAccount |
 | `gcp.logging.billingaccount.sink` | `{+parent}/sinks` | billingAccount |
 | `gcp.logging.billingaccount.view` | `{+parent}/views` | billingAccount, bucket |
 | `gcp.logging.folder.bucket` | `{+parent}/buckets` | folder |
 | `gcp.logging.folder.exclusion` | `{+parent}/exclusions` | folder |
 | `gcp.logging.folder.link` | `{+parent}/links` | bucket, folder |
-| `gcp.logging.folder.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}` | folder, name |
+| `gcp.logging.folder.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | folder |
 | `gcp.logging.folder.sink` | `{+parent}/sinks` | folder |
 | `gcp.logging.folder.view` | `{+parent}/views` | bucket, folder |
 | `gcp.logging.link` | `{+parent}/links` | bucket |
 | `gcp.logging.organization.bucket` | `{+parent}/buckets` | organization |
 | `gcp.logging.organization.exclusion` | `{+parent}/exclusions` | organization |
 | `gcp.logging.organization.link` | `{+parent}/links` | bucket, organization |
-| `gcp.logging.organization.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}` | name, organization |
+| `gcp.logging.organization.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | organization |
 | `gcp.logging.organization.sink` | `{+parent}/sinks` | organization |
 | `gcp.logging.organization.view` | `{+parent}/views` | bucket, organization |
-| `gcp.logging.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{name}}` | name |
 | `gcp.logging.view` | `{+parent}/views` | bucket |
 | `gcp.logicalview` | `{+parent}/logicalViews` | instance |
 | `gcp.managedidentity` | `{+parent}/managedIdentities` | namespace, workloadIdentityPool |
