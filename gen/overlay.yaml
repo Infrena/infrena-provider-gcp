@@ -330,6 +330,58 @@ rulings:
   #     defect.
   # ----------------------------------------------------------------------------
 
+# patchable: the types whose API publishes a PATCH that only accepts SOME of the
+# resource's fields. Discovery cannot say that -- it publishes the whole
+# resource as the request schema and limits it in PROSE on the method -- so the
+# generator refuses to derive an update verb for such a type until an entry here
+# names the fields the API really takes. Everything else settable becomes
+# ForceNew, which means a change to it REPLACES the resource, which is what the
+# API does with it anyway.
+#
+# It is an allowlist rather than a list of exclusions on purpose: a field added
+# upstream then defaults to replacement, which is destructive but loud and
+# convergent, rather than to a patch the API quietly ignores, which is neither.
+# See internal/gen/patchlimits.go. Types left out of this map are named in
+# gen/warnings.txt as `noupdate` rows, each quoting Google's own sentence.
+patchable:
+  gcp.network:
+    fields: [routingConfig]
+    note: >
+      compute.networks.patch, read from the pinned Discovery document on
+      2026-09-23: "Patches the specified network with the data included in the
+      request. Only routingConfig can be modified."
+
+      The type declares five settable, non-ForceNew attributes -- IPv4Range,
+      enableUlaInternalIpv6, mtu, networkFirewallPolicyEnforcementOrder and
+      routingConfig -- and exactly one of them is in that sentence. The other
+      four now replace the network, which is what changing them has always done
+      here and what the API forces either way.
+
+  gcp.image:
+    fields: [family, description]
+    note: >
+      compute.images.patch, same document and date: "Only the following fields
+      can be modified: family, description, deprecation status."
+
+      `deprecated` (the deprecation status) is readOnly in Discovery, so it is
+      output-only here and cannot be listed. `labels` is deliberately NOT
+      listed: compute changes image labels through a separate setLabels method,
+      not through patch, so a label change replaces the image until somebody
+      implements that call.
+
+# gcp.subnetwork is deliberately ABSENT, and it is the interesting one.
+# compute.subnetworks.patch says "Only certain fields can be updated with a
+# patch request as indicated in the field descriptions. You must specify the
+# current fingerprint of the subnetwork resource being patched." The fingerprint
+# is the blocker, not the field list: Subnetwork.fingerprint's own description
+# says "An up-to-date fingerprint must be provided in order to update the
+# Subnetwork, otherwise the request will fail with error 412". BuildMask sends
+# only the attributes that CHANGED, so it never sends a fingerprint, and every
+# subnetwork patch would 412. Listing fields here would ship a type whose every
+# update fails. The real fix is to carry compute's optimistic-locking
+# fingerprint from the observation Update was handed, which is a runtime change
+# and not a line in this file.
+
 # Curated aliases: the short word people actually say, for attributes they write
 # constantly. The generator already emits a snake_case alias for EVERY camelCase
 # attribute (11,680 of them), so this file is only for the cases where the

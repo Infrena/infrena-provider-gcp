@@ -58,7 +58,7 @@
 | [`gcp.router`](gcp.router.md) | yes | yes | yes | Represents a Router resource. |
 | [`gcp.securitypolicy`](gcp.securitypolicy.md) | yes | yes | yes | Represents a Google Cloud Armor security policy resource. |
 | [`gcp.sslcertificate`](gcp.sslcertificate.md) | yes | **no** | yes | An SslCertificate resource, used for HTTPS load balancing. |
-| [`gcp.subnetwork`](gcp.subnetwork.md) | yes | yes | yes | A VPC network is a virtual version of the traditional physical networks that exist within and between physical data centers. |
+| [`gcp.subnetwork`](gcp.subnetwork.md) | yes | **no** | yes | A VPC network is a virtual version of the traditional physical networks that exist within and between physical data centers. |
 | [`gcp.targetgrpcproxy`](gcp.targetgrpcproxy.md) | yes | yes | yes | Represents a Target gRPC Proxy resource. |
 | [`gcp.targethttpproxy`](gcp.targethttpproxy.md) | yes | yes | yes | Represents a TargetHttpProxy resource, which is used by one or more global forwarding rule to route incoming HTTP requests to a URL map. |
 | [`gcp.targetpool`](gcp.targetpool.md) | yes | **no** | yes | Represents a Target Pool resource. |
