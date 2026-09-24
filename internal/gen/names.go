@@ -178,7 +178,7 @@ func nameFor(c Candidate, wants map[string]int, taken map[string]string) (string
 	short := "gcp." + c.Resource
 	qualified := "gcp." + c.Service + "." + c.Resource
 	name := short
-	if wants[c.Resource] > 1 {
+	if wants[c.Resource] > 1 || genericWords[c.Resource] {
 		name = qualified
 	}
 	if holder, clash := taken[name]; clash && holder != c.key() {
@@ -189,4 +189,20 @@ func nameFor(c Candidate, wants map[string]int, taken map[string]string) (string
 			c.key(), short, qualified, holder)
 	}
 	return name, nil
+}
+
+// genericWords are resource names too general for one service to own the
+// short name: left to the short-unless-contested rule, a Memcache instance
+// became gcp.instance, a DNS policy gcp.policy and a monitoring group
+// gcp.group, permanently, because the lock only grows. A fresh candidate
+// with one of these names always takes gcp.<service>.<resource> (James,
+// 2026-09-24). Names already in the lock are returned before this rule runs,
+// so nothing published moves.
+var genericWords = map[string]bool{
+	"instance": true, "policy": true, "group": true, "metric": true,
+	"schema": true, "queue": true, "job": true, "rule": true,
+	"config": true, "key": true, "service": true, "cluster": true,
+	"database": true, "table": true, "template": true, "version": true,
+	"connection": true, "endpoint": true, "gateway": true, "repository": true,
+	"resource": true, "operation": true, "channel": true, "trigger": true,
 }
