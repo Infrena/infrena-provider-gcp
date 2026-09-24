@@ -49,23 +49,23 @@ A security profile defines the behavior associated to a profile type.
 | `threatPreventionProfile` | `threat_prevention_profile` | `map` | optional | — | The threat prevention configuration for the SecurityProfile. |
 | `threatPreventionProfile.antivirusOverrides` | `antivirus_overrides` | `list` | optional | unordered | Optional. Configuration for overriding antivirus actions per protocol. |
 | `threatPreventionProfile.antivirusOverrides[]` | — | `map` | optional | — | — |
-| `threatPreventionProfile.antivirusOverrides[].action` | — | `string` | optional | — | Required. Threat action override. For some threat types, only a subset of actions applies. |
-| `threatPreventionProfile.antivirusOverrides[].protocol` | — | `string` | optional | — | Required. Protocol to match. |
+| `threatPreventionProfile.antivirusOverrides[].action` | — | `string` | required | — | Required. Threat action override. For some threat types, only a subset of actions applies. |
+| `threatPreventionProfile.antivirusOverrides[].protocol` | — | `string` | required | — | Required. Protocol to match. |
 | `threatPreventionProfile.severityOverrides` | `severity_overrides` | `list` | optional | unordered | Optional. Configuration for overriding threats actions by severity match. |
 | `threatPreventionProfile.severityOverrides[]` | — | `map` | optional | — | — |
-| `threatPreventionProfile.severityOverrides[].action` | — | `string` | optional | — | Required. Threat action override. |
-| `threatPreventionProfile.severityOverrides[].severity` | — | `string` | optional | — | Required. Severity level to match. |
+| `threatPreventionProfile.severityOverrides[].action` | — | `string` | required | — | Required. Threat action override. |
+| `threatPreventionProfile.severityOverrides[].severity` | — | `string` | required | — | Required. Severity level to match. |
 | `threatPreventionProfile.threatOverrides` | `threat_overrides` | `list` | optional | unordered | Optional. Configuration for overriding threats actions by threat_id match. If a threat is matched both by configuration provided in severity_overrides and threat_overrides, the threat_overrides … |
 | `threatPreventionProfile.threatOverrides[]` | — | `map` | optional | — | — |
-| `threatPreventionProfile.threatOverrides[].action` | — | `string` | optional | — | Required. Threat action override. For some threat types, only a subset of actions applies. |
-| `threatPreventionProfile.threatOverrides[].threatId` | `threat_id` | `string` | optional | — | Required. Vendor-specific ID of a threat to override. |
-| `threatPreventionProfile.threatOverrides[].type_value` | wire `type` | `string` | output only | force new | Output only. Type of the threat (read only). |
+| `threatPreventionProfile.threatOverrides[].action` | — | `string` | required | — | Required. Threat action override. For some threat types, only a subset of actions applies. |
+| `threatPreventionProfile.threatOverrides[].threatId` | `threat_id` | `string` | required | — | Required. Vendor-specific ID of a threat to override. |
+| `threatPreventionProfile.threatOverrides[].type_value` | wire `type` | `string` | output only | — | Output only. Type of the threat (read only). |
 | `type_value` | wire `type` | `string` | required | force new | Immutable. The single ProfileType that the SecurityProfile resource configures. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Last resource update timestamp. |
 | `urlFilteringProfile` | `url_filtering_profile` | `map` | optional | — | The URL filtering configuration for the SecurityProfile. |
 | `urlFilteringProfile.urlFilters` | `url_filters` | `list` | optional | unordered | Optional. The list of filtering configs in which each config defines an action to take for some URL match. |
 | `urlFilteringProfile.urlFilters[]` | — | `map` | optional | — | — |
-| `urlFilteringProfile.urlFilters[].filteringAction` | `filtering_action` | `string` | optional | — | Required. The action taken when this filter is applied. |
-| `urlFilteringProfile.urlFilters[].priority` | — | `integer` | optional | — | Required. The priority of this filter within the URL Filtering Profile. Lower integers indicate higher priorities. The priority of a filter must be unique within a URL Filtering Profile. |
+| `urlFilteringProfile.urlFilters[].filteringAction` | `filtering_action` | `string` | required | — | Required. The action taken when this filter is applied. |
+| `urlFilteringProfile.urlFilters[].priority` | — | `integer` | required | — | Required. The priority of this filter within the URL Filtering Profile. Lower integers indicate higher priorities. The priority of a filter must be unique within a URL Filtering Profile. |
 | `urlFilteringProfile.urlFilters[].urls` | — | `list` | optional | — | Required. The list of strings that a URL must match with for this filter to be applied. |
 | `urlFilteringProfile.urlFilters[].urls[]` | — | `string` | optional | — | — |

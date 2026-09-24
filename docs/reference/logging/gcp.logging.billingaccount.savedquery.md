@@ -89,7 +89,7 @@ Describes a query that has been saved by a user.
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField.underlyingFieldSources[].projectedField.virtualField.underlyingFieldSources[]` | — | `map` | optional | opaque | — |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField.underlyingFieldSources[].projectedField.virtualField.virtualFieldType` | `virtual_field_type` | `string` | optional | — | Required. The type of the virtual field. |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField.virtualFieldType` | `virtual_field_type` | `string` | optional | — | Required. The type of the virtual field. |
-| `opsAnalyticsQuery.queryBuilder.filter` | — | `map` | required | — | The filter to use for the query. This equates to the WHERE clause in SQL. |
+| `opsAnalyticsQuery.queryBuilder.filter` | — | `map` | optional | — | The filter to use for the query. This equates to the WHERE clause in SQL. |
 | `opsAnalyticsQuery.queryBuilder.filter.childPredicates` | `child_predicates` | `list` | optional | — | The children of the filter predicate. This equates to the branches of the filter predicate that could contain further nested leaves. |
 | `opsAnalyticsQuery.queryBuilder.filter.childPredicates[]` | — | `map` | optional | — | — |
 | `opsAnalyticsQuery.queryBuilder.filter.childPredicates[].childPredicates` | `child_predicates` | `list` | optional | — | The children of the filter predicate. This equates to the branches of the filter predicate that could contain further nested leaves. |

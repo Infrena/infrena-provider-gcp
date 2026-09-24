@@ -32,7 +32,7 @@ projects/{project}/regions/{region}/routers/{router}
 
 ## Attributes
 
-125 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+127 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -43,7 +43,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `bgp.advertisedIpRanges` | `advertised_ip_ranges` | `list` | optional | unordered | User-specified list of individual IP ranges to advertise in custom mode. This field can only be populated if advertise_mode is CUSTOM and is advertised to all peers of the router. These IP ranges … |
 | `bgp.advertisedIpRanges[]` | — | `map` | optional | — | — |
 | `bgp.advertisedIpRanges[].description` | — | `string` | optional | — | User-specified description for the IP range. |
-| `bgp.advertisedIpRanges[].range` | — | `string` | optional | — | The IP range to advertise. The value must be a CIDR-formatted string. |
+| `bgp.advertisedIpRanges[].range` | — | `string` | required | — | The IP range to advertise. The value must be a CIDR-formatted string. |
 | `bgp.asn` | — | `integer` | required | — | Local BGP Autonomous System Number (ASN). Must be anRFC6996 private ASN, either 16-bit or 32-bit. The value will be fixed for this router resource. All VPN tunnels that link to this router will have … |
 | `bgp.identifierRange` | `identifier_range` | `string` | optional | — | Explicitly specifies a range of valid BGP Identifiers for this Router. It is provided as a link-local IPv4 range (from 169.254.0.0/16), of size at least /30, even if the BGP sessions are over IPv6 … |
 | `bgp.keepaliveInterval` | `keepalive_interval` | `integer` | optional | — | The interval in seconds between BGP keepalive messages that are sent to the peer. Hold time is three times the interval at which keepalive messages are sent, and the hold time is the maximum number … |
@@ -52,8 +52,10 @@ projects/{project}/regions/{region}/routers/{router}
 | `bgpPeers[].advertiseMode` | `advertise_mode` | `string` | optional | — | User-specified flag to indicate which mode to use for advertisement. |
 | `bgpPeers[].advertisedGroups` | `advertised_groups` | `list` | optional | — | User-specified list of prefix groups to advertise in custom mode, which currently supports the following option: - ALL_SUBNETS: Advertises all of the router's own VPC subnets. This excludes any … |
 | `bgpPeers[].advertisedGroups[]` | — | `string` | optional | — | — |
-| `bgpPeers[].advertisedIpRanges` | `advertised_ip_ranges` | `list` | optional | unordered | User-specified list of individual IP ranges to advertise in custom mode. This field can only be populated if advertise_mode is CUSTOM and overrides the list defined for the router (in the "bgp" … |
-| `bgpPeers[].advertisedIpRanges[]` | — | `map` | optional | same fields as `bgp.advertisedIpRanges[]` | — |
+| `bgpPeers[].advertisedIpRanges` | `advertised_ip_ranges` | `list` | optional | — | User-specified list of individual IP ranges to advertise in custom mode. This field can only be populated if advertise_mode is CUSTOM and overrides the list defined for the router (in the "bgp" … |
+| `bgpPeers[].advertisedIpRanges[]` | — | `map` | optional | — | — |
+| `bgpPeers[].advertisedIpRanges[].description` | — | `string` | optional | — | User-specified description for the IP range. |
+| `bgpPeers[].advertisedIpRanges[].range` | — | `string` | optional | — | The IP range to advertise. The value must be a CIDR-formatted string. |
 | `bgpPeers[].advertisedRoutePriority` | `advertised_route_priority` | `integer` | optional | — | The priority of routes advertised to this BGP peer. Where there is more than one matching route of maximum length, the routes with the lowest priority value win. |
 | `bgpPeers[].bfd` | — | `map` | optional | — | BFD configuration for the BGP peering. |
 | `bgpPeers[].bfd.minReceiveInterval` | `min_receive_interval` | `integer` | optional | — | The minimum interval, in milliseconds, between BFD control packets received from the peer router. The actual value is negotiated between the two routers and is equal to the greater of this value and … |
@@ -77,7 +79,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `bgpPeers[].ipv6NexthopAddress` | `ipv6_nexthop_address` | `string` | optional | — | IPv6 address of the interface inside Google Cloud Platform. |
 | `bgpPeers[].managementType` | `management_type` | `string` | output only | — | Output only. \[Output Only\] The resource that configures and manages this BGP peer. - MANAGED_BY_USER is the default value and can be managed by you or other users - MANAGED_BY_ATTACHMENT is a BGP … |
 | `bgpPeers[].md5AuthenticationKeyName` | `md5_authentication_key_name` | `string` | optional | — | Present if MD5 authentication is enabled for the peering. Must be the name of one of the entries in the Router.md5_authentication_keys. The field must comply with RFC1035. |
-| `bgpPeers[].name` | — | `string` | required | force new | Name of this BGP peer. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match the regular expression … |
+| `bgpPeers[].name` | — | `string` | optional | — | Name of this BGP peer. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match the regular expression … |
 | `bgpPeers[].peerAsn` | `peer_asn` | `integer` | optional | — | Peer BGP Autonomous System Number (ASN). Each BGP interface may use a different value. |
 | `bgpPeers[].peerIpAddress` | `peer_ip_address` | `string` | optional | — | IP address of the BGP interface outside Google Cloud Platform. |
 | `bgpPeers[].peerIpv4NexthopAddress` | `peer_ipv4_nexthop_address` | `string` | optional | — | IPv4 address of the BGP interface outside Google Cloud Platform. |
@@ -94,7 +96,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `interfaces[].linkedInterconnectAttachment` | `linked_interconnect_attachment` | `string` | optional | — | URI of the linked Interconnect attachment. It must be in the same region as the router. Each interface can have one linked resource, which can be a VPN tunnel, an Interconnect attachment, or a … |
 | `interfaces[].linkedVpnTunnel` | `linked_vpn_tunnel` | `string` | optional | — | URI of the linked VPN tunnel, which must be in the same region as the router. Each interface can have one linked resource, which can be a VPN tunnel, an Interconnect attachment, or a subnetwork. |
 | `interfaces[].managementType` | `management_type` | `string` | output only | — | Output only. \[Output Only\] The resource that configures and manages this interface. - MANAGED_BY_USER is the default value and can be managed directly by users. - MANAGED_BY_ATTACHMENT is an … |
-| `interfaces[].name` | — | `string` | required | force new | Name of this interface entry. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match the regular expression … |
+| `interfaces[].name` | — | `string` | optional | — | Name of this interface entry. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match the regular expression … |
 | `interfaces[].privateIpAddress` | `private_ip_address` | `string` | optional | — | The regional private internal IP address that is used to establish BGP sessions to a VM instance acting as a third-party Router Appliance, such as a Next Gen Firewall, a Virtual Router, or an SD-WAN … |
 | `interfaces[].redundantInterface` | `redundant_interface` | `string` | optional | — | Name of the interface that will be redundant with the current interface you are creating. The redundantInterface must belong to the same Cloud Router as the interface here. To establish the BGP … |
 | `interfaces[].subnetwork` | — | `string` | optional | — | The URI of the subnetwork resource that this interface belongs to, which must be in the same region as the Cloud Router. When you establish a BGP session to a VM instance using this interface, the VM … |
@@ -102,7 +104,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `md5AuthenticationKeys` | `md5_authentication_keys` | `list` | optional | — | Keys used for MD5 authentication. |
 | `md5AuthenticationKeys[]` | — | `map` | optional | — | — |
 | `md5AuthenticationKeys[].key` | — | `string` | required | — | \[Input only\] Value of the key. For patch and update calls, it can be skipped to copy the value from the previous configuration. This is allowed if the key with the same name existed before the … |
-| `md5AuthenticationKeys[].name` | — | `string` | required | force new | Name used to identify the key. Must be unique within a router. Must be referenced by exactly one bgpPeer. Must comply withRFC1035. |
+| `md5AuthenticationKeys[].name` | — | `string` | required | — | Name used to identify the key. Must be unique within a router. Must be referenced by exactly one bgpPeer. Must comply withRFC1035. |
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
 | `nats` | — | `list` | optional | — | A list of NAT services created in this router. |
 | `nats[]` | — | `map` | optional | — | — |
@@ -120,10 +122,10 @@ projects/{project}/regions/{region}/routers/{router}
 | `nats[].logConfig.filter` | — | `string` | optional | — | Specify the desired filtering of logs on this NAT. If unspecified, logs are exported for all connections handled by this NAT. This option can take one of the following values: - ERRORS_ONLY: Export … |
 | `nats[].maxPortsPerVm` | `max_ports_per_vm` | `integer` | optional | — | Maximum number of ports allocated to a VM from this NAT config when Dynamic Port Allocation is enabled. If Dynamic Port Allocation is not enabled, this field has no effect. If Dynamic Port Allocation … |
 | `nats[].minPortsPerVm` | `min_ports_per_vm` | `integer` | optional | — | Minimum number of ports allocated to a VM from this NAT config. If not set, a default number of ports is allocated to a VM. This is rounded up to the nearest power of 2. For example, if the value of … |
-| `nats[].name` | — | `string` | required | force new | Unique name of this Nat service. The name must be 1-63 characters long and comply withRFC1035. |
+| `nats[].name` | — | `string` | optional | — | Unique name of this Nat service. The name must be 1-63 characters long and comply withRFC1035. |
 | `nats[].nat64Subnetworks` | `nat64_subnetworks` | `list` | optional | — | List of Subnetwork resources whose traffic should be translated by NAT64 Gateway. It is used only when LIST_OF_IPV6_SUBNETWORKS is selected for the SubnetworkIpRangeToNat64Option above. |
 | `nats[].nat64Subnetworks[]` | — | `map` | optional | — | — |
-| `nats[].nat64Subnetworks[].name` | — | `string` | required | force new | URL for the subnetwork resource that will use NAT64. |
+| `nats[].nat64Subnetworks[].name` | — | `string` | optional | — | URL for the subnetwork resource that will use NAT64. |
 | `nats[].natIpAllocateOption` | `nat_ip_allocate_option` | `string` | optional | — | Specify the NatIpAllocateOption, which can take one of the following values: - MANUAL_ONLY: Uses only Nat IP addresses provided by customers. When there are not enough specified Nat IPs, the Nat … |
 | `nats[].natIps` | `nat_ips` | `list` | optional | — | A list of URLs of the IP resources used for this Nat service. These IP addresses must be valid static external IP addresses assigned to the project. |
 | `nats[].natIps[]` | — | `string` | optional | — | — |
@@ -145,7 +147,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `nats[].sourceSubnetworkIpRangesToNat64` | `source_subnetwork_ip_ranges_to_nat64` | `string` | optional | — | Specify the Nat option for NAT64, which can take one of the following values: - ALL_IPV6_SUBNETWORKS: All of the IP ranges in every Subnetwork are allowed to Nat. - LIST_OF_IPV6_SUBNETWORKS: A list … |
 | `nats[].subnetworks` | — | `list` | optional | — | A list of Subnetwork resources whose traffic should be translated by NAT Gateway. It is used only when LIST_OF_SUBNETWORKS is selected for the SubnetworkIpRangeToNatOption above. |
 | `nats[].subnetworks[]` | — | `map` | optional | — | — |
-| `nats[].subnetworks[].name` | — | `string` | required | force new | URL for the subnetwork resource that will use NAT. |
+| `nats[].subnetworks[].name` | — | `string` | optional | — | URL for the subnetwork resource that will use NAT. |
 | `nats[].subnetworks[].secondaryIpRangeNames` | `secondary_ip_range_names` | `list` | optional | — | A list of the secondary ranges of the Subnetwork that are allowed to use NAT. This can be populated only if "LIST_OF_SECONDARY_IP_RANGES" is one of the values in source_ip_ranges_to_nat. |
 | `nats[].subnetworks[].secondaryIpRangeNames[]` | — | `string` | optional | — | — |
 | `nats[].subnetworks[].sourceIpRangesToNat` | `source_ip_ranges_to_nat` | `list` | optional | — | Specify the options for NAT ranges in the Subnetwork. All options of a single value are valid except NAT_IP_RANGE_OPTION_UNSPECIFIED. The only valid option with multiple values is … |

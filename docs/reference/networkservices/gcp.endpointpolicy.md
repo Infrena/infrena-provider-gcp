@@ -46,8 +46,8 @@ projects/{{project}}/locations/global/endpointPolicies/{{name}}
 | `endpointMatcher.metadataLabelMatcher.metadataLabelMatchCriteria` | `metadata_label_match_criteria` | `string` | required | — | Specifies how matching should be done. Supported values are: MATCH_ANY: At least one of the Labels specified in the matcher should match the metadata presented by xDS client. MATCH_ALL: The metadata … |
 | `endpointMatcher.metadataLabelMatcher.metadataLabels` | `metadata_labels` | `list` | optional | — | The list of label value pairs that must match labels in the provided metadata based on filterMatchCriteria This list can have at most 64 entries. The list can be empty if the match criteria is … |
 | `endpointMatcher.metadataLabelMatcher.metadataLabels[]` | — | `map` | optional | — | — |
-| `endpointMatcher.metadataLabelMatcher.metadataLabels[].labelName` | `label_name` | `string` | optional | — | Required. Label name presented as key in xDS Node Metadata. |
-| `endpointMatcher.metadataLabelMatcher.metadataLabels[].labelValue` | `label_value` | `string` | optional | — | Required. Label value presented as value corresponding to the above key, in xDS Node Metadata. |
+| `endpointMatcher.metadataLabelMatcher.metadataLabels[].labelName` | `label_name` | `string` | required | — | Required. Label name presented as key in xDS Node Metadata. |
+| `endpointMatcher.metadataLabelMatcher.metadataLabels[].labelValue` | `label_value` | `string` | required | — | Required. Label value presented as value corresponding to the above key, in xDS Node Metadata. |
 | `labels` | — | `map` | optional | opaque | Optional. Set of label tags associated with the EndpointPolicy resource. |
 | `name` | — | `string` | required | force new | Identifier. Name of the EndpointPolicy resource. It matches pattern `projects/{project}/locations/*/endpointPolicies/{endpoint_policy}`. |
 | `serverTlsPolicy` | `server_tls_policy` | `string` | optional | — | Optional. A URL referring to ServerTlsPolicy resource. ServerTlsPolicy is used to determine the authentication policy to be applied to terminate the inbound traffic at the identified backends. If … |

@@ -40,7 +40,7 @@ projects/{project}/regions/{region}/resourcePolicies/{resourcePolicy}
 | `description` | — | `string` | optional | — | — |
 | `diskConsistencyGroupPolicy` | `disk_consistency_group_policy` | `map` | optional | opaque | Resource policy for disk consistency groups. |
 | `groupPlacementPolicy` | `group_placement_policy` | `map` | optional | — | Resource policy for instances for placement configuration. |
-| `groupPlacementPolicy.acceleratorTopologyMode` | `accelerator_topology_mode` | `string` | optional | force new | Specifies the connection mode for the accelerator topology. If not specified, the default is AUTO_CONNECT. |
+| `groupPlacementPolicy.acceleratorTopologyMode` | `accelerator_topology_mode` | `string` | optional | — | Specifies the connection mode for the accelerator topology. If not specified, the default is AUTO_CONNECT. |
 | `groupPlacementPolicy.availabilityDomainCount` | `availability_domain_count` | `integer` | optional | — | The number of availability domains to spread instances across. If two instances are in different availability domain, they are not in the same low latency network. |
 | `groupPlacementPolicy.collocation` | — | `string` | optional | — | Specifies network collocation |
 | `groupPlacementPolicy.gpuTopology` | `gpu_topology` | `string` | optional | force new | Specifies the shape of the GPU slice, in slice based GPU families eg. A4X. |
@@ -48,7 +48,7 @@ projects/{project}/regions/{region}/resourcePolicies/{resourcePolicy}
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `instanceSchedulePolicy` | `instance_schedule_policy` | `map` | optional | — | Resource policy for scheduling instance operations. |
 | `instanceSchedulePolicy.expirationTime` | `expiration_time` | `string` | optional | — | The expiration time of the schedule. The timestamp is an RFC3339 string. |
-| `instanceSchedulePolicy.startTime` | `start_time` | `string` | required | — | The start time of the schedule. The timestamp is an RFC3339 string. |
+| `instanceSchedulePolicy.startTime` | `start_time` | `string` | optional | — | The start time of the schedule. The timestamp is an RFC3339 string. |
 | `instanceSchedulePolicy.timeZone` | `time_zone` | `string` | required | — | Specifies the time zone to be used in interpreting Schedule.schedule. The value of this field must be a time zone name from the tz database: https://wikipedia.org/wiki/Tz_database. |
 | `instanceSchedulePolicy.vmStartSchedule` | `vm_start_schedule` | `map` | optional | — | Specifies the schedule for starting instances. |
 | `instanceSchedulePolicy.vmStartSchedule.schedule` | — | `string` | required | — | Specifies the frequency for the operation, using the unix-cron format. |
@@ -78,7 +78,7 @@ projects/{project}/regions/{region}/resourcePolicies/{resourcePolicy}
 | `snapshotSchedulePolicy.schedule.weeklySchedule` | `weekly_schedule` | `map` | optional | — | Time window specified for weekly operations. |
 | `snapshotSchedulePolicy.schedule.weeklySchedule.dayOfWeeks` | `day_of_weeks` | `list` | required | unordered | Up to 7 intervals/windows, one for each day of the week. |
 | `snapshotSchedulePolicy.schedule.weeklySchedule.dayOfWeeks[]` | — | `map` | optional | — | — |
-| `snapshotSchedulePolicy.schedule.weeklySchedule.dayOfWeeks[].day` | — | `string` | optional | — | Defines a schedule that runs on specific days of the week. Specify one or more days. The following options are available: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY. |
+| `snapshotSchedulePolicy.schedule.weeklySchedule.dayOfWeeks[].day` | — | `string` | required | — | Defines a schedule that runs on specific days of the week. Specify one or more days. The following options are available: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY. |
 | `snapshotSchedulePolicy.schedule.weeklySchedule.dayOfWeeks[].duration` | — | `string` | output only | — | Output only. \[Output only\] Duration of the time window, automatically chosen to be smallest possible in the given scenario. |
 | `snapshotSchedulePolicy.schedule.weeklySchedule.dayOfWeeks[].startTime` | `start_time` | `string` | required | — | Time within the window to start the operations. It must be in format "HH:MM", where HH : \[00-23\] and MM : \[00-00\] GMT. |
 | `snapshotSchedulePolicy.snapshotProperties` | `snapshot_properties` | `map` | optional | — | Properties with which snapshots are created such as labels, encryption keys. |

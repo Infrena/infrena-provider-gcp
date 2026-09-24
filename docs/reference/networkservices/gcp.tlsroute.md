@@ -50,13 +50,13 @@ projects/{{project}}/locations/global/tlsRoutes/{{name}}
 | `name` | — | `string` | required | force new | Identifier. Name of the TlsRoute resource. It matches pattern `projects/*/locations/*/tlsRoutes/tls_route_name>`. |
 | `rules` | — | `list` | required | — | Required. Rules that define how traffic is routed and handled. At least one RouteRule must be supplied. If there are multiple rules then the action taken will be the first rule to match. |
 | `rules[]` | — | `map` | optional | — | — |
-| `rules[].action` | — | `map` | optional | — | Required. The detailed rule defining how to route matched traffic. |
+| `rules[].action` | — | `map` | required | — | Required. The detailed rule defining how to route matched traffic. |
 | `rules[].action.destinations` | — | `list` | optional | — | Required. The destination services to which traffic should be forwarded. At least one destination service is required. |
 | `rules[].action.destinations[]` | — | `map` | optional | — | — |
 | `rules[].action.destinations[].serviceName` | `service_name` | `string` | optional | — | Required. The URL of a BackendService to route traffic to. |
 | `rules[].action.destinations[].weight` | — | `integer` | optional | — | Optional. Specifies the proportion of requests forwarded to the backend referenced by the service_name field. This is computed as: - weight/Sum(weights in destinations) Weights in all destinations … |
 | `rules[].action.idleTimeout` | `idle_timeout` | `string` | optional | — | Optional. Specifies the idle timeout for the selected route. The idle timeout is defined as the period in which there are no bytes sent or received on either the upstream or downstream connection. If … |
-| `rules[].matches` | — | `list` | optional | — | Required. RouteMatch defines the predicate used to match requests to a given action. Multiple match types are "OR"ed for evaluation. Atleast one RouteMatch must be supplied. |
+| `rules[].matches` | — | `list` | required | — | Required. RouteMatch defines the predicate used to match requests to a given action. Multiple match types are "OR"ed for evaluation. Atleast one RouteMatch must be supplied. |
 | `rules[].matches[]` | — | `map` | optional | — | — |
 | `rules[].matches[].alpn` | — | `list` | optional | — | Optional. ALPN (Application-Layer Protocol Negotiation) to match against. Examples: "http/1.1", "h2". At least one of sni_host and alpn is required. Up to 5 alpns across all matches can be set. |
 | `rules[].matches[].alpn[]` | — | `string` | optional | — | — |

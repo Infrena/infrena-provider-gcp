@@ -57,7 +57,7 @@ projects/{project}/topics/{topic}
 | `ingestionDataSourceSettings.azureEventHubs` | `azure_event_hubs` | `map` | optional | — | Optional. Azure Event Hubs. |
 | `ingestionDataSourceSettings.azureEventHubs.clientId` | `client_id` | `string` | optional | — | Optional. The client id of the Azure application that is being used to authenticate Pub/Sub. |
 | `ingestionDataSourceSettings.azureEventHubs.eventHub` | `event_hub` | `string` | optional | — | Optional. The name of the Event Hub. |
-| `ingestionDataSourceSettings.azureEventHubs.gcpServiceAccount` | `gcp_service_account` | `string` | required | — | Optional. The GCP service account to be used for Federated Identity authentication. |
+| `ingestionDataSourceSettings.azureEventHubs.gcpServiceAccount` | `gcp_service_account` | `string` | optional | — | Optional. The GCP service account to be used for Federated Identity authentication. |
 | `ingestionDataSourceSettings.azureEventHubs.namespace` | — | `string` | optional | — | Optional. The name of the Event Hubs namespace. |
 | `ingestionDataSourceSettings.azureEventHubs.resourceGroup` | `resource_group` | `string` | optional | — | Optional. Name of the resource group within the azure subscription. |
 | `ingestionDataSourceSettings.azureEventHubs.state` | — | `string` | output only | — | Output only. An output-only field that indicates the state of the Event Hubs ingestion source. |
@@ -91,7 +91,7 @@ projects/{project}/topics/{topic}
 | `messageTransforms` | `message_transforms` | `list` | optional | — | Optional. Transforms to be applied to messages published to the topic. Transforms are applied in the order specified. |
 | `messageTransforms[]` | — | `map` | optional | — | — |
 | `messageTransforms[].aiInference` | `ai_inference` | `map` | optional | — | Optional. AI Inference. Specifies the Vertex AI endpoint that inference requests built from the Pub/Sub message data and provided parameters will be sent to. |
-| `messageTransforms[].aiInference.endpoint` | — | `string` | optional | — | Required. An endpoint to a Vertex AI model of the form `projects/{project}/locations/{location}/endpoints/{endpoint}` or … |
+| `messageTransforms[].aiInference.endpoint` | — | `string` | required | — | Required. An endpoint to a Vertex AI model of the form `projects/{project}/locations/{location}/endpoints/{endpoint}` or … |
 | `messageTransforms[].aiInference.serviceAccountEmail` | `service_account_email` | `string` | optional | — | Optional. The service account to use to make prediction requests against endpoints. The resource creator or updater that specifies this field must have `iam.serviceAccounts.actAs` permission on the … |
 | `messageTransforms[].aiInference.unstructuredInference` | `unstructured_inference` | `map` | optional | — | Optional. Requests and responses can be any arbitrary JSON object. |
 | `messageTransforms[].aiInference.unstructuredInference.parameters` | — | `map` | optional | opaque | Optional. A parameters object to be included in each inference request. The parameters object is combined with the data field of the Pub/Sub message to form the inference request. |
@@ -101,8 +101,8 @@ projects/{project}/topics/{topic}
 | `messageTransforms[].disabled` | — | `boolean` | optional | — | Optional. If true, the transform is disabled and will not be applied to messages. Defaults to `false`. |
 | `messageTransforms[].enabled` | — | `boolean` | optional | — | Optional. This field is deprecated, use the `disabled` field to disable transforms. |
 | `messageTransforms[].javascriptUdf` | `javascript_udf` | `map` | optional | — | Optional. JavaScript User Defined Function. If multiple JavaScriptUDF's are specified on a resource, each must have a unique `function_name`. |
-| `messageTransforms[].javascriptUdf.code` | — | `string` | optional | — | Required. JavaScript code that contains a function `function_name` with the below signature: ``` /** * Transforms a Pub/Sub message. * @return {(Object)>\|null)} - To * filter a message, return … |
-| `messageTransforms[].javascriptUdf.functionName` | `function_name` | `string` | optional | — | Required. Name of the JavasScript function that should applied to Pub/Sub messages. |
+| `messageTransforms[].javascriptUdf.code` | — | `string` | required | — | Required. JavaScript code that contains a function `function_name` with the below signature: ``` /** * Transforms a Pub/Sub message. * @return {(Object)>\|null)} - To * filter a message, return … |
+| `messageTransforms[].javascriptUdf.functionName` | `function_name` | `string` | required | — | Required. Name of the JavasScript function that should applied to Pub/Sub messages. |
 | `name` | — | `string` | required | force new | Required. Identifier. The name of the topic. It must have the format `"projects/{project}/topics/{topic}"`. `{topic}` must start with a letter, and contain only letters (`\[A-Za-z\]`), numbers … |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | optional | — | Optional. Reserved for future use. This field is set only in responses from the server; it is ignored if it is set in any requests. |
 | `schemaSettings` | `schema_settings` | `map` | optional | — | Optional. Settings for validating messages published against a schema. |

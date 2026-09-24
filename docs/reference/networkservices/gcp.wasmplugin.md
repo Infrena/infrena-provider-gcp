@@ -49,5 +49,5 @@ projects/{{project}}/locations/{{location}}/wasmPlugins/{{name}}
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the resource was updated. |
 | `usedBy` | `used_by` | `list` | output only | — | Output only. List of all \[extensions\](https://cloud.google.com/service-extensions/docs/overview) that use this `WasmPlugin` resource. |
 | `usedBy[]` | — | `map` | optional | — | — |
-| `usedBy[].name` | — | `string` | output only | force new | Output only. Full name of the resource https://google.aip.dev/122#full-resource-names, for example `//networkservices.googleapis.com/projects/{project}/locations/{location}/lbRouteExtensions/{extensio … |
+| `usedBy[].name` | — | `string` | output only | — | Output only. Full name of the resource https://google.aip.dev/122#full-resource-names, for example `//networkservices.googleapis.com/projects/{project}/locations/{location}/lbRouteExtensions/{extensio … |
 | `versions` | — | `map` | required | opaque | Optional. All versions of this `WasmPlugin` resource in the key-value format. The key is the resource ID, and the value is the `VersionDetails` object. Lets you create or update a `WasmPlugin` … |

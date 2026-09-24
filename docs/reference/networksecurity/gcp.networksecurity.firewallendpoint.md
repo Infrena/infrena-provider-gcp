@@ -41,7 +41,7 @@ A Firewall endpoint is a Cloud Firewall resource that enables layer 7 advanced p
 | `associatedNetworks[]` | — | `string` | optional | — | — |
 | `associations` | — | `list` | output only | — | Output only. List of FirewallEndpointAssociations that are associated to this endpoint. An association will only appear in this list after traffic routing is fully configured. |
 | `associations[]` | — | `map` | optional | — | — |
-| `associations[].name` | — | `string` | output only | force new | Output only. The resource name of the FirewallEndpointAssociation. Format: projects/{project}/locations/{location}/firewallEndpointAssociations/{id} |
+| `associations[].name` | — | `string` | output only | — | Output only. The resource name of the FirewallEndpointAssociation. Format: projects/{project}/locations/{location}/firewallEndpointAssociations/{id} |
 | `associations[].network` | — | `string` | output only | — | Output only. The VPC network associated. Format: projects/{project}/global/networks/{name}. |
 | `billingProjectId` | `billing_project_id` | `string` | optional | — | Optional. Project to charge for the deployed firewall endpoint. This field must be specified when creating the endpoint in the organization scope, and should be omitted otherwise. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. Create time stamp. |

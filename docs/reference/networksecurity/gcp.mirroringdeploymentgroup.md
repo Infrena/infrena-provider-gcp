@@ -39,19 +39,19 @@ projects/{{project}}/locations/{{location}}/mirroringDeploymentGroups/{{mirrorin
 | --- | --- | --- | --- | --- | --- |
 | `connectedEndpointGroups` | `connected_endpoint_groups` | `list` | output only | — | Output only. The list of endpoint groups that are connected to this resource. |
 | `connectedEndpointGroups[]` | — | `map` | optional | — | — |
-| `connectedEndpointGroups[].name` | — | `string` | output only | force new | Output only. The connected endpoint group's resource name, for example: `projects/123456789/locations/global/mirroringEndpointGroups/my-eg`. See https://google.aip.dev/124. |
+| `connectedEndpointGroups[].name` | — | `string` | output only | — | Output only. The connected endpoint group's resource name, for example: `projects/123456789/locations/global/mirroringEndpointGroups/my-eg`. See https://google.aip.dev/124. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the resource was created. See https://google.aip.dev/148#timestamps. |
 | `description` | — | `string` | optional | — | Optional. User-provided description of the deployment group. Used as additional context for the deployment group. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels are key/value pairs that help to organize and filter resources. |
 | `locations` | — | `list` | output only | unordered | Output only. The list of locations where the deployment group is present. |
 | `locations[]` | — | `map` | optional | — | — |
-| `locations[].location` | — | `string` | output only | force new | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
+| `locations[].location` | — | `string` | output only | — | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
 | `locations[].state` | — | `string` | output only | — | Output only. The current state of the association in this location. |
 | `mirroring_deployment_group_id` | — | `string` | required | force new | The mirroring_deployment_group_id this gcp.mirroringdeploymentgroup belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `name` | — | `string` | output only | force new | Immutable. Identifier. The resource name of this deployment group, for example: `projects/123456789/locations/global/mirroringDeploymentGroups/my-dg`. See https://google.aip.dev/122 for more details. |
 | `nestedDeployments` | `nested_deployments` | `list` | output only | — | Output only. The list of Mirroring Deployments that belong to this group. |
 | `nestedDeployments[]` | — | `map` | optional | — | — |
-| `nestedDeployments[].name` | — | `string` | output only | force new | Output only. The name of the Mirroring Deployment, in the format: `projects/{project}/locations/{location}/mirroringDeployments/{mirroring_deployment}`. |
+| `nestedDeployments[].name` | — | `string` | output only | — | Output only. The name of the Mirroring Deployment, in the format: `projects/{project}/locations/{location}/mirroringDeployments/{mirroring_deployment}`. |
 | `nestedDeployments[].state` | — | `string` | output only | — | Output only. Most recent known state of the deployment. |
 | `network` | — | `string` | required | force new | Required. Immutable. The network that will be used for all child deployments, for example: `projects/{project}/global/networks/{network}`. See https://google.aip.dev/124. |
 | `reconciling` | — | `boolean` | output only | — | Output only. The current state of the resource does not match the user's intended state, and the system is working to reconcile them. This is part of the normal operation (e.g. adding a new … |

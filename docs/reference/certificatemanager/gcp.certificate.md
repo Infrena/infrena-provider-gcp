@@ -52,7 +52,7 @@ projects/{{project}}/locations/{{location}}/certificates/{{name}}
 | `managed.authorizationAttemptInfo[].troubleshooting` | — | `map` | output only | — | Output only. Troubleshooting information for the authorization attempt. This field is only populated if the authorization attempt failed. |
 | `managed.authorizationAttemptInfo[].troubleshooting.cname` | — | `map` | output only | — | Output only. CNAME troubleshooting information. |
 | `managed.authorizationAttemptInfo[].troubleshooting.cname.expectedData` | `expected_data` | `string` | output only | — | Output only. The expected value of the CNAME record for the domain, equals to `dns_resource_record.data` in the corresponding `DnsAuthorization`. |
-| `managed.authorizationAttemptInfo[].troubleshooting.cname.name` | — | `string` | output only | force new | Output only. The name of the CNAME record for the domain, equals to `dns_resource_record.name` in the corresponding `DnsAuthorization`. |
+| `managed.authorizationAttemptInfo[].troubleshooting.cname.name` | — | `string` | output only | — | Output only. The name of the CNAME record for the domain, equals to `dns_resource_record.name` in the corresponding `DnsAuthorization`. |
 | `managed.authorizationAttemptInfo[].troubleshooting.cname.resolvedData` | `resolved_data` | `list` | output only | — | Output only. The resolved CNAME chain. Empty list if the CNAME record for `CNAME.name` is not found. Otherwise the first item is the value of the CNAME record for `CNAME.name`. If the CNAME chain is … |
 | `managed.authorizationAttemptInfo[].troubleshooting.cname.resolvedData[]` | — | `string` | optional | — | — |
 | `managed.authorizationAttemptInfo[].troubleshooting.ips` | — | `map` | output only | — | Output only. IPs troubleshooting information. |
@@ -86,9 +86,9 @@ projects/{{project}}/locations/{{location}}/certificates/{{name}}
 | `scope` | — | `string` | optional | force new | Optional. Immutable. The scope of the certificate. |
 | `selfManaged` | `self_managed` | `map` | optional | — | If set, defines data of a self-managed certificate. |
 | `selfManaged.pemCertificate` | `pem_certificate` | `string` | optional | — | Optional. Input only. The PEM-encoded certificate chain. Leaf certificate comes first, followed by intermediate ones if any. |
-| `selfManaged.pemPrivateKey` | `pem_private_key` | `string` | optional | — | Optional. Input only. The PEM-encoded private key of the leaf certificate. |
+| `selfManaged.pemPrivateKey` | `pem_private_key` | `string` | optional | sensitive | Optional. Input only. The PEM-encoded private key of the leaf certificate. |
 | `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last update timestamp of a Certificate. |
 | `usedBy` | `used_by` | `list` | output only | — | Output only. The list of resources that use this Certificate. |
 | `usedBy[]` | — | `map` | optional | — | — |
-| `usedBy[].name` | — | `string` | output only | force new | Output only. Full name of the resource https://google.aip.dev/122#full-resource-names, e.g. `//certificatemanager.googleapis.com/projects/*/locations/*/certificateMaps/*/certificateMapEntries/*` or … |
+| `usedBy[].name` | — | `string` | output only | — | Output only. Full name of the resource https://google.aip.dev/122#full-resource-names, e.g. `//certificatemanager.googleapis.com/projects/*/locations/*/certificateMaps/*/certificateMapEntries/*` or … |

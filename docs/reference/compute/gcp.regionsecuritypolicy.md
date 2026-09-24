@@ -49,11 +49,11 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].detectionAbsoluteQps` | `detection_absolute_qps` | `float` | optional | — | — |
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].detectionLoadThreshold` | `detection_load_threshold` | `float` | optional | — | — |
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].detectionRelativeToBaselineQps` | `detection_relative_to_baseline_qps` | `float` | optional | — | — |
-| `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].name` | — | `string` | required | force new | The name must be 1-63 characters long, and comply withRFC1035. The name must be unique within the security policy. |
+| `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].name` | — | `string` | optional | — | The name must be 1-63 characters long, and comply withRFC1035. The name must be unique within the security policy. |
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs` | `traffic_granularity_configs` | `list` | optional | — | Configuration options for enabling Adaptive Protection to operate on specified granular traffic units. |
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[]` | — | `map` | optional | — | — |
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].enableEachUniqueValue` | `enable_each_unique_value` | `boolean` | optional | — | If enabled, traffic matching each unique value for the specified type constitutes a separate traffic unit. It can only be set to true if `value` is empty. |
-| `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].type_value` | wire `type` | `string` | optional | force new | Type of this configuration. |
+| `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].type_value` | wire `type` | `string` | optional | — | Type of this configuration. |
 | `adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].value` | — | `string` | optional | — | Requests that match this value constitute a granular traffic unit. |
 | `advancedOptionsConfig` | `advanced_options_config` | `map` | optional | — | — |
 | `advancedOptionsConfig.jsonCustomConfig` | `json_custom_config` | `map` | optional | — | Custom configuration to apply the JSON parsing. Only applicable when json_parsing is set to STANDARD. |
@@ -72,7 +72,7 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `associations[].excludedFolders[]` | — | `string` | optional | — | — |
 | `associations[].excludedProjects` | `excluded_projects` | `list` | optional | — | A list of projects to exclude from the security policy. |
 | `associations[].excludedProjects[]` | — | `string` | optional | — | — |
-| `associations[].name` | — | `string` | required | force new | The name for an association. |
+| `associations[].name` | — | `string` | optional | — | The name for an association. |
 | `associations[].securityPolicyId` | `security_policy_id` | `string` | output only | — | Output only. \[Output Only\] The security policy ID of the association. |
 | `associations[].shortName` | `short_name` | `string` | output only | — | Output only. \[Output Only\] The short name of the security policy of the association. |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
@@ -93,7 +93,7 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `region` | — | `string` | output only | force new | Output only. \[Output Only\] URL of the region where the regional security policy resides. This field is not applicable to global security policies. |
 | `rules` | — | `list` | optional | — | A list of rules that belong to this policy. There must always be a default rule which is a rule with priority 2147483647 and match all condition (for the match condition this means match "*" for … |
 | `rules[]` | — | `map` | optional | — | — |
-| `rules[].action` | — | `string` | optional | — | The Action to perform when the rule is matched. The following are the valid actions: - allow: allow access to target. - deny(STATUS): deny access to target, returns the HTTP response code specified … |
+| `rules[].action` | — | `string` | required | — | The Action to perform when the rule is matched. The following are the valid actions: - allow: allow access to target. - deny(STATUS): deny access to target, returns the HTTP response code specified … |
 | `rules[].description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
 | `rules[].headerAction` | `header_action` | `map` | optional | — | Optional, additional actions that are performed on headers. This field is only supported in Global Security Policies of type CLOUD_ARMOR. |
 | `rules[].headerAction.requestHeadersToAdds` | `request_headers_to_adds` | `list` | optional | — | The list of request headers to add or overwrite if they're already present. |
@@ -107,7 +107,7 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `rules[].match.config.srcIpRanges[]` | — | `string` | optional | — | — |
 | `rules[].match.expr` | — | `map` | optional | — | User defined CEVAL expression. A CEVAL expression is used to specify match criteria such as origin.ip, source.region_code and contents in the request header. Expressions containing … |
 | `rules[].match.expr.description` | — | `string` | optional | — | Optional. Description of the expression. This is a longer text which describes the expression, e.g. when hovered over it in a UI. |
-| `rules[].match.expr.expression` | — | `string` | optional | — | Textual representation of an expression in Common Expression Language syntax. |
+| `rules[].match.expr.expression` | — | `string` | required | — | Textual representation of an expression in Common Expression Language syntax. |
 | `rules[].match.expr.location` | — | `string` | optional | — | Optional. String indicating the location of the expression for error reporting, e.g. a file name and a position in the file. |
 | `rules[].match.expr.title` | — | `string` | optional | — | Optional. Title for the expression, i.e. a short string describing its purpose. This can be used e.g. in UIs which allow to enter the expression. |
 | `rules[].match.exprOptions` | `expr_options` | `map` | optional | — | The configuration options available when specifying a user defined CEVAL expression (i.e., 'expr'). |
@@ -134,7 +134,7 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `rules[].networkMatch.srcRegionCodes[]` | — | `string` | optional | — | — |
 | `rules[].networkMatch.userDefinedFields` | `user_defined_fields` | `list` | optional | — | User-defined fields. Each element names a defined field and lists the matching values for that field. |
 | `rules[].networkMatch.userDefinedFields[]` | — | `map` | optional | — | — |
-| `rules[].networkMatch.userDefinedFields[].name` | — | `string` | required | force new | Name of the user-defined field, as given in the definition. |
+| `rules[].networkMatch.userDefinedFields[].name` | — | `string` | optional | — | Name of the user-defined field, as given in the definition. |
 | `rules[].networkMatch.userDefinedFields[].values` | — | `list` | optional | — | Matching values of the field. Each element can be a 32-bit unsigned decimal or hexadecimal (starting with "0x") number (e.g. "64") or range (e.g. "0x400-0x7ff"). |
 | `rules[].networkMatch.userDefinedFields[].values[]` | — | `string` | optional | — | — |
 | `rules[].preconfiguredWafConfig` | `preconfigured_waf_config` | `map` | optional | — | Preconfigured WAF configuration to be applied for the rule. If the rule does not evaluate preconfigured WAF rules, i.e., if evaluatePreconfiguredWaf() is not used, this field will have no effect. |
@@ -146,25 +146,25 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `rules[].preconfiguredWafConfig.exclusions[].requestBodiesToExclude[].val` | — | `string` | optional | — | The value of the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestCookiesToExclude` | `request_cookies_to_exclude` | `list` | optional | — | A list of request cookie names whose value will be excluded from inspection during preconfigured WAF evaluation. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestCookiesToExclude[]` | — | `map` | optional | — | — |
-| `rules[].preconfiguredWafConfig.exclusions[].requestCookiesToExclude[].op` | — | `string` | optional | — | The match operator for the field. |
+| `rules[].preconfiguredWafConfig.exclusions[].requestCookiesToExclude[].op` | — | `string` | required | — | The match operator for the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestCookiesToExclude[].val` | — | `string` | optional | — | The value of the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestHeadersToExclude` | `request_headers_to_exclude` | `list` | optional | — | A list of request header names whose value will be excluded from inspection during preconfigured WAF evaluation. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestHeadersToExclude[]` | — | `map` | optional | — | — |
-| `rules[].preconfiguredWafConfig.exclusions[].requestHeadersToExclude[].op` | — | `string` | optional | — | The match operator for the field. |
+| `rules[].preconfiguredWafConfig.exclusions[].requestHeadersToExclude[].op` | — | `string` | required | — | The match operator for the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestHeadersToExclude[].val` | — | `string` | optional | — | The value of the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestQueryParamsToExclude` | `request_query_params_to_exclude` | `list` | optional | — | A list of request query parameter names whose value will be excluded from inspection during preconfigured WAF evaluation. Note that the parameter can be in the query string or in the POST body. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestQueryParamsToExclude[]` | — | `map` | optional | — | — |
-| `rules[].preconfiguredWafConfig.exclusions[].requestQueryParamsToExclude[].op` | — | `string` | optional | — | The match operator for the field. |
+| `rules[].preconfiguredWafConfig.exclusions[].requestQueryParamsToExclude[].op` | — | `string` | required | — | The match operator for the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestQueryParamsToExclude[].val` | — | `string` | optional | — | The value of the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestUrisToExclude` | `request_uris_to_exclude` | `list` | optional | — | A list of request URIs from the request line to be excluded from inspection during preconfigured WAF evaluation. When specifying this field, the query or fragment part should be excluded. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestUrisToExclude[]` | — | `map` | optional | — | — |
-| `rules[].preconfiguredWafConfig.exclusions[].requestUrisToExclude[].op` | — | `string` | optional | — | The match operator for the field. |
+| `rules[].preconfiguredWafConfig.exclusions[].requestUrisToExclude[].op` | — | `string` | required | — | The match operator for the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].requestUrisToExclude[].val` | — | `string` | optional | — | The value of the field. |
 | `rules[].preconfiguredWafConfig.exclusions[].targetRuleIds` | `target_rule_ids` | `list` | optional | — | A list of target rule IDs under the WAF rule set to apply the preconfigured WAF exclusion. If omitted, it refers to all the rule IDs under the WAF rule set. |
 | `rules[].preconfiguredWafConfig.exclusions[].targetRuleIds[]` | — | `string` | optional | — | — |
-| `rules[].preconfiguredWafConfig.exclusions[].targetRuleSet` | `target_rule_set` | `string` | optional | — | Target WAF rule set to apply the preconfigured WAF exclusion. |
+| `rules[].preconfiguredWafConfig.exclusions[].targetRuleSet` | `target_rule_set` | `string` | required | — | Target WAF rule set to apply the preconfigured WAF exclusion. |
 | `rules[].preview` | — | `boolean` | optional | — | If set to true, the specified action is not enforced. |
-| `rules[].priority` | — | `integer` | optional | — | An integer indicating the priority of a rule in the list. The priority must be a positive value between 0 and 2147483647. Rules are evaluated from highest to lowest priority where 0 is the highest … |
+| `rules[].priority` | — | `integer` | required | — | An integer indicating the priority of a rule in the list. The priority must be a positive value between 0 and 2147483647. Rules are evaluated from highest to lowest priority where 0 is the highest … |
 | `rules[].rateLimitOptions` | `rate_limit_options` | `map` | optional | — | Must be specified if the action is "rate_based_ban" or "throttle" or "fairshare". Cannot be specified for any other actions. |
 | `rules[].rateLimitOptions.banDurationSec` | `ban_duration_sec` | `integer` | optional | — | Can only be specified if the action for the rule is "rate_based_ban". If specified, determines the time (in seconds) the traffic will continue to be banned by the rate limit after the rate falls … |
 | `rules[].rateLimitOptions.banThreshold` | `ban_threshold` | `map` | optional | — | Can only be specified if the action for the rule is "rate_based_ban". If specified, the key will be banned for the configured 'ban_duration_sec' when the number of requests that exceed the … |
@@ -180,20 +180,20 @@ projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}
 | `rules[].rateLimitOptions.exceedAction` | `exceed_action` | `string` | optional | — | Action to take for requests that are above the configured rate limit threshold, to either deny with a specified HTTP response code, or redirect to a different endpoint. Valid options are … |
 | `rules[].rateLimitOptions.exceedRedirectOptions` | `exceed_redirect_options` | `map` | optional | — | Parameters defining the redirect action that is used as the exceed action. Cannot be specified if the exceed action is not redirect. This field is only supported in Global Security Policies of type … |
 | `rules[].rateLimitOptions.exceedRedirectOptions.target` | — | `string` | optional | — | Target for the redirect action. This is required if the type is EXTERNAL_302 and cannot be specified for GOOGLE_RECAPTCHA. |
-| `rules[].rateLimitOptions.exceedRedirectOptions.type_value` | wire `type` | `string` | optional | force new | Type of the redirect action. Possible values are: - GOOGLE_RECAPTCHA: redirect to reCAPTCHA for manual challenge assessment. - EXTERNAL_302: redirect to a different URL via a 302 response. |
+| `rules[].rateLimitOptions.exceedRedirectOptions.type_value` | wire `type` | `string` | optional | — | Type of the redirect action. Possible values are: - GOOGLE_RECAPTCHA: redirect to reCAPTCHA for manual challenge assessment. - EXTERNAL_302: redirect to a different URL via a 302 response. |
 | `rules[].rateLimitOptions.rateLimitThreshold` | `rate_limit_threshold` | `map` | optional | — | Threshold at which to begin ratelimiting. |
 | `rules[].rateLimitOptions.rateLimitThreshold.count` | — | `integer` | optional | — | Number of HTTP(S) requests for calculating the threshold. |
 | `rules[].rateLimitOptions.rateLimitThreshold.intervalSec` | `interval_sec` | `integer` | optional | — | Interval over which the threshold is computed. |
 | `rules[].redirectOptions` | `redirect_options` | `map` | optional | — | Parameters defining the redirect action. Cannot be specified for any other actions. This field is only supported in Global Security Policies of type CLOUD_ARMOR. |
 | `rules[].redirectOptions.target` | — | `string` | optional | — | Target for the redirect action. This is required if the type is EXTERNAL_302 and cannot be specified for GOOGLE_RECAPTCHA. |
-| `rules[].redirectOptions.type_value` | wire `type` | `string` | optional | force new | Type of the redirect action. Possible values are: - GOOGLE_RECAPTCHA: redirect to reCAPTCHA for manual challenge assessment. - EXTERNAL_302: redirect to a different URL via a 302 response. |
+| `rules[].redirectOptions.type_value` | wire `type` | `string` | optional | — | Type of the redirect action. Possible values are: - GOOGLE_RECAPTCHA: redirect to reCAPTCHA for manual challenge assessment. - EXTERNAL_302: redirect to a different URL via a 302 response. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. \[Output Only\] Server-defined URL for the resource. |
 | `shortName` | `short_name` | `string` | optional | — | User-provided name of the organization security policy. The name should be unique in the organization in which the security policy is created. This should only be used when SecurityPolicyType is … |
 | `type_value` | wire `type` | `string` | optional | force new | The type indicates the intended use of the security policy. - CLOUD_ARMOR: Cloud Armor backend security policies can be configured to filter incoming HTTP requests targeting backend services. They … |
 | `userDefinedFields` | `user_defined_fields` | `list` | optional | — | Definitions of user-defined fields for CLOUD_ARMOR_NETWORK policies. A user-defined field consists of up to 4 bytes extracted from a fixed offset in the packet, relative to the IPv4, IPv6, TCP, or … |
 | `userDefinedFields[]` | — | `map` | optional | — | — |
-| `userDefinedFields[].base` | — | `string` | optional | — | The base relative to which 'offset' is measured. Possible values are: - IPV4: Points to the beginning of the IPv4 header. - IPV6: Points to the beginning of the IPv6 header. - TCP: Points to the … |
+| `userDefinedFields[].base` | — | `string` | required | — | The base relative to which 'offset' is measured. Possible values are: - IPV4: Points to the beginning of the IPv4 header. - IPV6: Points to the beginning of the IPv6 header. - TCP: Points to the … |
 | `userDefinedFields[].mask` | — | `string` | optional | — | If specified, apply this mask (bitwise AND) to the field to ignore bits before matching. Encoded as a hexadecimal number (starting with "0x"). The last byte of the field (in network byte order) … |
-| `userDefinedFields[].name` | — | `string` | required | force new | The name of this field. Must be unique within the policy. |
+| `userDefinedFields[].name` | — | `string` | optional | — | The name of this field. Must be unique within the policy. |
 | `userDefinedFields[].offset` | — | `integer` | optional | — | Offset of the first byte of the field (in network byte order) relative to 'base'. |
 | `userDefinedFields[].size` | — | `integer` | optional | — | Size of the field in bytes. Valid values: 1-4. |

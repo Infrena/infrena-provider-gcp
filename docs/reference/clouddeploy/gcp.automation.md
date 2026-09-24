@@ -53,14 +53,14 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipelin
 | `rules[].advanceRolloutRule.condition.targetsPresentCondition.missingTargets` | `missing_targets` | `list` | optional | — | The list of Target names that do not exist. For example, `projects/{project_id}/locations/{location_name}/targets/{target_name}`. |
 | `rules[].advanceRolloutRule.condition.targetsPresentCondition.missingTargets[]` | — | `string` | optional | — | — |
 | `rules[].advanceRolloutRule.condition.targetsPresentCondition.status` | — | `boolean` | optional | — | True if there aren't any missing Targets. |
-| `rules[].advanceRolloutRule.condition.targetsPresentCondition.updateTime` | `update_time` | `string` | output only | — | Last time the condition was updated. |
+| `rules[].advanceRolloutRule.condition.targetsPresentCondition.updateTime` | `update_time` | `string` | optional | — | Last time the condition was updated. |
 | `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition` | `timed_promote_release_condition` | `map` | optional | — | Optional. TimedPromoteReleaseCondition contains rule conditions specific to a an Automation with a timed promote release rule defined. |
 | `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition.nextPromotionTime` | `next_promotion_time` | `string` | output only | — | Output only. When the next scheduled promotion(s) will occur. |
 | `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition.targetsList` | `targets_list` | `list` | output only | — | Output only. A list of targets involved in the upcoming timed promotion(s). |
 | `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition.targetsList[]` | — | `map` | optional | — | — |
 | `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition.targetsList[].destinationTargetId` | `destination_target_id` | `string` | optional | — | Optional. The destination target ID. |
 | `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition.targetsList[].sourceTargetId` | `source_target_id` | `string` | optional | — | Optional. The source target ID. |
-| `rules[].advanceRolloutRule.id` | — | `string` | optional | — | Required. ID of the rule. This id must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
+| `rules[].advanceRolloutRule.id` | — | `string` | required | — | Required. ID of the rule. This id must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
 | `rules[].advanceRolloutRule.sourcePhases` | `source_phases` | `list` | optional | — | Optional. Proceeds only after phase name matched any one in the list. This value must consist of lower-case letters, numbers, and hyphens, start with a letter and end with a letter or a number, and … |
 | `rules[].advanceRolloutRule.sourcePhases[]` | — | `string` | optional | — | — |
 | `rules[].advanceRolloutRule.wait` | — | `string` | optional | — | Optional. How long to wait after a rollout is finished. |
@@ -68,13 +68,13 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipelin
 | `rules[].promoteReleaseRule.condition` | — | `map` | output only | same fields as `rules[].advanceRolloutRule.condition` | Output only. Information around the state of the Automation rule. |
 | `rules[].promoteReleaseRule.destinationPhase` | `destination_phase` | `string` | optional | — | Optional. The starting phase of the rollout created by this operation. Default to the first phase. |
 | `rules[].promoteReleaseRule.destinationTargetId` | `destination_target_id` | `string` | optional | — | Optional. The ID of the stage in the pipeline to which this `Release` is deploying. If unspecified, default it to the next stage in the promotion flow. The value of this field could be one of the … |
-| `rules[].promoteReleaseRule.id` | — | `string` | optional | — | Required. ID of the rule. This id must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
+| `rules[].promoteReleaseRule.id` | — | `string` | required | — | Required. ID of the rule. This id must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
 | `rules[].promoteReleaseRule.wait` | — | `string` | optional | — | Optional. How long the release need to be paused until being promoted to the next target. |
 | `rules[].repairRolloutRule` | `repair_rollout_rule` | `map` | optional | — | Optional. The `RepairRolloutRule` will automatically repair a failed rollout. |
 | `rules[].repairRolloutRule.condition` | — | `map` | output only | — | Output only. Information around the state of the 'Automation' rule. |
 | `rules[].repairRolloutRule.condition.targetsPresentCondition` | `targets_present_condition` | `map` | optional | same fields as `rules[].advanceRolloutRule.condition.targetsPresentCondition` | Optional. Details around targets enumerated in the rule. |
 | `rules[].repairRolloutRule.condition.timedPromoteReleaseCondition` | `timed_promote_release_condition` | `map` | optional | same fields as `rules[].advanceRolloutRule.condition.timedPromoteReleaseCondition` | Optional. TimedPromoteReleaseCondition contains rule conditions specific to a an Automation with a timed promote release rule defined. |
-| `rules[].repairRolloutRule.id` | — | `string` | optional | — | Required. ID of the rule. This id must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
+| `rules[].repairRolloutRule.id` | — | `string` | required | — | Required. ID of the rule. This id must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
 | `rules[].repairRolloutRule.jobs` | — | `list` | optional | — | Optional. Jobs to repair. Proceeds only after job name matched any one in the list, or for all jobs if unspecified or empty. The phase that includes the job must match the phase ID specified in … |
 | `rules[].repairRolloutRule.jobs[]` | — | `string` | optional | — | — |
 | `rules[].repairRolloutRule.phases` | — | `list` | optional | — | Optional. Phases within which jobs are subject to automatic repair actions on failure. Proceeds only after phase name matched any one in the list, or for all phases if unspecified. This value must … |
@@ -82,7 +82,7 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipelin
 | `rules[].repairRolloutRule.repairPhases` | `repair_phases` | `list` | optional | — | Required. Defines the types of automatic repair phases for failed jobs. |
 | `rules[].repairRolloutRule.repairPhases[]` | — | `map` | optional | — | — |
 | `rules[].repairRolloutRule.repairPhases[].retry` | — | `map` | optional | — | Optional. Retries a failed job. |
-| `rules[].repairRolloutRule.repairPhases[].retry.attempts` | — | `string` | optional | — | Required. Total number of retries. Retry is skipped if set to 0; The minimum value is 1, and the maximum value is 10. |
+| `rules[].repairRolloutRule.repairPhases[].retry.attempts` | — | `string` | required | — | Required. Total number of retries. Retry is skipped if set to 0; The minimum value is 1, and the maximum value is 10. |
 | `rules[].repairRolloutRule.repairPhases[].retry.backoffMode` | `backoff_mode` | `string` | optional | — | Optional. The pattern of how wait time will be increased. Default is linear. Backoff mode will be ignored if `wait` is 0. |
 | `rules[].repairRolloutRule.repairPhases[].retry.wait` | — | `string` | optional | — | Optional. How long to wait for the first retry. Default is 0, and the maximum value is 14d. |
 | `rules[].repairRolloutRule.repairPhases[].rollback` | — | `map` | optional | — | Optional. Rolls back a `Rollout`. |
@@ -92,9 +92,9 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipelin
 | `rules[].timedPromoteReleaseRule.condition` | — | `map` | output only | same fields as `rules[].advanceRolloutRule.condition` | Output only. Information around the state of the Automation rule. |
 | `rules[].timedPromoteReleaseRule.destinationPhase` | `destination_phase` | `string` | optional | — | Optional. The starting phase of the rollout created by this rule. Default to the first phase. |
 | `rules[].timedPromoteReleaseRule.destinationTargetId` | `destination_target_id` | `string` | optional | — | Optional. The ID of the stage in the pipeline to which this `Release` is deploying. If unspecified, default it to the next stage in the promotion flow. The value of this field could be one of the … |
-| `rules[].timedPromoteReleaseRule.id` | — | `string` | optional | — | Required. ID of the rule. This ID must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
-| `rules[].timedPromoteReleaseRule.schedule` | — | `string` | optional | — | Required. Schedule in crontab format. e.g. "0 9 * * 1" for every Monday at 9am. |
-| `rules[].timedPromoteReleaseRule.timeZone` | `time_zone` | `string` | optional | — | Required. The time zone in IANA format \[IANA Time Zone Database\](https://www.iana.org/time-zones) (e.g. America/New_York). |
+| `rules[].timedPromoteReleaseRule.id` | — | `string` | required | — | Required. ID of the rule. This ID must be unique in the `Automation` resource to which this rule belongs. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
+| `rules[].timedPromoteReleaseRule.schedule` | — | `string` | required | — | Required. Schedule in crontab format. e.g. "0 9 * * 1" for every Monday at 9am. |
+| `rules[].timedPromoteReleaseRule.timeZone` | `time_zone` | `string` | required | — | Required. The time zone in IANA format \[IANA Time Zone Database\](https://www.iana.org/time-zones) (e.g. America/New_York). |
 | `selector` | — | `map` | required | — | Required. Selected resources to which the automation will be applied. |
 | `selector.targets` | — | `list` | required | — | Optional. Contains attributes about a target. |
 | `selector.targets[]` | — | `map` | optional | — | — |

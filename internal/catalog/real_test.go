@@ -960,3 +960,52 @@ func snakeOf(s string) string {
 	}
 	return b.String()
 }
+
+// TestTheShippedSecretsReachTheHostAsSensitive checks the definitions the host
+// receives, not the catalog, so a conversion that drops the flag fails too.
+// One secret at each depth: top level, inside an object, and inside a list
+// element. Until 2026-09-24 the generator set Sensitive nowhere, and all three
+// were printed in clear.
+func TestTheShippedSecretsReachTheHostAsSensitive(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defs := map[string]*schema.ResourceDefinition{}
+	for _, d := range c.Definitions() {
+		defs[d.Type] = d
+	}
+	for _, path := range []string{
+		"gcp.sslcertificate/privateKey",
+		"gcp.backendservice/iap/oauth2ClientSecret",
+		"gcp.compute.instance/disks/[]/diskEncryptionKey/rawKey",
+	} {
+		segs := strings.Split(path, "/")
+		d := defs[segs[0]]
+		if d == nil {
+			t.Errorf("%s: type %s does not ship", path, segs[0])
+			continue
+		}
+		a, ok := d.Attributes[segs[1]]
+		for _, s := range segs[2:] {
+			if !ok {
+				break
+			}
+			if s == "[]" {
+				ok = a.Elem != nil
+				if ok {
+					a = *a.Elem
+				}
+				continue
+			}
+			a, ok = a.Fields[s]
+		}
+		if !ok {
+			t.Errorf("%s: no such attribute in the definition", path)
+			continue
+		}
+		if !a.Sensitive {
+			t.Errorf("%s is a secret and reaches the host without Sensitive, so plans and state show it", path)
+		}
+	}
+}

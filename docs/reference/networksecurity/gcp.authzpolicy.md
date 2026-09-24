@@ -36,7 +36,7 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 
 ## Attributes
 
-112 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+126 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -44,7 +44,7 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the resource was created. |
 | `customProvider` | `custom_provider` | `map` | optional | — | Optional. Required if the action is `CUSTOM`. Allows delegating authorization decisions to Cloud IAP or to Service Extensions. One of `cloudIap` or `authzExtension` must be specified. |
 | `customProvider.authzExtension` | `authz_extension` | `map` | optional | — | Optional. Delegate authorization decision to user authored Service Extension. Only one of cloudIap or authzExtension can be specified. |
-| `customProvider.authzExtension.resources` | — | `list` | optional | — | Required. A list of references to authorization extensions that will be invoked for requests matching this policy. Limited to 1 custom provider. |
+| `customProvider.authzExtension.resources` | — | `list` | required | — | Required. A list of references to authorization extensions that will be invoked for requests matching this policy. Limited to 1 custom provider. |
 | `customProvider.authzExtension.resources[]` | — | `string` | optional | — | — |
 | `customProvider.cloudIap` | `cloud_iap` | `map` | optional | opaque | Optional. Delegates authorization decisions to Cloud IAP. Applicable only for managed load balancers. Enabling Cloud IAP at the AuthzPolicy level is not compatible with Cloud IAP settings in the … |
 | `description` | — | `string` | optional | — | Optional. A human-readable description of the resource. |
@@ -55,8 +55,8 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 | `httpRules[].from.notSources[]` | — | `map` | optional | — | — |
 | `httpRules[].from.notSources[].ipBlocks` | `ip_blocks` | `list` | optional | — | Optional. A list of IP addresses or IP address ranges to match against the source IP address of the request. Limited to 10 ip_blocks per Authorization Policy |
 | `httpRules[].from.notSources[].ipBlocks[]` | — | `map` | optional | — | — |
-| `httpRules[].from.notSources[].ipBlocks[].length` | — | `integer` | optional | — | Required. The length of the address range. |
-| `httpRules[].from.notSources[].ipBlocks[].prefix` | — | `string` | optional | — | Required. The address prefix. |
+| `httpRules[].from.notSources[].ipBlocks[].length` | — | `integer` | required | — | Required. The length of the address range. |
+| `httpRules[].from.notSources[].ipBlocks[].prefix` | — | `string` | required | — | Required. The address prefix. |
 | `httpRules[].from.notSources[].principals` | — | `list` | optional | — | Optional. A list of identities derived from the client's certificate. This field will not match on a request unless frontend mutual TLS is enabled for the forwarding rule or Gateway and the client … |
 | `httpRules[].from.notSources[].principals[]` | — | `map` | optional | — | — |
 | `httpRules[].from.notSources[].principals[].principal` | — | `map` | optional | — | Required. A non-empty string whose value is matched against the principal value based on the principal_selector. Only exact match can be applied for CLIENT_CERT_URI_SAN, CLIENT_CERT_DNS_NAME_SAN … |
@@ -88,7 +88,7 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 | `httpRules[].to.notOperations[].headerSet` | `header_set` | `map` | optional | — | Optional. A list of headers to match against in http header. |
 | `httpRules[].to.notOperations[].headerSet.headers` | — | `list` | optional | — | Required. A list of headers to match against in http header. The match can be one of exact, prefix, suffix, or contains (substring match). The match follows AND semantics which means all the headers … |
 | `httpRules[].to.notOperations[].headerSet.headers[]` | — | `map` | optional | — | — |
-| `httpRules[].to.notOperations[].headerSet.headers[].name` | — | `string` | required | — | Optional. Specifies the name of the header in the request. |
+| `httpRules[].to.notOperations[].headerSet.headers[].name` | — | `string` | optional | — | Optional. Specifies the name of the header in the request. |
 | `httpRules[].to.notOperations[].headerSet.headers[].value` | — | `map` | optional | — | Optional. Specifies how the header match will be performed. |
 | `httpRules[].to.notOperations[].headerSet.headers[].value.contains` | — | `string` | optional | — | The input string must have the substring specified here. Note: empty contains match is not allowed, please use regex instead. Examples: * ``abc`` matches the value ``xyz.abc.def`` |
 | `httpRules[].to.notOperations[].headerSet.headers[].value.exact` | — | `string` | optional | — | The input string must match exactly the string specified here. Examples: * ``abc`` only matches the value ``abc``. |
@@ -106,7 +106,7 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 | `httpRules[].to.notOperations[].mcp.baseProtocolMethodsOption` | `base_protocol_methods_option` | `string` | optional | — | Optional. If specified, matches on the MCP protocol's non-access specific methods namely: * initialize * completion/ * logging/ * notifications/ * ping Defaults to SKIP_BASE_PROTOCOL_METHODS if not … |
 | `httpRules[].to.notOperations[].mcp.methods` | — | `list` | optional | — | Optional. A list of MCP methods and associated parameters to match on. It is recommended to use this field to match on tools, prompts and resource accesses while setting the baseProtocolMethodsOption … |
 | `httpRules[].to.notOperations[].mcp.methods[]` | — | `map` | optional | — | — |
-| `httpRules[].to.notOperations[].mcp.methods[].name` | — | `string` | required | — | Required. The MCP method to match against. Allowed values include: 1. `tools`, `prompts`, `resources` - these will match against all sub methods under the respective methods. 2. `prompts/list` … |
+| `httpRules[].to.notOperations[].mcp.methods[].name` | — | `string` | optional | — | Required. The MCP method to match against. Allowed values include: 1. `tools`, `prompts`, `resources` - these will match against all sub methods under the respective methods. 2. `prompts/list` … |
 | `httpRules[].to.notOperations[].mcp.methods[].params` | — | `list` | optional | — | Optional. A list of MCP method parameters to match against. The match can be one of exact, prefix, suffix, or contains (substring match). Matches are always case sensitive unless the ignoreCase is … |
 | `httpRules[].to.notOperations[].mcp.methods[].params[]` | — | `map` | optional | — | — |
 | `httpRules[].to.notOperations[].mcp.methods[].params[].contains` | — | `string` | optional | — | The input string must have the substring specified here. Note: empty contains match is not allowed, please use regex instead. Examples: * ``abc`` matches the value ``xyz.abc.def`` |
@@ -134,7 +134,12 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 | `httpRules[].to.operations[]` | — | `map` | optional | — | — |
 | `httpRules[].to.operations[].headerSet` | `header_set` | `map` | optional | same fields as `httpRules[].to.notOperations[].headerSet` | Optional. A list of headers to match against in http header. |
 | `httpRules[].to.operations[].hosts` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].hosts` | Optional. A list of HTTP Hosts to match against. The match can be one of exact, prefix, suffix, or contains (substring match). Matches are always case sensitive unless the ignoreCase is set. Limited … |
-| `httpRules[].to.operations[].mcp` | — | `map` | optional | same fields as `httpRules[].to.notOperations[].mcp` | Optional. Defines the MCP protocol attributes to match on. If the MCP payload in the request body cannot be successfully parsed, the request will be denied. This field can be set only for … |
+| `httpRules[].to.operations[].mcp` | — | `map` | optional | — | Optional. Defines the MCP protocol attributes to match on. If the MCP payload in the request body cannot be successfully parsed, the request will be denied. This field can be set only for … |
+| `httpRules[].to.operations[].mcp.baseProtocolMethodsOption` | `base_protocol_methods_option` | `string` | optional | — | Optional. If specified, matches on the MCP protocol's non-access specific methods namely: * initialize * completion/ * logging/ * notifications/ * ping Defaults to SKIP_BASE_PROTOCOL_METHODS if not … |
+| `httpRules[].to.operations[].mcp.methods` | — | `list` | optional | — | Optional. A list of MCP methods and associated parameters to match on. It is recommended to use this field to match on tools, prompts and resource accesses while setting the baseProtocolMethodsOption … |
+| `httpRules[].to.operations[].mcp.methods[]` | — | `map` | optional | — | — |
+| `httpRules[].to.operations[].mcp.methods[].name` | — | `string` | required | — | Required. The MCP method to match against. Allowed values include: 1. `tools`, `prompts`, `resources` - these will match against all sub methods under the respective methods. 2. `prompts/list` … |
+| `httpRules[].to.operations[].mcp.methods[].params` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].mcp.methods[].params` | Optional. A list of MCP method parameters to match against. The match can be one of exact, prefix, suffix, or contains (substring match). Matches are always case sensitive unless the ignoreCase is … |
 | `httpRules[].to.operations[].methods` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].methods` | Optional. A list of HTTP methods to match against. Each entry must be a valid HTTP method name (GET, PUT, POST, HEAD, PATCH, DELETE, OPTIONS). It only allows exact match and is always case sensitive … |
 | `httpRules[].to.operations[].paths` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].paths` | Optional. A list of paths to match against. The match can be one of exact, prefix, suffix, or contains (substring match). Matches are always case sensitive unless the ignoreCase is set. Limited to 10 … |
 | `httpRules[].to.operations[].snis` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].snis` | Optional. A list of SNIs to match against. The match can be one of exact, prefix, suffix, or contains (substring match). If there is no SNI (i.e. plaintext HTTP traffic), the request will be denied … |
@@ -144,7 +149,16 @@ projects/{{project}}/locations/{{location}}/authzPolicies/{{name}}
 | `networkRules` | `network_rules` | `list` | optional | — | Optional. A list of authorization network rules to match against the incoming request. A policy match occurs when at least one network rule matches the request. At least one network rule is required … |
 | `networkRules[]` | — | `map` | optional | — | — |
 | `networkRules[].from` | — | `map` | optional | same fields as `httpRules[].from` | Optional. Describes properties of a source of a request. |
-| `networkRules[].to` | — | `map` | optional | same fields as `httpRules[].to` | Optional. Describes properties of a target of a request. |
+| `networkRules[].to` | — | `map` | optional | — | Optional. Describes properties of a target of a request. |
+| `networkRules[].to.notOperations` | `not_operations` | `list` | optional | same fields as `httpRules[].to.notOperations` | Optional. Describes the negated properties of the targets of a request. Matches requests for operations that do not match the criteria specified in this field. At least one of operations or … |
+| `networkRules[].to.operations` | — | `list` | optional | — | Optional. Describes properties of one or more targets of a request. At least one of operations or notOperations must be specified. Limited to 1 operation. A match occurs when ANY operation (in … |
+| `networkRules[].to.operations[]` | — | `map` | optional | — | — |
+| `networkRules[].to.operations[].headerSet` | `header_set` | `map` | optional | same fields as `httpRules[].to.notOperations[].headerSet` | Optional. A list of headers to match against in http header. |
+| `networkRules[].to.operations[].hosts` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].hosts` | Optional. A list of HTTP Hosts to match against. The match can be one of exact, prefix, suffix, or contains (substring match). Matches are always case sensitive unless the ignoreCase is set. Limited … |
+| `networkRules[].to.operations[].mcp` | — | `map` | optional | same fields as `httpRules[].to.notOperations[].mcp` | Optional. Defines the MCP protocol attributes to match on. If the MCP payload in the request body cannot be successfully parsed, the request will be denied. This field can be set only for … |
+| `networkRules[].to.operations[].methods` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].methods` | Optional. A list of HTTP methods to match against. Each entry must be a valid HTTP method name (GET, PUT, POST, HEAD, PATCH, DELETE, OPTIONS). It only allows exact match and is always case sensitive … |
+| `networkRules[].to.operations[].paths` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].paths` | Optional. A list of paths to match against. The match can be one of exact, prefix, suffix, or contains (substring match). Matches are always case sensitive unless the ignoreCase is set. Limited to 10 … |
+| `networkRules[].to.operations[].snis` | — | `list` | optional | same fields as `httpRules[].to.notOperations[].snis` | Optional. A list of SNIs to match against. The match can be one of exact, prefix, suffix, or contains (substring match). If there is no SNI (i.e. plaintext HTTP traffic), the request will be denied … |
 | `networkRules[].when` | — | `string` | optional | — | Optional. CEL expression that describes the conditions to be satisfied for the action. The result of the CEL expression is ANDed with the from and to. Refer to the CEL language reference for a list … |
 | `policyProfile` | `policy_profile` | `string` | optional | force new | Optional. Immutable. Defines the type of authorization being performed. If not specified, `REQUEST_AUTHZ` is applied. This field cannot be changed once AuthzPolicy is created. |
 | `target` | — | `map` | required | — | Required. Specifies the set of resources to which this policy should be applied to. |

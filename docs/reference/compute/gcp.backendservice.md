@@ -47,12 +47,12 @@ projects/{project}/global/backendServices/{backendService}
 | `backends[].capacityScaler` | `capacity_scaler` | `float` | optional | — | A multiplier applied to the backend's target capacity of its balancing mode. The default value is 1, which means the group serves up to 100% of its configured capacity (depending onbalancingMode). A … |
 | `backends[].customMetrics` | `custom_metrics` | `list` | optional | — | List of custom metrics that are used for CUSTOM_METRICS BalancingMode. |
 | `backends[].customMetrics[]` | — | `map` | optional | — | — |
-| `backends[].customMetrics[].dryRun` | `dry_run` | `boolean` | optional | — | If true, the metric data is collected and reported to Cloud Monitoring, but is not used for load balancing. |
+| `backends[].customMetrics[].dryRun` | `dry_run` | `boolean` | required | — | If true, the metric data is collected and reported to Cloud Monitoring, but is not used for load balancing. |
 | `backends[].customMetrics[].maxUtilization` | `max_utilization` | `float` | optional | — | Optional parameter to define a target utilization for the Custom Metrics balancing mode. The valid range is \[0.0, 1.0\]. |
-| `backends[].customMetrics[].name` | — | `string` | optional | — | Name of a custom utilization signal. The name must be 1-64 characters long and match the regular expression `\[a-z\](\[-_.a-z0-9\]*\[a-z0-9\])?` which means that the first character must be a … |
+| `backends[].customMetrics[].name` | — | `string` | required | — | Name of a custom utilization signal. The name must be 1-64 characters long and match the regular expression `\[a-z\](\[-_.a-z0-9\]*\[a-z0-9\])?` which means that the first character must be a … |
 | `backends[].description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
 | `backends[].failover` | — | `boolean` | optional | — | This field designates whether this is a failover backend. More than one failover backend can be configured for a given BackendService. This field can only be used for a regional external Passthrough … |
-| `backends[].group` | — | `string` | optional | — | The fully-qualified URL of aninstance group or network endpoint group (NEG) resource. To determine what types of backends a load balancer supports, see the \[Backend services … |
+| `backends[].group` | — | `string` | required | — | The fully-qualified URL of aninstance group or network endpoint group (NEG) resource. To determine what types of backends a load balancer supports, see the \[Backend services … |
 | `backends[].maxConnections` | `max_connections` | `integer` | optional | — | Defines a target maximum number of simultaneous connections. For usage guidelines, seeConnection balancing mode and Utilization balancing mode. Not available if the backend'sbalancingMode is RATE. |
 | `backends[].maxConnectionsPerEndpoint` | `max_connections_per_endpoint` | `integer` | optional | — | Defines a target maximum number of simultaneous connections. For usage guidelines, seeConnection balancing mode and Utilization balancing mode. Not available if the backend's balancingMode isRATE. |
 | `backends[].maxConnectionsPerInstance` | `max_connections_per_instance` | `integer` | optional | — | Defines a target maximum number of simultaneous connections. For usage guidelines, seeConnection balancing mode and Utilization balancing mode. Not available if the backend's balancingMode isRATE. |
@@ -70,7 +70,7 @@ projects/{project}/global/backendServices/{backendService}
 | `cdnPolicy` | `cdn_policy` | `map` | optional | — | Cloud CDN configuration for this BackendService. Only available for specified load balancer types. |
 | `cdnPolicy.bypassCacheOnRequestHeaders` | `bypass_cache_on_request_headers` | `list` | optional | — | Bypass the cache when the specified request headers are matched - e.g. Pragma or Authorization headers. Up to 5 headers can be specified. The cache is bypassed for all cdnPolicy.cacheMode settings. |
 | `cdnPolicy.bypassCacheOnRequestHeaders[]` | — | `map` | optional | — | — |
-| `cdnPolicy.bypassCacheOnRequestHeaders[].headerName` | `header_name` | `string` | optional | — | The header field name to match on when bypassing cache. Values are case-insensitive. |
+| `cdnPolicy.bypassCacheOnRequestHeaders[].headerName` | `header_name` | `string` | required | — | The header field name to match on when bypassing cache. Values are case-insensitive. |
 | `cdnPolicy.cacheKeyPolicy` | `cache_key_policy` | `map` | optional | — | The CacheKeyPolicy for this CdnPolicy. |
 | `cdnPolicy.cacheKeyPolicy.includeHost` | `include_host` | `boolean` | optional | — | If true, requests to different hosts will be cached separately. |
 | `cdnPolicy.cacheKeyPolicy.includeHttpHeaders` | `include_http_headers` | `list` | optional | — | Allows HTTP request headers (by name) to be used in the cache key. |
@@ -123,8 +123,8 @@ projects/{project}/global/backendServices/{backendService}
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `customMetrics` | `custom_metrics` | `list` | optional | — | List of custom metrics that are used for theWEIGHTED_ROUND_ROBIN locality_lb_policy. |
 | `customMetrics[]` | — | `map` | optional | — | — |
-| `customMetrics[].dryRun` | `dry_run` | `boolean` | optional | — | If true, the metric data is not used for load balancing. |
-| `customMetrics[].name` | — | `string` | optional | — | Name of a custom utilization signal. The name must be 1-64 characters long and match the regular expression `\[a-z\](\[-_.a-z0-9\]*\[a-z0-9\])?` which means that the first character must be a … |
+| `customMetrics[].dryRun` | `dry_run` | `boolean` | required | — | If true, the metric data is not used for load balancing. |
+| `customMetrics[].name` | — | `string` | required | — | Name of a custom utilization signal. The name must be 1-64 characters long and match the regular expression `\[a-z\](\[-_.a-z0-9\]*\[a-z0-9\])?` which means that the first character must be a … |
 | `customRequestHeaders` | `custom_request_headers` | `list` | optional | unordered | Headers that the load balancer adds to proxied requests. See \[Creating custom headers\](https://cloud.google.com/load-balancing/docs/custom-headers). |
 | `customRequestHeaders[]` | — | `string` | optional | — | — |
 | `customResponseHeaders` | `custom_response_headers` | `list` | optional | unordered | Headers that the load balancer adds to proxied responses. See \[Creating custom headers\](https://cloud.google.com/load-balancing/docs/custom-headers). |
@@ -149,9 +149,9 @@ projects/{project}/global/backendServices/{backendService}
 | `healthChecks[]` | — | `string` | optional | — | — |
 | `iap` | — | `map` | optional | — | The configurations for Identity-Aware Proxy on this resource. Not available for internal passthrough Network Load Balancers and external passthrough Network Load Balancers. |
 | `iap.enabled` | — | `boolean` | required | — | Whether the serving infrastructure will authenticate and authorize all incoming requests. |
-| `iap.oauth2ClientId` | `oauth2_client_id` | `string` | optional | — | OAuth2 client ID to use for the authentication flow. |
-| `iap.oauth2ClientSecret` | `oauth2_client_secret` | `string` | optional | — | OAuth2 client secret to use for the authentication flow. For security reasons, this value cannot be retrieved via the API. Instead, the SHA-256 hash of the value is returned in the … |
-| `iap.oauth2ClientSecretSha256` | `oauth2_client_secret_sha256` | `string` | output only | — | Output only. \[Output Only\] SHA256 hash value for the field oauth2_client_secret above. |
+| `iap.oauth2ClientId` | `oauth2_client_id` | `string` | optional | sensitive | OAuth2 client ID to use for the authentication flow. |
+| `iap.oauth2ClientSecret` | `oauth2_client_secret` | `string` | optional | sensitive | OAuth2 client secret to use for the authentication flow. For security reasons, this value cannot be retrieved via the API. Instead, the SHA-256 hash of the value is returned in the … |
+| `iap.oauth2ClientSecretSha256` | `oauth2_client_secret_sha256` | `string` | output only | sensitive | Output only. \[Output Only\] SHA256 hash value for the field oauth2_client_secret above. |
 | `id` | — | `string` | output only | — | \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `ipAddressSelectionPolicy` | `ip_address_selection_policy` | `string` | optional | — | Specifies a preference for traffic sent from the proxy to the backend (or from the client to the backend for proxyless gRPC). The possible values are: - IPV4_ONLY: Only send IPv4 traffic to the … |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of resource. Always compute#backendService for backend services. |
@@ -160,18 +160,18 @@ projects/{project}/global/backendServices/{backendService}
 | `localityLbPolicies[]` | — | `map` | optional | — | — |
 | `localityLbPolicies[].customPolicy` | `custom_policy` | `map` | optional | — | The configuration for a custom policy implemented by the user and deployed with the client. |
 | `localityLbPolicies[].customPolicy.data` | — | `string` | optional | — | An optional, arbitrary JSON object with configuration data, understood by a locally installed custom policy implementation. |
-| `localityLbPolicies[].customPolicy.name` | — | `string` | optional | — | Identifies the custom policy. The value should match the name of a custom implementation registered on the gRPC clients. It should follow protocol buffer message naming conventions and include the … |
+| `localityLbPolicies[].customPolicy.name` | — | `string` | required | — | Identifies the custom policy. The value should match the name of a custom implementation registered on the gRPC clients. It should follow protocol buffer message naming conventions and include the … |
 | `localityLbPolicies[].policy` | — | `map` | optional | — | The configuration for a built-in load balancing policy. |
-| `localityLbPolicies[].policy.name` | — | `string` | optional | — | The name of a locality load-balancing policy. Valid values include ROUND_ROBIN and, for Java clients, LEAST_REQUEST. For information about these values, see the description of localityLbPolicy. Do … |
+| `localityLbPolicies[].policy.name` | — | `string` | required | — | The name of a locality load-balancing policy. Valid values include ROUND_ROBIN and, for Java clients, LEAST_REQUEST. For information about these values, see the description of localityLbPolicy. Do … |
 | `localityLbPolicy` | `locality_lb_policy` | `string` | optional | — | The load balancing algorithm used within the scope of the locality. The possible values are: - ROUND_ROBIN: This is a simple policy in which each healthy backend is selected in round robin order … |
 | `logConfig` | `log_config` | `map` | optional | — | This field denotes the logging options for the load balancer traffic served by this backend service. If logging is enabled, logs will be exported to Stackdriver. |
 | `logConfig.enable` | — | `boolean` | optional | — | Denotes whether to enable logging for the load balancer traffic served by this backend service. The default value is false. |
 | `logConfig.loggingHttpRequestHeaders` | `logging_http_request_headers` | `list` | optional | — | The list of request headers that will be logged to Stackdriver. |
 | `logConfig.loggingHttpRequestHeaders[]` | — | `map` | optional | — | — |
-| `logConfig.loggingHttpRequestHeaders[].headerName` | `header_name` | `string` | optional | — | The name of the header to be logged. |
+| `logConfig.loggingHttpRequestHeaders[].headerName` | `header_name` | `string` | required | — | The name of the header to be logged. |
 | `logConfig.loggingHttpResponseHeaders` | `logging_http_response_headers` | `list` | optional | — | The list of response headers that will be logged to Stackdriver. |
 | `logConfig.loggingHttpResponseHeaders[]` | — | `map` | optional | — | — |
-| `logConfig.loggingHttpResponseHeaders[].headerName` | `header_name` | `string` | optional | — | The name of the header to be logged. |
+| `logConfig.loggingHttpResponseHeaders[].headerName` | `header_name` | `string` | required | — | The name of the header to be logged. |
 | `logConfig.optionalFields` | `optional_fields` | `list` | optional | — | This field can only be specified if logging is enabled for this backend service and "logConfig.optionalMode" was set to CUSTOM. Contains a list of optional fields you want to include in the logs. For … |
 | `logConfig.optionalFields[]` | — | `string` | optional | — | — |
 | `logConfig.optionalMode` | `optional_mode` | `string` | optional | — | This field can only be specified if logging is enabled for this backend service. Configures whether all, none or a subset of optional fields should be added to the reported logs. One of … |
@@ -180,7 +180,7 @@ projects/{project}/global/backendServices/{backendService}
 | `maxStreamDuration.nanos` | — | `integer` | optional | — | Span of time that's a fraction of a second at nanosecond resolution. Durations less than one second are represented with a 0 `seconds` field and a positive `nanos` field. Must be from 0 to … |
 | `maxStreamDuration.seconds` | — | `string` | required | — | Span of time at a resolution of a second. Must be from 0 to 315,576,000,000 inclusive. Note: these bounds are computed from: 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years |
 | `metadatas` | — | `map` | optional | opaque | Deployment metadata associated with the resource to be set by a GKE hub controller and read by the backend RCTH |
-| `name` | — | `string` | optional | — | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
+| `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
 | `network` | — | `string` | optional | — | The URL of the network to which this backend service belongs. This field must be set for Internal Passthrough Network Load Balancers when the haPolicy is enabled, and for External Passthrough Network … |
 | `networkPassThroughLbTrafficPolicy` | `network_pass_through_lb_traffic_policy` | `map` | optional | — | Configures traffic steering properties of internal passthrough Network Load Balancers. networkPassThroughLbTrafficPolicy cannot be specified with haPolicy. |
 | `networkPassThroughLbTrafficPolicy.zonalAffinity` | `zonal_affinity` | `map` | optional | — | When configured, new connections are load balanced across healthy backend endpoints in the local zone. |
@@ -213,7 +213,7 @@ projects/{project}/global/backendServices/{backendService}
 | `securityPolicy` | `security_policy` | `string` | output only | — | \[Output Only\] The resource URL for the security policy associated with this backend service. |
 | `securitySettings` | `security_settings` | `map` | optional | — | This field specifies the security settings that apply to this backend service. This field is applicable to a global backend service with the load_balancing_scheme set to INTERNAL_SELF_MANAGED. |
 | `securitySettings.awsV4Authentication` | `aws_v4_authentication` | `map` | optional | — | The configuration needed to generate a signature for access to private storage buckets that support AWS's Signature Version 4 for authentication. Allowed only for INTERNET_IP_PORT and … |
-| `securitySettings.awsV4Authentication.accessKey` | `access_key` | `string` | optional | — | The access key used for s3 bucket authentication. Required for updating or creating a backend that uses AWS v4 signature authentication, but will not be returned as part of the configuration when … |
+| `securitySettings.awsV4Authentication.accessKey` | `access_key` | `string` | optional | sensitive | The access key used for s3 bucket authentication. Required for updating or creating a backend that uses AWS v4 signature authentication, but will not be returned as part of the configuration when … |
 | `securitySettings.awsV4Authentication.accessKeyId` | `access_key_id` | `string` | optional | — | The identifier of an access key used for s3 bucket authentication. |
 | `securitySettings.awsV4Authentication.accessKeyVersion` | `access_key_version` | `string` | optional | — | The optional version identifier for the access key. You can use this to keep track of different iterations of your access key. |
 | `securitySettings.awsV4Authentication.originRegion` | `origin_region` | `string` | optional | — | The name of the cloud region of your origin. This is a free-form field with the name of the region your cloud uses to host your origin. For example, "us-east-1" for AWS or "us-ashburn-1" for OCI. |

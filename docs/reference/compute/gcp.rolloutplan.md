@@ -56,7 +56,7 @@ projects/{project}/global/rolloutPlans/{rolloutPlan}
 | `waves[].orchestrationOptions.delays[].type_value` | wire `type` | `string` | optional | — | Optional. Controls whether the specified duration is to be added at the end of each batch, or if the total processing time for each batch will be padded if needed to meet the specified duration. Must … |
 | `waves[].orchestrationOptions.maxConcurrentLocations` | `max_concurrent_locations` | `string` | optional | — | Optional. Maximum number of locations to be orchestrated in parallel. |
 | `waves[].orchestrationOptions.maxConcurrentResourcesPerLocation` | `max_concurrent_resources_per_location` | `string` | optional | — | Optional. Maximum number of resources to be orchestrated per location in parallel. |
-| `waves[].selectors` | — | `list` | optional | — | Required. The selectors for this wave. There is a logical AND between each selector defined in a wave, so a resource must satisfy the criteria of *all* the specified selectors to be in scope for the … |
+| `waves[].selectors` | — | `list` | required | — | Required. The selectors for this wave. There is a logical AND between each selector defined in a wave, so a resource must satisfy the criteria of *all* the specified selectors to be in scope for the … |
 | `waves[].selectors[]` | — | `map` | optional | — | — |
 | `waves[].selectors[].locationSelector` | `location_selector` | `map` | optional | — | Optional. Roll out to resources by Cloud locations. |
 | `waves[].selectors[].locationSelector.includedLocations` | `included_locations` | `list` | optional | — | Optional. Example: "us-central1-a" |
@@ -68,7 +68,7 @@ projects/{project}/global/rolloutPlans/{rolloutPlan}
 | `waves[].selectors[].resourceHierarchySelector.includedOrganizations[]` | — | `string` | optional | — | — |
 | `waves[].selectors[].resourceHierarchySelector.includedProjects` | `included_projects` | `list` | optional | — | Optional. Format: "projects/{project_id}" |
 | `waves[].selectors[].resourceHierarchySelector.includedProjects[]` | — | `string` | optional | — | — |
-| `waves[].validation` | — | `map` | optional | — | Required. The validation to be performed at the end of this wave. |
+| `waves[].validation` | — | `map` | required | — | Required. The validation to be performed at the end of this wave. |
 | `waves[].validation.timeBasedValidationMetadata` | `time_based_validation_metadata` | `map` | optional | — | Optional. Metadata required if type = "time". |
 | `waves[].validation.timeBasedValidationMetadata.waitDuration` | `wait_duration` | `string` | optional | — | Optional. The duration that the system waits in between waves. This wait starts after all changes in the wave are rolled out. |
-| `waves[].validation.type_value` | wire `type` | `string` | optional | — | Required. The type of the validation. If a type of validation is associated with a metadata object, the appropriate metadata field mapping to the validation type must be provided in the validation … |
+| `waves[].validation.type_value` | wire `type` | `string` | required | — | Required. The type of the validation. If a type of validation is associated with a metadata object, the appropriate metadata field mapping to the validation type must be provided in the validation … |

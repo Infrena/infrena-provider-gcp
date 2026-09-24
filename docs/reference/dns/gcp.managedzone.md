@@ -84,7 +84,7 @@ projects/{project}/managedZones/{managedZone}
 | `privateVisibilityConfig` | `private_visibility_config` | `map` | optional | — | For privately visible zones, the set of Virtual Private Cloud resources that the zone is visible from. |
 | `privateVisibilityConfig.gkeClusters` | `gke_clusters` | `list` | optional | — | The list of Google Kubernetes Engine clusters that can see this zone. |
 | `privateVisibilityConfig.gkeClusters[]` | — | `map` | optional | — | — |
-| `privateVisibilityConfig.gkeClusters[].gkeClusterName` | `gke_cluster_name` | `string` | optional | — | The resource name of the cluster to bind this ManagedZone to. This should be specified in the format like: projects/*/locations/*/clusters/*. This is referenced from GKE … |
+| `privateVisibilityConfig.gkeClusters[].gkeClusterName` | `gke_cluster_name` | `string` | required | — | The resource name of the cluster to bind this ManagedZone to. This should be specified in the format like: projects/*/locations/*/clusters/*. This is referenced from GKE … |
 | `privateVisibilityConfig.gkeClusters[].kind` | — | `string` | output only | — | — |
 | `privateVisibilityConfig.kind` | — | `string` | output only | — | — |
 | `privateVisibilityConfig.networks` | — | `list` | optional | unordered | The list of VPC networks that can see this zone. |

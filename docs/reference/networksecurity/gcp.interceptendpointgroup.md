@@ -45,7 +45,7 @@ projects/{{project}}/locations/{{location}}/interceptEndpointGroups/{{intercept_
 | `connectedDeploymentGroup` | `connected_deployment_group` | `map` | output only | — | Output only. Details about the connected deployment group to this endpoint group. |
 | `connectedDeploymentGroup.locations` | — | `list` | output only | unordered | Output only. The list of locations where the deployment group is present. |
 | `connectedDeploymentGroup.locations[]` | — | `map` | optional | — | — |
-| `connectedDeploymentGroup.locations[].location` | — | `string` | output only | force new | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
+| `connectedDeploymentGroup.locations[].location` | — | `string` | output only | — | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
 | `connectedDeploymentGroup.locations[].state` | — | `string` | output only | — | Output only. The current state of the association in this location. |
 | `connectedDeploymentGroup.name` | — | `string` | output only | — | Output only. The connected deployment group's resource name, for example: `projects/123456789/locations/global/interceptDeploymentGroups/my-dg`. See https://google.aip.dev/124. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the resource was created. See https://google.aip.dev/148#timestamps. |

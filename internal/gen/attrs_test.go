@@ -609,3 +609,126 @@ func TestInputOnlyComesFromTheTagInEitherSpelling(t *testing.T) {
 		}
 	}
 }
+
+// TestASecretIsSensitiveWhereverItSits. Discovery cannot say a field is a
+// secret, so magic-modules is the only source, and until 2026-09-24 the
+// generator never read it: an SSL certificate's private key and a disk's raw
+// encryption key went into plans and state in clear. The list element is
+// reached through item_type, which is where magic-modules keeps an array's
+// fields.
+func TestASecretIsSensitiveWhereverItSits(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"privateKey":  {Type: "string"},
+		"description": {Type: "string"},
+		"disks": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"rawKey":   {Type: "string"},
+			"diskName": {Type: "string"},
+		}}},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "privateKey", Sensitive: true},
+		{Name: "description"},
+		{Name: "disks", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+			{Name: "rawKey", WriteOnly: true},
+			{Name: "diskName"},
+		}}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !attrs["privateKey"].Sensitive {
+		t.Error("privateKey is marked sensitive in magic-modules and is not sensitive here")
+	}
+	if attrs["description"].Sensitive {
+		t.Error("description became sensitive, so the flag is not coming from the field")
+	}
+	elem := attrs["disks"].Elem
+	if !elem.Fields["rawKey"].Sensitive {
+		t.Error("disks[].rawKey is write_only in magic-modules and is not sensitive here")
+	}
+	if elem.Fields["diskName"].Sensitive {
+		t.Error("disks[].diskName became sensitive")
+	}
+}
+
+// TestAFlagStaysOnTheFieldItWasWrittenFor. The index was once one flat map
+// across every depth, keyed by bare name, so authz policy's required
+// ipBlocks[].prefix made every other field called prefix required too, and a
+// nested "name" could shadow the resource's own.
+func TestAFlagStaysOnTheFieldItWasWrittenFor(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"rules": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"name": str,
+			"ipBlocks": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+				"prefix": str}}},
+			"paths": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+				"prefix": str}}},
+		}}},
+		"name": str,
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "rules", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+			{Name: "name"},
+			{Name: "ipBlocks", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+				{Name: "prefix", Required: true}}}},
+			{Name: "paths", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+				{Name: "prefix"}}}},
+		}}},
+		{Name: "name", Required: true, Immutable: true},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := attrs["rules"].Elem.Fields
+	if !rule["ipBlocks"].Elem.Fields["prefix"].Required {
+		t.Error("ipBlocks[].prefix lost the required flag magic-modules gives it")
+	}
+	if rule["paths"].Elem.Fields["prefix"].Required {
+		t.Error("paths[].prefix is required, a flag that belongs to ipBlocks[].prefix")
+	}
+	if a := attrs["name"]; !a.Required || !a.ForceNew {
+		t.Errorf("the top-level name lost its own flags: %+v", a)
+	}
+	if rule["name"].Required || rule["name"].ForceNew {
+		t.Errorf("rules[].name took the top-level name's flags: %+v", rule["name"])
+	}
+}
+
+// TestAHandWrittenResourcesNestedRequiredIsNotTrusted. Terraform never runs
+// the YAML of an exclude_resource resource, so its nested `required` is
+// unenforced and wrong in places (compute Instance's access config name). The
+// same field on an ordinary resource keeps the flag, so a pass that clears
+// Required everywhere fails here too.
+func TestAHandWrittenResourcesNestedRequiredIsNotTrusted(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"name": str,
+		"accessConfigs": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"name": str}}},
+	}}
+	build := func(exclude bool) map[string]*catalog.Attr {
+		mm := &mmv1.Resource{Name: "W", ExcludeResource: exclude, Properties: []*mmv1.Field{
+			{Name: "name", Required: true},
+			{Name: "accessConfigs", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+				{Name: "name", Required: true}}}},
+		}}
+		attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return attrs
+	}
+	hand := build(true)
+	if !hand["name"].Required {
+		t.Error("the hand-written resource lost its top-level required name")
+	}
+	if hand["accessConfigs"].Elem.Fields["name"].Required {
+		t.Error("accessConfigs[].name is required on a resource whose YAML Terraform never runs")
+	}
+	if !build(false)["accessConfigs"].Elem.Fields["name"].Required {
+		t.Error("an ordinary resource lost a nested required flag")
+	}
+}
