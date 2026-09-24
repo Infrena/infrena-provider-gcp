@@ -2,12 +2,12 @@
 
 # GCP type reference
 
-This plugin serves **255 types** across 36 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
+This plugin serves **268 types** across 37 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
 - Catalog generated: 2026-09-24
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
-**[Types that are not served, and why](not-shipped.md)** — 365 entries. Read that page first if the type you want is missing from this one.
+**[Types that are not served, and why](not-shipped.md)** — 352 entries. Read that page first if the type you want is missing from this one.
 
 ## Services
 
@@ -16,33 +16,34 @@ This plugin serves **255 types** across 36 Google Cloud services. Every page bel
 | [accesscontextmanager](accesscontextmanager/README.md) | 1 |
 | [apigateway](apigateway/README.md) | 1 |
 | [artifactregistry](artifactregistry/README.md) | 4 |
-| [bigquery](bigquery/README.md) | 3 |
+| [bigquery](bigquery/README.md) | 5 |
 | [bigtableadmin](bigtableadmin/README.md) | 9 |
 | [binaryauthorization](binaryauthorization/README.md) | 1 |
 | [certificatemanager](certificatemanager/README.md) | 6 |
 | [cloudasset](cloudasset/README.md) | 2 |
-| [cloudbuild](cloudbuild/README.md) | 1 |
+| [cloudbuild](cloudbuild/README.md) | 2 |
 | [clouddeploy](clouddeploy/README.md) | 5 |
 | [cloudfunctions](cloudfunctions/README.md) | 1 |
 | [cloudkms](cloudkms/README.md) | 2 |
 | [cloudresourcemanager](cloudresourcemanager/README.md) | 8 |
-| [cloudtasks](cloudtasks/README.md) | 1 |
+| [cloudtasks](cloudtasks/README.md) | 2 |
 | [composer](composer/README.md) | 3 |
-| [compute](compute/README.md) | 72 |
+| [compute](compute/README.md) | 76 |
 | [container](container/README.md) | 2 |
 | [dataproc](dataproc/README.md) | 4 |
-| [dns](dns/README.md) | 3 |
+| [dns](dns/README.md) | 5 |
 | [eventarc](eventarc/README.md) | 7 |
 | [file](file/README.md) | 3 |
 | [firestore](firestore/README.md) | 4 |
 | [iam](iam/README.md) | 13 |
-| [logging](logging/README.md) | 24 |
+| [logging](logging/README.md) | 25 |
+| [memcache](memcache/README.md) | 1 |
 | [monitoring](monitoring/README.md) | 1 |
 | [networksecurity](networksecurity/README.md) | 26 |
 | [networkservices](networkservices/README.md) | 20 |
 | [notebooks](notebooks/README.md) | 1 |
 | [osconfig](osconfig/README.md) | 3 |
-| [pubsub](pubsub/README.md) | 3 |
+| [pubsub](pubsub/README.md) | 4 |
 | [redis](redis/README.md) | 1 |
 | [run](run/README.md) | 4 |
 | [secretmanager](secretmanager/README.md) | 2 |

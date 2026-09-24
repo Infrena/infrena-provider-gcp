@@ -510,6 +510,161 @@ rulings:
       the same rule applies, and the same open question about what
       Terraform additionally patches.
 
+  # P2, ruled 2026-09-24: the one-hook types, plus cloudtasks/Queue and
+  # monitoring/Service, which unblock gcp.task and the service-level
+  # objective type. Every template read at the pinned mmv1 commit. Held
+  # back: iam/WorkforcePool (soft delete), dataproc/Batch (server-added
+  # properties on an immutable type), binaryauthorization/Policy (a
+  # singleton whose delete is a PUT of the default).
+  logging/Metric:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  monitoring/Group:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  monitoring/MetricDescriptor:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  monitoring/AlertPolicy:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/self_link_as_name_set_project.go.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  dataproc/SessionTemplate:
+    hooks: [custom_import]
+    note: >
+      custom_import (custom_import/set_id_name_with_slashes.go.tmpl) only parses `terraform import`'s id argument, which
+      infrena does not use: import here goes through the catalog's own id
+      templates. Nothing on the wire.
+
+  compute/StoragePool:
+    hooks: [pre_delete]
+    note: >
+      pre_delete (pre_delete/compute_storage_pool.go.tmpl) refuses to delete when
+      `deletion_protection` is set, a Terraform-only field.
+
+  memcache/Instance:
+    hooks: [pre_delete]
+    note: >
+      pre_delete (pre_delete/memcache_instance.go.tmpl) refuses to delete when
+      `deletion_protection` is set, a Terraform-only field.
+
+  compute/TargetInstance:
+    hooks: [post_create]
+    note: >
+      post_create (post_create/compute_target_instance_security_policy.go.tmpl)
+      sets a security policy, but the whole body sits inside a
+      `TargetVersionName != "ga"` guard, so the GA provider this catalog mirrors
+      has no such hook.
+
+  compute/Interconnect:
+    hooks: [post_create]
+    note: >
+      post_create (post_create/labels.tmpl) calls setLabels after the insert.
+      magic-modules names setLabels as the labels field's update_url, so it is a
+      setter here and a create whose read-back lacks the labels calls it
+      (gcprov.setAfterCreate). Note what this type is: creating one orders a
+      physical dedicated interconnect.
+
+  cloudtasks/Queue:
+    hooks: [post_create, post_update]
+    note: >
+      post_create and post_update (cloud_tasks_queue_state.go.tmpl) call :pause
+      or :resume when Terraform's `desired_state` field changes. That field is
+      Terraform's; the API's `state` is output-only, so THE BOUNDED GAP is that a
+      queue cannot be paused from configuration here.
+
+  monitoring/Service:
+    hooks: [custom_import, encoder]
+    note: >
+      custom_import (custom_import/self_link_as_name.tmpl) only parses
+      `terraform import`'s id argument, which infrena does not use.
+
+      encoder (encoders/monitoring_service.go.tmpl) sets `custom: {}` when absent,
+      because only CUSTOM services can be created and the block has no fields,
+      and removes `name`, because the id is the serviceId query parameter. The
+      generator already sends the id as serviceId. THE BOUNDED GAP: write
+      `custom: {}` in configuration; Google's own error names it otherwise.
+
+  compute/Route:
+    hooks: [decoder]
+    note: >
+      decoder (decoders/route.tmpl) splits nextHopInstance into Terraform's
+      `next_hop_instance_zone` field and a relative link. We have no such field,
+      and the self_link equivalence reports nextHopInstance as written when
+      Google answers with a full url. The tgc_decoder beside it belongs to a
+      different tool.
+
+  bigquery/Job:
+    hooks: [encoder]
+    note: >
+      encoder (encoders/bigquery_job.go.tmpl) fills jobReference's project from
+      the provider's project. THE BOUNDED GAP: write jobReference.projectId in
+      configuration; the API's error names it otherwise.
+
+  cloudbuild/Repository:
+    hooks: [encoder]
+    note: >
+      encoder (encoders/cloudbuildv2_repository.go.tmpl) derives project and
+      location from Terraform's parent_connection field and writes the short name
+      back. Nothing reaches the body; it is Terraform's own id bookkeeping.
+
+  pubsub/Schema:
+    hooks: [update_encoder]
+    note: >
+      update_encoder (update_encoder/pubsub_schema.tmpl) wraps the body for a
+      schema commit, a new revision. This provider does not commit revisions: a
+      schema has no patch, so any change replaces it.
+
+  bigquery/RowAccessPolicy:
+    hooks: [pre_delete]
+    note: >
+      pre_delete (pre_delete/bigquery_row_access_policy.go.tmpl) always sends
+      force=true. THE BOUNDED GAP: without it, Google refuses to delete a table's
+      LAST row access policy, because that would widen access. The refusal is
+      loud and names the reason.
+
+  compute/NodeGroup:
+    hooks: [pre_create]
+    note: >
+      pre_create (pre_create/compute_node_group_url_replace.go.tmpl) fills the
+      initialNodeCount query parameter from Terraform's initial_size or the
+      autoscaling policy's minimum, in a create url magic-modules spells with
+      the token PRE_CREATE_REPLACE_ME. The generator refuses a create url
+      carrying that token, so this type does not ship until the parameter can
+      be filled; the ruling records what the hook does.
+
+  dns/Policy:
+    hooks: [pre_delete]
+    clear_before_delete: [networks]
+    note: >
+      pre_delete (pre_delete/detach_network.tmpl) patches `networks` to empty
+      before the delete, because Google refuses to delete a policy with networks
+      attached. clear_before_delete does the same here, and it is needed:
+      removing networks from configuration does not detach them.
+
+  dns/ResponsePolicy:
+    hooks: [pre_delete]
+    clear_before_delete: [gkeClusters, networks]
+    note: >
+      pre_delete (pre_delete/response_policy_detach_network_gke.tmpl) patches
+      `gkeClusters` and then `networks` to empty before the delete, for the same
+      reason as dns/Policy.
+
   # Secret Manager, ruled 2026-09-24 with the names James chose on the same
   # day: projects.secrets is gcp.secret and projects.locations.secrets is
   # gcp.regionalsecret. Held until both could ship, because regional secrets

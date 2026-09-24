@@ -17,17 +17,23 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 65 |
+| [unruled wire hooks](#unruled-wire-hooks) | 46 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
 | [no get method](#no-get-method) | 2 |
+| [create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill](#create-url-projectsprojectzoneszonenodegroupsinitialnodecountpre_create_replace_me-carries-a-token-magic-modules-pre_create-hook-replaces-which-this-provider-cannot-fill) | 1 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
+| [self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectalertpolicies-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
+| [self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectgroups-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
+| [self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectlocationslocationsessiontemplates-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
+| [self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectmetricdescriptors-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
+| [self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectservices-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**365** types did not ship. **62** more ship without a create.
+**352** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -301,35 +307,23 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `alloydb/Cluster` | 2 | pre_create, pre_delete, pre_update |
 | `alloydb/Instance` | 2 | custom_import, decoder, pre_create, pre_delete |
 | `alloydb/User` | 2 | custom_import, pre_update |
-| `bigquery/Job` | 2 | encoder |
-| `bigquery/RowAccessPolicy` | 2 | pre_delete |
 | `binaryauthorization/Policy` | 2 | pre_delete |
-| `cloudbuild/Repository` | 2 | encoder |
 | `cloudkms/CryptoKey` | 2 | custom_delete, custom_import, decoder, encoder, update_encoder |
 | `cloudkms/CryptoKeyVersion` | 2 | custom_delete, custom_import, pre_update |
 | `cloudresourcemanager/Lien` | 2 | decoder, pre_delete |
 | `cloudscheduler/Job` | 2 | encoder, post_create, post_update, update_encoder |
-| `cloudtasks/Queue` | 2 | post_create, post_update |
 | `compute/Disk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
 | `compute/FirewallPolicy` | 2 | post_create, post_delete, post_update |
 | `compute/GlobalVmExtensionPolicy` | 2 | post_delete, pre_delete, pre_update |
-| `compute/Interconnect` | 2 | post_create |
 | `compute/InterconnectAttachment` | 2 | post_create, pre_delete |
-| `compute/NodeGroup` | 2 | pre_create |
 | `compute/OrganizationSecurityPolicy` | 2 | post_create, post_delete, post_update |
 | `compute/RegionDisk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
 | `compute/Reservation` | 2 | decoder, pre_update, update_encoder |
-| `compute/Route` | 2 | decoder |
 | `compute/ServiceAttachment` | 2 | encoder, update_encoder |
 | `compute/Snapshot` | 2 | decoder, pre_create |
-| `compute/StoragePool` | 2 | pre_delete |
-| `compute/TargetInstance` | 2 | post_create |
 | `compute/VpnTunnel` | 2 | encoder, post_create |
 | `compute/ZoneVmExtensionPolicy` | 2 | pre_update |
 | `dataproc/Batch` | 2 | decoder |
-| `dataproc/SessionTemplate` | 2 | custom_import |
-| `dns/Policy` | 2 | pre_delete |
-| `dns/ResponsePolicy` | 2 | pre_delete |
 | `firestore/Index` | 2 | custom_create, custom_import, encoder |
 | `iam/OauthClient` | 2 | decoder, post_create, post_delete, post_update |
 | `iam/WorkforcePool` | 2 | decoder |
@@ -337,16 +331,9 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `logging/LogScope` | 2 | encoder |
 | `logging/LogScope` | 2 | encoder |
 | `logging/LogScope` | 2 | encoder |
-| `logging/Metric` | 2 | custom_import |
-| `memcache/Instance` | 2 | pre_delete |
-| `monitoring/AlertPolicy` | 2 | custom_import |
-| `monitoring/Group` | 2 | custom_import |
-| `monitoring/MetricDescriptor` | 2 | custom_import |
 | `monitoring/NotificationChannel` | 2 | custom_import, decoder, encoder |
-| `monitoring/Service` | 2 | custom_import, encoder |
 | `monitoring/UptimeCheckConfig` | 2 | custom_delete, custom_import, encoder |
 | `networkservices/Gateway` | 2 | post_delete, update_encoder |
-| `pubsub/Schema` | 2 | update_encoder |
 | `redis/Cluster` | 2 | decoder, encoder |
 | `redis/Instance` | 2 | decoder, encoder, pre_delete |
 | `spanner/BackupSchedule` | 2 | decoder, encoder, pre_update |
@@ -449,6 +436,14 @@ The API publishes no get. Reading one means listing its parent, which needs a ru
 | `cloudresourcemanager/tagHolds` | 2 | needs a ruling with read_via |
 | `servicenetworking/peeredDnsDomains` | 2 | needs a ruling with read_via |
 
+## create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `compute/NodeGroup` | 3 | — |
+
 ## reference to gcp.servertlspolicy.selfLink dropped
 
 Reported by the generator.
@@ -456,6 +451,46 @@ Reported by the generator.
 | Type | Tier | Detail |
 | --- | --- | --- |
 | `compute/gcp.targethttpsproxy.serverTlsPolicy` | 1 | gcp.servertlspolicy has no attribute "selfLink" |
+
+## self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `monitoring/AlertPolicy` | 3 | — |
+
+## self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `monitoring/Group` | 3 | — |
+
+## self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `dataproc/SessionTemplate` | 3 | — |
+
+## self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `monitoring/MetricDescriptor` | 3 | — |
+
+## self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `monitoring/Service` | 3 | — |
 
 ## Shipped, but cannot be created
 
