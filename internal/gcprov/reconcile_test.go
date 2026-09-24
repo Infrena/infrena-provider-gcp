@@ -1005,3 +1005,34 @@ func TestAListOfReferencesIsComparedElementByElement(t *testing.T) {
 		t.Errorf("reconciled list = %v, want the reference as it was written", got.Raw)
 	}
 }
+
+// TestAnOutputFieldInAnUnorderedListElementIsNotDrift. Nested pruning is off
+// inside unordered lists, where the reference element was picked by position.
+// An output-only field is dropped there anyway: no configured element can
+// hold one. A configured field Google left unset is still reported.
+func TestAnOutputFieldInAnUnorderedListElementIsNotDrift(t *testing.T) {
+	elem := &catalog.Attr{Canonical: "networks", Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+		"networkUrl": {Canonical: "networkUrl", Kind: value.KindString},
+		"kind":       {Canonical: "kind", Kind: value.KindString, Output: true},
+	}}
+	attr := &catalog.Attr{Canonical: "networks", Kind: value.KindList, Unordered: true, Elem: elem}
+	s := func(v string) value.Value { return value.String(v, value.SourceProvider) }
+	m := func(kv map[string]value.Value) value.Value { return value.Map(kv, value.SourceProvider) }
+	ref := value.List([]value.Value{m(map[string]value.Value{"networkUrl": s("n1")})}, value.SourceProvider)
+	in := value.List([]value.Value{m(map[string]value.Value{"networkUrl": s("n1"), "kind": s("dns#policyNetwork")})}, value.SourceProvider)
+	got := Reconcile(attr, ref, in)
+	items, _ := got.Raw.([]value.Value)
+	if len(items) != 1 {
+		t.Fatalf("reconciled list = %v", got.Raw)
+	}
+	fields, _ := items[0].Raw.(map[string]value.Value)
+	if _, has := fields["kind"]; has {
+		t.Error("the output-only kind is still in the element, so the plan reads it as drift")
+	}
+	if fields["networkUrl"].Raw != "n1" {
+		t.Errorf("networkUrl = %v, want n1", fields["networkUrl"].Raw)
+	}
+	if !got.Equal(ref) {
+		t.Errorf("the reconciled list %v does not equal the configured %v", got.Raw, ref.Raw)
+	}
+}
