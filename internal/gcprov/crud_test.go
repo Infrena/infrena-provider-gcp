@@ -1298,3 +1298,28 @@ func TestARegionalTypeIsReachedAtItsRegionsEndpoint(t *testing.T) {
 		}
 	}
 }
+
+// TestACreateAnsweredWithoutASelfLinkStillHasAnID. Cloud DNS answers a create
+// with the resource and no selfLink, and a DNS policy's id template, from
+// Discovery, ends in {policy} while the resource calls it name. The policy
+// was created on real Google and Create failed computing its id, which is a
+// resource nothing tracks. The last placeholder takes the resource's name.
+func TestACreateAnsweredWithoutASelfLinkStillHasAnID(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty := widgetType()
+	ty.SelfLink = "projects/{project}/locations/{region}/widgets/{widget}"
+	ty.ImportFormat = ty.SelfLink
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+	st, err := p.Create(context.Background(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "two", "sizeGb": int64(10),
+	}))
+	if err != nil {
+		t.Fatalf("Create failed for a resource that was created: %v", err)
+	}
+	if st.ProviderID != "projects/p/locations/r/widgets/two" {
+		t.Errorf("provider id = %q, want projects/p/locations/r/widgets/two", st.ProviderID)
+	}
+}
