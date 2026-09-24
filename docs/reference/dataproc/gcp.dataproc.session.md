@@ -19,7 +19,7 @@ A representation of a session.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/sessions` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/sessions?sessionId={{sessionId}}` |
 | Read | yes | `GET {+name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/sessions/{session}
 
 ## Attributes
 
-77 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+78 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -61,7 +61,7 @@ projects/{project}/locations/{location}/sessions/{session}
 | `jupyterSession.displayName` | `display_name` | `string` | optional | — | Optional. Display name, shown in the Jupyter kernelspec card. |
 | `jupyterSession.kernel` | — | `string` | optional | — | Optional. Kernel |
 | `labels` | — | `map` | optional | opaque | Optional. The labels to associate with the session. Label keys must contain 1 to 63 characters, and must conform to RFC 1035 (https://www.ietf.org/rfc/rfc1035.txt). Label values may be empty, but, if … |
-| `name` | — | `string` | optional | — | Identifier. The resource name of the session. |
+| `name` | — | `string` | output only | — | Identifier. The resource name of the session. |
 | `runtimeConfig` | `runtime_config` | `map` | optional | — | Optional. Runtime configuration for the session execution. |
 | `runtimeConfig.autotuningConfig` | `autotuning_config` | `map` | optional | — | Optional. Autotuning configuration of the workload. |
 | `runtimeConfig.autotuningConfig.scenarios` | — | `list` | optional | — | Optional. Scenarios for which tunings are applied. |
@@ -102,6 +102,7 @@ projects/{project}/locations/{location}/sessions/{session}
 | `runtimeInfo.outputUri` | `output_uri` | `string` | output only | — | Output only. A URI pointing to the location of the stdout and stderr of the workload. |
 | `runtimeInfo.propertiesInfo` | `properties_info` | `map` | optional | — | Optional. Properties of the workload organized by origin. |
 | `runtimeInfo.propertiesInfo.autotuningProperties` | `autotuning_properties` | `map` | output only | opaque | Output only. Properties set by autotuning engine. |
+| `sessionId` | — | `string` | required | force new, create only | Required. The ID to use for the session, which becomes the final component of the session's resource name.This value must be 4-63 characters. Valid characters are /a-z-/. |
 | `sessionTemplate` | `session_template` | `string` | optional | — | Optional. The session template used by the session.Only resource names, including project ID and location, are valid.Example: * … |
 | `sparkConnectSession` | `spark_connect_session` | `map` | optional | opaque | Optional. Spark connect session config. |
 | `state` | — | `string` | output only | — | Output only. A state of the session. |

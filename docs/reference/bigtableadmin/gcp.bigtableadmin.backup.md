@@ -19,7 +19,7 @@ A backup of a Cloud Bigtable table.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/backups` needs `cluster`, `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/backups?backupId={{backupId}}` needs `cluster`, `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,10 +33,11 @@ projects/{project}/instances/{instance}/clusters/{cluster}/backups/{backup}
 
 ## Attributes
 
-18 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+19 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `backupId` | — | `string` | required | force new, create only | Required. The id of the backup to be created. The `backup_id` along with the parent `parent` are combined as {parent}/backups/{backup_id} to create the full backup name, of the form … |
 | `backupType` | `backup_type` | `string` | optional | — | Indicates the backup type of the backup. |
 | `encryptionInfo` | `encryption_info` | `map` | output only | — | Output only. The encryption information for the backup. |
 | `encryptionInfo.encryptionStatus` | `encryption_status` | `map` | output only | — | Output only. The status of encrypt/decrypt calls on underlying data for this resource. Regardless of status, the existing data is always encrypted at rest. |
@@ -49,7 +50,7 @@ projects/{project}/instances/{instance}/clusters/{cluster}/backups/{backup}
 | `endTime` | `end_time` | `string` | output only | — | Output only. `end_time` is the time that the backup was finished. The row data in the backup will be no newer than this timestamp. |
 | `expireTime` | `expire_time` | `string` | optional | — | Required. The expiration time of the backup. When creating a backup or updating its `expire_time`, the value must be greater than the backup creation time by: - At least 6 hours - At most 90 days … |
 | `hotToStandardTime` | `hot_to_standard_time` | `string` | optional | — | The time at which the hot backup will be converted to a standard backup. Once the `hot_to_standard_time` has passed, Cloud Bigtable will convert the hot backup to a standard backup. This value must … |
-| `name` | — | `string` | optional | — | A globally unique identifier for the backup which cannot be changed. Values are of the form `projects/{project}/instances/{instance}/clusters/{cluster}/ backups/_a-zA-Z0-9*` The final segment of the … |
+| `name` | — | `string` | output only | — | A globally unique identifier for the backup which cannot be changed. Values are of the form `projects/{project}/instances/{instance}/clusters/{cluster}/ backups/_a-zA-Z0-9*` The final segment of the … |
 | `sizeBytes` | `size_bytes` | `string` | output only | — | Output only. Size of the backup in bytes. |
 | `sourceBackup` | `source_backup` | `string` | output only | — | Output only. Name of the backup from which this backup was copied. If a backup is not created by copying a backup, this field will be empty. Values are of the form … |
 | `sourceTable` | `source_table` | `string` | optional | force new | Required. Immutable. Name of the table from which this backup was created. This needs to be in the same instance as the backup. Values are of the form … |

@@ -19,7 +19,7 @@ The ACL policy resource.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/aclPolicies` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/aclPolicies?aclPolicyId={{aclPolicyId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,10 +33,11 @@ projects/{project}/locations/{location}/aclPolicies/{aclPolicy}
 
 ## Attributes
 
-19 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+20 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `aclPolicyId` | — | `string` | required | force new, create only | Required. The logical name of the ACL policy in the customer project with the following restrictions: * Must contain only lowercase letters, numbers, and hyphens. * Must start with a letter. * Must … |
 | `clusterAclPolicyAttachments` | `cluster_acl_policy_attachments` | `list` | output only | — | Output only. The ACL policy attachment status for each attached cluster. |
 | `clusterAclPolicyAttachments[]` | — | `map` | optional | — | — |
 | `clusterAclPolicyAttachments[].aclPolicyRevisionStatuses` | `acl_policy_revision_statuses` | `list` | output only | — | Output only. A list of status for various revisions of this ACL policy on the cluster. |
@@ -48,7 +49,7 @@ projects/{project}/locations/{location}/aclPolicies/{aclPolicy}
 | `clusterAclPolicyAttachments[].cluster` | — | `string` | output only | — | Output only. The resource name of the attached Cluster. Format: "projects/{project}/locations/{location}/clusters/{cluster}" |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp that the ACL policy was created. |
 | `etag` | — | `string` | output only | — | Output only. Etag for the ACL policy. |
-| `name` | — | `string` | optional | — | Identifier. Full resource path of the ACL policy. |
+| `name` | — | `string` | output only | — | Identifier. Full resource path of the ACL policy. |
 | `rules` | — | `list` | optional | — | Required. The ACL rules within the ACL policy. |
 | `rules[]` | — | `map` | optional | — | — |
 | `rules[].rule` | — | `string` | optional | — | Required. The rule to be applied to the username. Ex: "on >password123 ~* +@all" The format of the rule is defined by Redis OSS … |

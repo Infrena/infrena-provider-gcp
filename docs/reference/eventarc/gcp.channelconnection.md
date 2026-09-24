@@ -19,7 +19,7 @@ A representation of the ChannelConnection resource. A ChannelConnection is a res
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/channelConnections` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/channelConnections?channelConnectionId={{channelConnectionId}}` |
 | Read | yes | `GET {+name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
@@ -33,14 +33,15 @@ projects/{project}/locations/{location}/channelConnections/{channelConnection}
 
 ## Attributes
 
-7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+8 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `activationToken` | `activation_token` | `string` | optional | — | Input only. Activation token for the channel. The token will be used during the creation of ChannelConnection to bind the channel with the provider project. This field will not be stored in the … |
 | `channel` | — | `string` | optional | — | Required. The name of the connected subscriber Channel. This is a weak reference to avoid cross project and cross accounts references. This must be in … |
+| `channelConnectionId` | — | `string` | required | force new, create only | Required. The user-provided ID to be assigned to the channel connection. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation time. |
 | `labels` | — | `map` | optional | opaque | Optional. Resource labels. |
-| `name` | — | `string` | optional | — | Required. The name of the connection. |
+| `name` | — | `string` | output only | — | Required. The name of the connection. |
 | `uid` | — | `string` | output only | — | Output only. Server assigned ID of the resource. The server guarantees uniqueness and immutability until deleted. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last-modified time. |

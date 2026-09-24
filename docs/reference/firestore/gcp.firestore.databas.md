@@ -19,7 +19,7 @@ A Cloud Firestore Database.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/databases` |
+| Create | yes | `POST projects/{{project}}/databases?databaseId={{databaseId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/databases/{database}
 
 ## Attributes
 
-30 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+31 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -45,6 +45,7 @@ projects/{project}/databases/{database}
 | `concurrencyMode` | `concurrency_mode` | `string` | optional | — | The default concurrency control mode to use for this database. If unspecified in a CreateDatabase request, this will default based on the database edition: Optimistic for Enterprise and Pessimistic … |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp at which this database was created. Databases created before 2016 do not populate create_time. |
 | `databaseEdition` | `database_edition` | `string` | optional | force new | Immutable. The edition of the database. |
+| `databaseId` | — | `string` | required | force new, create only | Required. The ID to use for the database, which will become the final component of the database's resource name. This value should be 4-63 characters. Valid characters are /a-z-/ with first character … |
 | `deleteProtectionState` | `delete_protection_state` | `string` | optional | — | State of delete protection for the database. |
 | `deleteTime` | `delete_time` | `string` | output only | — | Output only. The timestamp at which this database was deleted. Only set if the database has been deleted. |
 | `earliestVersionTime` | `earliest_version_time` | `string` | output only | — | Output only. The earliest timestamp at which older versions of the data can be read from the database. See \[version_retention_period\] above; this field is populated with `now - … |
@@ -54,7 +55,7 @@ projects/{project}/databases/{database}
 | `keyPrefix` | `key_prefix` | `string` | output only | — | Output only. The key_prefix for this database. This key_prefix is used, in combination with the project ID ("~") to construct the application ID that is returned from the Cloud Datastore APIs in … |
 | `locationId` | `location_id` | `string` | optional | — | Required. The location of the database. Available locations are listed at https://cloud.google.com/firestore/docs/locations. |
 | `mongodbCompatibleDataAccessMode` | `mongodb_compatible_data_access_mode` | `string` | optional | — | Optional. The MongoDB compatible API data access mode to use for this database. If not set on write, the default value is DATA_ACCESS_MODE_ENABLED for Enterprise edition. The value is always … |
-| `name` | — | `string` | optional | — | The resource name of the Database. Format: `projects/{project}/databases/{database}` |
+| `name` | — | `string` | output only | — | The resource name of the Database. Format: `projects/{project}/databases/{database}` |
 | `pointInTimeRecoveryEnablement` | `point_in_time_recovery_enablement` | `string` | optional | — | Whether to enable the PITR feature on this database. |
 | `previousId` | `previous_id` | `string` | output only | — | Output only. The database resource's prior database ID. This field is only populated for deleted databases. |
 | `realtimeUpdatesMode` | `realtime_updates_mode` | `string` | optional | force new | Immutable. The default Realtime Updates mode to use for this database. |

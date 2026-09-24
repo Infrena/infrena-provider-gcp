@@ -19,7 +19,7 @@ Tags point to a version and represent an alternative name that can be used to ac
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/tags` needs `package`, `repository`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/tags?tagId={{tagId}}` needs `package`, `repository`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,9 +33,10 @@ projects/{project}/locations/{location}/repositories/{repository}/packages/{pack
 
 ## Attributes
 
-2 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+3 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `name` | — | `string` | optional | — | The name of the tag, for example: "projects/p1/locations/us-central1/repositories/repo1/packages/pkg1/tags/tag1". If the package part contains slashes, the slashes are escaped. The tag part can only … |
+| `name` | — | `string` | output only | — | The name of the tag, for example: "projects/p1/locations/us-central1/repositories/repo1/packages/pkg1/tags/tag1". If the package part contains slashes, the slashes are escaped. The tag part can only … |
+| `tagId` | — | `string` | optional | force new, create only | The tag id to use for this repository. |
 | `version` | — | `string` | optional | — | The name of the version the tag refers to, for example: `projects/p1/locations/us-central1/repositories/repo1/packages/pkg1/versions/sha256:5243811` If the package or version ID parts contain … |

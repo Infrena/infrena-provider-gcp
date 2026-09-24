@@ -18,7 +18,7 @@ A Service-Level Objective (SLO) describes a level of desired good service. It co
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/serviceLevelObjectives` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/serviceLevelObjectives?serviceLevelObjectiveId={{serviceLevelObjectiveId}}` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -32,14 +32,14 @@ A Service-Level Objective (SLO) describes a level of desired good service. It co
 
 ## Attributes
 
-47 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+48 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `calendarPeriod` | `calendar_period` | `string` | optional | — | A calendar period, semantically "since the start of the current ". At this time, only DAY, WEEK, FORTNIGHT, and MONTH are supported. |
 | `displayName` | `display_name` | `string` | optional | — | Name used for UI elements listing this SLO. |
 | `goal` | — | `float` | optional | — | The fraction of service that must be good in order for this objective to be met. 0 &lt; goal &lt;= 0.9999. |
-| `name` | — | `string` | optional | — | Identifier. Resource name for this ServiceLevelObjective. The format is: projects/\[PROJECT_ID_OR_NUMBER\]/services/\[SERVICE_ID\]/serviceLevelObjectives/\[SLO_NAME\] |
+| `name` | — | `string` | output only | — | Identifier. Resource name for this ServiceLevelObjective. The format is: projects/\[PROJECT_ID_OR_NUMBER\]/services/\[SERVICE_ID\]/serviceLevelObjectives/\[SLO_NAME\] |
 | `rollingPeriod` | `rolling_period` | `string` | optional | — | A rolling time period, semantically "in the past ". Must be an integer multiple of 1 day no larger than 30 days. |
 | `serviceLevelIndicator` | `service_level_indicator` | `map` | optional | — | The definition of good service, used to measure and calculate the quality of the Service's performance with respect to a single aspect of service quality. |
 | `serviceLevelIndicator.basicSli` | `basic_sli` | `map` | optional | — | Basic SLI on a well-known service type. |
@@ -82,4 +82,5 @@ A Service-Level Objective (SLO) describes a level of desired good service. It co
 | `serviceLevelIndicator.windowsBased.metricSumInRange.range` | — | `map` | optional | same fields as `serviceLevelIndicator.requestBased.distributionCut.range` | Range of values considered "good." For a one-sided range, set one bound to an infinite value. |
 | `serviceLevelIndicator.windowsBased.metricSumInRange.timeSeries` | `time_series` | `string` | optional | — | A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) specifying the TimeSeries to use for evaluating window quality. |
 | `serviceLevelIndicator.windowsBased.windowPeriod` | `window_period` | `string` | optional | — | Duration over which window quality is evaluated. Must be an integer fraction of a day and at least 60s. |
+| `serviceLevelObjectiveId` | — | `string` | optional | force new, create only | Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern ^\[a-zA-Z0-9-_:.\]+$ |
 | `userLabels` | `user_labels` | `map` | optional | opaque | Labels which have been used to annotate the service-level objective. Label keys must start with a letter. Label keys and values may contain lowercase letters, numbers, underscores, and dashes. Label … |

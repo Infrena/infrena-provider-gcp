@@ -1240,6 +1240,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// this runs after, sees everything that function declared, and touches only
 	// what it left behind.
 	bindCreateQueryID(t, t.Attributes, create)
+	// And when the url carries no id at all: see addCreateIDParameter.
+	addCreateIDParameter(t, t.Attributes, create)
 
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err

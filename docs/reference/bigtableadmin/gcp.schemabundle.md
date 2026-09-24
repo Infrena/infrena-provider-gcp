@@ -19,7 +19,7 @@ A named collection of related schemas.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/schemaBundles` needs `instance`, `table`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/schemaBundles?schemaBundleId={{schemaBundleId}}` needs `instance`, `table`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/instances/{instance}/tables/{table}/schemaBundles/{schemaBund
 
 ## Attributes
 
-7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+8 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -41,6 +41,7 @@ projects/{project}/instances/{instance}/tables/{table}/schemaBundles/{schemaBund
 | `avroSchema.jsonSchemas` | `json_schemas` | `list` | optional | — | Required. The Avro schemas in JSON format. Each element must be the content of a valid, self-contained Avro schema file (.avsc), as described in https://avro.apache.org/docs/1.8.1/spec.html. Use … |
 | `avroSchema.jsonSchemas[]` | — | `string` | optional | — | — |
 | `etag` | — | `string` | optional | — | Optional. The etag for this schema bundle. This may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. The server returns an ABORTED error on a … |
-| `name` | — | `string` | optional | — | Identifier. The unique name identifying this schema bundle. Values are of the form `projects/{project}/instances/{instance}/tables/{table}/schemaBundles/{schema_bundle}` |
+| `name` | — | `string` | output only | — | Identifier. The unique name identifying this schema bundle. Values are of the form `projects/{project}/instances/{instance}/tables/{table}/schemaBundles/{schema_bundle}` |
 | `protoSchema` | `proto_schema` | `map` | optional | — | Schema for Protobufs. |
 | `protoSchema.protoDescriptors` | `proto_descriptors` | `string` | optional | — | Required. Contains a protobuf-serialized \[google.protobuf.FileDescriptorSet\](https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/descriptor.proto), which could include … |
+| `schemaBundleId` | — | `string` | required | force new, create only | Required. The unique ID to use for the schema bundle, which will become the final component of the schema bundle's resource name. |

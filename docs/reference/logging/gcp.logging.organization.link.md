@@ -19,7 +19,7 @@ Describes a link connected to an analytics enabled bucket.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/links` needs `bucket`, `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/links?linkId={{linkId}}` needs `bucket`, `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ organizations/{organization}/locations/{location}/buckets/{bucket}/links/{link}
 
 ## Attributes
 
-6 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -42,4 +42,5 @@ organizations/{organization}/locations/{location}/buckets/{bucket}/links/{link}
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation timestamp of the link. |
 | `description` | — | `string` | optional | — | Optional. Describes this link.The maximum length of the description is 8000 characters. |
 | `lifecycleState` | `lifecycle_state` | `string` | output only | — | Output only. The resource lifecycle state. |
+| `linkId` | — | `string` | required | force new, create only | Required. The ID to use for the link. The link_id can have up to 100 characters. A valid link_id must only have alphanumeric characters and underscores within it. |
 | `name` | — | `string` | output only | — | Output only. The resource name of the link. The name can have up to 100 characters. A valid link id (at the end of the link name) must only have alphanumeric characters and underscores within it … |
