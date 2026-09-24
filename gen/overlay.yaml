@@ -339,11 +339,36 @@ rulings:
       A key ring has no update method; everything settable is set at creation.
 
   # ----------------------------------------------------------------------------
-  # NOT RULED. One P0 candidate is left, and it waits on a decision rather
-  # than on the generator. Kept here because this is the file the next person
-  # opens.
+  # NOT RULED. One P0 candidate is left. The names are decided; it now waits on
+  # regional endpoint support. Kept here because this is the file the next
+  # person opens.
   #
-  # THE NAME COLLISION -- blocks secretmanager/Secret.
+  # DECIDED 2026-09-24: projects.secrets ships as gcp.secret and
+  # projects.locations.secrets as gcp.regionalsecret (magic-modules'
+  # RegionalSecret, Terraform's google_secret_manager_regional_secret, and our
+  # own gcp.region* compute types). Neither ships until both can: no ruling and
+  # no names.lock entry before then. Two things stand in the way besides the
+  # name, both found while deciding it:
+  #
+  #   - The regional collection is paired with the wrong magic-modules
+  #     resource. Regional secrets are a separate product,
+  #     secretmanagerregional/RegionalSecret, with their own pre_update and
+  #     pre_delete templates. matchResource only searches the product named
+  #     like the Discovery document, so projects.locations.secrets gets the
+  #     global Secret and its hooks. Read RegionalSecret's templates before
+  #     ruling it.
+  #
+  #   - Regional secrets are served from secretmanager.{location}.rep.googleapis.com.
+  #     magic-modules points the regional product there, and the Discovery
+  #     document lists 50 such endpoints under `endpoints`, which the generator
+  #     ignores. absURL builds from the one global APIBaseURL. So this needs a
+  #     catalog field and runtime support, and a live test showing the regional
+  #     type reaching its regional host.
+  #
+  #   Secret versions have no create method (they are added with addVersion),
+  #   so gcp.secret manages the secret and not its value.
+  #
+  # THE NAME COLLISION -- how it was found.
   #
   #     Both hooks on secretmanager/Secret are benign: pre_delete is gated on
   #     `deletion_protection`, a Terraform-only field absent from the v1 Secret
