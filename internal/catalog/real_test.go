@@ -1012,3 +1012,24 @@ func TestTheShippedSecretsReachTheHostAsSensitive(t *testing.T) {
 		}
 	}
 }
+
+// TestNodeGroupShipsWithItsNodeCount. magic-modules leaves NodeGroup's
+// initialNodeCount as PRE_CREATE_REPLACE_ME for Terraform's pre_create; the
+// generator binds it to Discovery's query parameter. Without that binding the
+// type is refused, and this is the check that the binding runs.
+func TestNodeGroupShipsWithItsNodeCount(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := c.Type("gcp.nodegroup")
+	if !ok {
+		t.Fatal("gcp.nodegroup does not ship")
+	}
+	if !strings.Contains(ty.CreateURL, "initialNodeCount={{initialNodeCount}}") {
+		t.Errorf("create url %q does not bind initialNodeCount", ty.CreateURL)
+	}
+	if a := ty.Attributes["initialNodeCount"]; a == nil || !a.Required || !a.CreateOnly {
+		t.Errorf("initialNodeCount = %+v, want a required create-only attribute", a)
+	}
+}

@@ -64,6 +64,9 @@ type Parameter struct {
 	Type     string `json:"type"`
 	Location string `json:"location"`
 	Required bool   `json:"required"`
+	// Format refines Type as it does on a schema ("int32" on compute's
+	// nodeGroups.insert initialNodeCount).
+	Format string `json:"format"`
 	// Pattern is the regular expression Discovery publishes for a path
 	// parameter's value, e.g. "^projects/[^/]+$". It is the ONLY thing that
 	// tells two identically spelled placeholders apart when one collection
