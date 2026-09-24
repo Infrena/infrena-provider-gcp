@@ -747,3 +747,292 @@ func countRequests(s *gcpfake.Server, path string) int {
 	}
 	return n
 }
+
+// inputOnlyAttrs is a small schema with an input-only field at each of the
+// places the catalog has them today: top level, inside a nested object, and
+// inside the elements of an ordered list -- the last being compute's
+// disks[].initializeParams, the field that made an instance plan its own
+// replacement on every run. Plus one inside an UNORDERED list, where the
+// reference element is chosen by position and cannot be trusted to copy from.
+func inputOnlyAttrs() map[string]*catalog.Attr {
+	str := func(inputOnly bool) *catalog.Attr {
+		return &catalog.Attr{Kind: value.KindString, InputOnly: inputOnly}
+	}
+	disk := &catalog.Attr{Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+		"source":           str(false),
+		"initializeParams": str(true),
+	}}
+	return map[string]*catalog.Attr{
+		"secret":   str(true),
+		"plain":    str(false),
+		"settings": {Kind: value.KindMap, Fields: map[string]*catalog.Attr{"key": str(true), "mode": str(false)}},
+		"disks":    {Kind: value.KindList, Elem: disk},
+		"rules":    {Kind: value.KindList, Unordered: true, Elem: disk},
+	}
+}
+
+func s(v string) value.Value { return value.String(v, value.SourceExplicit) }
+func obj(m map[string]value.Value) value.Value {
+	return value.Map(m, value.SourceExplicit)
+}
+func lst(vs ...value.Value) value.Value { return value.List(vs, value.SourceExplicit) }
+
+// TestAnInputOnlyFieldIsCarriedForwardWhereverItSits. GCP never returns these
+// fields, so reporting them missing is drift on every plan against a resource
+// that is exactly as configured. Carried at the top level, inside an object,
+// and inside an ordered list's elements.
+func TestAnInputOnlyFieldIsCarriedForwardWhereverItSits(t *testing.T) {
+	reference := map[string]value.Value{
+		"secret":   s("hunter2"),
+		"plain":    s("configured"),
+		"settings": obj(map[string]value.Value{"key": s("k1"), "mode": s("fast")}),
+		"disks":    lst(obj(map[string]value.Value{"source": s("d1"), "initializeParams": s("image-a")})),
+	}
+	// What GCP answers: every input-only field missing, and so is `plain`,
+	// which is NOT input-only and must stay missing.
+	incoming := map[string]value.Value{
+		"settings": obj(map[string]value.Value{"mode": s("fast")}),
+		"disks":    lst(obj(map[string]value.Value{"source": s("d1")})),
+	}
+	got := ReconcileAttrs(inputOnlyAttrs(), reference, incoming)
+
+	if !got["secret"].Equal(s("hunter2")) {
+		t.Errorf("top-level input-only not carried: %v", got["secret"])
+	}
+	if _, present := got["plain"]; present {
+		t.Error("a field that is NOT input-only was carried forward; GCP not returning it is real")
+	}
+	if settings, _ := got["settings"].Raw.(map[string]value.Value); !settings["key"].Equal(s("k1")) {
+		t.Errorf("nested input-only not carried: %v", got["settings"])
+	}
+	disks, _ := got["disks"].Raw.([]value.Value)
+	if len(disks) != 1 {
+		t.Fatalf("disks = %v", got["disks"])
+	}
+	if d, _ := disks[0].Raw.(map[string]value.Value); !d["initializeParams"].Equal(s("image-a")) {
+		t.Errorf("input-only inside an ordered list's element not carried: %v", disks[0])
+	}
+	if !got["disks"].Equal(reference["disks"]) {
+		t.Errorf("the replan-forever case still diffs: got %v, configured %v", got["disks"], reference["disks"])
+	}
+}
+
+// TestAnInputOnlyAnswerIsBelieved. If the API does return the field, its
+// answer is the truth, the same rule CreateOnly follows.
+func TestAnInputOnlyAnswerIsBelieved(t *testing.T) {
+	got := ReconcileAttrs(inputOnlyAttrs(),
+		map[string]value.Value{"secret": s("old")},
+		map[string]value.Value{"secret": s("rotated-by-someone")})
+	if !got["secret"].Equal(s("rotated-by-someone")) {
+		t.Errorf("secret = %v, want the API's answer", got["secret"])
+	}
+}
+
+// TestNothingIsCopiedFromAnUnmatchedListElement. In an unordered list the
+// reference element is chosen by POSITION before the list is matched, so it
+// may be a sibling; copying its input-only value would attribute one element's
+// configuration to another. None of the catalog's input-only fields sit in an
+// unordered list today, and this is what keeps one from being mishandled.
+func TestNothingIsCopiedFromAnUnmatchedListElement(t *testing.T) {
+	got := ReconcileAttrs(inputOnlyAttrs(),
+		map[string]value.Value{"rules": lst(obj(map[string]value.Value{"source": s("a"), "initializeParams": s("for-a")}))},
+		map[string]value.Value{"rules": lst(obj(map[string]value.Value{"source": s("b")}))})
+	rules, _ := got["rules"].Raw.([]value.Value)
+	for _, r := range rules {
+		if m, _ := r.Raw.(map[string]value.Value); m["initializeParams"].Known {
+			t.Errorf("copied %v into an element of an unordered list", m["initializeParams"])
+		}
+	}
+}
+
+// diskAttrs is compute's disks[] as far as these tests need it: what a user
+// writes, what the server fills in, and the one input-only field.
+func diskAttrs(unordered bool) map[string]*catalog.Attr {
+	str := func() *catalog.Attr { return &catalog.Attr{Kind: value.KindString} }
+	return map[string]*catalog.Attr{"disks": {Kind: value.KindList, Unordered: unordered, Elem: &catalog.Attr{
+		Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+			"boot": {Kind: value.KindBool}, "autoDelete": {Kind: value.KindBool},
+			"initializeParams": {Kind: value.KindString, InputOnly: true},
+			"deviceName":       str(), "source": str(), "mode": str(), "interface": str(), "type_value": str(),
+		},
+	}}}
+}
+
+func asked() map[string]value.Value {
+	return map[string]value.Value{"disks": lst(obj(map[string]value.Value{
+		"boot": value.Bool(true, value.SourceExplicit), "autoDelete": value.Bool(true, value.SourceExplicit),
+		"initializeParams": s("debian-12"),
+	}))}
+}
+
+// googlesAnswer is what compute really returned on 2026-09-24: the disk the
+// user asked for, with five declared fields filled in that nobody set, and no
+// initializeParams at all.
+func googlesAnswer() map[string]value.Value {
+	return map[string]value.Value{"disks": lst(obj(map[string]value.Value{
+		"boot": value.Bool(true, value.SourceProvider), "autoDelete": value.Bool(true, value.SourceProvider),
+		"deviceName": s("persistent-disk-0"), "source": s("projects/p/zones/z/disks/vm"),
+		"mode": s("READ_WRITE"), "interface": s("SCSI"), "type_value": s("PERSISTENT"),
+	}))}
+}
+
+// TestAServerFilledNestedFieldIsNotDrift is the live failure, rebuilt from the
+// real answer. infrena's planner forgives an unconfigured key inside a
+// composite only when it is an empty collection, so these five made `disks`
+// differ, and disks forces replacement: the instance planned its own
+// replacement on every run. Carrying initializeParams forward alone did not
+// change that -- which only the live suite could show.
+func TestAServerFilledNestedFieldIsNotDrift(t *testing.T) {
+	got := ReconcileAttrs(diskAttrs(false), asked(), googlesAnswer())
+	if !got["disks"].Equal(asked()["disks"]) {
+		t.Errorf("disks still differs from what was asked:\n got  %v\n want %v", got["disks"], asked()["disks"])
+	}
+}
+
+// TestANestedFieldSomebodyConfiguredStillShowsDrift. Pruning is only of what
+// nobody asked for. A field configuration sets, changed outside infrena, must
+// still come back as it really is.
+func TestANestedFieldSomebodyConfiguredStillShowsDrift(t *testing.T) {
+	ref := asked()
+	d := ref["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	d["mode"] = s("READ_WRITE")
+	ans := googlesAnswer()
+	ans["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)["mode"] = s("READ_ONLY")
+	got := ReconcileAttrs(diskAttrs(false), ref, ans)
+	m := got["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	if !m["mode"].Equal(s("READ_ONLY")) {
+		t.Errorf("a configured nested field changed outside infrena was hidden: mode = %v", m["mode"])
+	}
+}
+
+// TestWithNoReferenceEverythingIsReported. An import or a discovery has
+// nothing to say what was asked for, so nothing may be taken to be the
+// server's choice.
+func TestWithNoReferenceEverythingIsReported(t *testing.T) {
+	got := ReconcileAttrs(diskAttrs(false), map[string]value.Value{}, googlesAnswer())
+	m := got["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	if _, kept := m["deviceName"]; !kept {
+		t.Error("with no reference, a server-filled nested field was dropped")
+	}
+}
+
+// TestNothingIsPrunedAgainstAnUnmatchedListElement. In an unordered list the
+// reference element is picked by position and may be a sibling, and pruning
+// against the wrong element could drop a field the right one sets -- a
+// change nobody could then see.
+func TestNothingIsPrunedAgainstAnUnmatchedListElement(t *testing.T) {
+	got := ReconcileAttrs(diskAttrs(true), asked(), googlesAnswer())
+	m := got["disks"].Raw.([]value.Value)[0].Raw.(map[string]value.Value)
+	if _, kept := m["deviceName"]; !kept {
+		t.Error("a field was pruned against an unordered list's positional reference")
+	}
+}
+
+// TestAPortRangeIsReportedAsItWasWritten. compute answers a forwarding rule's
+// portRange "80" as "80-80", and the field is ForceNew, so the rule was
+// replaced on every plan. The rule applies only to an attribute the catalog
+// marks, and only to the same range: a different range is still drift.
+func TestAPortRangeIsReportedAsItWasWritten(t *testing.T) {
+	marked := &catalog.Attr{Canonical: "portRange", Kind: value.KindString, Equivalence: catalog.EquivalencePortRange}
+	plain := &catalog.Attr{Canonical: "portRange", Kind: value.KindString}
+	s := func(v string) value.Value { return value.String(v, value.SourceProvider) }
+	for _, c := range []struct {
+		attr          *catalog.Attr
+		ref, in, want string
+	}{
+		{marked, "80", "80-80", "80"},
+		{marked, "80", "81-81", "81-81"},
+		{marked, "8080-8090", "8080-8090", "8080-8090"},
+		{marked, "8080", "8080-8090", "8080-8090"},
+		{plain, "80", "80-80", "80-80"},
+	} {
+		got := Reconcile(c.attr, s(c.ref), s(c.in))
+		if got.Raw != c.want {
+			t.Errorf("equivalence %q, written %q, answered %q: reported %v, want %q",
+				c.attr.Equivalence, c.ref, c.in, got.Raw, c.want)
+		}
+	}
+}
+
+// TestEachEquivalenceSaysSameOnlyForTheSameValue. Every rule has a case it
+// must call equal and one it must not: a rule that calls everything equal
+// hides real drift, which is worse than the replacement it was written to
+// stop.
+func TestEachEquivalenceSaysSameOnlyForTheSameValue(t *testing.T) {
+	const net = "https://www.googleapis.com/compute/v1/projects/p/global/networks/n"
+	for _, c := range []struct {
+		rule, want, got string
+		same            bool
+	}{
+		{catalog.EquivalenceSelfLink, "projects/p/global/networks/n", net, true},
+		{catalog.EquivalenceSelfLink, "n", net, true},
+		{catalog.EquivalenceSelfLink, "projects/p/global/networks/m", net, false},
+		{catalog.EquivalenceSelfLink, "projects/q/global/networks/n", net, false},
+		{catalog.EquivalenceSelfLink, "m", net, false},
+		{catalog.EquivalenceResourceName, "projects/p/locations/l/certificates/c", "//certificatemanager.googleapis.com/projects/1/locations/l/certificates/c", true},
+		{catalog.EquivalenceResourceName, "projects/p/locations/l/certificates/c", "projects/p/locations/l/certificates/d", false},
+		{catalog.EquivalenceCase, "tcp", "TCP", true},
+		{catalog.EquivalenceCase, "tcp", "UDP", false},
+		{catalog.EquivalenceDuration, "10s", "10.000s", true},
+		{catalog.EquivalenceDuration, "10s", "11s", false},
+		{catalog.EquivalencePortRange, "80", "80-80", true},
+		{"no-such-rule", "a", "a ", false},
+	} {
+		if got := equivalent(c.rule, c.want, c.got); got != c.same {
+			t.Errorf("%s: %q against %q = %v, want %v", c.rule, c.want, c.got, got, c.same)
+		}
+	}
+}
+
+// TestAListOfReferencesIsComparedElementByElement. A backend service's
+// healthChecks are a list of references, and the list's rule reaches each
+// element: written relative, answered as full urls, reported as written.
+func TestAListOfReferencesIsComparedElementByElement(t *testing.T) {
+	elem := &catalog.Attr{Canonical: "healthChecks", Kind: value.KindString, Equivalence: catalog.EquivalenceSelfLink}
+	attr := &catalog.Attr{Canonical: "healthChecks", Kind: value.KindList, Equivalence: catalog.EquivalenceSelfLink, Elem: elem}
+	s := func(v string) value.Value { return value.String(v, value.SourceProvider) }
+	list := func(vs ...string) value.Value {
+		out := make([]value.Value, len(vs))
+		for i, v := range vs {
+			out[i] = s(v)
+		}
+		return value.List(out, value.SourceProvider)
+	}
+	got := Reconcile(attr, list("projects/p/global/healthChecks/hc"),
+		list("https://www.googleapis.com/compute/v1/projects/p/global/healthChecks/hc"))
+	items, _ := got.Raw.([]value.Value)
+	if len(items) != 1 || items[0].Raw != "projects/p/global/healthChecks/hc" {
+		t.Errorf("reconciled list = %v, want the reference as it was written", got.Raw)
+	}
+}
+
+// TestAnOutputFieldInAnUnorderedListElementIsNotDrift. Nested pruning is off
+// inside unordered lists, where the reference element was picked by position.
+// An output-only field is dropped there anyway: no configured element can
+// hold one. A configured field Google left unset is still reported.
+func TestAnOutputFieldInAnUnorderedListElementIsNotDrift(t *testing.T) {
+	elem := &catalog.Attr{Canonical: "networks", Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+		"networkUrl": {Canonical: "networkUrl", Kind: value.KindString},
+		"kind":       {Canonical: "kind", Kind: value.KindString, Output: true},
+	}}
+	attr := &catalog.Attr{Canonical: "networks", Kind: value.KindList, Unordered: true, Elem: elem}
+	s := func(v string) value.Value { return value.String(v, value.SourceProvider) }
+	m := func(kv map[string]value.Value) value.Value { return value.Map(kv, value.SourceProvider) }
+	ref := value.List([]value.Value{m(map[string]value.Value{"networkUrl": s("n1")})}, value.SourceProvider)
+	in := value.List([]value.Value{m(map[string]value.Value{"networkUrl": s("n1"), "kind": s("dns#policyNetwork")})}, value.SourceProvider)
+	got := Reconcile(attr, ref, in)
+	items, _ := got.Raw.([]value.Value)
+	if len(items) != 1 {
+		t.Fatalf("reconciled list = %v", got.Raw)
+	}
+	fields, _ := items[0].Raw.(map[string]value.Value)
+	if _, has := fields["kind"]; has {
+		t.Error("the output-only kind is still in the element, so the plan reads it as drift")
+	}
+	if fields["networkUrl"].Raw != "n1" {
+		t.Errorf("networkUrl = %v, want n1", fields["networkUrl"].Raw)
+	}
+	if !got.Equal(ref) {
+		t.Errorf("the reconciled list %v does not equal the configured %v", got.Raw, ref.Raw)
+	}
+}

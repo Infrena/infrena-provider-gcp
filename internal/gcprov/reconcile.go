@@ -1,7 +1,9 @@
 package gcprov
 
 import (
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena/pkg/value"
@@ -47,6 +49,18 @@ type reconciler struct {
 	// can cost a request, so it is only called once a value is already known
 	// to be a project resource name that disagrees.
 	aliases func() ProjectAliases
+	// unmatched is true inside the elements of an UNORDERED list. There the
+	// reference element an incoming element is reconciled against is chosen by
+	// position before the list is matched and reordered, so it may be a
+	// sibling. Anything that COPIES from the reference -- carrying an
+	// input-only field forward -- must not trust it. Nothing that reads the
+	// reference only to decide spelling or order is affected.
+	//
+	// The zero value is the safe, ordinary case on purpose: the reconciler
+	// is constructed in more than one place (projects.go builds the one the
+	// runtime uses), and a flag every constructor had to remember to set is
+	// a flag that is off in production and on in the tests.
+	unmatched bool
 }
 
 func (r reconciler) value(attr *catalog.Attr, reference, incoming value.Value) value.Value {
@@ -73,8 +87,85 @@ func (r reconciler) value(attr *catalog.Attr, reference, incoming value.Value) v
 	case attr.Kind == value.KindList && attr.Elem != nil:
 		return r.list(attr, reference, incoming)
 	default:
-		return r.sameProjectSpelling(reference, asDeclaredKind(attr, incoming))
+		return sameByEquivalence(attr, reference, r.sameProjectSpelling(reference, asDeclaredKind(attr, incoming)))
 	}
+}
+
+// sameByEquivalence returns the reference's spelling when the attribute's
+// Equivalence says it and Google's answer are the same value written two
+// ways. The same job sameProjectSpelling does for projects, for the rules
+// the catalog names: see catalog.Attr.Equivalence.
+func sameByEquivalence(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	if attr.Equivalence == "" || reference.Kind != value.KindString || incoming.Kind != value.KindString || !reference.Known {
+		return incoming
+	}
+	want, _ := reference.Raw.(string)
+	got, _ := incoming.Raw.(string)
+	if want == got {
+		return incoming
+	}
+	if !equivalent(attr.Equivalence, want, got) {
+		return incoming
+	}
+	return value.Value{Kind: value.KindString, Known: true, Raw: want, Source: incoming.Source}
+}
+
+// equivalent reports whether want and got are one value under the named rule.
+// An unknown rule makes nothing equivalent, which is the behaviour without one.
+func equivalent(rule, want, got string) bool {
+	switch rule {
+	case catalog.EquivalencePortRange:
+		return portRange(want) != "" && portRange(want) == portRange(got)
+	case catalog.EquivalenceSelfLink:
+		if !strings.Contains(want, "/") || !strings.Contains(got, "/") {
+			// A bare name against a path: the path must end in it.
+			return lastSegment(want) == lastSegment(got) && want != "" && got != ""
+		}
+		w, g := fromProjects(want), fromProjects(got)
+		return w != "" && w == g
+	case catalog.EquivalenceResourceName:
+		return want != "" && lastSegment(want) == lastSegment(got)
+	case catalog.EquivalenceCase:
+		return strings.EqualFold(want, got)
+	case catalog.EquivalenceDuration:
+		w, errW := time.ParseDuration(want)
+		g, errG := time.ParseDuration(got)
+		return errW == nil && errG == nil && w == g
+	}
+	return false
+}
+
+// fromProjects is a resource path from its "projects/" segment on, which is
+// what a full url, a versioned path and a relative name all share, or ""
+// when there is none.
+func fromProjects(s string) string {
+	if strings.HasPrefix(s, "projects/") {
+		return s
+	}
+	if i := strings.Index(s, "/projects/"); i >= 0 {
+		return s[i+1:]
+	}
+	return ""
+}
+
+func lastSegment(s string) string {
+	return s[strings.LastIndexByte(s, '/')+1:]
+}
+
+// portRange is a port or port range in its "low-high" form, or "" when s is
+// neither.
+func portRange(s string) string {
+	lo, hi, isRange := strings.Cut(s, "-")
+	if !isRange {
+		hi = lo
+	}
+	if _, err := strconv.Atoi(lo); err != nil {
+		return ""
+	}
+	if _, err := strconv.Atoi(hi); err != nil {
+		return ""
+	}
+	return lo + "-" + hi
 }
 
 // sameProjectSpelling returns the REFERENCE's spelling of a project
@@ -144,7 +235,33 @@ func (r reconciler) attrs(attrs map[string]*catalog.Attr, reference, incoming ma
 		a := attrs[name]
 		out[name] = withoutReservedLabels(a, r.value(a, reference[name], v))
 	}
+	for name, a := range attrs {
+		if carried, ok := r.carryInputOnly(a, reference[name], incoming, name); ok {
+			out[name] = carried
+		}
+	}
 	return out
+}
+
+// carryInputOnly is the whole of input-only handling: a field the API never
+// returns is reported as the reference holds it, because there is nothing of
+// GCP's to compare it against. Reported missing instead, it is drift on every
+// plan against a resource that is exactly as configured -- the compute
+// instance that proposed replacing itself for ever was this, on
+// disks[].initializeParams.
+//
+// Only when the API really did leave it out: an answer that carries the field
+// is believed, the same rule CreateOnly follows. And only a KNOWN reference
+// value is carried; an unknown one would be a claim about something nobody
+// has resolved.
+func (r reconciler) carryInputOnly(a *catalog.Attr, ref value.Value, in map[string]value.Value, name string) (value.Value, bool) {
+	if a == nil || !a.InputOnly || r.unmatched || !ref.Known {
+		return value.Value{}, false
+	}
+	if _, answered := in[name]; answered {
+		return value.Value{}, false
+	}
+	return ref, true
 }
 
 // reconcileObject drops keys the schema does not declare and recurses into the
@@ -160,11 +277,50 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 		// the honest answer, the same one wireValue gives for the same case.
 		return incoming
 	}
-	ref, _ := reference.Raw.(map[string]value.Value)
+	ref, hasRef := reference.Raw.(map[string]value.Value)
+	hasRef = hasRef && reference.Known
 	out := make(map[string]value.Value, len(in))
 	for name, field := range attr.Fields {
 		v, found := in[name]
 		if !found {
+			if carried, ok := r.carryInputOnly(field, ref[name], in, name); ok {
+				out[name] = carried
+			}
+			continue
+		}
+		// A DECLARED nested field the reference never set is the server's
+		// choice, and it is dropped the same as an undeclared one.
+		//
+		// infrena's planner forgives a key configuration does not mention only
+		// at the top level, where it can ask the schema whether the attribute
+		// is computed. Inside a composite it has no per-leaf schema, so it
+		// forgives nothing but an empty collection -- and a real compute disk
+		// comes back with deviceName, source, mode, interface and type filled
+		// in, which made every instance plan its own replacement. This is the
+		// nested form of infrena's own top-level rule: when configuration sets
+		// no value, the provider's choice is authoritative.
+		//
+		// Only against a real reference object. With none -- an import, a
+		// discovery -- there is nothing to say what was asked for, so
+		// everything is reported. And never inside an unordered list, where the
+		// reference element was picked by position and may be a sibling.
+		//
+		// The cost, accepted on 2026-09-24: an out-of-band change to a nested
+		// field nobody configured is no longer drift. One somebody configured
+		// still is.
+		if hasRef && !r.unmatched {
+			if _, asked := ref[name]; !asked {
+				continue
+			}
+		}
+		// An output-only field can never be in configuration, so inside
+		// an element that answers a configured one it is always drift, even
+		// in an unordered list where the pruning above is off (a sibling
+		// picked by position still holds only what configuration can write).
+		// Cloud DNS answers every network of a policy with kind
+		// "dns#policyNetwork", and the plan after each create proposed an
+		// update (live run, 2026-09-24).
+		if hasRef && r.unmatched && field.Output {
 			continue
 		}
 		out[name] = r.value(field, ref[name], v)
@@ -197,7 +353,9 @@ func (r reconciler) list(attr *catalog.Attr, reference, incoming value.Value) va
 		if i < len(ref) {
 			refItem = ref[i]
 		}
-		items[i] = r.value(attr.Elem, refItem, item)
+		elem := r
+		elem.unmatched = r.unmatched || attr.Unordered
+		items[i] = elem.value(attr.Elem, refItem, item)
 	}
 	if !attr.Unordered {
 		return value.Value{Kind: value.KindList, Known: true, Raw: items, Source: incoming.Source}

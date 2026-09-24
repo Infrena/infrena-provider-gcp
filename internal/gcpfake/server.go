@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -59,6 +60,21 @@ type Server struct {
 	srv *httptest.Server
 
 	mu sync.Mutex
+
+	// fingerprints counts compute-style fingerprints handed out, so each
+	// modification of a locked resource gets a new one, deterministically.
+	fingerprints int
+
+	// dropOnCreate lists fields an insert ignores, for DropOnCreate.
+	dropOnCreate map[string]bool
+
+	// deleteThenFail lists resources whose next delete is accepted and then
+	// fails, for DeleteThenFailOperation.
+	deleteThenFail map[string]bool
+
+	// oneFieldPatch lists resources that refuse a patch changing more than
+	// one field, for OneFieldPerPatch.
+	oneFieldPatch map[string]bool
 
 	// resources holds every stored resource, keyed by the exact request path
 	// it lives at (e.g. "/v1/projects/p/locations/r/widgets/one"), matching
@@ -322,8 +338,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.handleGet(w, r)
+	case r.Method == http.MethodPost && s.setterTarget(r.URL.Path) != "":
+		s.handleSetter(w, r, bodyBytes)
 	case r.Method == http.MethodPost:
 		s.handleCreate(w, r, bodyBytes)
+	case r.Method == http.MethodPut:
+		// Pub/Sub creates with a PUT to the new resource's own path. The
+		// resource is stored at exactly that path, and a second PUT to it is
+		// the ALREADY_EXISTS the real API answers.
+		s.handleCreateAt(w, r, bodyBytes)
 	case r.Method == http.MethodPatch:
 		s.handlePatch(w, r, bodyBytes)
 	case r.Method == http.MethodDelete:
@@ -420,7 +443,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 			return
 		}
 	}
-	id := resourceID(r, body)
+	id, fromQuery := resourceID(r, body)
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "no id in the request's query parameters or body")
 		return
@@ -428,6 +451,22 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	collection := strings.TrimSuffix(r.URL.Path, "/")
 	path := collection + "/" + id
 	stored := cloneMap(body)
+	s.mu.Lock()
+	for f := range s.dropOnCreate {
+		delete(stored, f)
+	}
+	s.mu.Unlock()
+	if fromQuery {
+		// AIP-133: a resource created with its id as a query parameter comes
+		// back with `name` set to its FULL relative resource name, whatever
+		// the request's body said. The fake used to store the body as sent,
+		// which carries no name at all for these creates -- so every test
+		// saw the short name the id implied, and a type whose schema calls
+		// the short name `name` looked as though it round-tripped. Compute's
+		// insert, which names the resource in the body and answers with the
+		// short name, is untouched.
+		stored["name"] = strings.TrimPrefix(trimVersionPrefix(path), "/")
+	}
 
 	s.mu.Lock()
 	s.resources[path] = stored
@@ -444,21 +483,21 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 // parameter (e.g. "widgetId", "instanceId" — the name varies by API, so any
 // non-reserved parameter is accepted) or, failing that, the last segment of
 // the body's own "name".
-func resourceID(r *http.Request, body map[string]any) string {
+func resourceID(r *http.Request, body map[string]any) (string, bool) {
 	reserved := map[string]bool{"updateMask": true, "pageToken": true, "pageSize": true, "parent": true, "requestId": true}
 	for k, v := range r.URL.Query() {
 		if reserved[k] || len(v) == 0 || v[0] == "" {
 			continue
 		}
-		return v[0]
+		return v[0], true
 	}
 	if name, ok := body["name"].(string); ok && name != "" {
 		if i := strings.LastIndex(name, "/"); i >= 0 {
-			return name[i+1:]
+			return name[i+1:], false
 		}
-		return name
+		return name, false
 	}
-	return ""
+	return "", false
 }
 
 func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
@@ -482,6 +521,11 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 	var mask []string
 	if m := r.URL.Query().Get("updateMask"); m != "" {
 		mask = strings.Split(m, ",")
+	} else if inner, m, ok := unwrapUpdateEnvelope(patchBody); ok {
+		// AIP-134's UpdateXRequest: {"topic": {...}, "updateMask": "a,b"}.
+		// The resource is patched from the inner object, under the mask the
+		// envelope carries, exactly as a query-string mask would be.
+		patchBody, mask = inner, strings.Split(m, ",")
 	}
 	// A mask naming a field the body does not carry is exactly the bug a mask
 	// built from the wrong side of a diff produces (Task 14 depends on this
@@ -490,6 +534,37 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 		if _, present := lookupDotted(patchBody, m); !present {
 			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT",
 				fmt.Sprintf("updateMask names %q, which is not present in the request body", m))
+			return
+		}
+	}
+
+	// Compute's optimistic locking. A resource that carries a fingerprint
+	// refuses a modification that does not quote the CURRENT one, and gets a
+	// new one after every change. The fake did not do this, and 19 patchable
+	// compute types went without ever sending one -- every patch to them
+	// would have been a 412 from real Google while every test here passed.
+	if fp, locked := existing["fingerprint"].(string); locked {
+		if sent, _ := patchBody["fingerprint"].(string); sent != fp {
+			writeError(w, http.StatusPreconditionFailed, "FAILED_PRECONDITION",
+				fmt.Sprintf("conditionNotMet: supplied fingerprint %q does not match current fingerprint %q", sent, fp))
+			return
+		}
+	}
+
+	s.mu.Lock()
+	oneField := s.oneFieldPatch[path]
+	s.mu.Unlock()
+	if oneField {
+		var changed []string
+		for k, v := range patchBody {
+			if k != "fingerprint" && !reflect.DeepEqual(existing[k], v) {
+				changed = append(changed, k)
+			}
+		}
+		if len(changed) > 1 {
+			sort.Strings(changed)
+			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", fmt.Sprintf(
+				"Only one field at a time can be modified in the request. The modified fields were: %v.", changed))
 			return
 		}
 	}
@@ -506,6 +581,13 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 		}
 	}
 
+	if _, locked := existing["fingerprint"].(string); locked {
+		s.mu.Lock()
+		s.fingerprints++
+		merged["fingerprint"] = fmt.Sprintf("fp-%d", s.fingerprints)
+		s.mu.Unlock()
+	}
+
 	s.mu.Lock()
 	s.resources[path] = merged
 	s.mu.Unlock()
@@ -517,7 +599,10 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	s.mu.Lock()
 	_, existed := s.resources[path]
-	delete(s.resources, path)
+	failing := s.deleteThenFail[path]
+	if !failing {
+		delete(s.resources, path)
+	}
 	s.mu.Unlock()
 	if !existed {
 		// A real delete of something already gone is a 404, same as a get.
@@ -720,4 +805,170 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 
 func writeNotFound(w http.ResponseWriter, path string) {
 	writeError(w, http.StatusNotFound, "NOT_FOUND", fmt.Sprintf("%s not found", path))
+}
+
+// handleCreateAt is a create addressed to the item's own path rather than to
+// its collection -- Pub/Sub's topics, subscriptions and snapshots.
+func (s *Server) handleCreateAt(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
+	path := r.URL.Path
+	body := map[string]any{}
+	if len(bodyBytes) > 0 {
+		if err := json.Unmarshal(bodyBytes, &body); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "malformed JSON body")
+			return
+		}
+	}
+	s.mu.Lock()
+	_, exists := s.resources[path]
+	if !exists {
+		body["name"] = strings.TrimPrefix(trimVersionPrefix(path), "/")
+		s.resources[path] = body
+	}
+	s.mu.Unlock()
+	if exists {
+		writeError(w, http.StatusConflict, "ALREADY_EXISTS", "Resource already exists in the project (resource="+path+").")
+		return
+	}
+	s.respondMutation(w, path, body, false)
+}
+
+// unwrapUpdateEnvelope recognises AIP-134's update request: exactly one
+// object-valued field (the resource) beside a non-empty field mask named
+// updateMask or fieldMask -- the two spellings the pinned documents use. A
+// body that is anything else is a bare resource and is left alone.
+func unwrapUpdateEnvelope(body map[string]any) (map[string]any, string, bool) {
+	var mask string
+	var inner map[string]any
+	for k, v := range body {
+		switch vv := v.(type) {
+		case string:
+			if k == "updateMask" || k == "fieldMask" {
+				mask = vv
+				continue
+			}
+			return nil, "", false
+		case map[string]any:
+			if inner != nil {
+				return nil, "", false
+			}
+			inner = vv
+		default:
+			return nil, "", false
+		}
+	}
+	if inner == nil || mask == "" {
+		return nil, "", false
+	}
+	return inner, mask, true
+}
+
+// DropOnCreate makes creates ignore the named fields, as compute's inserts
+// ignore what only a setter changes: a backend service's securityPolicy, an
+// address's labels. The body is stored without them, so the first read after
+// the create does not have them.
+func (s *Server) DropOnCreate(fields ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dropOnCreate == nil {
+		s.dropOnCreate = map[string]bool{}
+	}
+	for _, f := range fields {
+		s.dropOnCreate[f] = true
+	}
+}
+
+// setterTarget is the stored resource a POST to path calls a method of, or
+// "" when path is not "<resource>/<method>". Only method names compute uses
+// for setters count ("set..." and "expand..."), so a create that posts to a
+// child collection under a stored resource is still a create. Compute's
+// global target proxies
+// publish setUrlMap and setSslCertificates without the "global" segment
+// their own address has, so that spelling is tried as well, as the real API
+// serves both.
+var setterNameRE = regexp.MustCompile(`^(?:set|expand)[A-Z][A-Za-z]*$`)
+
+func (s *Server) setterTarget(path string) string {
+	i := strings.LastIndex(path, "/")
+	if i <= 0 || !setterNameRE.MatchString(path[i+1:]) {
+		return ""
+	}
+	parent := path[:i]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.resources[parent]; ok {
+		return parent
+	}
+	if j := strings.Index(parent, "/projects/"); j >= 0 {
+		rest := parent[j+len("/projects/"):]
+		if k := strings.Index(rest, "/"); k >= 0 {
+			global := parent[:j] + "/projects/" + rest[:k] + "/global" + rest[k:]
+			if _, ok := s.resources[global]; ok {
+				return global
+			}
+		}
+	}
+	return ""
+}
+
+// handleSetter answers a compute setter (setLabels, setUrlMap,
+// setSecurityPolicy): the body's fields are written onto the resource. A
+// resource that carries a labelFingerprint refuses a body that quotes a stale
+// one and gets a new one after, which is how compute guards setLabels.
+func (s *Server) handleSetter(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
+	path := s.setterTarget(r.URL.Path)
+	body := map[string]any{}
+	if len(bodyBytes) > 0 {
+		if err := json.Unmarshal(bodyBytes, &body); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "malformed JSON body")
+			return
+		}
+	}
+	s.mu.Lock()
+	existing := s.resources[path]
+	s.mu.Unlock()
+	if fp, locked := existing["labelFingerprint"].(string); locked {
+		if sent, _ := body["labelFingerprint"].(string); sent != fp {
+			writeError(w, http.StatusPreconditionFailed, "FAILED_PRECONDITION",
+				fmt.Sprintf("conditionNotMet: supplied labelFingerprint %q does not match current %q", sent, fp))
+			return
+		}
+	}
+	merged := cloneMap(existing)
+	for k, v := range body {
+		merged[k] = v
+	}
+	s.mu.Lock()
+	if _, locked := existing["labelFingerprint"].(string); locked {
+		s.fingerprints++
+		merged["labelFingerprint"] = fmt.Sprintf("lfp-%d", s.fingerprints)
+	}
+	s.resources[path] = merged
+	s.mu.Unlock()
+	s.respondMutation(w, path, merged, false)
+}
+
+// DeleteThenFailOperation makes the next delete of path accepted and then
+// failed: Google answers with an operation, the operation finishes with the
+// given error, and the resource is still there. Under the default
+// synchronous style there is no operation to fail, so set a style first.
+func (s *Server) DeleteThenFailOperation(path, code, message string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deleteThenFail == nil {
+		s.deleteThenFail = map[string]bool{}
+	}
+	s.deleteThenFail[path] = true
+	s.createThenFail[path] = apiErrorSpec{Code: code, Message: message}
+}
+
+// OneFieldPerPatch makes path refuse a patch that changes more than one
+// field, as compute's subnetworks do: "Only one field at a time can be
+// modified in the request."
+func (s *Server) OneFieldPerPatch(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.oneFieldPatch == nil {
+		s.oneFieldPatch = map[string]bool{}
+	}
+	s.oneFieldPatch[path] = true
 }

@@ -51,13 +51,18 @@ type RefTarget struct {
 
 // Attr is one attribute, at any depth.
 type Attr struct {
-	Canonical   string           `json:"canonical"`
-	Aliases     []string         `json:"aliases,omitempty"`
-	Kind        value.Kind       `json:"kind"`
-	Required    bool             `json:"required,omitempty"`
-	ForceNew    bool             `json:"force_new,omitempty"`
-	Output      bool             `json:"output,omitempty"`
-	Sensitive   bool             `json:"sensitive,omitempty"`
+	Canonical string     `json:"canonical"`
+	Aliases   []string   `json:"aliases,omitempty"`
+	Kind      value.Kind `json:"kind"`
+	Required  bool       `json:"required,omitempty"`
+	ForceNew  bool       `json:"force_new,omitempty"`
+	Output    bool       `json:"output,omitempty"`
+	Sensitive bool       `json:"sensitive,omitempty"`
+	// Equivalence names a rule by which two different spellings of this
+	// field's value are the same value, so that Google's canonical answer is
+	// not drift against what configuration wrote: "port_range" says "80" and
+	// "80-80" are one range. gcprov's reconciler applies it.
+	Equivalence string           `json:"equivalence,omitempty"`
 	Description string           `json:"description,omitempty"`
 	Ref         *RefTarget       `json:"ref,omitempty"`
 	Fields      map[string]*Attr `json:"fields,omitempty"`
@@ -72,6 +77,19 @@ type Attr struct {
 	// prior state rather than expecting GCP to echo it back, and it is
 	// ForceNew because nothing can change it afterwards.
 	CreateOnly bool `json:"create_only,omitempty"`
+	// InputOnly marks a field of the RESOURCE that the API accepts and never
+	// returns: compute's disks[].initializeParams, a certificate's private
+	// key, the tag bindings a resource is created with. Discovery says so in
+	// prose ("Input only." / "[Input Only]"), never as structure.
+	//
+	// It is not CreateOnly. A create-only attribute is not part of the
+	// resource at all and travels beside a create wrapper; an input-only one
+	// is a resource field and travels inside it, and may be patchable.
+	// What they share is the read side: nothing comes back to compare, so the
+	// reconciler carries the value forward from the reference rather than
+	// reporting it missing -- which the next plan would read as drift, for
+	// ever, on a resource that is exactly as configured.
+	InputOnly bool `json:"input_only,omitempty"`
 
 	// Unordered marks a list GCP may return in a different order than it was
 	// sent. Task 15 reorders those to match the reference; an ordered list is
@@ -122,6 +140,67 @@ type Type struct {
 	// having to lie about what a read returns. See gen.resourceSchema.
 	CreateWrapper string `json:"create_wrapper,omitempty"`
 
+	// UpdateWrapper is the same idea on the update side, and it is NOT a
+	// variant spelling of the same body: pubsub's topics.patch takes
+	// UpdateTopicRequest{topic, updateMask}, so the resource is wrapped AND
+	// the field mask moves off the query string into the body. A type with an
+	// UpdateWrapper therefore never carries an updateMask query parameter --
+	// UpdateMask is false for all of them -- and the mask goes into
+	// UpdateMaskField instead.
+	//
+	// Eight collections in the pinned documents have this shape: the three
+	// pubsub types, three spanner types, cloudasset feeds and iam
+	// serviceAccounts. Sending the bare resource to any of them is rejected.
+	UpdateWrapper string `json:"update_wrapper,omitempty"`
+	// UpdateMaskField is the name of the mask field INSIDE an update wrapper.
+	// It is read from the request schema rather than assumed, because it is
+	// not always the same word: six of the eight say "updateMask" and
+	// spanner's instances and instancePartitions say "fieldMask".
+	UpdateMaskField string `json:"update_mask_field,omitempty"`
+	// LockField names the top-level field the API requires, up to date, in
+	// every update: compute's optimistic-locking fingerprint. "An up-to-date
+	// fingerprint must be provided in order to update the Subnetwork,
+	// otherwise the request will fail with error 412 conditionNotMet." A user
+	// never writes one, so it is never in the diff; Update copies the current
+	// value from the observation it was handed instead. Measured on
+	// 2026-09-23: 21 types carry one, 19 of them updatable.
+	LockField string `json:"lock_field,omitempty"`
+
+	// Setters change some fields in place through a method of their own
+	// rather than the resource's update: compute's setLabels, setUrlMap,
+	// setSecurityPolicy. magic-modules names them per field (update_url on a
+	// property); the generator admits one only where Discovery publishes the
+	// same method on the resource's own address and its request carries
+	// exactly those fields, plus a lock. A type with setters is updatable
+	// even with no UpdateVerb, and the fields they carry never go into a
+	// patch.
+	Setters []Setter `json:"setters,omitempty"`
+
+	// EndpointTemplate is the host this type is reached through when it is
+	// not APIBaseURL's, with "{location}" to be filled from the resource's
+	// own path: "https://secretmanager.{location}.rep.googleapis.com/".
+	// Regional secrets exist only at their region's endpoint. From
+	// magic-modules' product base_url, checked against every endpoint the
+	// Discovery document lists.
+	EndpointTemplate string `json:"endpoint_template,omitempty"`
+
+	// ClearBeforeDelete are fields Delete patches to empty before deleting,
+	// because the API refuses to delete the resource while they are set.
+	// From a ruling, which cites the hook that does the same.
+	ClearBeforeDelete []string `json:"clear_before_delete,omitempty"`
+
+	// PatchOneField says the API refuses a patch changing more than one
+	// top-level field, so Update sends one patch per changed field, reading
+	// the lock afresh between them. From the overlay, on evidence.
+	PatchOneField bool `json:"patch_one_field,omitempty"`
+
+	// CreateVerb is the HTTP method a create is sent with. Empty means POST,
+	// which is 355 of the 358 create methods in the pinned documents. The other
+	// three are Pub/Sub's topics, subscriptions and snapshots, which create
+	// with a PUT to the new resource's OWN path: a POST there is refused, and
+	// gcp.pubsub.snapshot shipped doing exactly that until 2026-09-23.
+	CreateVerb string `json:"create_verb,omitempty"`
+
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`
 
@@ -157,6 +236,16 @@ type Type struct {
 	OperationParamPatterns map[string]string `json:"operation_param_patterns,omitempty"`
 
 	Await AwaitKind `json:"await"`
+	// DeleteAwait is how a delete completes, when that differs from Await.
+	// Await is read from the CREATE method's response and a delete's can be
+	// different: sqladmin's sslCerts insert answers with the resource and
+	// its delete with an operation, so a delete that reused Await returned
+	// as soon as Google accepted it -- and infrena drops a replaced object's
+	// Deposed record on that success, the only handle on it. Eight
+	// Bigtable, Spanner and KMS types go the other way and reported a
+	// failure for a delete that worked. Nil means "the same as Await";
+	// DeleteAwaitKind is how to read it.
+	DeleteAwait *AwaitKind `json:"delete_await,omitempty"`
 	// OperationWaitPath is the API's own operations wait path for this type's
 	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
 	// EMPTY means the API publishes no wait method — container and sqladmin do
@@ -324,7 +413,7 @@ func (c *Catalog) Definitions() []*schema.ResourceDefinition {
 				// answer has to be true.
 				Create: len(t.UnresolvedCreatePlaceholders()) == 0,
 				Read:   true,
-				Update: t.UpdateVerb != "",
+				Update: t.UpdateVerb != "" || len(t.Setters) > 0,
 				Delete: true,
 				Import: t.ImportFormat != "",
 			},
@@ -577,3 +666,62 @@ func urlPlaceholders(tmpl string) []string {
 	}
 	return names
 }
+
+// Setter is one method that changes some of a resource's fields in place.
+type Setter struct {
+	// Method is the method's name, for messages: "setLabels".
+	Method string `json:"method"`
+	// Path is the method's own url template, spelled with the resource's
+	// self_link placeholders so the resource's id fills it. Not self_link
+	// plus the method: compute's global target proxies are read at
+	// projects/{project}/global/targetHttpsProxies/{x} and their setUrlMap
+	// lives at projects/{project}/targetHttpsProxies/{x}/setUrlMap.
+	Path string `json:"path"`
+	Verb string `json:"verb"`
+	// Fields are the wire names of the attributes the request carries. A
+	// change to any of them calls the method, with all of them in the body.
+	Fields []string `json:"fields"`
+	// Lock is a request property copied from the current state rather than
+	// from configuration: compute's labelFingerprint.
+	Lock string `json:"lock,omitempty"`
+}
+
+// SetterFor is the setter that carries the attribute with wire name
+// canonical, or nil when its update, if any, is the resource's own.
+func (t *Type) SetterFor(canonical string) *Setter {
+	for i := range t.Setters {
+		for _, f := range t.Setters[i].Fields {
+			if f == canonical {
+				return &t.Setters[i]
+			}
+		}
+	}
+	return nil
+}
+
+// DeleteAwaitKind is how this type's delete completes.
+func (t *Type) DeleteAwaitKind() AwaitKind {
+	if t.DeleteAwait != nil {
+		return *t.DeleteAwait
+	}
+	return t.Await
+}
+
+// The equivalence rules gcprov knows. Each is written here from what its
+// magic-modules name says it does; none is copied.
+const (
+	// EquivalencePortRange: a single port and the one-port range it names
+	// are the same value, "80" and "80-80".
+	EquivalencePortRange = "port_range"
+	// EquivalenceSelfLink: two references to the same resource, however much
+	// of the url each carries -- "https://.../compute/v1/projects/p/global/
+	// networks/n", "projects/p/global/networks/n" -- or a bare name and a
+	// path ending in it.
+	EquivalenceSelfLink = "self_link"
+	// EquivalenceResourceName: the same last path segment.
+	EquivalenceResourceName = "resource_name"
+	// EquivalenceCase: equal but for case ("TCP" and "tcp").
+	EquivalenceCase = "case"
+	// EquivalenceDuration: the same length of time ("10s" and "10.000s").
+	EquivalenceDuration = "duration"
+)

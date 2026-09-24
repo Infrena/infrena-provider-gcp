@@ -200,6 +200,7 @@ func pointCatalogAt(c *catalog.Catalog, base string) *catalog.Catalog {
 	for i, t := range c.Types {
 		cp := *t
 		cp.APIBaseURL = base
+		cp.EndpointTemplate = "" // a real Google host; see gcpplugin.redirect
 		types[i] = &cp
 	}
 	// DiscoverDefault travels too: discovery's fallback reads its type list

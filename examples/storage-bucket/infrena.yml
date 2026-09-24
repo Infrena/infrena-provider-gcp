@@ -1,0 +1,48 @@
+# One Cloud Storage bucket, versioned, with uniform bucket-level access.
+project: gcp-storage-bucket-example
+
+infrena: ">= 0.15.0"
+
+# See examples/network/infrena.yml for why `gcp_project` must carry a
+# `default:`. Short version: a provider instance's configuration is resolved
+# for every command, and `discover` has no environment to resolve it from.
+variables:
+  gcp_project:
+    type: string
+    default: my-gcp-project
+  # A bucket name is GLOBAL, not per-project, so this one is almost certainly
+  # taken. Pass your own with `--var bucket_name=<name>`.
+  bucket_name:
+    type: string
+    default: my-gcp-project-assets
+
+environments:
+  dev: {}
+
+providers:
+  - plugin: gcp
+    project: ${var.gcp_project}
+    region: us-central1
+
+resources:
+  assets:
+    type: gcp.storage.bucket
+    name: ${var.bucket_name}
+    # A Cloud Storage location, which is its own list: a multi-region (US, EU),
+    # a dual-region (NAM4) or a region (US-CENTRAL1). It is NOT taken from the
+    # provider's `region:`.
+    location: US-CENTRAL1
+    storageClass: STANDARD
+    # A free-form map: infrena copies it through exactly as written, so the
+    # keys here are label keys and nothing translates them.
+    labels:
+      managed-by: infrena
+      example: storage-bucket
+    # Nested keys are the schema's own spelling. A snake_case alias exists for
+    # every camelCase attribute this catalog declares, so `iam_configuration`
+    # would work too -- but the schema spelling always does, at every depth.
+    versioning:
+      enabled: true
+    iamConfiguration:
+      uniformBucketLevelAccess:
+        enabled: true

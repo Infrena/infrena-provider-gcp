@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# check-examples: compile every examples/*/infrena.yml with a REAL infrena binary, so a stale
+# example fails CI rather than a user.
+#
+# An example is documentation that claims to work. Nothing else in this repository reads
+# examples/ -- the unit suites call into the provider, and e2e compiles its own fixture -- so
+# a type that got renamed, an attribute that turned out to be output-only and a variable that
+# stopped resolving are all invisible here until somebody copies the file and it fails on
+# their machine. This is the check that moves that discovery into CI.
+#
+# NOTHING HERE REACHES GCP. `infrena validate` compiles and type-checks against the plugin's
+# schemas and contacts no provider; it never plans, never reads and never applies. The
+# credential environment is cleared anyway, so the claim does not rest on that one promise.
+#
+# INFRENA_SRC names the infrena checkout the host binary is built from; it defaults to the
+# sibling checkout, exactly as e2e/e2e_test.go's does. A build FAILS rather than skips: a
+# skipped check reads precisely like a passing one.
+#
+# EXAMPLES_DIR overrides which directory is walked. It exists so a test can point this at a
+# deliberately broken example and confirm the refusal, which no example committed here could
+# ever demonstrate.
+set -euo pipefail
+
+# CDPATH= : an interactive CDPATH makes cd echo the resolved directory, which would put a
+# stray path line in the output. Harmless in CI, which has none set, but this script is
+# also run by hand.
+CDPATH= cd "$(dirname "$0")/.."
+root="$PWD"
+
+examples="${EXAMPLES_DIR:-$root/examples}"
+if [[ ! -d "$examples" ]]; then
+  echo "check-examples: no examples directory at $examples" >&2
+  exit 1
+fi
+
+src="${INFRENA_SRC:-$(dirname "$root")/infrena}"
+if [[ ! -f "$src/go.mod" ]]; then
+  echo "check-examples: no infrena module at $src" >&2
+  echo "Clone it beside this repository, or set INFRENA_SRC to a checkout." >&2
+  exit 1
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+# A WORKSPACE JOINING THE TWO CHECKOUTS, written here rather than relying on either
+# repository's own go.work, for the reason e2e/e2e_test.go's build() gives: without it the
+# plugin would speak the SDK of the release go.mod requires while the host is the working
+# tree, and the two would each still agree with themselves. GOWORK is set explicitly on both
+# builds so a go.work sitting in either checkout cannot change what is built.
+#
+# The `go` directive is read from go.mod rather than written literally: a workspace declaring
+# a version below either module's is refused outright, so a hardcoded one would turn the next
+# toolchain bump into a failure in a file nobody would think to look in.
+go_directive="$(sed -n 's/^go[[:space:]]\{1,\}//p' "$root/go.mod" | head -1)"
+if [[ -z "$go_directive" ]]; then
+  echo "check-examples: go.mod has no go directive to build a workspace from" >&2
+  exit 1
+fi
+printf 'go %s\n\nuse (\n\t%s\n\t%s\n)\n' "$go_directive" "$root" "$src" > "$work/go.work"
+
+mkdir -p "$work/bin"
+echo "==> building infrena from $src"
+(CDPATH= cd "$src" && GOWORK="$work/go.work" go build -o "$work/bin/infrena" ./cmd/infrena)
+# The binary NAME is how the host finds a plugin, so it is not arbitrary.
+echo "==> building the plugin"
+GOWORK="$work/go.work" go build -o "$work/bin/infrena-plugin-gcp" ./cmd/infrena-plugin-gcp
+
+# Belt and braces. `validate` contacts no provider, but a script whose header promises it
+# reaches no cloud should not depend on one command's documented behaviour: these are the
+# variables internal/gcptest.Isolate clears, and with them cleared there is no identity on
+# the machine to find.
+export GOOGLE_APPLICATION_CREDENTIALS=
+export GOOGLE_CLOUD_PROJECT=
+export GCE_METADATA_HOST=127.0.0.1:1
+export CLOUDSDK_CONFIG="$work/gcloud"
+
+failed=0
+checked=0
+for config in "$examples"/*/infrena.yml; do
+  # An unmatched glob survives as its own text under `set -u`, and an examples directory that
+  # had gone empty would then read as "everything passed". Refused rather than skipped.
+  [[ -f "$config" ]] || continue
+  dir="$(dirname "$config")"
+  checked=$((checked + 1))
+  echo "==> ${dir#"$root"/}"
+  if ! "$work/bin/infrena" --chdir "$dir" --plugin-dir "$work/bin" validate; then
+    failed=$((failed + 1))
+  fi
+done
+
+if [[ "$checked" -eq 0 ]]; then
+  echo "check-examples: $examples holds no */infrena.yml, so this checked nothing" >&2
+  exit 1
+fi
+if [[ "$failed" -ne 0 ]]; then
+  echo "check-examples: $failed of $checked examples do not compile" >&2
+  exit 1
+fi
+echo "check-examples: all $checked examples compile"

@@ -1,0 +1,66 @@
+# A VPC network with one subnetwork inside it.
+#
+# Two types, one reference, and the reference is the point: the subnetwork
+# cannot be created until the network exists and has told GCP what its self
+# link is, so `${net}` is both the value and the ordering.
+project: gcp-network-example
+
+infrena: ">= 0.15.0"
+
+# gcp_project CARRIES A `default:` ON PURPOSE, and so does every other
+# variable an example reads from `providers:`.
+#
+# A provider instance's configuration crosses to the plugin's Configure, so
+# infrena resolves it for every command -- including `discover`, which takes
+# no environment at all and therefore has no environment-specific value to
+# resolve from. A variable with no `default:` is unresolvable there, and
+# infrena refuses to run rather than let the plugin fall back to whatever
+# project the machine's credentials happen to name.
+#
+# Change these to your own project, or leave them and pass
+# `--var gcp_project=<id>` on the command line.
+variables:
+  gcp_project:
+    type: string
+    default: my-gcp-project
+  gcp_region:
+    type: string
+    default: us-central1
+
+environments:
+  dev: {}
+
+providers:
+  - plugin: gcp
+    project: ${var.gcp_project}
+    region: ${var.gcp_region}
+
+resources:
+  net:
+    type: gcp.network
+    name: example-net
+    # Without this, GCP creates a subnetwork in every region the moment the
+    # network exists, and the one declared below collides with the one it made.
+    autoCreateSubnetworks: false
+
+  sub:
+    type: gcp.subnetwork
+    name: example-subnet
+    ipCidrRange: 10.184.0.0/24
+    # ${net}, the whole resource, not ${net.selfLink}. gcp.subnetwork.network
+    # declares which attribute of a gcp.network it holds -- selfLink, because
+    # the subnetworks API wants the network's URL rather than its name -- so
+    # infrena picks it for you. The provider says which attribute; you say
+    # which resource.
+    #
+    # ${net.selfLink} also works and means the same thing. This spelling is
+    # here because it is the one that stops being right if the API ever wants
+    # something else, without anyone having to edit configuration.
+    #
+    # Either way the reference is what orders the two creates: selfLink is an
+    # output, so the subnetwork cannot be built until the network exists.
+    network: ${net}
+    # The region comes from the provider instance above. gcp.subnetwork does
+    # declare a `region` attribute, but setting it there as well would put the
+    # same fact in two places that can disagree.
+    privateIpGoogleAccess: true

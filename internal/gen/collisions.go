@@ -75,6 +75,9 @@ func resolveWithinServiceCollisions(shipping []pending) ([]pending, []aliasLoser
 		if len(idxs) < 2 {
 			continue
 		}
+		if namedApartByMagicModules(shipping, idxs) {
+			continue
+		}
 
 		// Cluster by canonical path: members of the same cluster are the same
 		// resource reached through a different root or axis. clusterOrder
@@ -283,4 +286,39 @@ func disambiguateByPath(shipping []pending, survivors []int) {
 			return
 		}
 	}
+}
+
+// namedApartByMagicModules resolves a collision magic-modules has already
+// resolved: when every colliding type has its own magic-modules resource,
+// each with a different name, and one of them IS the collection's name, the
+// others take theirs. Secret Manager's projects.secrets and
+// projects.locations.secrets both singularize to "secret", and the path walk
+// skips location words by design, so it could not tell them apart; magic-
+// modules calls them Secret and RegionalSecret, which gives gcp.secret and
+// gcp.regionalsecret, the names James chose on 2026-09-24.
+//
+// Requiring one name to equal the collection's keeps an existing type on the
+// name it already has: only the one magic-modules names differently moves.
+func namedApartByMagicModules(shipping []pending, idxs []int) bool {
+	seen := map[string]bool{}
+	var plain bool
+	for _, i := range idxs {
+		mm := shipping[i].mm
+		if mm == nil {
+			return false
+		}
+		n := strings.ToLower(mm.Name)
+		if seen[n] {
+			return false
+		}
+		seen[n] = true
+		plain = plain || n == shipping[i].cand.Resource
+	}
+	if !plain {
+		return false
+	}
+	for _, i := range idxs {
+		shipping[i].cand.Resource = strings.ToLower(shipping[i].mm.Name)
+	}
+	return true
 }

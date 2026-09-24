@@ -1,0 +1,55 @@
+# A tag key, a value under it, and that value bound to a project.
+#
+# Tags are the resource-manager kind (`gcloud resource-manager tags`), not the
+# free-form `labels:` map every other example uses. A key and its values are
+# declared once under an organization or a project; a binding is what attaches
+# one value to one resource.
+project: gcp-tag-binding-example
+
+infrena: ">= 0.15.0"
+
+# See examples/network/infrena.yml for why `gcp_project` must carry a
+# `default:`.
+variables:
+  gcp_project:
+    type: string
+    default: my-gcp-project
+  # THE PROJECT NUMBER, NOT THE PROJECT ID, and the two are not
+  # interchangeable here: cloudresourcemanager rejects an id in a binding's
+  # parent. Read it with:
+  #
+  #   gcloud projects describe <project-id> --format='value(projectNumber)'
+  gcp_project_number:
+    type: string
+    default: "123456789012"
+
+environments:
+  dev: {}
+
+providers:
+  - plugin: gcp
+    project: ${var.gcp_project}
+    region: us-central1
+
+resources:
+  environment_key:
+    type: gcp.tagkey
+    # A key hangs off an organization or a project, written as a relative
+    # resource name: `organizations/<number>` or `projects/<id>`.
+    parent: projects/${var.gcp_project}
+    shortName: example-environment
+    description: Which environment a resource belongs to.
+
+  production_value:
+    type: gcp.tagvalue
+    # The key's generated name, `tagKeys/<number>`, which only exists after the
+    # key does.
+    parent: ${environment_key.name}
+    shortName: production
+
+  binding:
+    type: gcp.tagbinding
+    # A binding's parent is a FULL resource name -- the `//service/path` form,
+    # not the relative one used above -- and it carries the project NUMBER.
+    parent: //cloudresourcemanager.googleapis.com/projects/${var.gcp_project_number}
+    tagValue: ${production_value.name}

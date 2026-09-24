@@ -1,6 +1,7 @@
 package gcprov
 
 import (
+	"github.com/infrena/infrena/pkg/value"
 	"testing"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -261,5 +262,33 @@ func TestANameThatMatchesTheShapeOfAnotherTypeIsNotTakenVerbatim(t *testing.T) {
 		// this type's collection -- the point is only that the verbatim
 		// shortcut did not fire.
 		t.Errorf("provider id = %q, want the template's own expansion %q", got, want)
+	}
+}
+
+// TestADocumentedImportShapeNeverParsesAnId. The generator now fills a
+// bare-capture type's import format with the API's real shape so a user can
+// see it. That must never narrow what parses: an id in some other shape -- one
+// Google might hand back that the pattern did not anticipate -- still has to
+// parse, or a create whose name failed to parse would leave a resource nothing
+// tracks.
+//
+// What guarantees it is that the bare capture stays among the templates
+// ParseProviderID tries, NOT the order they are tried in: every template is
+// tried and the first that fits wins, so order only decides which segments get
+// extracted. (A sabotage that merely reordered them passed, which is how this
+// comment came to say so.)
+func TestADocumentedImportShapeNeverParsesAnId(t *testing.T) {
+	ty := &catalog.Type{
+		Name: "gcp.database", SelfLink: "{+name}",
+		ImportFormat: "projects/{project}/instances/{instance}/databases/{database}",
+		Attributes:   map[string]*catalog.Attr{"name": {Canonical: "name", Kind: value.KindString, Output: true}},
+	}
+	for _, id := range []string{
+		"projects/p/instances/i/databases/d",
+		"projects/p/instances/i/databases/d/an-extra-segment-nobody-expected",
+	} {
+		if _, err := ParseProviderID(ty, id); err != nil {
+			t.Errorf("%q refused: %v", id, err)
+		}
 	}
 }

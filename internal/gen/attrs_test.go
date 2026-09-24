@@ -171,17 +171,28 @@ func TestNestedImmutabilityReachesTheNestedAttribute(t *testing.T) {
 	}
 }
 
+// props builds a schema with the named properties, which is all AwaitOf reads.
+func props(names ...string) *disco.Schema {
+	s := &disco.Schema{Properties: map[string]*disco.Schema{}}
+	for _, n := range names {
+		s.Properties[n] = &disco.Schema{Type: "string"}
+	}
+	return s
+}
+
+// The shapes below are the real ones, measured across every mutation response
+// in the pinned documents on 2026-09-23: every long-running operation carries
+// done, error, metadata, name and response, and every compute-style one
+// carries error, name, operationType, selfLink, status and targetLink.
+var (
+	lroShape     = []string{"done", "error", "metadata", "name", "response"}
+	computeShape = []string{"error", "name", "operationType", "selfLink", "status", "targetLink"}
+)
+
 func TestAwaitIsChosenFromTheOperationShape(t *testing.T) {
-	longrunning := &disco.Document{Name: "redis", Schemas: map[string]*disco.Schema{
-		"Operation": {Properties: map[string]*disco.Schema{"done": {Type: "boolean"}}},
-	}}
-	compute := &disco.Document{Name: "compute", Schemas: map[string]*disco.Schema{
-		"Operation": {Properties: map[string]*disco.Schema{
-			"status": {Type: "string"}, "targetLink": {Type: "string"}}},
-	}}
-	widget := &disco.Document{Name: "tiny", Schemas: map[string]*disco.Schema{
-		"Widget": {Properties: map[string]*disco.Schema{"name": {Type: "string"}}},
-	}}
+	longrunning := &disco.Document{Name: "redis", Schemas: map[string]*disco.Schema{"Operation": props(lroShape...)}}
+	compute := &disco.Document{Name: "compute", Schemas: map[string]*disco.Schema{"Operation": props(computeShape...)}}
+	widget := &disco.Document{Name: "tiny", Schemas: map[string]*disco.Schema{"Widget": props("name")}}
 	op := &disco.Method{Response: &disco.Ref{Ref: "Operation"}}
 	if k, _ := AwaitOf(longrunning, op); k != catalog.AwaitLongRunning {
 		t.Errorf("longrunning doc gave %v", k)
@@ -191,6 +202,39 @@ func TestAwaitIsChosenFromTheOperationShape(t *testing.T) {
 	}
 	if k, _ := AwaitOf(widget, &disco.Method{Response: &disco.Ref{Ref: "Widget"}}); k != catalog.AwaitNone {
 		t.Errorf("a method returning the resource gave %v, want none", k)
+	}
+}
+
+// TestAwaitDoesNotDependOnWhatTheOperationIsCalled is the defect: AwaitOf used
+// to require a schema named exactly "Operation". Eventarc, Cloud Run v2 and
+// Firestore call google.longrunning.Operation "GoogleLongrunningOperation", and
+// API Gateway calls it "ApigatewayOperation", so 13 shipping types -- Cloud Run
+// services among them -- treated an operation still running as the finished
+// resource.
+func TestAwaitDoesNotDependOnWhatTheOperationIsCalled(t *testing.T) {
+	for _, name := range []string{"GoogleLongrunningOperation", "ApigatewayOperation"} {
+		d := &disco.Document{Name: "run", Schemas: map[string]*disco.Schema{name: props(lroShape...)}}
+		if k, _ := AwaitOf(d, &disco.Method{Response: &disco.Ref{Ref: name}}); k != catalog.AwaitLongRunning {
+			t.Errorf("%s gave %v, want long-running", name, k)
+		}
+	}
+}
+
+// TestAResourceThatLooksLikeAnOperationIsNotOne. Deciding by shape rather than
+// name means a resource can now reach these checks, so they must not be fooled
+// by one field. dataproc's Job has `done` and `status` and is a resource; most
+// resources have `status` and `name`; DNS's own "Operation" has only `status`
+// and is not compute's.
+func TestAResourceThatLooksLikeAnOperationIsNotOne(t *testing.T) {
+	for name, s := range map[string]*disco.Schema{
+		"dataproc Job":       props("done", "status", "reference", "placement"),
+		"resource w/ status": props("name", "status", "selfLink", "description"),
+		"dns Operation":      props("id", "status", "type", "startTime"),
+	} {
+		d := &disco.Document{Name: "x", Schemas: map[string]*disco.Schema{"Thing": s}}
+		if k, _ := AwaitOf(d, &disco.Method{Response: &disco.Ref{Ref: "Thing"}}); k != catalog.AwaitNone {
+			t.Errorf("%s gave %v, want none", name, k)
+		}
 	}
 }
 
@@ -516,5 +560,349 @@ func TestARealFieldNameBeatsAnotherFieldsApiName(t *testing.T) {
 	if a := attrs["id"]; a.Required || a.ForceNew {
 		t.Errorf("id: %+v -- want the field actually called \"id\", not the one that merely "+
 			"claims the name through api_name", a)
+	}
+}
+
+// TestImmutabilityComesFromEitherSource. magic-modules' `immutable:` and
+// Discovery's "Immutable." tag are ORed: on 2026-09-23 the tag caught 55 fields
+// magic-modules had not marked, and magic-modules marks many the API never
+// tags. A field the API will not change must replace the resource rather than
+// be sent as a patch the API refuses.
+func TestImmutabilityComesFromEitherSource(t *testing.T) {
+	body := &disco.Schema{Properties: map[string]*disco.Schema{
+		"tagged":  {Type: "string", Description: "Optional. Input only. Immutable. Tags bound at creation."},
+		"curated": {Type: "string", Description: "The format. Nothing here says so."},
+		"neither": {Type: "string", Description: "A description."},
+		"prose":   {Type: "string", Description: "The deadline. Immutable. After that it is fixed."},
+	}}
+	mm := &mmv1.Resource{Name: "Widget", Properties: []*mmv1.Field{{Name: "curated", Type: "String", Immutable: true}}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{"tagged": true, "curated": true, "neither": false, "prose": false} {
+		if got := attrs[name].ForceNew; got != want {
+			t.Errorf("%s: ForceNew = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// TestInputOnlyComesFromTheTagInEitherSpelling. The modern APIs write "Input
+// only." and compute writes "[Input Only]" -- disks[].initializeParams, the
+// field behind an instance that planned its own replacement on every run,
+// uses the bracketed form. An output-only field is never input-only: GCP
+// returns what it sets, and there is nothing of the user's to carry.
+func TestInputOnlyComesFromTheTagInEitherSpelling(t *testing.T) {
+	body := &disco.Schema{Properties: map[string]*disco.Schema{
+		"modern":  {Type: "string", Description: "Optional. Input only. Immutable. Tags bound at creation."},
+		"compute": {Type: "string", Description: "[Input Only] Specifies the parameters for a new disk."},
+		"plain":   {Type: "string", Description: "A description that mentions input only in passing."},
+		"output":  {Type: "string", ReadOnly: true, Description: "Input only. A field that contradicts itself."},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{"modern": true, "compute": true, "plain": false, "output": false} {
+		if got := attrs[name].InputOnly; got != want {
+			t.Errorf("%s: InputOnly = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// TestASecretIsSensitiveWhereverItSits. Discovery cannot say a field is a
+// secret, so magic-modules is the only source, and until 2026-09-24 the
+// generator never read it: an SSL certificate's private key and a disk's raw
+// encryption key went into plans and state in clear. The list element is
+// reached through item_type, which is where magic-modules keeps an array's
+// fields.
+func TestASecretIsSensitiveWhereverItSits(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"privateKey":  {Type: "string"},
+		"description": {Type: "string"},
+		"disks": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"rawKey":   {Type: "string"},
+			"diskName": {Type: "string"},
+		}}},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "privateKey", Sensitive: true},
+		{Name: "description"},
+		{Name: "disks", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+			{Name: "rawKey", WriteOnly: true},
+			{Name: "diskName"},
+		}}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !attrs["privateKey"].Sensitive {
+		t.Error("privateKey is marked sensitive in magic-modules and is not sensitive here")
+	}
+	if attrs["description"].Sensitive {
+		t.Error("description became sensitive, so the flag is not coming from the field")
+	}
+	elem := attrs["disks"].Elem
+	if !elem.Fields["rawKey"].Sensitive {
+		t.Error("disks[].rawKey is write_only in magic-modules and is not sensitive here")
+	}
+	if elem.Fields["diskName"].Sensitive {
+		t.Error("disks[].diskName became sensitive")
+	}
+}
+
+// TestAFlagStaysOnTheFieldItWasWrittenFor. The index was once one flat map
+// across every depth, keyed by bare name, so authz policy's required
+// ipBlocks[].prefix made every other field called prefix required too, and a
+// nested "name" could shadow the resource's own.
+func TestAFlagStaysOnTheFieldItWasWrittenFor(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"rules": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"name": str,
+			"ipBlocks": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+				"prefix": str}}},
+			"paths": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+				"prefix": str}}},
+		}}},
+		"name": str,
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "rules", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+			{Name: "name"},
+			{Name: "ipBlocks", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+				{Name: "prefix", Required: true}}}},
+			{Name: "paths", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+				{Name: "prefix"}}}},
+		}}},
+		{Name: "name", Required: true, Immutable: true},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := attrs["rules"].Elem.Fields
+	if !rule["ipBlocks"].Elem.Fields["prefix"].Required {
+		t.Error("ipBlocks[].prefix lost the required flag magic-modules gives it")
+	}
+	if rule["paths"].Elem.Fields["prefix"].Required {
+		t.Error("paths[].prefix is required, a flag that belongs to ipBlocks[].prefix")
+	}
+	if a := attrs["name"]; !a.Required || !a.ForceNew {
+		t.Errorf("the top-level name lost its own flags: %+v", a)
+	}
+	if rule["name"].Required || rule["name"].ForceNew {
+		t.Errorf("rules[].name took the top-level name's flags: %+v", rule["name"])
+	}
+}
+
+// TestAHandWrittenResourcesNestedRequiredIsNotTrusted. Terraform never runs
+// the YAML of an exclude_resource resource, so its nested `required` is
+// unenforced and wrong in places (compute Instance's access config name). The
+// same field on an ordinary resource keeps the flag, so a pass that clears
+// Required everywhere fails here too.
+func TestAHandWrittenResourcesNestedRequiredIsNotTrusted(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"name": str,
+		"accessConfigs": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"name": str}}},
+	}}
+	build := func(exclude bool) map[string]*catalog.Attr {
+		mm := &mmv1.Resource{Name: "W", ExcludeResource: exclude, Properties: []*mmv1.Field{
+			{Name: "name", Required: true},
+			{Name: "accessConfigs", Type: "Array", ItemType: &mmv1.ItemType{Type: "NestedObject", Properties: []*mmv1.Field{
+				{Name: "name", Required: true}}}},
+		}}
+		attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return attrs
+	}
+	hand := build(true)
+	if !hand["name"].Required {
+		t.Error("the hand-written resource lost its top-level required name")
+	}
+	if hand["accessConfigs"].Elem.Fields["name"].Required {
+		t.Error("accessConfigs[].name is required on a resource whose YAML Terraform never runs")
+	}
+	if !build(false)["accessConfigs"].Elem.Fields["name"].Required {
+		t.Error("an ordinary resource lost a nested required flag")
+	}
+}
+
+// TestAFieldGoogleNeverReturnsIsCarried. magic-modules' ignore_read is the
+// second source for input only, and the one that covers compute: an SSL
+// certificate's privateKey is never returned, and read as removed it replaced
+// the certificate on every plan. Nested too, where most of these live.
+func TestAFieldGoogleNeverReturnsIsCarried(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"privateKey":  str,
+		"certificate": str,
+		"iap":         {Type: "object", Properties: map[string]*disco.Schema{"oauth2ClientSecret": str}},
+		"selfLink":    str,
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "privateKey", IgnoreRead: true, Required: true, Immutable: true},
+		{Name: "certificate"},
+		{Name: "iap", Type: "NestedObject", Properties: []*mmv1.Field{{Name: "oauth2ClientSecret", IgnoreRead: true}}},
+		{Name: "selfLink", IgnoreRead: true, Output: true},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !attrs["privateKey"].InputOnly {
+		t.Error("privateKey is ignore_read in magic-modules and is not carried forward")
+	}
+	if attrs["certificate"].InputOnly {
+		t.Error("certificate became input only, so the flag is not coming from the field")
+	}
+	if !attrs["iap"].Fields["oauth2ClientSecret"].InputOnly {
+		t.Error("iap.oauth2ClientSecret is ignore_read and is not carried forward")
+	}
+	if attrs["selfLink"].InputOnly {
+		t.Error("an output field became input only; there is nothing of the user's to carry")
+	}
+}
+
+// TestAReferenceThatTakesSeveralTypesIsNotTyped. A url map's defaultService
+// is a BackendService reference in magic-modules and takes a backend bucket
+// too. Typed, infrena refused a valid configuration before sending anything.
+// The ordinary reference beside it keeps its type, so a change that drops
+// every reference fails here too.
+func TestAReferenceThatTakesSeveralTypesIsNotTyped(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{"defaultService": str, "network": str}}
+	mm := &mmv1.Resource{Name: "UrlMap", Properties: []*mmv1.Field{
+		{Name: "defaultService", Type: "ResourceRef", Resource: "BackendService",
+			CustomExpand: "templates/terraform/custom_expand/reference_to_backend.tmpl"},
+		{Name: "network", Type: "ResourceRef", Resource: "Network"},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := attrs["defaultService"].Ref; r != nil {
+		t.Errorf("defaultService refers only to %s, but it takes a backend bucket as well", r.Type)
+	}
+	if attrs["network"].Ref == nil {
+		t.Error("network lost its reference")
+	}
+}
+
+// TestADiffSuppressNameBecomesAnEquivalence. The name is magic-modules data;
+// the rule it maps to is ours. An unknown name maps to nothing.
+func TestADiffSuppressNameBecomesAnEquivalence(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{"portRange": str, "target": str}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "portRange", DiffSuppressFunc: "PortRangeDiffSuppress"},
+		{Name: "target", DiffSuppressFunc: "tpgresource.Base64DiffSuppress"},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := attrs["portRange"].Equivalence; got != catalog.EquivalencePortRange {
+		t.Errorf("portRange equivalence = %q, want %q", got, catalog.EquivalencePortRange)
+	}
+	if got := attrs["target"].Equivalence; got != "" {
+		t.Errorf("target equivalence = %q for a suppress function with no rule written here", got)
+	}
+}
+
+// TestAListsEquivalenceReachesItsElements. The reconciler compares a list of
+// references element by element, so the rule the list carries must be on the
+// element too.
+func TestAListsEquivalenceReachesItsElements(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"healthChecks": {Type: "array", Items: &disco.Schema{Type: "string"}}}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "healthChecks", DiffSuppressFunc: "tpgresource.CompareSelfLinkRelativePaths"}}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := attrs["healthChecks"].Elem.Equivalence; got != catalog.EquivalenceSelfLink {
+		t.Errorf("healthChecks element equivalence = %q, want %q", got, catalog.EquivalenceSelfLink)
+	}
+}
+
+// TestAReferenceComparesAsOneInAnyForm. Terraform gives every ResourceRef the
+// CompareSelfLinkOrResourceName suppress itself, so the YAML never names it,
+// and a subnetwork's network written relatively planned a replacement on real
+// Google. A named suppress still wins, and a plain string gets nothing.
+func TestAReferenceComparesAsOneInAnyForm(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"network": str, "target": str, "description": str,
+		"healthChecks": {Type: "array", Items: str},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "network", Type: "ResourceRef", Resource: "Network"},
+		{Name: "target", Type: "ResourceRef", Resource: "Target", DiffSuppressFunc: "tpgresource.CompareResourceNames"},
+		{Name: "description", Type: "String"},
+		{Name: "healthChecks", Type: "Array", ItemType: &mmv1.ItemType{Type: "ResourceRef"}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{
+		"network":     catalog.EquivalenceSelfLink,
+		"target":      catalog.EquivalenceResourceName,
+		"description": "",
+	} {
+		if got := attrs[name].Equivalence; got != want {
+			t.Errorf("%s equivalence = %q, want %q", name, got, want)
+		}
+	}
+	if got := attrs["healthChecks"].Elem.Equivalence; got != catalog.EquivalenceSelfLink {
+		t.Errorf("healthChecks element equivalence = %q, want self_link", got)
+	}
+}
+
+// TestTheKindConstantIsOutputOnly. Cloud DNS answers each network of a
+// policy with kind "dns#policyNetwork"; settable, and inside an unordered
+// list where nothing is pruned, it was drift on the plan after every create.
+// A field that merely happens to be called kind, with neither the constant
+// default nor the description, stays settable.
+func TestTheKindConstantIsOutputOnly(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"networks": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+			"kind":       {Type: "string", Default: "dns#policyNetwork"},
+			"networkUrl": {Type: "string"},
+		}}},
+		"kind": {Type: "string", Description: "Identifies what kind of resource this is. Value: the fixed string \"dns#policy\"."},
+	}}
+	other := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"kind":     {Type: "string", Description: "The workload kind: BATCH or SERVING."},
+		"category": {Type: "string", Default: "acme#widget", Description: "The kind of item this is."}}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, &mmv1.Resource{Name: "W"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !attrs["kind"].Output {
+		t.Error("the top-level kind constant is settable")
+	}
+	if !attrs["networks"].Elem.Fields["kind"].Output {
+		t.Error("networks[].kind, dns#policyNetwork, is settable")
+	}
+	if attrs["networks"].Elem.Fields["networkUrl"].Output {
+		t.Error("networkUrl became output-only")
+	}
+	o, err := BuildAttributes(&disco.Document{Name: "tiny"}, other, &mmv1.Resource{Name: "W"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o["kind"].Output {
+		t.Error("a field that is only called kind became output-only")
+	}
+	if o["category"].Output {
+		t.Error("a field not called kind became output-only for looking like the constant")
 	}
 }

@@ -133,3 +133,56 @@ func TestURLsAndUpdateMechanicsAreRead(t *testing.T) {
 		t.Errorf("update_url = %q, want empty for a fixture that does not set it", r.UpdateURL)
 	}
 }
+
+// TestTheLifecycleKeysAreRead covers every key added once the coverage guard
+// showed they were being dropped. Each is set in the fixture to something its
+// zero value is not.
+func TestTheLifecycleKeysAreRead(t *testing.T) {
+	r := loadRes(t, "Gadget.yaml")
+	if !r.Immutable || r.ReadVerb != "POST" || r.DeleteVerb != "PATCH" || !r.ExcludeDelete || !r.ExcludeRead ||
+		r.ReadQueryParams != "?view=FULL" || r.Mutex != "gadgets/{{project}}" ||
+		r.IDFormat != "projects/{{project}}/gadgets/{{name}}" || !r.ExcludeResource {
+		t.Errorf("resource keys not read: %+v", r)
+	}
+	if nq := r.NestedQuery; nq == nil || len(nq.Keys) != 2 || nq.Keys[1] != "gadgets" || !nq.IsListOfIDs || !nq.ModifyByPatch {
+		t.Errorf("nested_query = %+v", r.NestedQuery)
+	}
+	if !field(t, r, "zone").URLParamOnly {
+		t.Error("url_param_only not read")
+	}
+	if l := field(t, r, "labels"); l.UpdateURL != "projects/{{project}}/gadgets/{{name}}/setLabels" ||
+		l.UpdateVerb != "POST" || l.UpdateID != "labels" || l.FingerprintName != "labelFingerprint" {
+		t.Errorf("per-field update not read: %+v", l)
+	}
+	if p := field(t, r, "password"); !p.Sensitive || !p.WriteOnly || !p.ClientSide {
+		t.Errorf("secret flags not read: %+v", p)
+	}
+	s := field(t, r, "size")
+	if s.MinVersion != "beta" || !s.DefaultFromAPI || !s.IgnoreRead || !s.SendEmptyValue ||
+		s.CustomExpand == "" || s.CustomFlatten == "" || len(s.UpdateMaskFields) != 2 || s.UpdateMaskFields[1] != "config.unit" {
+		t.Errorf("field keys not read: %+v", s)
+	}
+	if it := field(t, r, "tags").ItemType; it == nil || it.Type != "String" {
+		t.Errorf("a mapping item_type lost its type: %+v", it)
+	}
+	it := field(t, r, "rules").ItemType
+	if it == nil || it.Type != "NestedObject" || len(it.Properties) != 1 {
+		t.Fatalf("a nested item_type lost its fields: %+v", it)
+	}
+	if p := it.Properties[0]; !p.Immutable || p.ApiName != "rank" {
+		t.Errorf("a field inside a list element lost its flags: %+v", p)
+	}
+}
+
+// TestAScalarItemTypeIsItsTypeName. Most arrays spell the element as a bare
+// name, and that spelling must not fail to decode now that a mapping is
+// decoded as a field.
+func TestAScalarItemTypeIsItsTypeName(t *testing.T) {
+	r, err := ParseResource([]byte("name: X\nproperties:\n  - name: ids\n    type: Array\n    item_type: String\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if it := r.Properties[0].ItemType; it == nil || it.Type != "String" {
+		t.Errorf("item_type = %+v, want Type String", it)
+	}
+}
