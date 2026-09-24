@@ -12,6 +12,7 @@ import (
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/disco"
+	"github.com/infrena/infrena-provider-gcp/internal/mmv1"
 	"github.com/infrena/infrena/pkg/value"
 )
 
@@ -1650,5 +1651,119 @@ func TestAReferenceToAnAttributeTheTargetLacksIsDropped(t *testing.T) {
 	}
 	if len(warnings) != 1 || warnings[0].Resource != "gcp.targethttpsproxy.serverTlsPolicy" {
 		t.Errorf("warnings = %+v, want exactly one, naming the dropped edge", warnings)
+	}
+}
+
+// secretFixture is Secret Manager's shape: one Discovery document, two
+// collections that create at the same path, and two magic-modules products,
+// the regional one on a location-specific host.
+func secretFixture(endpoints string) map[string]string {
+	doc := `{"name": "sm", "version": "v1", "rootUrl": "https://sm.googleapis.com/", "servicePath": "",
+  "endpoints": ` + endpoints + `,
+  "schemas": {"Secret": {"id": "Secret", "type": "object", "properties": {"name": {"type": "string", "readOnly": true}}}},
+  "resources": {"projects": {"resources": {
+    "secrets": {"methods": {
+      "get": {"id": "a", "path": "v1/projects/{projectsId}/secrets/{secretsId}", "httpMethod": "GET", "response": {"$ref": "Secret"},
+        "parameters": {"projectsId": {"location": "path"}, "secretsId": {"location": "path"}}},
+      "create": {"id": "b", "path": "v1/projects/{projectsId}/secrets", "httpMethod": "POST", "request": {"$ref": "Secret"}, "response": {"$ref": "Secret"},
+        "parameters": {"projectsId": {"location": "path"}, "secretId": {"location": "query"}}},
+      "delete": {"id": "c", "path": "v1/projects/{projectsId}/secrets/{secretsId}", "httpMethod": "DELETE",
+        "parameters": {"projectsId": {"location": "path"}, "secretsId": {"location": "path"}}}}},
+    "locations": {"resources": {"secrets": {"methods": {
+      "get": {"id": "d", "path": "v1/projects/{projectsId}/locations/{locationsId}/secrets/{secretsId}", "httpMethod": "GET", "response": {"$ref": "Secret"},
+        "parameters": {"projectsId": {"location": "path"}, "locationsId": {"location": "path"}, "secretsId": {"location": "path"}}},
+      "create": {"id": "e", "path": "v1/projects/{projectsId}/locations/{locationsId}/secrets", "httpMethod": "POST", "request": {"$ref": "Secret"}, "response": {"$ref": "Secret"},
+        "parameters": {"projectsId": {"location": "path"}, "locationsId": {"location": "path"}, "secretId": {"location": "query"}}},
+      "delete": {"id": "f", "path": "v1/projects/{projectsId}/locations/{locationsId}/secrets/{secretsId}", "httpMethod": "DELETE",
+        "parameters": {"projectsId": {"location": "path"}, "locationsId": {"location": "path"}, "secretsId": {"location": "path"}}}}}}}
+  }}}}`
+	return map[string]string{
+		"schemas/sm.json":                       doc,
+		"mmv1/products/sm/product.yaml":         "name: SM\nversions:\n  - name: ga\n    base_url: https://sm.googleapis.com/v1/\n",
+		"mmv1/products/sm/Secret.yaml":          "name: Secret\nbase_url: projects/{{project}}/secrets\nself_link: projects/{{project}}/secrets/{{secret_id}}\ncreate_url: projects/{{project}}/secrets?secretId={{secret_id}}\n",
+		"mmv1/products/smregional/product.yaml": "name: SMRegional\nversions:\n  - name: ga\n    base_url: https://sm.{{location}}.rep.googleapis.com/v1/\n",
+		"mmv1/products/smregional/RegionalSecret.yaml": "name: RegionalSecret\nbase_url: projects/{{project}}/locations/{{location}}/secrets\n" +
+			"self_link: projects/{{project}}/locations/{{location}}/secrets/{{secret_id}}\ncreate_url: projects/{{project}}/locations/{{location}}/secrets?secretId={{secret_id}}\n",
+	}
+}
+
+func buildSecrets(t *testing.T, endpoints string) *catalog.Catalog {
+	t.Helper()
+	in := writeRefFixture(t, secretFixture(endpoints))
+	if err := os.WriteFile(in.OverlayPath, []byte("rulings: {}\naliases: {}\ndiscover_default: []\nproduct_aliases:\n  sm: [smregional]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res.Catalog
+}
+
+// TestTheRegionalCollectionIsPairedNamedAndHostedApart. Secret Manager's two
+// collections create at the same path and both singularize to "secret": the
+// regional one pairs with RegionalSecret (whose base_url walks its path),
+// takes that name, and carries the regional host the product declares.
+func TestTheRegionalCollectionIsPairedNamedAndHostedApart(t *testing.T) {
+	c := buildSecrets(t, `[{"location": "us-east1", "endpointUrl": "https://sm.us-east1.rep.googleapis.com/"},
+    {"location": "europe-west1", "endpointUrl": "https://sm.europe-west1.rep.googleapis.com/"}]`)
+	global, ok := c.Type("gcp.secret")
+	if !ok {
+		t.Fatalf("gcp.secret missing; types: %v", typeNames(c))
+	}
+	regional, ok := c.Type("gcp.regionalsecret")
+	if !ok {
+		t.Fatalf("gcp.regionalsecret missing; types: %v", typeNames(c))
+	}
+	if !strings.Contains(regional.SelfLink, "locations/") || strings.Contains(global.SelfLink, "locations/") {
+		t.Errorf("the pairing is crossed: gcp.secret at %q, gcp.regionalsecret at %q", global.SelfLink, regional.SelfLink)
+	}
+	if regional.EndpointTemplate != "https://sm.{location}.rep.googleapis.com/" {
+		t.Errorf("gcp.regionalsecret endpoint template = %q", regional.EndpointTemplate)
+	}
+	if global.EndpointTemplate != "" {
+		t.Errorf("gcp.secret has an endpoint template %q; its product's host is the API's own", global.EndpointTemplate)
+	}
+}
+
+// TestAnEndpointTemplateThatMissesOneEndpointIsRefused. A template that got
+// one listed location wrong would send that location's requests to a host
+// that does not serve them, so it is not carried at all.
+func TestAnEndpointTemplateThatMissesOneEndpointIsRefused(t *testing.T) {
+	c := buildSecrets(t, `[{"location": "us-east1", "endpointUrl": "https://sm.us-east1.rep.googleapis.com/"},
+    {"location": "europe-west1", "endpointUrl": "https://europe-west1-sm.googleapis.com/"}]`)
+	regional, ok := c.Type("gcp.regionalsecret")
+	if !ok {
+		t.Fatalf("gcp.regionalsecret missing; types: %v", typeNames(c))
+	}
+	if regional.EndpointTemplate != "" {
+		t.Errorf("endpoint template %q admitted although it does not produce every endpoint the document lists", regional.EndpointTemplate)
+	}
+}
+
+func typeNames(c *catalog.Catalog) []string {
+	var out []string
+	for _, t := range c.Types {
+		out = append(out, t.Name)
+	}
+	return out
+}
+
+// TestAMatchWhoseBaseURLStartsWithAPlaceholderIsKept. networksecurity's
+// AddressGroup lives at "{{parent}}/locations/{{location}}/addressGroups",
+// which stands for this collection's path and others; ProjectAddressGroup,
+// an IAM-only stub, spells projects/ out. Preferring the literal match
+// swapped the real resource for the stub.
+func TestAMatchWhoseBaseURLStartsWithAPlaceholderIsKept(t *testing.T) {
+	real := &mmv1.Resource{Name: "AddressGroup", BaseURL: "{{parent}}/locations/{{location}}/addressGroups"}
+	stub := &mmv1.Resource{Name: "ProjectAddressGroup", BaseURL: "projects/{{project}}/locations/{{location}}/addressGroups"}
+	col := []string{"projects", "locations", "addressGroups"}
+	if got := preferExactCollection([]*mmv1.Resource{real, stub}, col, real); got != real {
+		t.Errorf("paired with %s, want AddressGroup kept", got.Name)
+	}
+	global := &mmv1.Resource{Name: "Secret", BaseURL: "projects/{{project}}/secrets"}
+	regional := &mmv1.Resource{Name: "RegionalSecret", BaseURL: "projects/{{project}}/locations/{{location}}/secrets"}
+	if got := preferExactCollection([]*mmv1.Resource{global, regional}, []string{"projects", "locations", "secrets"}, global); got != regional {
+		t.Errorf("paired with %s, want RegionalSecret, so the guard now keeps everything", got.Name)
 	}
 }

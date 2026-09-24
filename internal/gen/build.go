@@ -146,7 +146,7 @@ func Build(in Inputs) (*Result, error) {
 		}
 		for _, col := range d.Collections() {
 			leaf := col.Path[len(col.Path)-1]
-			mm := matchResource(mms, leaf, createPathOf(col))
+			mm := preferExactCollection(mms, col.Path, matchResource(mms, leaf, createPathOf(col)))
 			rawName := leaf
 			if mm != nil {
 				rawName = mm.Name
@@ -1282,6 +1282,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		return nil, err
 	}
 
+	t.EndpointTemplate = endpointTemplate(doc, mm, t)
+
 	// After self_link is final: a setter is admitted only on the address the
 	// resource is read at. See discoveredSetters.
 	t.Setters = discoveredSetters(doc, col, mm, t)
@@ -2291,4 +2293,92 @@ func addressesTheResource(tmpl string) bool {
 	}
 	last := tmpl[strings.LastIndexByte(tmpl, '/')+1:]
 	return strings.HasPrefix(last, "{{") && strings.HasSuffix(last, "}}") && !strings.Contains(last, ":")
+}
+
+// preferExactCollection replaces a name match with the resource whose
+// base_url walks exactly this collection's path, when the name match's does
+// not. Secret Manager's two collections, projects.secrets and
+// projects.locations.secrets, share a create path ("v1/{+parent}/secrets")
+// and the name Secret, so matchResource paired both with the global Secret;
+// the regional one is magic-modules' RegionalSecret, in another product,
+// whose base_url is projects/{{project}}/locations/{{location}}/secrets.
+//
+// Only a resource whose name ENDS in the collection's singular is eligible
+// ("RegionalSecret" for "secrets"), so this chooses between candidates for
+// the same thing and never pairs a collection with something unrelated that
+// happens to live at the same depth.
+func preferExactCollection(mms []*mmv1.Resource, colPath []string, matched *mmv1.Resource) *mmv1.Resource {
+	// A base_url that starts with a placeholder ("{{parent}}/locations/...")
+	// can stand for any path, this collection's included, so a match on one
+	// is not displaced: measured, the only such displacement swapped
+	// networksecurity's AddressGroup for ProjectAddressGroup, a stub that
+	// "Only used to generate IAM resources".
+	if matched == nil || len(colPath) == 0 || sameLiterals(matched.BaseURL, colPath) ||
+		strings.HasPrefix(strings.TrimPrefix(matched.BaseURL, "/"), "{{") {
+		return matched
+	}
+	want := strings.ToLower(singular(colPath[len(colPath)-1]))
+	var exact *mmv1.Resource
+	for _, mm := range mms {
+		if strings.HasSuffix(strings.ToLower(mm.Name), want) && sameLiterals(mm.BaseURL, colPath) {
+			if exact != nil {
+				return matched // two candidates: not a choice to make by guessing
+			}
+			exact = mm
+		}
+	}
+	if exact == nil {
+		return matched
+	}
+	return exact
+}
+
+// sameLiterals reports whether a url template's literal segments are exactly
+// the collection path's words, in order: "projects/{{project}}/locations/
+// {{location}}/secrets" against [projects locations secrets].
+func sameLiterals(tmpl string, colPath []string) bool {
+	if i := strings.IndexByte(tmpl, '?'); i >= 0 {
+		tmpl = tmpl[:i]
+	}
+	var lits []string
+	for _, seg := range strings.Split(strings.Trim(tmpl, "/"), "/") {
+		if seg != "" && !strings.Contains(seg, "{") {
+			lits = append(lits, seg)
+		}
+	}
+	if len(lits) != len(colPath) {
+		return false
+	}
+	for i := range lits {
+		if lits[i] != colPath[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// endpointTemplate is the host a type must be reached through when magic-
+// modules puts it on a location-specific one, as regional secrets are, or
+// "". Taken from the product's base_url with the api version (PathPrefix)
+// removed, and admitted only when it reproduces EVERY endpoint the Discovery
+// document lists: a template that got one location wrong would send that
+// location's requests to a host that does not serve them.
+//
+// Only for a type whose self_link names a location, since the runtime fills
+// the template from the resource's own path.
+func endpointTemplate(doc *disco.Document, mm *mmv1.Resource, t *catalog.Type) string {
+	if mm == nil || !strings.Contains(mm.ProductBaseURL, "{{location}}") || len(doc.Endpoints) == 0 ||
+		!strings.Contains(t.SelfLink, "locations/") {
+		return ""
+	}
+	tmpl := strings.ReplaceAll(strings.TrimSuffix(mm.ProductBaseURL, t.PathPrefix), "{{location}}", "{location}")
+	if !strings.HasSuffix(tmpl, "/") || strings.Contains(tmpl, "{{") {
+		return ""
+	}
+	for _, e := range doc.Endpoints {
+		if strings.ReplaceAll(tmpl, "{location}", e.Location) != e.EndpointURL {
+			return ""
+		}
+	}
+	return tmpl
 }

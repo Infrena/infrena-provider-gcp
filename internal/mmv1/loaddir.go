@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // LoadError names one file that failed to parse, and why.
@@ -23,7 +25,8 @@ func (e LoadError) Unwrap() error { return e.Err }
 
 // LoadDir reads every resource file under root, keyed by product directory.
 //
-// product.yaml is skipped: it describes the product, not a resource. A file
+// product.yaml is not a resource: only its GA base_url is read, onto every
+// resource of that product (ProductBaseURL). A resource file
 // that fails to read OR to parse is named in the returned []LoadError rather
 // than silently skipped or allowed to abort the rest of the load. Collecting
 // rather than aborting matters even beyond not hiding the failure: WalkDir
@@ -34,6 +37,7 @@ func (e LoadError) Unwrap() error { return e.Err }
 // happen at all, such as an unreadable root directory.
 func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 	out := map[string][]*Resource{}
+	baseURLs := map[string]string{}
 	var loadErrs []LoadError
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -43,6 +47,24 @@ func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 			return nil
 		}
 		if filepath.Base(path) == "product.yaml" {
+			// Read for one fact only, the GA host, which is not the
+			// Discovery document's for a regional product. A product file
+			// that will not parse costs that fact, never the load.
+			if data, err := os.ReadFile(path); err == nil {
+				var p struct {
+					Versions []struct {
+						Name    string `yaml:"name"`
+						BaseURL string `yaml:"base_url"`
+					} `yaml:"versions"`
+				}
+				if yaml.Unmarshal(data, &p) == nil {
+					for _, v := range p.Versions {
+						if v.Name == "ga" {
+							baseURLs[filepath.Base(filepath.Dir(path))] = v.BaseURL
+						}
+					}
+				}
+			}
 			return nil
 		}
 		data, readErr := os.ReadFile(path)
@@ -61,6 +83,11 @@ func LoadDir(root string) (map[string][]*Resource, []LoadError, error) {
 	})
 	if err != nil {
 		return nil, nil, err
+	}
+	for product, rs := range out {
+		for _, r := range rs {
+			r.ProductBaseURL = baseURLs[product]
+		}
 	}
 	return out, loadErrs, nil
 }

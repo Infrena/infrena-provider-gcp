@@ -176,6 +176,14 @@ type Type struct {
 	// patch.
 	Setters []Setter `json:"setters,omitempty"`
 
+	// EndpointTemplate is the host this type is reached through when it is
+	// not APIBaseURL's, with "{location}" to be filled from the resource's
+	// own path: "https://secretmanager.{location}.rep.googleapis.com/".
+	// Regional secrets exist only at their region's endpoint. From
+	// magic-modules' product base_url, checked against every endpoint the
+	// Discovery document lists.
+	EndpointTemplate string `json:"endpoint_template,omitempty"`
+
 	// PatchOneField says the API refuses a patch changing more than one
 	// top-level field, so Update sends one patch per changed field, reading
 	// the lock afresh between them. From the overlay, on evidence.

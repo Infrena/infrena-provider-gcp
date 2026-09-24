@@ -173,6 +173,11 @@ func redirect(c *catalog.Catalog, host, instance string) (*catalog.Catalog, oaut
 	for i, t := range c.Types {
 		cp := *t
 		cp.APIBaseURL = rehost(host, t.APIBaseURL)
+		// Cleared, never rehosted: a regional endpoint template is a Google
+		// host with a placeholder in it, and the override's one promise is
+		// that nothing reaches the real cloud. Every request then goes to
+		// the rehosted APIBaseURL.
+		cp.EndpointTemplate = ""
 		types[i] = &cp
 	}
 	return &catalog.Catalog{
