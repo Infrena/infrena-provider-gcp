@@ -4,14 +4,15 @@ What is deliberately not here yet, with the reason. Everything below is known, n
 
 ## Coverage
 
-**380 types do not ship** — [the full list, with a reason each](reference/not-shipped.md).
+**Most of GCP does not ship yet.** [not-shipped.md](reference/not-shipped.md) lists every type that
+does not, with the reason for each, and its summary table gives the current counts.
 
 The largest group is types whose magic-modules definition declares wire-affecting hooks and has no
 ruling yet. Those are unblocked one at a time by someone reading the hooks and writing a ruling;
 [CONTRIBUTING.md](../CONTRIBUTING.md) describes how, and it is the single most useful contribution
 anyone can make here.
 
-**65 types ship but cannot create.** Their create URL names a placeholder nothing can fill. They can
+**Some types ship but cannot create** ([counted and listed](reference/not-shipped.md#shipped-but-cannot-be-created)). Their create URL names a placeholder nothing can fill. They can
 be read, imported and destroyed, and `infrena explain` says so per type rather than promising a
 create that would fail on string substitution. The generator binds a parent placeholder from the
 API's own published `pattern` where it can; these are the ones where the pattern is too loose to be
@@ -46,7 +47,7 @@ lifecycle. Adding a third would mean resolving three-way disagreements with no t
 
 ## How this list stays honest
 
-The type counts above are generated. [not-shipped.md](reference/not-shipped.md) is written by
+This page states no counts; they live on generated pages. [not-shipped.md](reference/not-shipped.md) is written by
 `cmd/gen-docs` from `gen/warnings.txt`, CI fails if the committed pages disagree with the catalog,
 and a test fails if the README's coverage claim drifts more than 10% from the real number.
 

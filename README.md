@@ -1,6 +1,6 @@
 # infrena-provider-gcp
 
-The Google Cloud provider for [infrena](https://github.com/Infrena/infrena). It serves **235
+The Google Cloud provider for [infrena](https://github.com/Infrena/infrena). It serves **243
 resource types** across 35 GCP services, generated from Google's own API Discovery documents with a
 [magic-modules](https://github.com/GoogleCloudPlatform/magic-modules) overlay for the lifecycle
 facts Discovery does not carry.
@@ -117,7 +117,7 @@ skips with a warning rather than guessing when it cannot.
 
 ## What the tier gate means
 
-**The catalog does not cover all of GCP, and the gap is deliberate.** 235 types ship; 380 entries
+**The catalog does not cover all of GCP, and the gap is deliberate.** 243 types ship; 372 entries
 are listed in [not-shipped.md](docs/reference/not-shipped.md) with the reason for each.
 
 The generator ships a type only when it can vouch for it. Roughly 45% of magic-modules resources
