@@ -155,3 +155,63 @@ func discoveredUpdateWrapper(d *disco.Document, col disco.Collection) (wrapper, 
 	}
 	return wrapper, masks[0]
 }
+
+// updateURLMatchesPatch reports whether an update_url magic-modules declared is
+// the address of the collection's own patch method.
+//
+// magic-modules defaults update_verb to PUT (mmv1/api/resource.go), so a
+// resource that declares an update_url and no verb has written that url for a
+// PUT, and pairing it with a PATCH we inferred would be exactly the kind of
+// reconstruction this codebase keeps getting wrong. Checking it instead of
+// guessing turns the question into one the documents can answer: the url's path
+// must be where the patch lives, and every query parameter it carries must be
+// one the patch declares.
+//
+// Four resources in the vendored tree are in this position -- apigee's
+// TargetServer, bigquery's Dataset and compute's Autoscaler and
+// RegionAutoscaler -- and the compute pair are why it matters. Their patch is
+// published on the COLLECTION, with the resource named by "?autoscaler=", so
+// magic-modules' url is not merely compatible with a PATCH, it is the only
+// address a PATCH can be sent to.
+func updateURLMatchesPatch(updateURL string, patch *disco.Method) bool {
+	if patch == nil {
+		return false
+	}
+	path, query, _ := strings.Cut(updateURL, "?")
+	if !samePathShape(path, patch.Path) {
+		return false
+	}
+	for _, kv := range strings.Split(query, "&") {
+		if kv == "" {
+			continue
+		}
+		k, _, _ := strings.Cut(kv, "=")
+		if p := patch.Parameters[k]; p == nil || p.Location != "query" {
+			return false
+		}
+	}
+	return true
+}
+
+// samePathShape compares two url templates ignoring what their placeholders are
+// called and ignoring a leading api-version prefix, which Discovery paths carry
+// ("compute/v1/projects/...") and stored templates do not -- the version lives
+// in PathPrefix here, which is why absURL exists.
+func samePathShape(a, b string) bool {
+	na, nb := normalizePathShape(a), normalizePathShape(b)
+	return na != "" && (na == nb || strings.HasSuffix(nb, "/"+na) || strings.HasSuffix(na, "/"+nb))
+}
+
+func normalizePathShape(p string) string {
+	var out []string
+	for _, seg := range strings.Split(strings.Trim(p, "/"), "/") {
+		switch {
+		case seg == "":
+		case strings.HasPrefix(seg, "{"):
+			out = append(out, "*")
+		default:
+			out = append(out, seg)
+		}
+	}
+	return strings.Join(out, "/")
+}

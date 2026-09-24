@@ -20,7 +20,7 @@ Represents an Autoscaler resource. Autoscalers allow you to automatically scale 
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/regions/{{region}}/autoscalers` |
 | Read | yes | `GET projects/{project}/regions/{region}/autoscalers/{autoscaler}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{{project}}/regions/{{region}}/autoscalers?autoscaler={{name}}` |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/autoscalers/{autoscaler}` |
 | Import | yes | by id, see below |
 

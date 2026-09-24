@@ -366,3 +366,88 @@ func TestAPatchableEntryWithoutASourceIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// collectionPatchDoc publishes compute's autoscaler shape: the patch lives on
+// the COLLECTION and names the resource in a query parameter, so its path is
+// not the get's and never can be.
+func collectionPatchDoc() string {
+	return `{
+  "name": "acme", "version": "v1", "rootUrl": "https://acme.googleapis.com/", "servicePath": "",
+  "schemas": {
+    "Scaler": {"id": "Scaler", "type": "object", "properties": {
+      "name": {"type": "string", "description": "The name."},
+      "size": {"type": "integer", "format": "int64", "description": "How big."}
+    }},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {"projects": {"resources": {"scalers": {"methods": {
+    "get": {"id": "a.s.get", "path": "projects/{project}/scalers/{scaler}", "httpMethod": "GET", "response": {"$ref": "Scaler"}},
+    "insert": {"id": "a.s.insert", "path": "projects/{project}/scalers", "httpMethod": "POST", "request": {"$ref": "Scaler"}, "response": {"$ref": "Operation"}},
+    "delete": {"id": "a.s.delete", "path": "projects/{project}/scalers/{scaler}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+    "patch": {"id": "a.s.patch", "path": "projects/{project}/scalers", "httpMethod": "PATCH", "request": {"$ref": "Scaler"}, "response": {"$ref": "Operation"},
+      "parameters": {"scaler": {"type": "string", "location": "query", "description": "Name of the scaler to patch."}}}
+  }}}}}
+}`
+}
+
+func scalerFixture(t *testing.T, updateURL string) Inputs {
+	t.Helper()
+	return writeRefFixture(t, map[string]string{
+		"schemas/acme.json": collectionPatchDoc(),
+		"mmv1/products/acme/Scaler.yaml": `name: Scaler
+description: patched on the collection, named by a query parameter.
+base_url: projects/{{project}}/scalers
+self_link: projects/{{project}}/scalers/{{name}}
+update_url: '` + updateURL + `'
+properties:
+  - name: name
+    type: String
+  - name: size
+    type: Integer
+`,
+	})
+}
+
+// TestADeclaredUpdateUrlIsAcceptedWhenItMatchesThePatch. magic-modules defaults
+// update_verb to PUT, so a resource declaring an update_url and no verb wrote
+// that url for a PUT, and pairing it with an inferred PATCH would be a guess.
+// Checking it against the method turns the guess into a question the documents
+// answer -- and for compute's two autoscalers the answer matters, because their
+// patch is published on the collection and that url is the only address a PATCH
+// can go to.
+func TestADeclaredUpdateUrlIsAcceptedWhenItMatchesThePatch(t *testing.T) {
+	res, err := Build(scalerFixture(t, "projects/{{project}}/scalers?scaler={{name}}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.scaler")
+	if !ok {
+		t.Fatalf("gcp.scaler missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Errorf("UpdateVerb = %q, want PATCH: the declared url is exactly where the patch lives", ty.UpdateVerb)
+	}
+}
+
+// TestADeclaredUpdateUrlIsRefusedWhenThePatchDoesNotAgree covers both halves of
+// the check. A url naming a query parameter the patch never declares, and a url
+// whose path is not the patch's, are each a different request from the one the
+// API publishes.
+func TestADeclaredUpdateUrlIsRefusedWhenThePatchDoesNotAgree(t *testing.T) {
+	for name, url := range map[string]string{
+		"undeclared query parameter": "projects/{{project}}/scalers?autoscaler={{name}}",
+		"a path the patch is not at": "projects/{{project}}/otherthings?scaler={{name}}",
+	} {
+		res, err := Build(scalerFixture(t, url))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		ty, ok := res.Catalog.Type("gcp.scaler")
+		if !ok {
+			t.Fatalf("%s: gcp.scaler missing", name)
+		}
+		if ty.UpdateVerb != "" {
+			t.Errorf("%s: UpdateVerb = %q, want empty", name, ty.UpdateVerb)
+		}
+	}
+}
