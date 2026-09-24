@@ -176,6 +176,11 @@ type Type struct {
 	// patch.
 	Setters []Setter `json:"setters,omitempty"`
 
+	// PatchOneField says the API refuses a patch changing more than one
+	// top-level field, so Update sends one patch per changed field, reading
+	// the lock afresh between them. From the overlay, on evidence.
+	PatchOneField bool `json:"patch_one_field,omitempty"`
+
 	// CreateVerb is the HTTP method a create is sent with. Empty means POST,
 	// which is 355 of the 358 create methods in the pinned documents. The other
 	// three are Pub/Sub's topics, subscriptions and snapshots, which create

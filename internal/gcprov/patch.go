@@ -3,6 +3,7 @@ package gcprov
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"sort"
@@ -291,12 +292,40 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	// planning, so it is as current as a value can be without the extra read
 	// this function deliberately does not make. Without it every patch to the
 	// 19 locked compute types is a 412.
+	if ty.PatchOneField {
+		if fields := topLevelFields(mask); len(fields) > 1 {
+			return p.patchOneFieldAtATime(ctx, ty, current, desired, attrs, reqURL, body, mask, fields, setters)
+		}
+	}
 	if ty.LockField != "" {
 		if a, v := lockValue(ty, current.Attributes); v.Known {
 			body[ty.LockField] = wireValue(a, v)
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err // last point before the resource is modified
+	}
+	resp, err := p.sendPatch(ctx, ty, reqURL, body, mask)
+	if err != nil {
+		// The PATCH itself failed, so nothing was changed, and state still
+		// records the resource at the id it already had. Safe to error.
+		return nil, err
+	}
+
+	// From here on the patch is real, and errors are REPORTED, not returned,
+	// for as long as there is a truthful state to return instead.
+	_, awaitErr := p.await(ctx, ty, resp)
+	if awaitErr != nil {
+		fmt.Fprintf(os.Stderr, "gcp: %s: update reported a failure, reading back what exists: %v\n",
+			ty.Name, awaitErr)
+	}
+	return p.updateThroughSetters(ctx, ty, current, desired, setters, true, awaitErr)
+}
+
+// sendPatch sends one patch of body and mask in the shape the type's API
+// takes it.
+func (p *Provider) sendPatch(ctx context.Context, ty *catalog.Type, reqURL string, body map[string]any, mask []string) (map[string]any, error) {
 	switch {
 	case ty.UpdateWrapper != "":
 		// AIP-134's UpdateXRequest shape: the resource is wrapped and the field
@@ -315,24 +344,100 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 		reqURL += maskQuery(reqURL, mask)
 	}
 
-	if err := ctx.Err(); err != nil {
-		return nil, err // last point before the resource is modified
+	return p.client.Do(ctx, ty.UpdateVerb, reqURL, body)
+}
+
+// topLevelFields are the distinct top-level fields a mask names, in mask
+// order ("logConfig.enable" is logConfig).
+func topLevelFields(mask []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range mask {
+		f, _, _ := strings.Cut(m, ".")
+		if !seen[f] {
+			seen[f] = true
+			out = append(out, f)
+		}
 	}
-	resp, err := p.client.Do(ctx, ty.UpdateVerb, reqURL, body)
+	return out
+}
+
+// patchOneFieldAtATime is Update for an API that refuses a patch changing
+// more than one field (see catalog.Type.PatchOneField): one patch per
+// changed top-level field, each awaited before the next.
+//
+// THE ONE PLACE UPDATE READS. Each patch changes the resource's fingerprint,
+// and the next patch must quote the new one or it is refused with a 412, so
+// the lock is read afresh before every patch after the first. The diff is
+// still the one taken against the observation Update was handed; only the
+// lock is re-read.
+//
+// The orphan rule as elsewhere: the first failure before anything is sent is
+// returned, and one after is reported and followed by a truthful read.
+func (p *Provider) patchOneFieldAtATime(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, desired *resource.DesiredResource,
+	attrs map[string]value.Value, reqURL string, body map[string]any, mask, fields []string, setters []*catalog.Setter) (*resource.ResourceState, error) {
+	var lock any
+	if ty.LockField != "" {
+		if a, v := lockValue(ty, current.Attributes); v.Known {
+			lock = wireValue(a, v)
+		}
+	}
+	var failure error
+	for i, f := range fields {
+		part := map[string]any{f: body[f]}
+		var partMask []string
+		for _, m := range mask {
+			if m == f || strings.HasPrefix(m, f+".") {
+				partMask = append(partMask, m)
+			}
+		}
+		if i == 0 {
+			if err := ctx.Err(); err != nil {
+				return nil, err // last point before the resource is modified
+			}
+		} else if ty.LockField != "" {
+			fresh, err := p.freshLock(ctx, ty, current.ProviderID, attrs)
+			if err != nil {
+				failure = err
+				break
+			}
+			lock = fresh
+		}
+		if lock != nil {
+			part[ty.LockField] = lock
+		}
+		resp, err := p.sendPatch(context.WithoutCancel(ctx), ty, reqURL, part, partMask)
+		if err != nil && i == 0 {
+			return nil, err
+		}
+		if err == nil {
+			_, err = p.await(ctx, ty, resp)
+		}
+		if err != nil {
+			failure = err
+			break
+		}
+	}
+	if failure != nil {
+		fmt.Fprintf(os.Stderr, "gcp: %s: a one-field patch failed after an earlier one applied, reading back what exists: %v\n",
+			ty.Name, failure)
+	}
+	return p.updateThroughSetters(ctx, ty, current, desired, setters, true, failure)
+}
+
+// freshLock reads the resource for the current value of its lock field.
+func (p *Provider) freshLock(ctx context.Context, ty *catalog.Type, id string, attrs map[string]value.Value) (any, error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Duration(ty.TimeoutSeconds)*time.Second)
+	defer cancel()
+	getURL, err := p.itemURL(ty, "", id, attrs)
 	if err != nil {
-		// The PATCH itself failed, so nothing was changed, and state still
-		// records the resource at the id it already had. Safe to error.
 		return nil, err
 	}
-
-	// From here on the patch is real, and errors are REPORTED, not returned,
-	// for as long as there is a truthful state to return instead.
-	_, awaitErr := p.await(ctx, ty, resp)
-	if awaitErr != nil {
-		fmt.Fprintf(os.Stderr, "gcp: %s: update reported a failure, reading back what exists: %v\n",
-			ty.Name, awaitErr)
+	got, err := p.client.Do(ctx, http.MethodGet, getURL, nil)
+	if err != nil {
+		return nil, err
 	}
-	return p.updateThroughSetters(ctx, ty, current, desired, setters, true, awaitErr)
+	return got[ty.LockField], nil
 }
 
 // updateThroughSetters sends the setters Update found changed, then reads
