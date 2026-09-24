@@ -615,7 +615,7 @@ patchable:
       implements that call.
 
   gcp.subnetwork:
-    fields: [secondaryIpRanges, role, stackType, privateIpv6GoogleAccess]
+    fields: [secondaryIpRanges, role, stackType, privateIpv6GoogleAccess, logConfig]
     note: >
       compute.subnetworks.patch, read from the pinned Discovery document on
       2026-09-23: "Only certain fields can be updated with a patch request as
@@ -626,18 +626,19 @@ patchable:
       updated with a patch request"), stackType and privateIpv6GoogleAccess
       ("can be both set at resource creation time and updated using patch").
       privateIpGoogleAccess is updated by a separate method,
-      setPrivateIpGoogleAccess, and ipCidrRange by expandIpCidrRange; this
-      provider calls neither, so both replace. ipv6AccessType is "immutable
+      setPrivateIpGoogleAccess, and ipCidrRange by expandIpCidrRange; since
+      2026-09-24 both are setters (magic-modules names them per field), so
+      neither needs to be on this list. ipv6AccessType is "immutable
       and can only be specified during creation or the first time the subnet
       is updated into IPV4_IPV6 dual stack", a transition this list does not
       try to model.
 
-      NOT LISTED, AND WORTH CONFIRMING LIVE: logConfig. Turning flow logs on
-      and off is the commonest subnetwork change there is, and compute's own
-      documentation elsewhere does it by patch -- but its field description
-      here says nothing either way, and the rule for this list is Google's
-      text. So today a flow-log change plans a REPLACEMENT, loudly. If the live
-      suite shows a patch accepts it, add it here.
+      logConfig is listed on evidence rather than on Google's text, which says
+      nothing either way: magic-modules patches it with the fingerprint, and
+      the live probe on 2026-09-24 (TestLiveProbes) sent exactly that patch to
+      a real subnetwork and Google applied it -- flow logs on, at the interval
+      sent. Turning flow logs on and off is the commonest subnetwork change
+      there is, and until this it planned a replacement.
 
       This entry was held back until 2026-09-23 because of the fingerprint,
       not the field list. Every update needs the current one, and the update

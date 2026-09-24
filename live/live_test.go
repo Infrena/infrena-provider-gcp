@@ -2440,7 +2440,8 @@ resources:
 		body = strings.Replace(body, "    autoCreateSubnetworks: false\n",
 			"    autoCreateSubnetworks: false\n    routingConfig:\n      routingMode: GLOBAL\n", 1)
 		body = strings.Replace(body, "    network: ${net.selfLink}\n",
-			"    network: ${net.selfLink}\n    secondaryIpRanges:\n      - rangeName: extra\n        ipCidrRange: 10.185.0.0/24\n", 1)
+			"    network: ${net.selfLink}\n    secondaryIpRanges:\n      - rangeName: extra\n        ipCidrRange: 10.185.0.0/24\n"+
+				"    logConfig:\n      enable: true\n      aggregationInterval: INTERVAL_10_MIN\n", 1)
 		write(t, dir, "infrena.yml", body)
 
 		out := filepath.Join(t.TempDir(), "plan.json")
@@ -2451,7 +2452,7 @@ resources:
 		}
 		for _, c := range changes {
 			if c.Kind != "update" {
-				t.Errorf("%s plans a %s; routingConfig and secondaryIpRanges are both patchable, "+
+				t.Errorf("%s plans a %s; routingConfig, secondaryIpRanges and logConfig are all patchable, "+
 					"so a replace means the allowlist is wrong: %v", c.Address, c.Kind, c.Reasons)
 			}
 		}
@@ -2466,6 +2467,9 @@ resources:
 			SecondaryIPRanges []struct {
 				RangeName string `json:"rangeName"`
 			} `json:"secondaryIpRanges"`
+			LogConfig struct {
+				Enable bool `json:"enable"`
+			} `json:"logConfig"`
 		}
 		code, raw, err := g.get(t.Context(), g.computeURL(subPath))
 		if err == nil && code == http.StatusOK {
@@ -2473,6 +2477,9 @@ resources:
 		}
 		if err != nil || len(subnet.SecondaryIPRanges) != 1 || subnet.SecondaryIPRanges[0].RangeName != "extra" {
 			t.Errorf("google's subnetwork does not carry the new secondary range: %d %s %v", code, raw, err)
+		}
+		if !subnet.LogConfig.Enable {
+			t.Errorf("google's subnetwork does not have flow logs on after the patch: %s", raw)
 		}
 		var network struct {
 			RoutingConfig struct {
