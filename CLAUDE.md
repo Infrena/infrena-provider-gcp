@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-The GCP provider for infrena: an out-of-process plugin serving 235 resource types generated from
+The GCP provider for infrena: an out-of-process plugin serving 239 resource types generated from
 Google's API Discovery documents plus a vendored magic-modules overlay.
 
 ## Where the contract lives
@@ -53,6 +53,18 @@ scripts/release-check vX.Y.Z
   It also refuses a patch whose request schema is not the resource's own (Pub/Sub's
   `UpdateTopicRequest` wraps it and puts the mask in the body) or whose path is not the `get` path.
   A type with no verb is not merely unpatchable: the host **replaces** it.
+- **Discovery carries field behaviour in prose, and all of it matters.** Proto-first APIs write a run
+  of tags at the start of a description ("Optional. Input only. Immutable."), compute writes
+  "[Output Only]" / "[Input Only]". Read the whole leading run with `disco.Behaviors`, never a
+  prefix and never a search of the whole text. `Immutable.` is ORed into ForceNew with
+  magic-modules; `Input only.` fields are never returned and the reconciler carries them forward.
+- **Recognise an operation by its shape, not its schema name.** `Operation`,
+  `GoogleLongrunningOperation` and `ApigatewayOperation` are the same thing. Treating a pending
+  operation as the resource puts it into state, the host refuses it, and the real resource is
+  orphaned. A resource can look like an operation from one field (dataproc's `Job` has `done`).
+- **Test the path production takes.** The reconciler is built in more than one place; a flag only
+  one constructor set once left a fix on in the tests and off in production. And the fake echoes
+  whatever it is sent, so test a field Google never returns by SEEDING the fake without it.
 - **Provider IDs are relative resource names** (`projects/p/zones/z/instances/web1`). None of the
   AWS `<region>/<identifier>` machinery applies: GCP names are already hierarchical and unique,
   which is what that machinery exists to fake.
