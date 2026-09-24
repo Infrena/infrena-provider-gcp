@@ -246,3 +246,43 @@ func addCreateIDParameter(t *catalog.Type, attrs map[string]*catalog.Attr, creat
 func selfLinkEndsInName(tmpl string) bool {
 	return strings.HasSuffix(tmpl, "/{{name}}") || strings.HasSuffix(tmpl, "/{name}")
 }
+
+// fillPreCreateTokens binds a create-url query value magic-modules leaves as
+// PRE_CREATE_REPLACE_ME, for its pre_create hook to fill, to an attribute of
+// the same name as the query parameter, which the user writes. compute's
+// NodeGroup: "?initialNodeCount=PRE_CREATE_REPLACE_ME", filled by Terraform
+// from initial_size. The parameter is Discovery's (initialNodeCount, a
+// required integer), so the attribute is typed and required from it, and
+// create-only: it is a query parameter of the insert and nothing else.
+//
+// Only a token Discovery publishes as a query parameter of the create is
+// bound. Anything else is left in place, and the type is refused with the
+// token named (buildType).
+func fillPreCreateTokens(t *catalog.Type, attrs map[string]*catalog.Attr, create *disco.Method) {
+	path, query, ok := strings.Cut(t.CreateURL, "?")
+	if !ok || create == nil || !strings.Contains(query, "PRE_CREATE_REPLACE_ME") {
+		return
+	}
+	kvs := strings.Split(query, "&")
+	for i, kv := range kvs {
+		k, v, _ := strings.Cut(kv, "=")
+		p := create.Parameters[k]
+		if v != "PRE_CREATE_REPLACE_ME" || p == nil || p.Location != "query" {
+			continue
+		}
+		if a := attrs[k]; a == nil {
+			attrs[k] = &catalog.Attr{
+				Canonical:   k,
+				Kind:        KindOf(&disco.Schema{Type: p.Type, Format: p.Format}),
+				ForceNew:    true,
+				CreateOnly:  true,
+				Required:    p.Required,
+				Description: strings.TrimSpace(p.Description),
+			}
+		} else if a.Output {
+			continue
+		}
+		kvs[i] = k + "={{" + k + "}}"
+	}
+	t.CreateURL = path + "?" + strings.Join(kvs, "&")
+}

@@ -937,10 +937,21 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.Description = mm.Description
 		t.BaseURL = mm.BaseURL
 		t.CreateURL = mm.CreateURL
-		t.UpdateURL = mm.UpdateURL
 		t.DeleteURL = mm.DeleteURL
 		t.SelfLink = mm.SelfLink
-		t.UpdateVerb = mm.UpdateVerb
+		// PATCH or nothing, from magic-modules too. Its update_verb is
+		// Terraform's whole-object update, and BuildMask sends only what
+		// the diff changed: POSTed to monitoring's metricDescriptors (a
+		// create that overwrites) it would wipe every field it left out,
+		// and pubsub's schemas :commit takes a CommitSchemaRequest wrapper
+		// this provider does not build. Refused, the type is replaced on
+		// change, which is the safe direction.
+		if mm.UpdateVerb == "" || strings.EqualFold(mm.UpdateVerb, http.MethodPatch) {
+			t.UpdateVerb = mm.UpdateVerb
+			t.UpdateURL = mm.UpdateURL
+		} else {
+			t.UpdateURL = ""
+		}
 		t.UpdateMask = mm.UpdateMask
 		if len(mm.ImportFormat) > 0 {
 			t.ImportFormat = strings.Join(mm.ImportFormat, "\n")
@@ -962,6 +973,17 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// would address the wrong resource.
 	if t.SelfLink == "" {
 		if get := col.Methods["get"]; get != nil {
+			t.SelfLink = get.Path
+		}
+	}
+	// magic-modules writes some self_links as one bare placeholder,
+	// "v3/{{name}}", where name is the FULL resource name
+	// (projects/p/alertPolicies/123). As a {{...}} placeholder its slashes
+	// would be escaped, and the collection check refused all five such types.
+	// Discovery's get path says the same address correctly -- "v3/{+name}",
+	// reserved expansion, slashes kept -- so it is used instead.
+	if bareMMPlaceholderRE.MatchString(t.SelfLink) {
+		if get := col.Methods["get"]; get != nil && isBareCapture(strings.TrimPrefix(get.Path, versionPrefixOf(get.Path))) {
 			t.SelfLink = get.Path
 		}
 	}
@@ -1294,6 +1316,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	bindCreateQueryID(t, t.Attributes, create)
 	// And when the url carries no id at all: see addCreateIDParameter.
 	addCreateIDParameter(t, t.Attributes, create)
+	// And a query value magic-modules leaves for its pre_create hook to fill.
+	fillPreCreateTokens(t, t.Attributes, create)
 
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err
@@ -2406,4 +2430,17 @@ func endpointTemplate(doc *disco.Document, mm *mmv1.Resource, t *catalog.Type) s
 		}
 	}
 	return tmpl
+}
+
+// bareMMPlaceholderRE is a magic-modules self_link that is one placeholder
+// and at most a version segment: "v3/{{name}}", "{{name}}".
+var bareMMPlaceholderRE = regexp.MustCompile(`^(?:v[0-9][0-9a-z]*/)?\{\{[a-z_]+\}\}$`)
+
+// versionPrefixOf is a path's leading version segment with its slash
+// ("v3/"), or "".
+func versionPrefixOf(path string) string {
+	if m := regexp.MustCompile(`^v[0-9][0-9a-z]*/`).FindString(path); m != "" {
+		return m
+	}
+	return ""
 }

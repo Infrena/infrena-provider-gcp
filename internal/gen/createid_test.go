@@ -5,6 +5,7 @@ import (
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/disco"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 // createIDDoc publishes two collections that are identical except for one
@@ -401,5 +402,26 @@ properties:
 	}
 	if id := ty.Attributes["clashId"]; id == nil || !id.Output || id.CreateOnly {
 		t.Errorf("the resource's own clashId was disturbed: %+v", id)
+	}
+}
+
+// TestAPreCreateTokenIsBoundToTheQueryParameterItStandsFor. compute's
+// NodeGroup create url carries "?initialNodeCount=PRE_CREATE_REPLACE_ME" for
+// Terraform's pre_create to fill; Discovery publishes initialNodeCount as a
+// required integer query parameter, so it becomes a create-only attribute
+// the user writes. A token Discovery does not publish is left, and the type
+// is refused (TestACreateURLCarryingAPreCreateTokenIsRefused).
+func TestAPreCreateTokenIsBoundToTheQueryParameterItStandsFor(t *testing.T) {
+	ty := &catalog.Type{CreateURL: "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME"}
+	attrs := map[string]*catalog.Attr{"name": {Canonical: "name", Kind: value.KindString}}
+	create := &disco.Method{Parameters: map[string]*disco.Parameter{
+		"initialNodeCount": {Type: "integer", Format: "int32", Location: "query", Required: true, Description: "Initial count of nodes."}}}
+	fillPreCreateTokens(ty, attrs, create)
+	if want := "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount={{initialNodeCount}}"; ty.CreateURL != want {
+		t.Errorf("create url = %q, want %q", ty.CreateURL, want)
+	}
+	a := attrs["initialNodeCount"]
+	if a == nil || !a.Required || !a.CreateOnly || !a.ForceNew || a.Kind != value.KindInt {
+		t.Errorf("initialNodeCount = %+v, want a required create-only integer", a)
 	}
 }
