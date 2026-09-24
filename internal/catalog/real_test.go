@@ -849,9 +849,9 @@ func TestDefinitionsCarryListElements(t *testing.T) {
 // rule names its protocol.
 //
 // A one-letter word in a snake_case name is the signature. It is not a perfect
-// rule, and the corpus DOES hold two legitimate instances -- dataproc's
-// sparkRJob and mainRFileUri, where the R is the R language and a real
-// one-letter word. They are allowed by name below rather than by loosening the
+// rule, and the corpus DOES hold legitimate instances -- dataproc's
+// sparkRJob and mainRFileUri, where the R is the R language, and BigQuery
+// ML's rSquared and calculatePValues -- each a real one-letter word. They are allowed by name below rather than by loosening the
 // rule, because loosening it to accept any single letter would accept every
 // shattered acronym it exists to catch.
 //
@@ -867,7 +867,10 @@ func TestNoAliasIsAMangledAcronym(t *testing.T) {
 	}
 	oneLetter := regexp.MustCompile(`(^|_)[a-z](_|$)`)
 	// Real one-letter words, not shattered acronyms. See the doc comment.
-	allowed := map[string]bool{"spark_r_job": true, "main_r_file_uri": true}
+	// r_squared and calculate_p_values arrived with gcp.bigquery.job on
+	// 2026-09-24: R-squared and p-values, statistics' own one-letter words.
+	allowed := map[string]bool{"spark_r_job": true, "main_r_file_uri": true,
+		"r_squared": true, "calculate_p_values": true}
 	checked := 0
 	var walk func(tyName, path string, as map[string]*Attr)
 	walk = func(tyName, path string, as map[string]*Attr) {

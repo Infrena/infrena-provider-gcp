@@ -2,8 +2,9 @@
 
 # cloudtasks
 
-1 type(s). [Back to the index](../README.md).
+2 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
+| [`gcp.cloudtasks.queue`](gcp.cloudtasks.queue.md) | yes | yes | yes | A named resource to which messages are sent by publishers. |
 | [`gcp.task`](gcp.task.md) | **no** | **no** | yes | A unit of scheduled work. |

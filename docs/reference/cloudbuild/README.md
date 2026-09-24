@@ -2,8 +2,9 @@
 
 # cloudbuild
 
-1 type(s). [Back to the index](../README.md).
+2 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.connection`](gcp.connection.md) | yes | yes | yes | A connection to a SCM like GitHub, GitHub Enterprise, Bitbucket Data Center/Cloud or GitLab. |
+| [`gcp.repository`](gcp.repository.md) | yes | **no** | yes | A repository associated to a parent connection. |

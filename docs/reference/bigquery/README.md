@@ -2,10 +2,12 @@
 
 # bigquery
 
-3 type(s). [Back to the index](../README.md).
+5 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
+| [`gcp.bigquery.job`](gcp.bigquery.job.md) | yes | **no** | yes | Jobs are actions that BigQuery runs on your behalf to load data, export data, query data, or copy data. |
 | [`gcp.bigquery.table`](gcp.bigquery.table.md) | yes | yes | yes | A Table that belongs to a Dataset |
 | [`gcp.dataset`](gcp.dataset.md) | yes | yes | yes | Datasets allow you to organize and control access to your tables. |
 | [`gcp.routine`](gcp.routine.md) | yes | **no** | yes | A user-defined function or a stored procedure that belongs to a Dataset |
+| [`gcp.rowaccesspolicy`](gcp.rowaccesspolicy.md) | yes | **no** | yes | Represents access on a subset of rows on the specified table, defined by its filter predicate. |
