@@ -97,3 +97,50 @@ func TestLiveProbeDNSDescriptionRequired(t *testing.T) {
 		}
 	}
 }
+
+// TestLiveManagedZone is gcp.managedzone on real Google, shipped since P0 and
+// never run live until the DNS policy showed that Cloud DNS answers with no
+// selfLink: the provider id then comes from the resource's name.
+func TestLiveManagedZone(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	zone := "infrena-zone-" + n.run
+	url := "https://dns.googleapis.com/dns/v1/projects/" + project + "/managedZones/" + zone
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 5*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.managedzone", url, url)
+	})
+	cfg := func(desc string) string {
+		return fmt.Sprintf(`project: infrena-gcp-live-zone
+%sresources:
+  zone:
+    type: gcp.managedzone
+    name: %s
+    dnsName: %s.example.com.
+    visibility: private
+    description: %s
+`, liveProvider(project, sa), zone, zone, desc)
+	}
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", cfg("created by the infrena live suite"))
+	applyOK(t, dir, "create")
+	if changes := planIs(t, dir, exitOK); len(changes) != 0 {
+		t.Errorf("the plan after creating the zone proposes %v", changes)
+	}
+	write(t, dir, "infrena.yml", cfg("changed by the infrena live suite"))
+	changes := planIs(t, dir, exitChanges)
+	if len(changes) != 1 || changes[0].Kind != "update" {
+		t.Fatalf("a description change plans %v, want one update", changes)
+	}
+	applyOK(t, dir, "update")
+	if changes := planIs(t, dir, exitOK); len(changes) != 0 {
+		t.Errorf("the plan after the update proposes %v", changes)
+	}
+	write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+	applyOK(t, dir, "destroy")
+	if code, _, err := g.get(t.Context(), url); err == nil && code == http.StatusOK {
+		t.Error("the zone is still there after a successful destroy")
+	}
+}
