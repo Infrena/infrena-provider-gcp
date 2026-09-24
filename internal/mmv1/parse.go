@@ -87,6 +87,12 @@ type Field struct {
 	// are not counted by the tier gate. 446 and 610 fields.
 	CustomExpand  string `yaml:"custom_expand"`
 	CustomFlatten string `yaml:"custom_flatten"`
+
+	// DiffSuppressFunc names the Go function Terraform uses to call two
+	// spellings of the field equal: "80" and "80-80" for a port range. The
+	// function is in magic-modules' MPL code and is never copied; its NAME is
+	// data, and internal/gen maps the names it knows to rules written here.
+	DiffSuppressFunc string `yaml:"diff_suppress_func"`
 }
 
 // ItemType is an Array's element type.

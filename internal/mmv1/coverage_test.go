@@ -57,7 +57,7 @@ var ignoredFieldKeys = map[string]string{
 	"tgc_ignore_read": "terraform-google-conversion", "tgc_ignore_terraform_custom_flatten": "terraform-google-conversion",
 	"is_missing_in_cai": "cloud asset conversion", "include_empty_value_in_cai": "cloud asset conversion",
 	"exclude_false_in_cai": "cloud asset conversion",
-	"diff_suppress_func":   "tf plan-time Go", "state_func": "tf state Go", "set_hash_func": "tf set hashing",
+	"state_func":           "tf state Go", "set_hash_func": "tf set hashing",
 	"key_expander": "tf map key Go", "validation": "tf client-side validation; the API validates",
 	"item_validation": "tf client-side validation; the API validates",
 	"at_least_one_of": "tf validation; the API validates", "conflicts": "tf validation; the API validates",

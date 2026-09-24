@@ -1,6 +1,7 @@
 package gcprov
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -85,8 +86,48 @@ func (r reconciler) value(attr *catalog.Attr, reference, incoming value.Value) v
 	case attr.Kind == value.KindList && attr.Elem != nil:
 		return r.list(attr, reference, incoming)
 	default:
-		return r.sameProjectSpelling(reference, asDeclaredKind(attr, incoming))
+		return sameByEquivalence(attr, reference, r.sameProjectSpelling(reference, asDeclaredKind(attr, incoming)))
 	}
+}
+
+// sameByEquivalence returns the reference's spelling when the attribute's
+// Equivalence says it and Google's answer are the same value written two
+// ways. The same job sameProjectSpelling does for projects, for the rules
+// the catalog names: see catalog.Attr.Equivalence.
+func sameByEquivalence(attr *catalog.Attr, reference, incoming value.Value) value.Value {
+	if attr.Equivalence == "" || reference.Kind != value.KindString || incoming.Kind != value.KindString || !reference.Known {
+		return incoming
+	}
+	want, _ := reference.Raw.(string)
+	got, _ := incoming.Raw.(string)
+	if want == got {
+		return incoming
+	}
+	switch attr.Equivalence {
+	case catalog.EquivalencePortRange:
+		if portRange(want) == "" || portRange(want) != portRange(got) {
+			return incoming
+		}
+	default:
+		return incoming
+	}
+	return value.Value{Kind: value.KindString, Known: true, Raw: want, Source: incoming.Source}
+}
+
+// portRange is a port or port range in its "low-high" form, or "" when s is
+// neither.
+func portRange(s string) string {
+	lo, hi, isRange := strings.Cut(s, "-")
+	if !isRange {
+		hi = lo
+	}
+	if _, err := strconv.Atoi(lo); err != nil {
+		return ""
+	}
+	if _, err := strconv.Atoi(hi); err != nil {
+		return ""
+	}
+	return lo + "-" + hi
 }
 
 // sameProjectSpelling returns the REFERENCE's spelling of a project

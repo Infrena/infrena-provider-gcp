@@ -51,13 +51,18 @@ type RefTarget struct {
 
 // Attr is one attribute, at any depth.
 type Attr struct {
-	Canonical   string           `json:"canonical"`
-	Aliases     []string         `json:"aliases,omitempty"`
-	Kind        value.Kind       `json:"kind"`
-	Required    bool             `json:"required,omitempty"`
-	ForceNew    bool             `json:"force_new,omitempty"`
-	Output      bool             `json:"output,omitempty"`
-	Sensitive   bool             `json:"sensitive,omitempty"`
+	Canonical string     `json:"canonical"`
+	Aliases   []string   `json:"aliases,omitempty"`
+	Kind      value.Kind `json:"kind"`
+	Required  bool       `json:"required,omitempty"`
+	ForceNew  bool       `json:"force_new,omitempty"`
+	Output    bool       `json:"output,omitempty"`
+	Sensitive bool       `json:"sensitive,omitempty"`
+	// Equivalence names a rule by which two different spellings of this
+	// field's value are the same value, so that Google's canonical answer is
+	// not drift against what configuration wrote: "port_range" says "80" and
+	// "80-80" are one range. gcprov's reconciler applies it.
+	Equivalence string           `json:"equivalence,omitempty"`
 	Description string           `json:"description,omitempty"`
 	Ref         *RefTarget       `json:"ref,omitempty"`
 	Fields      map[string]*Attr `json:"fields,omitempty"`
@@ -683,3 +688,7 @@ func (t *Type) DeleteAwaitKind() AwaitKind {
 	}
 	return t.Await
 }
+
+// EquivalencePortRange: a single port and the one-port range it names are
+// the same value, "80" and "80-80".
+const EquivalencePortRange = "port_range"
