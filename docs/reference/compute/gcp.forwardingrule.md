@@ -23,7 +23,7 @@ Its patch is restricted in prose ("Currently, you can only patch the network_tie
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/regions/{{region}}/forwardingRules` |
 | Read | yes | `GET projects/{project}/regions/{region}/forwardingRules/{forwardingRule}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/regions/{region}/forwardingRules/{forwardingRule}` |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/forwardingRules/{forwardingRule}` |
 | Import | yes | by id, see below |
 
@@ -42,8 +42,8 @@ projects/{project}/regions/{region}/forwardingRules/{forwardingRule}
 | `IPAddress` | `ip_address` | `string` | optional | force new | IP address for which this forwarding rule accepts traffic. When a client sends traffic to this IP address, the forwarding rule directs the traffic to the referenced target or backendService. While … |
 | `IPProtocol` | `ip_protocol` | `string` | optional | force new | The IP protocol to which this rule applies. For protocol forwarding, valid options are TCP, UDP, ESP,AH, SCTP, ICMP andL3_DEFAULT. The valid IP protocols are different for different load balancing … |
 | `allPorts` | `all_ports` | `boolean` | optional | force new | The ports, portRange, and allPorts fields are mutually exclusive. Only packets addressed to ports in the specified range will be forwarded to the backends configured with this forwarding rule. The … |
-| `allowGlobalAccess` | `allow_global_access` | `boolean` | optional | force new | If set to true, clients can access the internal passthrough Network Load Balancers, the regional internal Application Load Balancer, and the regional internal proxy Network Load Balancer from all … |
-| `allowPscGlobalAccess` | `allow_psc_global_access` | `boolean` | optional | force new | This is used in PSC consumer ForwardingRule to control whether the PSC endpoint can be accessed from another region. |
+| `allowGlobalAccess` | `allow_global_access` | `boolean` | optional | — | If set to true, clients can access the internal passthrough Network Load Balancers, the regional internal Application Load Balancer, and the regional internal proxy Network Load Balancer from all … |
+| `allowPscGlobalAccess` | `allow_psc_global_access` | `boolean` | optional | — | This is used in PSC consumer ForwardingRule to control whether the PSC endpoint can be accessed from another region. |
 | `attachedExtensions` | `attached_extensions` | `list` | output only | — | Output only. \[Output Only\]. The extensions that are attached to this ForwardingRule. |
 | `attachedExtensions[]` | — | `map` | optional | — | — |
 | `attachedExtensions[].reference` | — | `string` | output only | — | Output only. The resource name. |

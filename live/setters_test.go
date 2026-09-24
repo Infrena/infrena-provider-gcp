@@ -124,7 +124,11 @@ func TestLiveLoadBalancerSetters(t *testing.T) {
 		}
 	})
 
+	var cfgDesc func(urlMap, team, desc string) string
 	cfg := func(urlMap, team string) string {
+		return cfgDesc(urlMap, team, "")
+	}
+	cfgDesc = func(urlMap, team, desc string) string {
 		return fmt.Sprintf(`project: infrena-gcp-live-lb
 %[1]sresources:
   bucket:
@@ -153,10 +157,10 @@ func TestLiveLoadBalancerSetters(t *testing.T) {
     target: ${proxy.selfLink}
     portRange: "80"
     loadBalancingScheme: EXTERNAL_MANAGED
-    labels:
+%[5]s    labels:
       infrena-live: "true"
       team: %[4]s
-`, liveProvider(project, sa), id, urlMap, team)
+`, liveProvider(project, sa), id, urlMap, team, desc)
 	}
 	dir := t.TempDir()
 	write(t, dir, "infrena.yml", cfg("map_a", "a"))
@@ -209,6 +213,30 @@ func TestLiveLoadBalancerSetters(t *testing.T) {
 		}
 		if changes := planIs(t, dir, exitOK); len(changes) != 0 {
 			t.Errorf("the plan after setLabels proposes %v", changes)
+		}
+	})
+
+	// The patchable: list, through infrena: description is a PATCH carrying
+	// the fingerprint the forwarding rule advises, not a replacement.
+	t.Run("a_description_change_is_a_patch", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cfgDesc("map_b", "b", "    description: patched by infrena\n"))
+		changes := planIs(t, dir, exitChanges)
+		if len(changes) != 1 || changes[0].Kind != "update" {
+			t.Fatalf("a description change on the global forwarding rule plans %v; it must be one UPDATE", changes)
+		}
+		applyOK(t, dir, "patch description")
+		var rule struct {
+			Description string `json:"description"`
+		}
+		code, raw, err := g.get(t.Context(), paths[0].url)
+		if err == nil && code == http.StatusOK {
+			err = json.Unmarshal(raw, &rule)
+		}
+		if err != nil || rule.Description != "patched by infrena" {
+			t.Errorf("google's forwarding rule does not carry the new description: %d %s %v", code, raw, err)
+		}
+		if changes := planIs(t, dir, exitOK); len(changes) != 0 {
+			t.Errorf("the plan after the description patch proposes %v", changes)
 		}
 	})
 

@@ -18,6 +18,7 @@ func TestTheLockFieldIsReadFromWhatTheAPISays(t *testing.T) {
 	for desc, want := range map[string]string{
 		"An up-to-date fingerprint must be provided in order to update the Subnetwork, otherwise the request will fail with error 412 conditionNotMet.":                                                                    "fingerprint",
 		"You must always provide an up-to-date fingerprint hash in order to update the instance.":                                                                                                                          "fingerprint",
+		"This field will be ignored when inserting a ForwardingRule. Include the fingerprint in patch request to ensure that you do not overwrite changes that were applied from another concurrent request.":              "fingerprint",
 		"This field will be ignored when\ninserting a BackendService. An up-to-date fingerprint must be provided in\norder to update the BackendService, otherwise the request will fail with\nerror 412 conditionNotMet.": "fingerprint",
 		"A hash of the contents. Output only.": "",
 	} {

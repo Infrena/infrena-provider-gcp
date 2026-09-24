@@ -614,6 +614,37 @@ patchable:
       not through patch, so a label change replaces the image until somebody
       implements that call.
 
+  gcp.forwardingrule:
+    fields: [allowGlobalAccess, allowPscGlobalAccess]
+    note: >
+      compute.forwardingRules.patch says "Currently, you can only patch the
+      network_tier field", and that understates it: the live suite's probe on
+      2026-09-24 patched a global forwarding rule's description and Google
+      applied it. Listed here only what has a source: allowGlobalAccess and
+      allowPscGlobalAccess, because magic-modules patches exactly those two
+      per field (update_url with PATCH on ForwardingRule.yaml), which
+      Terraform users exercise in production. networkTier, the one field
+      Google's sentence names, is NOT listed: magic-modules marks it
+      immutable, either source's immutable makes a field ForceNew here, and
+      listing it would claim a patch that never happens. description is NOT listed for the regional rule: the probe
+      patched a global one, and the regional patch has not been asked. labels
+      and target are not here because setters change them (setLabels,
+      setTarget). Everything else replaces the rule.
+
+  gcp.globalforwardingrule:
+    fields: [description, loadBalancingScheme, externalManagedBackendBucketMigrationState, externalManagedBackendBucketMigrationTestingPercentage]
+    note: >
+      compute.globalForwardingRules.patch carries the same "only the
+      network_tier field" sentence as the regional one, and it is wrong the
+      same way. description is listed on live evidence: the probe on
+      2026-09-24 patched it, with the fingerprint, and Google applied it.
+      loadBalancingScheme and the two backend bucket migration fields are
+      listed because magic-modules patches exactly those per field
+      (GlobalForwardingRule.yaml), for the EXTERNAL to EXTERNAL_MANAGED
+      migration Google documents on those fields. networkTier is not listed,
+      for the regional rule's reason. labels and target change through
+      setLabels and setTarget.
+
   gcp.subnetwork:
     fields: [secondaryIpRanges, role, stackType, privateIpv6GoogleAccess, logConfig]
     one_field_per_patch: true

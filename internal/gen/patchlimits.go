@@ -227,8 +227,11 @@ func normalizePathShape(p string) string {
 // the Subnetwork". It is prose because Discovery has no structure for it.
 // Any whitespace between the words: backend services break the line inside
 // "in order to\nupdate", and a literal space shipped both of them without
-// their lock.
-var lockFieldRE = regexp.MustCompile(`(?i)in\s+order\s+to\s+(?:update|patch)`)
+// their lock. Forwarding rules say it as advice ("Include the fingerprint in
+// patch request to ensure that you do not overwrite changes"): optional to
+// Google, sent here, because it is what keeps a patch from overwriting a
+// concurrent change and the live probe that sent it was accepted.
+var lockFieldRE = regexp.MustCompile(`(?i)in\s+order\s+to\s+(?:update|patch)|include\s+the\s+fingerprint\s+in\s+patch\s+request`)
 
 // lockFieldOf names the field t's API requires, current, in every update, or
 // "". Only a top-level `fingerprint` that says so counts: labelFingerprint

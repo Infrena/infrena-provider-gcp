@@ -23,12 +23,11 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
-| [Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.](#updates-the-specified-forwarding-rule-with-the-data-included-in-the-request-this-method-supportspatch-semantics-and-uses-thejson-merge-patch-format-and-processing-rules-currently-you-can-only-patch-the-network_tier-field) | 2 |
 | [no get method](#no-get-method) | 2 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**369** types did not ship. **62** more ship without a create.
+**367** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -442,15 +441,6 @@ Reported by the generator.
 | `gcp.publicadvertisedprefix` | noupdate | — |
 | `gcp.publicdelegatedprefix` | noupdate | — |
 | `gcp.servicebinding` | noupdate | — |
-
-## Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `gcp.forwardingrule` | noupdate | — |
-| `gcp.globalforwardingrule` | noupdate | — |
 
 ## no get method
 
