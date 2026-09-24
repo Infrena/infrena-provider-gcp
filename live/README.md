@@ -161,14 +161,17 @@ Google directly, finds tag resources by listing rather than from state, and
 when it cannot delete something it prints `CLEANUP FAILED:` with the
 resource id and the url. A silent cleanup failure spends money forever.
 
-### It depends on a resource the provider cannot manage
+### It borrows the project's `default` network
 
-`gcp.firewall`'s `network` is REQUIRED and **`gcp.network` does not ship** —
-compute's `Network` needs four hook rulings the tier gate has not been given,
-and `Subnetwork` one. So the rule references the project's auto-created
-`default` VPC by self link rather than managing it. That is a consequence of
-the tier gate, not an oversight, and it is why the suite cannot be written
-without something somebody else made.
+`gcp.firewall`'s `network` is REQUIRED, and the rule references the project's
+auto-created `default` VPC by self link rather than a network the suite makes.
+
+This used to be forced: `gcp.network` did not ship until compute's `Network` and
+`Subnetwork` hooks were ruled (see `gen/overlay.yaml`). It ships now, so this is
+a choice. Borrowing the default network keeps the suite to one fewer resource to
+create, wait on and clean up, and a leaked VPC is the most expensive thing this
+suite could leave behind. It also means discovery has a Google-made network to
+flag as system-owned, which the discover test asserts.
 
 ## `Retry-After`: measured, not inherited
 
