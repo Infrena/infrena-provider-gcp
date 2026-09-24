@@ -50,8 +50,8 @@ values do not.
 | Label | `infrena-live-tests=true` — **this is what the guard checks**, and it is the one value you must match exactly |
 | Billing account | `012345-567890-ABCDEF` — needed only if the project is not already billed |
 | Service account | `infrena-live@example-project-1234.iam.gserviceaccount.com` |
-| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
-| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager |
+| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin`, `dns.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
+| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager, dns |
 
 If `gcloud projects create` returns `QuotaFailure: you have exceeded your
 allotted project quota`, reusing a dormant project works — but verify it is
