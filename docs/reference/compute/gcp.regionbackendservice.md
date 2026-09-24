@@ -14,7 +14,7 @@ A Region Backend Service defines a regionally-scoped group of virtual machines t
 | Tier | 1 (ruled: The regional twin of compute/BackendService, with different templates.
 encoder (encoders/region_backend_service.go.tmpl) strips the capacity fields (capacityScaler, maxConnections*, maxRate*, maxUtilization) from every backend when the scheme is not a managed one. Terraform's schema defaults them, and the API refuses them for EXTERNAL and INTERNAL schemes. This provider has no defaults, so they go out only if written, and Google's error names the field. The part that sets subsetting to NONE is inside a TargetVersionName != ga guard, so it is not in the GA provider this catalog mirrors.
 decoder (decoders/region_backend_service.go.tmpl) is the same consistentHash drop as the global one, which our changed-fields-only patch does not need. Its subsetting half is behind the same beta guard.
-post_create (compute_region_backend_service_security_policy.go.tmpl) calls setSecurityPolicy, and securityPolicy is "[Output Only]" in Discovery, so the same bounded gap as the global type applies.
+post_create (compute_region_backend_service_security_policy.go.tmpl) calls setSecurityPolicy. Unlike the global type, magic-modules names that method on the field itself (update_url), so this provider calls it too: on update, and after a create the insert ignored it on. Discovery's "[Output Only]" on securityPolicy means only that the insert and patch ignore it. So a Cloud Armor policy CAN be attached here, and cannot on the global type.
 ) |
 | Mutation timeout | 600s |
 

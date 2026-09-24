@@ -339,11 +339,11 @@ rulings:
       A key ring has no update method; everything settable is set at creation.
 
   # P1, the load balancer, ruled 2026-09-24. Every template below was read at
-  # the pinned mmv1 commit (2d08a4a7b218c0c9d6c3ba236eae45193d386f44). These six
-  # are the ones whose hooks are Terraform's own bookkeeping. The other four
-  # (Address, GlobalAddress, ForwardingRule, GlobalForwardingRule) wait on
-  # labels: compute accepts a label change only through setLabels, which this
-  # provider does not call.
+  # the pinned mmv1 commit (2d08a4a7b218c0c9d6c3ba236eae45193d386f44). The
+  # first six are the ones whose hooks are Terraform's own bookkeeping. The
+  # last four (Address, GlobalAddress, ForwardingRule, GlobalForwardingRule)
+  # waited on labels, which compute changes only through setLabels, until the
+  # generator learned magic-modules' per-field setters.
   compute/BackendService:
     hooks: [decoder, encoder, post_create, post_update]
     note: >
@@ -392,8 +392,12 @@ rulings:
       patch does not need. Its subsetting half is behind the same beta guard.
 
       post_create (compute_region_backend_service_security_policy.go.tmpl)
-      calls setSecurityPolicy, and securityPolicy is "[Output Only]" in
-      Discovery, so the same bounded gap as the global type applies.
+      calls setSecurityPolicy. Unlike the global type, magic-modules names
+      that method on the field itself (update_url), so this provider calls it
+      too: on update, and after a create the insert ignored it on. Discovery's
+      "[Output Only]" on securityPolicy means only that the insert and patch
+      ignore it. So a Cloud Armor policy CAN be attached here, and cannot on
+      the global type.
 
   compute/BackendBucket:
     hooks: [encoder, post_create, post_update]
@@ -446,6 +450,65 @@ rulings:
       by writing an empty list therefore sends [] rather than null. Google
       requires the list empty whenever the profile is not CUSTOM, and whether
       it treats [] the same as null is not verified.
+
+  compute/Address:
+    hooks: [post_create]
+    note: >
+      post_create (post_create/labels.tmpl) calls setLabels after the insert,
+      because compute's labels "can only be added or modified by the
+      setLabels method". This provider does the same thing generically:
+      magic-modules names setLabels as the labels field's update_url, so it
+      is a setter here, and a create whose read-back is missing configured
+      labels calls it (gcprov.setAfterCreate). A later label change calls it
+      too. addresses publish no patch at all, so every other change replaces
+      the address, which is what the API does with it anyway.
+
+  compute/GlobalAddress:
+    hooks: [post_create, pre_create]
+    note: >
+      post_create is the same labels.tmpl as compute/Address, handled the same
+      way.
+
+      pre_create (pre_create/compute_global_address.go.tmpl) sets networkTier
+      to PREMIUM unless addressType is INTERNAL. Discovery's own description
+      of the field says "global external IP addresses are always Premium
+      Tier", so leaving it unset gets the same tier from Google. Terraform
+      sends it because its schema would otherwise record no value.
+
+  compute/ForwardingRule:
+    hooks: [post_create, pre_create]
+    note: >
+      post_create is labels.tmpl, handled as on compute/Address. target also
+      has a setter (setTarget), so pointing a forwarding rule at a new target
+      is an update, not a replacement.
+
+      pre_create (pre_create/compute_forwarding_rule.go.tmpl) removes labels
+      from the insert when the target is a Private Service Connect service
+      attachment, because Google refuses labels on those creates. THE BOUNDED
+      GAP: a PSC forwarding rule configured with labels fails its create with
+      Google's own error. Leave labels off it.
+
+      Its patch is restricted in prose ("Currently, you can only patch the
+      network_tier field"), so without a patchable: list every field no setter
+      carries replaces the rule. Terraform patches allowGlobalAccess and
+      allowPscGlobalAccess as well; which list is right is open and will be
+      settled live.
+
+  compute/GlobalForwardingRule:
+    hooks: [post_create, pre_create]
+    note: >
+      The global twin. post_create is labels.tmpl and target has setTarget, as
+      on compute/ForwardingRule.
+
+      pre_create (pre_create/compute_global_forwarding_rule.go.tmpl) removes
+      labels from the insert when the target is a PSC service attachment or
+      one of the Google API bundles "all-apis" and "vpc-sc". The same bounded
+      gap as the regional rule applies: labels on those fail the create
+      loudly.
+
+      Its patch carries the same prose restriction as the regional one, so
+      the same rule applies, and the same open question about what
+      Terraform additionally patches.
 
   # ----------------------------------------------------------------------------
   # NOT RULED. One P0 candidate is left. The names are decided; it now waits on

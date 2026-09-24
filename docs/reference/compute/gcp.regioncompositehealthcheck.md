@@ -39,7 +39,7 @@ projects/{{project}}/regions/{{region}}/compositeHealthChecks/{{name}}
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
 | `fingerprint` | — | `string` | output only | — | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a CompositeHealthCheck. An up-to-date … |
-| `healthDestination` | `health_destination` | `string` | required | — | URL to the destination resource. Must be set. Must be aForwardingRule. The ForwardingRule must have load balancing scheme INTERNAL orINTERNAL_MANAGED and must be regional and in the same region as … |
+| `healthDestination` | `health_destination` | `string` | required | refers to `gcp.forwardingrule.selfLink` | URL to the destination resource. Must be set. Must be aForwardingRule. The ForwardingRule must have load balancing scheme INTERNAL orINTERNAL_MANAGED and must be regional and in the same region as … |
 | `healthSources` | `health_sources` | `list` | optional | — | URLs to the HealthSource resources whose results are AND'ed. I.e. he aggregated result is is HEALTHY only if all sources are HEALTHY. Must have at least 1. Must not have more than 10. Must be … |
 | `healthSources[]` | — | `string` | optional | — | — |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] A unique identifier for this resource type. The server generates this identifier. |
@@ -48,3 +48,11 @@ projects/{{project}}/regions/{{region}}/compositeHealthChecks/{{name}}
 | `region` | — | `string` | output only | force new | Output only. \[Output Only\] URL of the region where the composite health check resides. This field applies only to the regional resource. You must specify this field as part of the HTTP request URL … |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. \[Output Only\] Server-defined URL for the resource. |
 | `selfLinkWithId` | `self_link_with_id` | `string` | output only | — | Output only. \[Output Only\] Server-defined URL with id for the resource. |
+
+## References
+
+These attributes name another type. infrena uses them to order a plan.
+
+| Attribute | Points at |
+| --- | --- |
+| `healthDestination` | `gcp.forwardingrule.selfLink` |

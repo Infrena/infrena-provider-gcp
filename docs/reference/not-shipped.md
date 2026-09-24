@@ -17,17 +17,18 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 71 |
+| [unruled wire hooks](#unruled-wire-hooks) | 67 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
+| [Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.](#updates-the-specified-forwarding-rule-with-the-data-included-in-the-request-this-method-supportspatch-semantics-and-uses-thejson-merge-patch-format-and-processing-rules-currently-you-can-only-patch-the-network_tier-field) | 2 |
 | [no get method](#no-get-method) | 2 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**371** types did not ship. **62** more ship without a create.
+**369** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -310,12 +311,8 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `cloudresourcemanager/Lien` | 2 | decoder, pre_delete |
 | `cloudscheduler/Job` | 2 | encoder, post_create, post_update, update_encoder |
 | `cloudtasks/Queue` | 2 | post_create, post_update |
-| `compute/Address` | 2 | post_create |
 | `compute/Disk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
 | `compute/FirewallPolicy` | 2 | post_create, post_delete, post_update |
-| `compute/ForwardingRule` | 2 | post_create, pre_create |
-| `compute/GlobalAddress` | 2 | post_create, pre_create |
-| `compute/GlobalForwardingRule` | 2 | post_create, pre_create |
 | `compute/GlobalVmExtensionPolicy` | 2 | post_delete, pre_delete, pre_update |
 | `compute/Interconnect` | 2 | post_create |
 | `compute/InterconnectAttachment` | 2 | post_create, pre_delete |
@@ -445,6 +442,15 @@ Reported by the generator.
 | `gcp.publicadvertisedprefix` | noupdate | — |
 | `gcp.publicdelegatedprefix` | noupdate | — |
 | `gcp.servicebinding` | noupdate | — |
+
+## Updates the specified forwarding rule with the data included in the request. This method supportsPATCH semantics and uses theJSON merge patch format and processing rules. Currently, you can only patch the network_tier field.
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `gcp.forwardingrule` | noupdate | — |
+| `gcp.globalforwardingrule` | noupdate | — |
 
 ## no get method
 
