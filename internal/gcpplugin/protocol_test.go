@@ -306,3 +306,90 @@ func TestAnEndpointOverrideThatIsNotAUrlIsRefused(t *testing.T) {
 		t.Errorf("the error does not name the variable at fault: %v", err)
 	}
 }
+
+// TestAPubSubTopicLivesAndDiesThroughTheHost runs gcp.topic -- the REAL
+// generated catalog entry, through the host's own adapter -- from create to
+// delete. Pub/Sub is the one API whose shape differs at both ends: a create is
+// a PUT to the topic's own path, where every other API in the catalog POSTs to
+// a collection, and an update is AIP-134's UpdateTopicRequest envelope with the
+// field mask in the body. Either one wrong and every call fails, so this
+// asserts the wire, not just the resulting state.
+func TestAPubSubTopicLivesAndDiesThroughTheHost(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	prov := configured(t, s)
+	ctx := context.Background()
+
+	const id = "projects/host-project/topics/orders"
+	const path = "/v1/" + id
+	labels := func(owner string) value.Value {
+		return value.Map(map[string]value.Value{"owner": value.String(owner, value.SourceExplicit)}, value.SourceExplicit)
+	}
+	desired := &resource.DesiredResource{Type: "gcp.topic", Attrs: map[string]value.Value{
+		"name":   value.String(id, value.SourceExplicit),
+		"labels": labels("platform"),
+	}}
+
+	created, err := prov.Create(ctx, desired)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.ProviderID != id {
+		t.Fatalf("provider id = %q, want %q", created.ProviderID, id)
+	}
+	var sawPut bool
+	for _, r := range s.Requests() {
+		if r.Path == path && r.Method == "PUT" {
+			sawPut = true
+		}
+		if r.Method == "POST" {
+			t.Errorf("create POSTed to %s; Pub/Sub creates with a PUT to the topic's own path", r.Path)
+		}
+	}
+	if !sawPut {
+		t.Fatalf("no PUT to %s; requests were %v", path, s.Requests())
+	}
+
+	read, err := prov.Read(ctx, created)
+	if err != nil || read == nil {
+		t.Fatalf("read: %v (state %v)", err, read)
+	}
+
+	desired.Attrs["labels"] = labels("someone-else")
+	updated, err := prov.Update(ctx, read, desired)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	var patch *gcpfake.Request
+	for _, r := range s.Requests() {
+		if r.Method == "PATCH" && r.Path == path {
+			r := r
+			patch = &r
+		}
+	}
+	if patch == nil {
+		t.Fatal("no PATCH was sent")
+	}
+	if _, onQuery := patch.Query["updateMask"]; onQuery {
+		t.Error("the mask went on the query string; UpdateTopicRequest carries it in the body")
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(patch.Body, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if _, wrapped := envelope["topic"].(map[string]any); !wrapped || envelope["updateMask"] != "labels" {
+		t.Errorf("update body is not UpdateTopicRequest{topic, updateMask: labels}: %s", patch.Body)
+	}
+	got, _ := updated.Attributes["labels"].Raw.(map[string]value.Value)
+	if owner, _ := got["owner"].Raw.(string); owner != "someone-else" {
+		t.Errorf("after the update the owner label is %q, want %q", owner, "someone-else")
+	}
+
+	if err := prov.Delete(ctx, updated); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, still := s.Get(path); still {
+		t.Error("the topic is still there after a delete the host reported as successful")
+	}
+}

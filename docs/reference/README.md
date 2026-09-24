@@ -2,12 +2,12 @@
 
 # GCP type reference
 
-This plugin serves **239 types** across 35 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
+This plugin serves **243 types** across 35 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
 - Catalog generated: 2026-09-24
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
-**[Types that are not served, and why](not-shipped.md)** — 376 entries. Read that page first if the type you want is missing from this one.
+**[Types that are not served, and why](not-shipped.md)** — 372 entries. Read that page first if the type you want is missing from this one.
 
 ## Services
 
@@ -16,7 +16,7 @@ This plugin serves **239 types** across 35 Google Cloud services. Every page bel
 | [accesscontextmanager](accesscontextmanager/README.md) | 1 |
 | [apigateway](apigateway/README.md) | 1 |
 | [artifactregistry](artifactregistry/README.md) | 4 |
-| [bigquery](bigquery/README.md) | 2 |
+| [bigquery](bigquery/README.md) | 3 |
 | [bigtableadmin](bigtableadmin/README.md) | 9 |
 | [binaryauthorization](binaryauthorization/README.md) | 1 |
 | [certificatemanager](certificatemanager/README.md) | 6 |
@@ -24,7 +24,7 @@ This plugin serves **239 types** across 35 Google Cloud services. Every page bel
 | [cloudbuild](cloudbuild/README.md) | 1 |
 | [clouddeploy](clouddeploy/README.md) | 5 |
 | [cloudfunctions](cloudfunctions/README.md) | 1 |
-| [cloudkms](cloudkms/README.md) | 1 |
+| [cloudkms](cloudkms/README.md) | 2 |
 | [cloudresourcemanager](cloudresourcemanager/README.md) | 8 |
 | [cloudtasks](cloudtasks/README.md) | 1 |
 | [composer](composer/README.md) | 3 |
@@ -42,7 +42,7 @@ This plugin serves **239 types** across 35 Google Cloud services. Every page bel
 | [networkservices](networkservices/README.md) | 20 |
 | [notebooks](notebooks/README.md) | 1 |
 | [osconfig](osconfig/README.md) | 3 |
-| [pubsub](pubsub/README.md) | 1 |
+| [pubsub](pubsub/README.md) | 3 |
 | [redis](redis/README.md) | 1 |
 | [run](run/README.md) | 4 |
 | [spanner](spanner/README.md) | 2 |
