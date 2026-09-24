@@ -421,6 +421,14 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// Without this the host prints them in plans and state, in clear.
 			a.Sensitive = f.Sensitive || f.WriteOnly
 			a.Equivalence = equivalences[f.DiffSuppressFunc]
+			// A reference compares as one whatever form it is written in.
+			// Terraform's generator gives every ResourceRef field
+			// CompareSelfLinkOrResourceName itself, so the YAML never spells it
+			// out: a subnetwork's network written as a relative path came back
+			// as a full url and planned a replacement (live run, 2026-09-24).
+			if a.Equivalence == "" && isResourceRef(f) {
+				a.Equivalence = catalog.EquivalenceSelfLink
+			}
 			if f.Output {
 				a.Output = true
 			}
@@ -548,4 +556,10 @@ var equivalences = map[string]string{
 	"tpgresource.CompareResourceNames":          catalog.EquivalenceResourceName,
 	"tpgresource.CaseDiffSuppress":              catalog.EquivalenceCase,
 	"tpgresource.DurationDiffSuppress":          catalog.EquivalenceDuration,
+}
+
+// isResourceRef reports whether f holds references: a ResourceRef, or an
+// Array of them.
+func isResourceRef(f *mmv1.Field) bool {
+	return f.Type == "ResourceRef" || (f.ItemType != nil && f.ItemType.Type == "ResourceRef")
 }
