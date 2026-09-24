@@ -2371,6 +2371,10 @@ func TestLiveNetworkAndSubnetwork(t *testing.T) {
 		g.deleteAndWait(t, ctx, "gcp.network", netPath, g.computeURL(netPath))
 	})
 
+	// The subnetwork names its network as a RELATIVE path, built from the
+	// network's name so the dependency stays, and Google answers with a full
+	// url. The a_second_plan_is_clean subtest is then the live proof of the
+	// self_link equivalence: without it the two spellings are a replacement.
 	dir := t.TempDir()
 	write(t, dir, "infrena.yml", fmt.Sprintf(`project: infrena-gcp-live-net
 environments:
@@ -2389,7 +2393,7 @@ resources:
     type: gcp.subnetwork
     name: %[5]s
     ipCidrRange: 10.184.0.0/24
-    network: ${net.selfLink}
+    network: projects/%[1]s/global/networks/${net.name}
 `, project, region, os.Getenv(saEnv), netName, subName))
 
 	r := run(t, dir, "apply", "live", "--auto-approve")
@@ -2439,8 +2443,8 @@ resources:
 		body := readFile(t, dir, "infrena.yml")
 		body = strings.Replace(body, "    autoCreateSubnetworks: false\n",
 			"    autoCreateSubnetworks: false\n    routingConfig:\n      routingMode: GLOBAL\n", 1)
-		body = strings.Replace(body, "    network: ${net.selfLink}\n",
-			"    network: ${net.selfLink}\n    secondaryIpRanges:\n      - rangeName: extra\n        ipCidrRange: 10.185.0.0/24\n"+
+		body = strings.Replace(body, "    network: projects/"+project+"/global/networks/${net.name}\n",
+			"    network: projects/"+project+"/global/networks/${net.name}\n    secondaryIpRanges:\n      - rangeName: extra\n        ipCidrRange: 10.185.0.0/24\n"+
 				"    logConfig:\n      enable: true\n      aggregationInterval: INTERVAL_10_MIN\n", 1)
 		write(t, dir, "infrena.yml", body)
 
