@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/clusters/{cluster}
 
 ## Attributes
 
-871 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+882 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -704,7 +704,14 @@ projects/{project}/locations/{location}/clusters/{cluster}
 | `nodePools[].conditions` | — | `list` | output only | — | Output only. Which conditions caused the current node pool state. |
 | `nodePools[].conditions[]` | — | `map` | optional | same fields as `conditions[]` | — |
 | `nodePools[].config` | — | `map` | optional | — | The node configuration of the pool. |
-| `nodePools[].config.accelerators` | — | `list` | optional | same fields as `nodeConfig.accelerators` | A list of hardware accelerators to be attached to each node. See https://cloud.google.com/compute/docs/gpus for more information about support for GPUs. |
+| `nodePools[].config.accelerators` | — | `list` | optional | — | A list of hardware accelerators to be attached to each node. See https://cloud.google.com/compute/docs/gpus for more information about support for GPUs. |
+| `nodePools[].config.accelerators[]` | — | `map` | optional | — | — |
+| `nodePools[].config.accelerators[].acceleratorCount` | `accelerator_count` | `string` | optional | — | The number of the accelerator cards exposed to an instance. |
+| `nodePools[].config.accelerators[].acceleratorType` | `accelerator_type` | `string` | optional | — | The accelerator type resource name. List of supported accelerators \[here\](https://cloud.google.com/compute/docs/gpus) |
+| `nodePools[].config.accelerators[].gpuDriverInstallationConfig` | `gpu_driver_installation_config` | `map` | optional | — | The configuration for auto installation of GPU driver. |
+| `nodePools[].config.accelerators[].gpuDriverInstallationConfig.gpuDriverVersion` | `gpu_driver_version` | `string` | optional | — | Mode for how the GPU driver is installed. |
+| `nodePools[].config.accelerators[].gpuPartitionSize` | `gpu_partition_size` | `string` | optional | — | Size of partitions to create on the GPU. Valid values are described in the NVIDIA \[mig user guide\](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#partitioning). |
+| `nodePools[].config.accelerators[].gpuSharingConfig` | `gpu_sharing_config` | `map` | optional | same fields as `nodeConfig.accelerators[].gpuSharingConfig` | The configuration for GPU sharing options. |
 | `nodePools[].config.advancedMachineFeatures` | `advanced_machine_features` | `map` | optional | same fields as `nodeConfig.advancedMachineFeatures` | Advanced features for the Compute Engine VM. |
 | `nodePools[].config.bootDisk` | `boot_disk` | `map` | optional | same fields as `nodeConfig.bootDisk` | The boot disk configuration for the node pool. |
 | `nodePools[].config.bootDiskKmsKey` | `boot_disk_kms_key` | `string` | optional | — | The Customer Managed Encryption Key used to encrypt the boot disk attached to each node in the node pool. This should be of the form … |
@@ -750,7 +757,11 @@ projects/{project}/locations/{location}/clusters/{cluster}
 | `nodePools[].config.storagePools` | `storage_pools` | `list` | optional | same fields as `nodeConfig.storagePools` | List of Storage Pools where boot disks are provisioned. |
 | `nodePools[].config.tags` | — | `list` | optional | same fields as `nodeConfig.tags` | The list of instance tags applied to all nodes. Tags are used to identify valid sources or targets for network firewalls and are specified by the client during cluster or node pool creation. Each tag … |
 | `nodePools[].config.taintConfig` | `taint_config` | `map` | optional | same fields as `nodeConfig.taintConfig` | Optional. The taint configuration for the node pool. |
-| `nodePools[].config.taints` | — | `list` | optional | same fields as `nodeConfig.taints` | List of kubernetes taints to be applied to each node. For more information, including usage and the valid values, see: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/ |
+| `nodePools[].config.taints` | — | `list` | optional | — | List of kubernetes taints to be applied to each node. For more information, including usage and the valid values, see: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/ |
+| `nodePools[].config.taints[]` | — | `map` | optional | — | — |
+| `nodePools[].config.taints[].effect` | — | `string` | optional | — | Effect for taint. |
+| `nodePools[].config.taints[].key` | — | `string` | optional | — | Key for taint. |
+| `nodePools[].config.taints[].value` | — | `string` | optional | — | Value for taint. |
 | `nodePools[].config.windowsNodeConfig` | `windows_node_config` | `map` | optional | same fields as `nodeConfig.windowsNodeConfig` | Parameters that can be configured on Windows nodes. |
 | `nodePools[].config.workloadMetadataConfig` | `workload_metadata_config` | `map` | optional | same fields as `nodeConfig.workloadMetadataConfig` | The workload metadata configuration for this node. |
 | `nodePools[].etag` | — | `string` | output only | — | Output only. This checksum is computed by the server based on the value of node pool fields, and may be sent on update requests to ensure the client has an up-to-date value before proceeding. |
