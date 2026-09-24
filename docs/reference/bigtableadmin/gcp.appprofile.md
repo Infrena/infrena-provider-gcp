@@ -19,7 +19,7 @@ A configuration object describing how Cloud Bigtable should treat traffic from a
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/appProfiles` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/appProfiles?appProfileId={{appProfileId}}` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,10 +33,11 @@ projects/{project}/instances/{instance}/appProfiles/{appProfile}
 
 ## Attributes
 
-16 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+17 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `appProfileId` | — | `string` | required | force new, create only | Required. The ID to be used when referring to the new app profile within its instance, e.g., just `myprofile` rather than `projects/myproject/instances/myinstance/appProfiles/myprofile`. |
 | `dataBoostIsolationReadOnly` | `data_boost_isolation_read_only` | `map` | optional | — | Specifies that this app profile is intended for read-only usage via the Data Boost feature. |
 | `dataBoostIsolationReadOnly.computeBillingOwner` | `compute_billing_owner` | `string` | optional | — | The Compute Billing Owner for this Data Boost App Profile. |
 | `description` | — | `string` | optional | — | Long form description of the use case for this AppProfile. |
@@ -45,7 +46,7 @@ projects/{project}/instances/{instance}/appProfiles/{appProfile}
 | `multiClusterRoutingUseAny.clusterIds` | `cluster_ids` | `list` | optional | — | The set of clusters to route to. The order is ignored; clusters will be tried in order of distance. If left empty, all clusters are eligible. |
 | `multiClusterRoutingUseAny.clusterIds[]` | — | `string` | optional | — | — |
 | `multiClusterRoutingUseAny.rowAffinity` | `row_affinity` | `map` | optional | opaque | Row affinity sticky routing based on the row key of the request. Requests that span multiple rows are routed non-deterministically. |
-| `name` | — | `string` | optional | — | The unique name of the app profile, up to 50 characters long. Values are of the form `projects/{project}/instances/{instance}/appProfiles/_a-zA-Z0-9*`. |
+| `name` | — | `string` | output only | — | The unique name of the app profile, up to 50 characters long. Values are of the form `projects/{project}/instances/{instance}/appProfiles/_a-zA-Z0-9*`. |
 | `priority` | — | `string` | optional | — | This field has been deprecated in favor of `standard_isolation.priority`. If you set this field, `standard_isolation.priority` will be set instead. The priority of requests sent using this app … |
 | `singleClusterRouting` | `single_cluster_routing` | `map` | optional | — | Use a single-cluster routing policy. |
 | `singleClusterRouting.allowTransactionalWrites` | `allow_transactional_writes` | `boolean` | optional | — | Whether or not `CheckAndMutateRow` and `ReadModifyWriteRow` requests are allowed by this app profile. It is unsafe to send these requests to the same table/row/column in multiple clusters. |

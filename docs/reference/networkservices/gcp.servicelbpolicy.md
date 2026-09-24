@@ -19,7 +19,7 @@ ServiceLbPolicy holds global load balancing and traffic distribution configurati
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/serviceLbPolicies` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/serviceLbPolicies?serviceLbPolicyId={{serviceLbPolicyId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/serviceLbPolicies/{serviceLbPolicy}
 
 ## Attributes
 
-13 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+14 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -48,5 +48,6 @@ projects/{project}/locations/{location}/serviceLbPolicies/{serviceLbPolicy}
 | `isolationConfig.isolationMode` | `isolation_mode` | `string` | optional | — | Optional. The isolation mode of the load balancer. |
 | `labels` | — | `map` | optional | opaque | Optional. Set of label tags associated with the ServiceLbPolicy resource. |
 | `loadBalancingAlgorithm` | `load_balancing_algorithm` | `string` | optional | — | Optional. The type of load balancing algorithm to be used. The default behavior is WATERFALL_BY_REGION. |
-| `name` | — | `string` | optional | — | Identifier. Name of the ServiceLbPolicy resource. It matches pattern `projects/{project}/locations/{location}/serviceLbPolicies/{service_lb_policy_name}`. |
+| `name` | — | `string` | output only | — | Identifier. Name of the ServiceLbPolicy resource. It matches pattern `projects/{project}/locations/{location}/serviceLbPolicies/{service_lb_policy_name}`. |
+| `serviceLbPolicyId` | — | `string` | required | force new, create only | Required. Short name of the ServiceLbPolicy resource to be created. E.g. for resource name `projects/{project}/locations/{location}/serviceLbPolicies/{service_lb_policy_name}`. the id is value of … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when this resource was last updated. |

@@ -19,7 +19,7 @@ A Filestore instance.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/instances` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/instances?instanceId={{instanceId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/instances/{instance}
 
 ## Attributes
 
-76 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+77 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -66,6 +66,7 @@ projects/{project}/locations/{location}/instances/{instance}
 | `fileShares[].nfsExportOptions[].squashMode` | `squash_mode` | `string` | optional | — | Either NO_ROOT_SQUASH, for allowing root access on the exported directory, or ROOT_SQUASH, for not allowing root access. The default is NO_ROOT_SQUASH. |
 | `fileShares[].sourceBackup` | `source_backup` | `string` | optional | — | The resource name of the backup, in the format `projects/{project_number}/locations/{location_id}/backups/{backup_id}`, that this file share has been restored from. |
 | `fileShares[].sourceBackupdrBackup` | `source_backupdr_backup` | `string` | optional | — | The resource name of the BackupDR backup, in the format `projects/{project_id}/locations/{location_id}/backupVaults/{backupvault_id}/dataSources/{datasource_id}/backups/{backup_id}`, |
+| `instanceId` | — | `string` | required | force new, create only | Required. The name of the instance to create. The name must be unique for the specified project and location. |
 | `kmsKeyName` | `kms_key_name` | `string` | optional | — | KMS key name used for data encryption. |
 | `labels` | — | `map` | optional | opaque | Resource labels to represent user provided metadata. |
 | `maxCapacityGb` | `max_capacity_gb` | `string` | output only | — | Output only. The maximum capacity of the instance in GB. |

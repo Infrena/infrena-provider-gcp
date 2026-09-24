@@ -19,7 +19,7 @@ A SQL logical view object that can be referenced in SQL queries.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/logicalViews` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/logicalViews?logicalViewId={{logicalViewId}}` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,11 +33,12 @@ projects/{project}/instances/{instance}/logicalViews/{logicalView}
 
 ## Attributes
 
-4 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+5 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `deletionProtection` | `deletion_protection` | `boolean` | optional | — | Optional. Set to true to make the LogicalView protected against deletion. |
 | `etag` | — | `string` | optional | — | Optional. The etag for this logical view. This may be sent on update requests to ensure that the client has an up-to-date value before proceeding. The server returns an ABORTED error on a mismatched … |
-| `name` | — | `string` | optional | — | Identifier. The unique name of the logical view. Format: `projects/{project}/instances/{instance}/logicalViews/{logical_view}` |
+| `logicalViewId` | — | `string` | required | force new, create only | Required. The ID to use for the logical view, which will become the final component of the logical view's resource name. |
+| `name` | — | `string` | output only | — | Identifier. The unique name of the logical view. Format: `projects/{project}/instances/{instance}/logicalViews/{logical_view}` |
 | `query` | — | `string` | optional | — | Required. The logical view's select query. |

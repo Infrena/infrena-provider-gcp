@@ -19,7 +19,7 @@ A Filestore backup.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/backups` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/backups?backupId={{backupId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,10 +33,11 @@ projects/{project}/locations/{location}/backups/{backup}
 
 ## Attributes
 
-16 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+17 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `backupId` | — | `string` | required | force new, create only | Required. The ID to use for the backup. The ID must be unique within the specified project and location. This value must start with a lowercase letter followed by up to 62 lowercase letters, numbers … |
 | `capacityGb` | `capacity_gb` | `string` | output only | — | Output only. Capacity of the source file share when the backup was created. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The time when the backup was created. |
 | `description` | — | `string` | optional | — | A description of the backup with 2048 characters or less. Requests with longer descriptions will be rejected. |

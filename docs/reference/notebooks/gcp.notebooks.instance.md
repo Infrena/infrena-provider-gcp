@@ -19,7 +19,7 @@ The definition of a notebook instance.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/instances` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/instances?instanceId={{instanceId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/instances/{instance}
 
 ## Attributes
 
-92 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+93 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -108,6 +108,7 @@ projects/{project}/locations/{location}/instances/{instance}
 | `healthInfo` | `health_info` | `map` | output only | opaque | Output only. Additional information about instance health. Example: healthInfo": { "docker_proxy_agent_status": "1", "docker_status": "1", "jupyterlab_api_status": "-1", "jupyterlab_status": "-1" … |
 | `healthState` | `health_state` | `string` | output only | — | Output only. Instance health_state. |
 | `id` | — | `string` | output only | — | Output only. Unique ID of the resource. |
+| `instanceId` | — | `string` | required | force new, create only | Required. User-defined unique ID of this instance. |
 | `instanceOwners` | `instance_owners` | `list` | optional | — | Optional. The owner of this instance after creation. Format: `alias@example.com` Currently supports one owner only. If not specified, all of the service account users of your VM instance's service … |
 | `instanceOwners[]` | — | `string` | optional | — | — |
 | `labels` | — | `map` | optional | opaque | Optional. Labels to apply to this instance. These can be later modified by the UpdateInstance method. |

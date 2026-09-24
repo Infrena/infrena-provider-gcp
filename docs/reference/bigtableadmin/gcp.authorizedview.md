@@ -19,7 +19,7 @@ An Authorized View of a Cloud Bigtable Table.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/authorizedViews` needs `instance`, `table`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/authorizedViews?authorizedViewId={{authorizedViewId}}` needs `instance`, `table`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,13 +33,14 @@ projects/{project}/instances/{instance}/tables/{table}/authorizedViews/{authoriz
 
 ## Attributes
 
-7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+8 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `authorizedViewId` | — | `string` | required | force new, create only | Required. The id of the AuthorizedView to create. This AuthorizedView must not already exist. The `authorized_view_id` appended to `parent` forms the full AuthorizedView name of the form … |
 | `deletionProtection` | `deletion_protection` | `boolean` | optional | — | Set to true to make the AuthorizedView protected against deletion. The parent Table and containing Instance cannot be deleted if an AuthorizedView has this bit set. |
 | `etag` | — | `string` | optional | — | The etag for this AuthorizedView. If this is provided on update, it must match the server's etag. The server returns ABORTED error on a mismatched etag. |
-| `name` | — | `string` | optional | — | Identifier. The name of this AuthorizedView. Values are of the form `projects/{project}/instances/{instance}/tables/{table}/authorizedViews/{authorized_view}` |
+| `name` | — | `string` | output only | — | Identifier. The name of this AuthorizedView. Values are of the form `projects/{project}/instances/{instance}/tables/{table}/authorizedViews/{authorized_view}` |
 | `subsetView` | `subset_view` | `map` | optional | — | An AuthorizedView permitting access to an explicit subset of a Table. |
 | `subsetView.familySubsets` | `family_subsets` | `map` | optional | opaque | Map from column family name to the columns in this family to be included in the AuthorizedView. |
 | `subsetView.rowPrefixes` | `row_prefixes` | `list` | optional | — | Row prefixes to be included in the AuthorizedView. To provide access to all rows, include the empty string as a prefix (""). |

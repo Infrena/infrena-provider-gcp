@@ -262,3 +262,107 @@ func TestARepeatedPlaceholderIsNotAShape(t *testing.T) {
 		t.Errorf("got %q, want no shape", got)
 	}
 }
+
+// createParamDoc publishes four collections created by POST to the collection
+// with the new resource's id as a query parameter -- AIP-133's shape -- where
+// nothing in magic-modules supplies a create url to carry it.
+//
+//	gadgets  the ordinary case: gadgetId, Required, and a full-path name
+//	optis    Cloud Run's case: the id is optional
+//	clashes  the resource has an output field of its own called clashId
+//	reqs     the only query parameter is requestId, which names no resource
+func createParamDoc() string {
+	coll := func(plural, schema, param, desc string) string {
+		return `"` + plural + `": {"methods": {
+        "get": {"id": "a.` + plural + `.get", "path": "v1/{+name}", "httpMethod": "GET", "response": {"$ref": "` + schema + `"},
+          "parameters": {"name": {"type": "string", "location": "path", "pattern": "^projects/[^/]+/` + plural + `/[^/]+$"}}},
+        "create": {"id": "a.` + plural + `.create", "path": "v1/projects/{project}/` + plural + `", "httpMethod": "POST",
+          "request": {"$ref": "` + schema + `"}, "response": {"$ref": "` + schema + `"},
+          "parameters": {"project": {"type": "string", "location": "path"}, "` + param + `": {"type": "string", "location": "query", "description": "` + desc + `"}}},
+        "delete": {"id": "a.` + plural + `.delete", "path": "v1/{+name}", "httpMethod": "DELETE",
+          "parameters": {"name": {"type": "string", "location": "path", "pattern": "^projects/[^/]+/` + plural + `/[^/]+$"}}}
+      }}`
+	}
+	schema := func(n string, extra string) string {
+		return `"` + n + `": {"id": "` + n + `", "type": "object", "properties": {
+      "name": {"type": "string", "description": "Identifier. The full resource name."},
+      "size": {"type": "integer", "format": "int64"}` + extra + `}}`
+	}
+	return `{"name": "acme", "version": "v1", "rootUrl": "https://acme.googleapis.com/", "servicePath": "",
+  "schemas": {` + schema("Gadget", "") + `, ` + schema("Opti", "") + `,
+    ` + schema("Clash", `, "clashId": {"type": "string", "readOnly": true, "description": "Output only. Server id."}`) + `,
+    ` + schema("Req", "") + `},
+  "resources": {"projects": {"resources": {
+    ` + coll("gadgets", "Gadget", "gadgetId", "Required. The ID to use for the gadget, which will become the final component of its name.") + `,
+    ` + coll("optis", "Opti", "optiId", "Optional. The unique identifier. If not provided, the server will generate one.") + `,
+    ` + coll("clashes", "Clash", "clashId", "Required. The ID to use.") + `,
+    ` + coll("reqs", "Req", "requestId", "An optional request id for idempotency.") + `
+  }}}}`
+}
+
+func createParamBuild(t *testing.T) *Result {
+	t.Helper()
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": createParamDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+// TestACreateSendsTheIdTheAPIAsksFor is 21 shipping types, found by a live
+// Cloud Run job: the create url carried no id, so a Required id was never
+// sent, and where it was optional the name went in the body, which Cloud Run
+// refuses ("job.name must be empty on CreateJobRequest"). The id now gets its
+// own create-only attribute, the url names it, and `name` -- Google's to
+// assign from the parent and the id -- is no longer sent.
+func TestACreateSendsTheIdTheAPIAsksFor(t *testing.T) {
+	ty, ok := createParamBuild(t).Catalog.Type("gcp.gadget")
+	if !ok {
+		t.Fatal("gcp.gadget missing")
+	}
+	if got, want := ty.CreateTemplate(), "projects/{project}/gadgets?gadgetId={{gadgetId}}"; got != want {
+		t.Errorf("create template = %q, want %q", got, want)
+	}
+	id := ty.Attributes["gadgetId"]
+	if id == nil || !id.CreateOnly || !id.ForceNew || id.Output {
+		t.Fatalf("gadgetId = %+v, want a settable create-only ForceNew attribute", id)
+	}
+	if !id.Required {
+		t.Error("gadgetId is not Required, though the API's own description says so")
+	}
+	if n := ty.Attributes["name"]; n == nil || !n.Output {
+		t.Errorf("name = %+v, want output-only: Google assigns it from the parent and the id", n)
+	}
+	if missing := ty.UnresolvedCreatePlaceholders(); len(missing) > 0 {
+		t.Errorf("still uncreatable, needs %v", missing)
+	}
+}
+
+// TestAnOptionalIdIsNotRequired. Cloud Run generates an id when none is
+// given, so leaving it out is the user's choice, not an error.
+func TestAnOptionalIdIsNotRequired(t *testing.T) {
+	ty, ok := createParamBuild(t).Catalog.Type("gcp.opti")
+	if !ok || ty.Attributes["optiId"] == nil {
+		t.Fatalf("gcp.opti has no optiId: %v", ty)
+	}
+	if ty.Attributes["optiId"].Required {
+		t.Error("an optional id was made Required")
+	}
+}
+
+// TestNeitherACollidingFieldNorAnUnrelatedParameterIsTouched. A resource
+// field of the same name is never shadowed -- gcp.target's own output-only
+// targetId is why -- and requestId names no resource, so it is left alone
+// because the rule is the parameter named after the resource, not any
+// parameter ending in Id.
+func TestNeitherACollidingFieldNorAnUnrelatedParameterIsTouched(t *testing.T) {
+	res := createParamBuild(t)
+	clash, _ := res.Catalog.Type("gcp.clash")
+	if clash == nil || !clash.Attributes["clashId"].Output || clash.Attributes["clashId"].CreateOnly {
+		t.Errorf("the resource's own output field was shadowed: %+v", clash.Attributes["clashId"])
+	}
+	req, _ := res.Catalog.Type("gcp.req")
+	if req == nil || req.Attributes["requestId"] != nil || req.CreateTemplate() != "projects/{project}/reqs" {
+		t.Errorf("requestId was taken for a resource id: template %q", req.CreateTemplate())
+	}
+}

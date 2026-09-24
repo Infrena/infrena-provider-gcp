@@ -19,7 +19,7 @@ WorkerPool acts as a top-level container that manages a set of configurations an
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/workerPools` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/workerPools?workerPoolId={{workerPoolId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/workerPools/{workerPool}
 
 ## Attributes
 
-191 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+192 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -79,7 +79,7 @@ projects/{project}/locations/{location}/workerPools/{workerPool}
 | `latestCreatedRevision` | `latest_created_revision` | `string` | output only | — | Output only. Name of the last created revision. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. |
 | `latestReadyRevision` | `latest_ready_revision` | `string` | output only | — | Output only. Name of the latest revision that is serving workloads. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. |
 | `launchStage` | `launch_stage` | `string` | optional | — | Optional. The launch stage as defined by \[Google Cloud Platform Launch Stages\](https://cloud.google.com/terms/launch-stages). Cloud Run supports `ALPHA`, `BETA`, and `GA`. If no value is specified … |
-| `name` | — | `string` | optional | — | The fully qualified name of this WorkerPool. In CreateWorkerPoolRequest, this field is ignored, and instead composed from CreateWorkerPoolRequest.parent and CreateWorkerPoolRequest.worker_id. Format … |
+| `name` | — | `string` | output only | — | The fully qualified name of this WorkerPool. In CreateWorkerPoolRequest, this field is ignored, and instead composed from CreateWorkerPoolRequest.parent and CreateWorkerPoolRequest.worker_id. Format … |
 | `observedGeneration` | `observed_generation` | `string` | output only | — | Output only. The generation of this WorkerPool currently serving workloads. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. Please note that unlike … |
 | `reconciling` | — | `boolean` | output only | — | Output only. Returns true if the WorkerPool is currently being acted upon by the system to bring it into the desired state. When a new WorkerPool is created, or an existing one is updated, Cloud Run … |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. Reserved for future use. |
@@ -228,3 +228,4 @@ projects/{project}/locations/{location}/workerPools/{workerPool}
 | `threatDetectionEnabled` | `threat_detection_enabled` | `boolean` | output only | — | Output only. Indicates whether Cloud Run Threat Detection monitoring is enabled for the parent project of this worker pool. |
 | `uid` | — | `string` | output only | — | Output only. Server assigned unique identifier for the trigger. The value is a UUID4 string and guaranteed to remain unchanged until the resource is deleted. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last-modified time. |
+| `workerPoolId` | — | `string` | optional | force new, create only | Optional. The unique identifier for the WorkerPool. It must begin with letter, and cannot end with hyphen; must contain fewer than 50 characters. The name of the worker pool becomes … |

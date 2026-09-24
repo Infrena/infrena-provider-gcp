@@ -19,7 +19,7 @@ Service acts as a top-level container that manages a set of configurations and r
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/services` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/services?serviceId={{serviceId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/services/{service}
 
 ## Attributes
 
-234 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+235 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -88,7 +88,7 @@ projects/{project}/locations/{location}/services/{service}
 | `multiRegionSettings.multiRegionId` | `multi_region_id` | `string` | optional | — | Optional. System-generated unique id for the multi-region Service. |
 | `multiRegionSettings.regions` | — | `list` | optional | — | Required. List of regions to deploy to, including primary region. |
 | `multiRegionSettings.regions[]` | — | `string` | optional | — | — |
-| `name` | — | `string` | optional | — | Identifier. The fully qualified name of this Service. In CreateServiceRequest, this field is ignored, and instead composed from CreateServiceRequest.parent and CreateServiceRequest.service_id … |
+| `name` | — | `string` | output only | — | Identifier. The fully qualified name of this Service. In CreateServiceRequest, this field is ignored, and instead composed from CreateServiceRequest.parent and CreateServiceRequest.service_id … |
 | `observedGeneration` | `observed_generation` | `string` | output only | — | Output only. The generation of this Service currently serving traffic. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. Please note that unlike v1 … |
 | `reconciling` | — | `boolean` | output only | — | Output only. Returns true if the Service is currently being acted upon by the system to bring it into the desired state. When a new Service is created, or an existing one is updated, Cloud Run will … |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. Reserved for future use. |
@@ -97,6 +97,7 @@ projects/{project}/locations/{location}/services/{service}
 | `scaling.maxInstanceCount` | `max_instance_count` | `integer` | optional | — | Optional. total max instances for the service. This number of instances is divided among all revisions with specified traffic based on the percent of traffic they are receiving. |
 | `scaling.minInstanceCount` | `min_instance_count` | `integer` | optional | — | Optional. total min instances for the service. This number of instances is divided among all revisions with specified traffic based on the percent of traffic they are receiving. |
 | `scaling.scalingMode` | `scaling_mode` | `string` | optional | — | Optional. The scaling mode for the service. |
+| `serviceId` | — | `string` | optional | force new, create only | Optional. The unique identifier for the Service. It must begin with letter, and cannot end with hyphen; must contain fewer than 50 characters. The name of the service becomes … |
 | `sshEnabled` | `ssh_enabled` | `boolean` | optional | — | Optional. Enables SSH access to the Service. |
 | `template` | — | `map` | optional | — | Required. The template used to create revisions for this Service. |
 | `template.annotations` | — | `map` | optional | opaque | Optional. Unstructured key value map that may be set by external tools to store and arbitrary metadata. They are not queryable and should be preserved when modifying objects. Cloud Run API v2 does … |

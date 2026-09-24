@@ -454,63 +454,63 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 
 | Type | Create url | Needs |
 | --- | --- | --- |
-| `gcp.appprofile` | `{+parent}/appProfiles` | instance |
-| `gcp.attachment` | `{+parent}/attachments` | repository |
-| `gcp.authorizedview` | `{+parent}/authorizedViews` | instance, table |
-| `gcp.bigtableadmin.backup` | `{+parent}/backups` | cluster, instance |
-| `gcp.bigtableadmin.cluster` | `{+parent}/clusters` | instance |
+| `gcp.appprofile` | `{+parent}/appProfiles?appProfileId={{appProfileId}}` | instance |
+| `gcp.attachment` | `{+parent}/attachments?attachmentId={{attachmentId}}` | repository |
+| `gcp.authorizedview` | `{+parent}/authorizedViews?authorizedViewId={{authorizedViewId}}` | instance, table |
+| `gcp.bigtableadmin.backup` | `{+parent}/backups?backupId={{backupId}}` | cluster, instance |
+| `gcp.bigtableadmin.cluster` | `{+parent}/clusters?clusterId={{clusterId}}` | instance |
 | `gcp.bigtableadmin.table` | `{+parent}/tables` | instance |
-| `gcp.cloudasset.savedquery` | `{+parent}/savedQueries` | parent |
+| `gcp.cloudasset.savedquery` | `{+parent}/savedQueries?savedQueryId={{savedQueryId}}` | parent |
 | `gcp.cloudresourcemanager.folder.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | folder |
 | `gcp.cloudresourcemanager.organization.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | organization |
 | `gcp.config` | `{+parent}/configs` | api |
 | `gcp.credential` | `{+parent}/credentials` | oauthClient |
 | `gcp.feed` | `{+parent}/feeds` | parent |
-| `gcp.file.snapshot` | `{+parent}/snapshots` | instance |
+| `gcp.file.snapshot` | `{+parent}/snapshots?snapshotId={{snapshotId}}` | instance |
 | `gcp.iam.organization.role` | `{+parent}/roles` | organization |
 | `gcp.iam.serviceaccount.key` | `{+name}/keys` | serviceAccount |
 | `gcp.iam.workforcepool.provider` | `{+parent}/providers` | workforcePool |
 | `gcp.iam.workforcepool.provider.key` | `{+parent}/keys` | provider, workforcePool |
 | `gcp.iam.workloadidentitypool.provider` | `{+parent}/providers` | workloadIdentityPool |
 | `gcp.iam.workloadidentitypool.provider.key` | `{+parent}/keys` | provider, workloadIdentityPool |
-| `gcp.logging.billingaccount.bucket` | `{+parent}/buckets` | billingAccount |
+| `gcp.logging.billingaccount.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | billingAccount |
 | `gcp.logging.billingaccount.exclusion` | `{+parent}/exclusions` | billingAccount |
-| `gcp.logging.billingaccount.link` | `{+parent}/links` | billingAccount, bucket |
+| `gcp.logging.billingaccount.link` | `{+parent}/links?linkId={{linkId}}` | billingAccount, bucket |
 | `gcp.logging.billingaccount.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | billingAccount |
 | `gcp.logging.billingaccount.sink` | `{+parent}/sinks` | billingAccount |
-| `gcp.logging.billingaccount.view` | `{+parent}/views` | billingAccount, bucket |
-| `gcp.logging.folder.bucket` | `{+parent}/buckets` | folder |
+| `gcp.logging.billingaccount.view` | `{+parent}/views?viewId={{viewId}}` | billingAccount, bucket |
+| `gcp.logging.folder.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | folder |
 | `gcp.logging.folder.exclusion` | `{+parent}/exclusions` | folder |
-| `gcp.logging.folder.link` | `{+parent}/links` | bucket, folder |
+| `gcp.logging.folder.link` | `{+parent}/links?linkId={{linkId}}` | bucket, folder |
 | `gcp.logging.folder.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | folder |
 | `gcp.logging.folder.sink` | `{+parent}/sinks` | folder |
-| `gcp.logging.folder.view` | `{+parent}/views` | bucket, folder |
-| `gcp.logging.link` | `{+parent}/links` | bucket |
-| `gcp.logging.organization.bucket` | `{+parent}/buckets` | organization |
+| `gcp.logging.folder.view` | `{+parent}/views?viewId={{viewId}}` | bucket, folder |
+| `gcp.logging.link` | `{+parent}/links?linkId={{linkId}}` | bucket |
+| `gcp.logging.organization.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | organization |
 | `gcp.logging.organization.exclusion` | `{+parent}/exclusions` | organization |
-| `gcp.logging.organization.link` | `{+parent}/links` | bucket, organization |
+| `gcp.logging.organization.link` | `{+parent}/links?linkId={{linkId}}` | bucket, organization |
 | `gcp.logging.organization.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | organization |
 | `gcp.logging.organization.sink` | `{+parent}/sinks` | organization |
-| `gcp.logging.organization.view` | `{+parent}/views` | bucket, organization |
-| `gcp.logging.view` | `{+parent}/views` | bucket |
-| `gcp.logicalview` | `{+parent}/logicalViews` | instance |
+| `gcp.logging.organization.view` | `{+parent}/views?viewId={{viewId}}` | bucket, organization |
+| `gcp.logging.view` | `{+parent}/views?viewId={{viewId}}` | bucket |
+| `gcp.logicalview` | `{+parent}/logicalViews?logicalViewId={{logicalViewId}}` | instance |
 | `gcp.managedidentity` | `{+parent}/managedIdentities` | namespace, workloadIdentityPool |
-| `gcp.materializedview` | `{+parent}/materializedViews` | instance |
+| `gcp.materializedview` | `{+parent}/materializedViews?materializedViewId={{materializedViewId}}` | instance |
 | `gcp.namespace` | `{+parent}/namespaces` | workloadIdentityPool |
 | `gcp.networksecurity.organization.addressgroup` | `{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}` | organization |
 | `gcp.networksecurity.organization.firewallendpoint` | `{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` | organization |
 | `gcp.networksecurity.organization.securityprofile` | `{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` | organization |
 | `gcp.networksecurity.organization.securityprofilegroup` | `{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` | organization |
 | `gcp.networksecurity.rule` | `{+parent}/rules` | gatewaySecurityPolicy |
-| `gcp.osconfig.folder.policyorchestrator` | `{+parent}/policyOrchestrators` | folder |
-| `gcp.osconfig.organization.policyorchestrator` | `{+parent}/policyOrchestrators` | organization |
+| `gcp.osconfig.folder.policyorchestrator` | `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` | folder |
+| `gcp.osconfig.organization.policyorchestrator` | `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` | organization |
 | `gcp.proposal` | `{+parent}/proposals` | singleTenantHsmInstance |
-| `gcp.schemabundle` | `{+parent}/schemaBundles` | instance, table |
+| `gcp.schemabundle` | `{+parent}/schemaBundles?schemaBundleId={{schemaBundleId}}` | instance, table |
 | `gcp.scimtenant` | `{+parent}/scimTenants` | provider, workforcePool |
-| `gcp.servicelevelobjective` | `{+parent}/serviceLevelObjectives` | parent |
-| `gcp.spanner.backup` | `{+parent}/backups` | instance |
+| `gcp.servicelevelobjective` | `{+parent}/serviceLevelObjectives?serviceLevelObjectiveId={{serviceLevelObjectiveId}}` | parent |
+| `gcp.spanner.backup` | `{+parent}/backups?backupId={{backupId}}` | instance |
 | `gcp.spanner.session` | `{+database}/sessions` | database, instance |
-| `gcp.tag` | `{+parent}/tags` | package, repository |
+| `gcp.tag` | `{+parent}/tags?tagId={{tagId}}` | package, repository |
 | `gcp.task` | `{+parent}/tasks` | queue |
 | `gcp.token` | `{+parent}/tokens` | provider, scimTenant, workforcePool |
 | `gcp.usercred` | `{+parent}/userCreds` | database |

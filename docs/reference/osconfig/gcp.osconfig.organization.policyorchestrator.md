@@ -19,7 +19,7 @@ A policy orchestrator manages project-level and zone-level policy resources, suc
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/policyOrchestrators` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ A policy orchestrator manages project-level and zone-level policy resources, suc
 
 ## Attributes
 
-175 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+176 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -42,7 +42,7 @@ A policy orchestrator manages project-level and zone-level policy resources, suc
 | `description` | — | `string` | optional | — | Optional. Freeform text describing the purpose of the resource. |
 | `etag` | — | `string` | output only | — | Output only. This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels as key value pairs |
-| `name` | — | `string` | optional | force new | Immutable. Identifier. In the following format: * `organizations/{organization_id}/locations/global/policyOrchestrators/{orchestrator_id}` * … |
+| `name` | — | `string` | output only | — | Immutable. Identifier. In the following format: * `organizations/{organization_id}/locations/global/policyOrchestrators/{orchestrator_id}` * … |
 | `orchestratedResource` | `orchestrated_resource` | `map` | optional | — | Required. Resource to be orchestrated by the policy orchestrator. |
 | `orchestratedResource.id` | — | `string` | optional | — | Optional. ID of the resource to be used while generating set of affected resources. For UPSERT action the value is auto-generated during PolicyOrchestrator creation when not set. When the value is … |
 | `orchestratedResource.osPolicyAssignmentV1Payload` | `os_policy_assignment_v1_payload` | `map` | optional | — | Optional. OSPolicyAssignment resource to be created, updated or deleted. Name field is ignored and replace with a generated value. With this field set, orchestrator will perform actions on … |
@@ -209,6 +209,7 @@ A policy orchestrator manages project-level and zone-level policy resources, suc
 | `orchestrationState.previousIterationState.progress` | — | `float` | output only | — | Output only. An estimated percentage of the progress. Number between 0 and 100. |
 | `orchestrationState.previousIterationState.startTime` | `start_time` | `string` | output only | — | Output only. Start time of the wave iteration. |
 | `orchestrationState.previousIterationState.state` | — | `string` | output only | — | Output only. State of the iteration. |
+| `policyOrchestratorId` | — | `string` | required | force new, create only | Required. The logical identifier of the policy orchestrator, with the following restrictions: * Must contain only lowercase letters, numbers, and hyphens. * Must start with a letter. * Must be … |
 | `reconciling` | — | `boolean` | output only | — | Output only. Set to true, if there are ongoing changes being applied by the orchestrator. |
 | `state` | — | `string` | optional | — | Optional. State of the orchestrator. Can be updated to change orchestrator behaviour. Allowed values: - `ACTIVE` - orchestrator is actively looking for actions to be taken. - `STOPPED` - orchestrator … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Timestamp when the policy orchestrator resource was last modified. |

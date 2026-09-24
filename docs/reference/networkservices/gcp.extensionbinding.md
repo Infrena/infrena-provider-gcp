@@ -19,7 +19,7 @@
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/extensionBindings` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/extensionBindings?extensionBindingId={{extensionBindingId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,13 +33,14 @@ projects/{project}/locations/{location}/extensionBindings/{extensionBinding}
 
 ## Attributes
 
-57 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+58 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the resource was created. |
 | `description` | — | `string` | optional | — | Optional. A human-readable description of the resource. |
 | `etag` | — | `string` | optional | — | Optional. Etag of the resource. If provided, it must match the server's etag. If the provided etag does not match the server's etag, the request will fail with a 409 ABORTED error. |
+| `extensionBindingId` | — | `string` | required | force new, create only | Required. Short name of the `ExtensionBinding` resource to be created. |
 | `failOpen` | `fail_open` | `boolean` | optional | — | Optional. Determines the behavior of the extension binding when the call to the extension fails or times out. Default value is `FALSE`. When set to `TRUE`, failures of the extension are silently … |
 | `labels` | — | `map` | optional | opaque | Optional. Set of labels associated with the `ExtensionBinding` resource. The format must comply with \[the following … |
 | `matchConditions` | `match_conditions` | `list` | optional | — | Optional. A list of match conditions to match against the incoming request. The extension will be invoked if at least one condition matches the request, or if no match conditions are specified … |
@@ -82,7 +83,7 @@ projects/{project}/locations/{location}/extensionBindings/{extensionBinding}
 | `matchConditions[].to.notDestination.hosts` | — | `list` | optional | same fields as `matchConditions[].to.destination.hosts` | Optional. A list of HTTP Hosts to match against. Limited to 10 hosts. If not specified, any host is allowed. If specified, a match occurs if any of the hosts matches the host value in the request. |
 | `matchConditions[].to.notDestination.paths` | — | `list` | optional | same fields as `matchConditions[].to.destination.paths` | Optional. A list of paths to match against. Limited to 10 paths. If not specified, any path is allowed. Note that this path match includes the query parameters. For gRPC services, this should be a … |
 | `matchConditions[].to.notDestination.resources` | — | `list` | optional | same fields as `matchConditions[].to.destination.resources` | Optional. A list of non-empty strings whose value is matched against the resource to which a request is sent (e.g., an Agent in AiApplication). If not specified, any resource is allowed. If … |
-| `name` | — | `string` | optional | — | Identifier. Name of the `ExtensionBinding` resource in the following format: `projects/{project}/locations/{location}/extensionBindings/{extension_binding}`. |
+| `name` | — | `string` | output only | — | Identifier. Name of the `ExtensionBinding` resource in the following format: `projects/{project}/locations/{location}/extensionBindings/{extension_binding}`. |
 | `priority` | — | `integer` | optional | — | Optional. Priority of the extension binding. Lower numbers indicate higher priority. Priority of extension bindings are used to determine the order in which extension bindings are applied to a … |
 | `producerExtension` | `producer_extension` | `string` | optional | — | Required. The name of the extension that this binding should attach to target resources. Format: For Google-provided extensions, specify the service endpoint (see \[Model Armor … |
 | `producerMetadata` | `producer_metadata` | `map` | optional | opaque | Optional. Additional metadata that should be passed to the attached extension with each request. |
