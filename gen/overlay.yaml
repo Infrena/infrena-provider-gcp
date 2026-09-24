@@ -633,8 +633,12 @@ rulings:
     hooks: [update_encoder]
     note: >
       update_encoder (update_encoder/pubsub_schema.tmpl) wraps the body for a
-      schema commit, a new revision. This provider does not commit revisions: a
-      schema has no patch, so any change replaces it.
+      schema commit, a new revision: magic-modules declares update_verb POST
+      to schemas/{name}:commit. This provider does not commit revisions, and
+      the generator refuses any update verb but PATCH, so any change replaces
+      the schema. (An earlier version of this note said "a schema has no
+      patch" and missed that the declared POST reached the catalog anyway,
+      until the generator stopped letting it.)
 
   bigquery/RowAccessPolicy:
     hooks: [pre_delete]
@@ -650,9 +654,11 @@ rulings:
       pre_create (pre_create/compute_node_group_url_replace.go.tmpl) fills the
       initialNodeCount query parameter from Terraform's initial_size or the
       autoscaling policy's minimum, in a create url magic-modules spells with
-      the token PRE_CREATE_REPLACE_ME. The generator refuses a create url
-      carrying that token, so this type does not ship until the parameter can
-      be filled; the ruling records what the hook does.
+      the token PRE_CREATE_REPLACE_ME. The generator binds that token to
+      Discovery's own query parameter (fillPreCreateTokens): initialNodeCount,
+      a required create-only integer the user writes. THE BOUNDED GAP:
+      Terraform's fallback to the autoscaling policy's minimum is not
+      reproduced; write initialNodeCount.
 
   dns/Policy:
     hooks: [pre_delete]

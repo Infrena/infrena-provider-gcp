@@ -2,12 +2,12 @@
 
 # GCP type reference
 
-This plugin serves **268 types** across 37 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
+This plugin serves **274 types** across 37 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
 - Catalog generated: 2026-09-24
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
-**[Types that are not served, and why](not-shipped.md)** — 352 entries. Read that page first if the type you want is missing from this one.
+**[Types that are not served, and why](not-shipped.md)** — 346 entries. Read that page first if the type you want is missing from this one.
 
 ## Services
 
@@ -28,9 +28,9 @@ This plugin serves **268 types** across 37 Google Cloud services. Every page bel
 | [cloudresourcemanager](cloudresourcemanager/README.md) | 8 |
 | [cloudtasks](cloudtasks/README.md) | 2 |
 | [composer](composer/README.md) | 3 |
-| [compute](compute/README.md) | 76 |
+| [compute](compute/README.md) | 77 |
 | [container](container/README.md) | 2 |
-| [dataproc](dataproc/README.md) | 4 |
+| [dataproc](dataproc/README.md) | 5 |
 | [dns](dns/README.md) | 5 |
 | [eventarc](eventarc/README.md) | 7 |
 | [file](file/README.md) | 3 |
@@ -38,7 +38,7 @@ This plugin serves **268 types** across 37 Google Cloud services. Every page bel
 | [iam](iam/README.md) | 13 |
 | [logging](logging/README.md) | 25 |
 | [memcache](memcache/README.md) | 1 |
-| [monitoring](monitoring/README.md) | 1 |
+| [monitoring](monitoring/README.md) | 5 |
 | [networksecurity](networksecurity/README.md) | 26 |
 | [networkservices](networkservices/README.md) | 20 |
 | [notebooks](notebooks/README.md) | 1 |
