@@ -410,12 +410,12 @@ const machineTypeTmpl = "https://www.googleapis.com/compute/v1/projects/%s/zones
 
 // networkTmpl is the auto-created `default` VPC, by self link.
 //
-// THE SUITE DEPENDS ON A RESOURCE THE PROVIDER CANNOT MANAGE. gcp.firewall's
-// `network` is REQUIRED and gcp.network does not ship -- compute's Network
-// needs four hook rulings the tier gate has not been given, so the generator
-// holds it back. There is no way to write this suite without referring to a
-// network somebody else made. That is a consequence of the tier gate, not an
-// oversight; see live/README.md.
+// The suite BORROWS it rather than managing a network of its own.
+// gcp.firewall's `network` is REQUIRED, and until compute's Network and
+// Subnetwork hooks were ruled gcp.network did not ship, so borrowing was the
+// only option. It ships now and this is a choice: one fewer resource to create,
+// wait on and clean up, and a leaked VPC is the most expensive thing this suite
+// could leave behind. See live/README.md.
 const networkTmpl = "https://www.googleapis.com/compute/v1/projects/%s/global/networks/default"
 
 // names holds one run's resource names. Every one carries the run id, so two
@@ -757,10 +757,10 @@ func TestLiveWorkflow(t *testing.T) {
 		//
 		// The project's `default` auto-mode network brings four firewall
 		// rules Google made -- default-allow-internal, -ssh, -rdp, -icmp --
-		// and this provider knows them by name as system-owned. They are the
-		// ONLY system-owned resources this project can demonstrate: gcp.network
-		// does not ship, so the auto-mode network the brief named is not a
-		// type discovery can report at all, and the goog- label rule needs a
+		// and this provider knows them by name as system-owned. The network
+		// itself is Google's too, and now that gcp.network ships it is a type
+		// discovery reports, flagged by systemowned.go on its name and its
+		// autoCreateSubnetworks. The goog- label rule still needs a
 		// Google-managed service nothing here creates.
 		r := mustRun(t, dir, exitOK, "discover")
 		out := r.combined()
@@ -781,6 +781,18 @@ func TestLiveWorkflow(t *testing.T) {
 		if !strings.Contains(out, "auto mode network") && !strings.Contains(out, "system") {
 			t.Errorf("discover never says the default-allow rules are Google's, so a user has no "+
 				"way to know not to adopt them:\n%s", out)
+		}
+		// The network's own reason, not the phrase above: the firewall rules'
+		// reason mentions the auto mode network too, so matching it would pass
+		// with the network missing entirely.
+		//
+		// ADDED 2026-09-23 AND NOT YET RUN against real Google. gcp.network
+		// began shipping after this suite last ran. If it fails, read the
+		// discover output above before the code: the wording may differ, or
+		// this project's default network may not be in auto mode.
+		if !strings.Contains(out, "autoCreateSubnetworks set") {
+			t.Errorf("discover does not flag the project's default network as Google's; gcp.network "+
+				"ships now and systemowned.go knows the auto mode network by name:\n%s", out)
 		}
 	})
 
