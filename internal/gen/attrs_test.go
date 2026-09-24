@@ -831,3 +831,37 @@ func TestAListsEquivalenceReachesItsElements(t *testing.T) {
 		t.Errorf("healthChecks element equivalence = %q, want %q", got, catalog.EquivalenceSelfLink)
 	}
 }
+
+// TestAReferenceComparesAsOneInAnyForm. Terraform gives every ResourceRef the
+// CompareSelfLinkOrResourceName suppress itself, so the YAML never names it,
+// and a subnetwork's network written relatively planned a replacement on real
+// Google. A named suppress still wins, and a plain string gets nothing.
+func TestAReferenceComparesAsOneInAnyForm(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"network": str, "target": str, "description": str,
+		"healthChecks": {Type: "array", Items: str},
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "network", Type: "ResourceRef", Resource: "Network"},
+		{Name: "target", Type: "ResourceRef", Resource: "Target", DiffSuppressFunc: "tpgresource.CompareResourceNames"},
+		{Name: "description", Type: "String"},
+		{Name: "healthChecks", Type: "Array", ItemType: &mmv1.ItemType{Type: "ResourceRef"}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{
+		"network":     catalog.EquivalenceSelfLink,
+		"target":      catalog.EquivalenceResourceName,
+		"description": "",
+	} {
+		if got := attrs[name].Equivalence; got != want {
+			t.Errorf("%s equivalence = %q, want %q", name, got, want)
+		}
+	}
+	if got := attrs["healthChecks"].Elem.Equivalence; got != catalog.EquivalenceSelfLink {
+		t.Errorf("healthChecks element equivalence = %q, want self_link", got)
+	}
+}
