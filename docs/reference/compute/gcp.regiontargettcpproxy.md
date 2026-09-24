@@ -46,4 +46,12 @@ projects/{project}/regions/{region}/targetTcpProxies/{targetTcpProxy}
 | `proxyHeader` | `proxy_header` | `string` | optional | — | Specifies the type of proxy header to append before sending data to the backend, either NONE or PROXY_V1. The default is NONE. |
 | `region` | — | `string` | output only | force new | Output only. \[Output Only\] URL of the region where the regional TCP proxy resides. This field is not applicable to global TCP proxy. |
 | `selfLink` | `self_link` | `string` | output only | — | \[Output Only\] Server-defined URL for the resource. |
-| `service` | — | `string` | optional | — | URL to the BackendService resource. |
+| `service` | — | `string` | optional | refers to `gcp.regionbackendservice.selfLink` | URL to the BackendService resource. |
+
+## References
+
+These attributes name another type. infrena uses them to order a plan.
+
+| Attribute | Points at |
+| --- | --- |
+| `service` | `gcp.regionbackendservice.selfLink` |
