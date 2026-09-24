@@ -24,16 +24,10 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
 | [no get method](#no-get-method) | 2 |
-| [create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill](#create-url-projectsprojectzoneszonenodegroupsinitialnodecountpre_create_replace_me-carries-a-token-magic-modules-pre_create-hook-replaces-which-this-provider-cannot-fill) | 1 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectalertpolicies-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectgroups-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectlocationslocationsessiontemplates-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectmetricdescriptors-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectservices-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**352** types did not ship. **62** more ship without a create.
+**346** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -436,14 +430,6 @@ The API publishes no get. Reading one means listing its parent, which needs a ru
 | `cloudresourcemanager/tagHolds` | 2 | needs a ruling with read_via |
 | `servicenetworking/peeredDnsDomains` | 2 | needs a ruling with read_via |
 
-## create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `compute/NodeGroup` | 3 | — |
-
 ## reference to gcp.servertlspolicy.selfLink dropped
 
 Reported by the generator.
@@ -451,46 +437,6 @@ Reported by the generator.
 | Type | Tier | Detail |
 | --- | --- | --- |
 | `compute/gcp.targethttpsproxy.serverTlsPolicy` | 1 | gcp.servertlspolicy has no attribute "selfLink" |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/AlertPolicy` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/Group` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `dataproc/SessionTemplate` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/MetricDescriptor` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/Service` | 3 | — |
 
 ## Shipped, but cannot be created
 

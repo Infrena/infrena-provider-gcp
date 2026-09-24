@@ -115,7 +115,6 @@ tier3	compute/InstanceGroupManager	magic-modules marks it exclude: true
 tier2	compute/InterconnectAttachment	unruled wire hooks: post_create, pre_delete
 tier3	compute/MachineImage	min_version is beta, not ga
 tier3	compute/MachineType	magic-modules marks it exclude: true
-tier3	compute/NodeGroup	create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill
 tier2	compute/OrganizationSecurityPolicy	unruled wire hooks: post_create, post_delete, post_update
 tier3	compute/PreviewFeature	no insert or create method
 tier3	compute/Region	magic-modules marks it exclude: true
@@ -171,7 +170,6 @@ tier3	container/well-known	no insert or create method
 tier3	container/zones	no insert or create method
 tier1	dataproc/AutoscalingPolicy	legacy alias of gcp.dataproc.autoscalingpolicy (projects.locations.autoscalingPolicies)
 tier2	dataproc/Batch	unruled wire hooks: decoder
-tier3	dataproc/SessionTemplate	self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates
 tier3	dataproc/jobs	no insert or create method
 tier3	dataproc/nodeGroups	no delete method
 tier3	dataproc/operations	no insert or create method
@@ -251,11 +249,7 @@ tier3	logging/v2	no insert or create method
 tier1	logging/views	legacy alias of gcp.logging.view (projects.locations.buckets.views)
 tier3	memcache/locations	no insert or create method
 tier3	memcache/operations	no insert or create method
-tier3	monitoring/AlertPolicy	self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates
-tier3	monitoring/Group	self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates
-tier3	monitoring/MetricDescriptor	self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates
 tier2	monitoring/NotificationChannel	unruled wire hooks: custom_import, decoder, encoder
-tier3	monitoring/Service	self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates
 tier2	monitoring/UptimeCheckConfig	unruled wire hooks: custom_delete, custom_import, encoder
 tier3	monitoring/alerts	no insert or create method
 tier3	monitoring/collectdTimeSeries	no delete method

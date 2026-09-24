@@ -12,7 +12,7 @@ A schema is a format that messages must follow, creating a contract between publ
 | Scope | global |
 | Asset type | `pubsub.googleapis.com/Schema` |
 | Hangs off | `projects` |
-| Tier | 1 (ruled: update_encoder (update_encoder/pubsub_schema.tmpl) wraps the body for a schema commit, a new revision. This provider does not commit revisions: a schema has no patch, so any change replaces it.
+| Tier | 1 (ruled: update_encoder (update_encoder/pubsub_schema.tmpl) wraps the body for a schema commit, a new revision: magic-modules declares update_verb POST to schemas/{name}:commit. This provider does not commit revisions, and the generator refuses any update verb but PATCH, so any change replaces the schema. (An earlier version of this note said "a schema has no patch" and missed that the declared POST reached the catalog anyway, until the generator stopped letting it.)
 ) |
 | Mutation timeout | 60s |
 
@@ -22,7 +22,7 @@ A schema is a format that messages must follow, creating a contract between publ
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/schemas?schemaId={{name}}` |
 | Read | yes | `GET {+name}` |
-| Update | yes | `POST projects/{{project}}/schemas/{{name}}:commit` |
+| Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

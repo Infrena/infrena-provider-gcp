@@ -2,7 +2,7 @@
 
 # compute
 
-76 type(s). [Back to the index](../README.md).
+77 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
@@ -36,6 +36,7 @@
 | [`gcp.networkedgesecurityservice`](gcp.networkedgesecurityservice.md) | yes | yes | yes | Google Cloud Armor network edge security service resource. |
 | [`gcp.networkendpointgroup`](gcp.networkendpointgroup.md) | yes | **no** | yes | Network endpoint groups (NEGs) are zonal resources that represent collections of IP address and port combinations for GCP resources within … |
 | [`gcp.networkfirewallpolicy`](gcp.networkfirewallpolicy.md) | yes | yes | yes | The Compute NetworkFirewallPolicy resource |
+| [`gcp.nodegroup`](gcp.nodegroup.md) | yes | yes | yes | Represents a NodeGroup resource to manage a group of sole-tenant nodes. |
 | [`gcp.nodetemplate`](gcp.nodetemplate.md) | yes | **no** | yes | Represents a NodeTemplate resource. |
 | [`gcp.packetmirroring`](gcp.packetmirroring.md) | yes | yes | yes | Packet Mirroring mirrors traffic to and from particular VM instances. |
 | [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | **no** | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
