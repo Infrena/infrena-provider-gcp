@@ -420,6 +420,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// keys and tokens, `write_only` on values Terraform never keeps.
 			// Without this the host prints them in plans and state, in clear.
 			a.Sensitive = f.Sensitive || f.WriteOnly
+			a.Equivalence = equivalences[f.DiffSuppressFunc]
 			if f.Output {
 				a.Output = true
 			}
@@ -520,4 +521,17 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 // backend bucket.
 func acceptsSeveralTypes(f *mmv1.Field) bool {
 	return strings.HasSuffix(f.CustomExpand, "/reference_to_backend.tmpl")
+}
+
+// equivalences maps a magic-modules diff_suppress_func NAME to the rule
+// gcprov applies for it. Only names whose rule is written and tested there
+// belong here; an unknown name maps to nothing, which is today's behaviour.
+// Measured 2026-09-24: 33 distinct names on 110 fields of shipped types, the
+// commonest CompareSelfLinkOrResourceName (31). Each needs its own rule, so
+// each is added when one is written, not all at once.
+var equivalences = map[string]string{
+	// compute's forwarding rules: configuration writes "80" and Google
+	// answers "80-80", and portRange is ForceNew, so the rule was replaced
+	// on every plan (live run, 2026-09-24).
+	"PortRangeDiffSuppress": catalog.EquivalencePortRange,
 }

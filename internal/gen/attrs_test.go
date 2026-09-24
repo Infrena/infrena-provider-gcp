@@ -793,3 +793,24 @@ func TestAReferenceThatTakesSeveralTypesIsNotTyped(t *testing.T) {
 		t.Error("network lost its reference")
 	}
 }
+
+// TestADiffSuppressNameBecomesAnEquivalence. The name is magic-modules data;
+// the rule it maps to is ours. An unknown name maps to nothing.
+func TestADiffSuppressNameBecomesAnEquivalence(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{"portRange": str, "target": str}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "portRange", DiffSuppressFunc: "PortRangeDiffSuppress"},
+		{Name: "target", DiffSuppressFunc: "tpgresource.CompareSelfLinkOrResourceName"},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := attrs["portRange"].Equivalence; got != catalog.EquivalencePortRange {
+		t.Errorf("portRange equivalence = %q, want %q", got, catalog.EquivalencePortRange)
+	}
+	if got := attrs["target"].Equivalence; got != "" {
+		t.Errorf("target equivalence = %q for a suppress function with no rule written here", got)
+	}
+}

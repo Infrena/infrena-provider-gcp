@@ -927,3 +927,29 @@ func TestNothingIsPrunedAgainstAnUnmatchedListElement(t *testing.T) {
 		t.Error("a field was pruned against an unordered list's positional reference")
 	}
 }
+
+// TestAPortRangeIsReportedAsItWasWritten. compute answers a forwarding rule's
+// portRange "80" as "80-80", and the field is ForceNew, so the rule was
+// replaced on every plan. The rule applies only to an attribute the catalog
+// marks, and only to the same range: a different range is still drift.
+func TestAPortRangeIsReportedAsItWasWritten(t *testing.T) {
+	marked := &catalog.Attr{Canonical: "portRange", Kind: value.KindString, Equivalence: catalog.EquivalencePortRange}
+	plain := &catalog.Attr{Canonical: "portRange", Kind: value.KindString}
+	s := func(v string) value.Value { return value.String(v, value.SourceProvider) }
+	for _, c := range []struct {
+		attr          *catalog.Attr
+		ref, in, want string
+	}{
+		{marked, "80", "80-80", "80"},
+		{marked, "80", "81-81", "81-81"},
+		{marked, "8080-8090", "8080-8090", "8080-8090"},
+		{marked, "8080", "8080-8090", "8080-8090"},
+		{plain, "80", "80-80", "80-80"},
+	} {
+		got := Reconcile(c.attr, s(c.ref), s(c.in))
+		if got.Raw != c.want {
+			t.Errorf("equivalence %q, written %q, answered %q: reported %v, want %q",
+				c.attr.Equivalence, c.ref, c.in, got.Raw, c.want)
+		}
+	}
+}
