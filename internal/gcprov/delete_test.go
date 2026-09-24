@@ -8,6 +8,8 @@ import (
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
 	"github.com/infrena/infrena-provider-gcp/internal/gcptest"
+	"github.com/infrena/infrena/pkg/resource"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 const deletePath = "/v1/projects/p/locations/r/widgets/one"
@@ -98,5 +100,72 @@ func TestAnOperationThatFindsNothingBecauseItIsGoneIsASuccess(t *testing.T) {
 
 	if err := p.Delete(context.Background(), widgetState()); err != nil {
 		t.Fatalf("Delete = %v, but the resource is gone", err)
+	}
+}
+
+// networkedWidget is a widget whose API refuses deletion while networks are
+// attached, the way a Cloud DNS policy does.
+func networkedWidget(t *testing.T, networks []any) (*gcpfake.Server, *Provider) {
+	t.Helper()
+	s := gcpfake.New(t)
+	s.Seed(deletePath, map[string]any{"name": "one", "networks": networks})
+	ty := widgetType()
+	ty.UpdateMask = false
+	ty.Attributes["networks"] = &catalog.Attr{Canonical: "networks", Kind: value.KindList,
+		Elem: &catalog.Attr{Canonical: "networks", Kind: value.KindString}}
+	ty.ClearBeforeDelete = []string{"networks"}
+	return s, testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+}
+
+func networkedState(networks ...string) *resource.ResourceState {
+	st := widgetState()
+	var items []any
+	for _, n := range networks {
+		items = append(items, n)
+	}
+	st.Attributes["networks"] = attrsMixed(map[string]any{"networks": items})["networks"]
+	return st
+}
+
+// TestAFieldTheAPIWillNotDeleteAroundIsClearedFirst. Google refuses to delete
+// a Cloud DNS policy with networks attached, and configuration cannot detach
+// them (a field removed from configuration keeps its value here), so the
+// policy could never be destroyed. Delete clears them with a patch first.
+func TestAFieldTheAPIWillNotDeleteAroundIsClearedFirst(t *testing.T) {
+	gcptest.Isolate(t)
+	s, p := networkedWidget(t, []any{"projects/p/global/networks/n"})
+	defer s.Close()
+
+	if err := p.Delete(context.Background(), networkedState("projects/p/global/networks/n")); err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for _, r := range s.Requests() {
+		if r.Method == "PATCH" || r.Method == "DELETE" {
+			order = append(order, r.Method)
+		}
+		if r.Method == "PATCH" && !strings.Contains(string(r.Body), `"networks":null`) {
+			t.Errorf("the clearing patch does not empty networks: %s", r.Body)
+		}
+	}
+	if strings.Join(order, ",") != "PATCH,DELETE" {
+		t.Errorf("requests were %v, want the clearing PATCH and then the DELETE", order)
+	}
+}
+
+// TestNothingToClearSendsNoPatch. A policy with no networks attached is
+// deleted directly: a patch that changes nothing is a request for nothing.
+func TestNothingToClearSendsNoPatch(t *testing.T) {
+	gcptest.Isolate(t)
+	s, p := networkedWidget(t, nil)
+	defer s.Close()
+
+	if err := p.Delete(context.Background(), networkedState()); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range s.Requests() {
+		if r.Method == "PATCH" {
+			t.Errorf("sent a clearing patch with nothing to clear: %s", r.Body)
+		}
 	}
 }

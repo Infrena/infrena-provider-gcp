@@ -1204,6 +1204,14 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.OperationParamPatterns = operationParamPatterns(doc, t.OperationPollPath)
 	}
 
+	if ruling != nil && len(ruling.ClearBeforeDelete) > 0 {
+		for _, f := range ruling.ClearBeforeDelete {
+			if a := attrs[f]; a == nil || a.Output {
+				return nil, fmt.Errorf("clear_before_delete names %q, which is not a settable attribute of this type", f)
+			}
+		}
+		t.ClearBeforeDelete = ruling.ClearBeforeDelete
+	}
 	if ruling != nil && ruling.ReadVia != "" {
 		t.ReadVia = ruling.ReadVia
 	}
@@ -1280,6 +1288,14 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err
+	}
+	// magic-modules marks a create url its pre_create hook rewrites with this
+	// token (compute's NodeGroup: "?initialNodeCount=PRE_CREATE_REPLACE_ME").
+	// Shipped, every create would send the token itself. Refused until the
+	// generator can fill that parameter.
+	if strings.Contains(t.CreateURL, "PRE_CREATE_REPLACE_ME") {
+		return nil, fmt.Errorf("create url %q carries a token magic-modules' pre_create hook replaces, "+
+			"which this provider cannot fill", t.CreateURL)
 	}
 
 	t.EndpointTemplate = endpointTemplate(doc, mm, t)

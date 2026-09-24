@@ -491,6 +491,9 @@ func (p *Provider) Delete(ctx context.Context, current *resource.ResourceState) 
 	if err := ctx.Err(); err != nil {
 		return err // last chance to stop before anything is destroyed
 	}
+	if err := p.clearBeforeDelete(ctx, ty, current, attrs); err != nil {
+		return err
+	}
 	resp, err := p.client.Do(ctx, http.MethodDelete, reqURL, nil)
 	if isNotFound(err) {
 		return nil
@@ -894,4 +897,54 @@ func baseURLFor(ty *catalog.Type, rel string) string {
 		return ty.APIBaseURL
 	}
 	return strings.ReplaceAll(ty.EndpointTemplate, "{location}", loc)
+}
+
+// clearBeforeDelete patches each of ty.ClearBeforeDelete to empty, when the
+// resource holds anything in it, and waits for each. A Cloud DNS policy
+// refuses deletion while networks are attached; the clearing patch is what
+// Terraform's pre_delete sends. A failure here returns before the DELETE, so
+// state still records the resource, which does still exist.
+func (p *Provider) clearBeforeDelete(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, attrs map[string]value.Value) error {
+	if len(ty.ClearBeforeDelete) == 0 || ty.UpdateVerb == "" {
+		return nil
+	}
+	reqURL, err := p.itemURL(ty, ty.UpdateURL, current.ProviderID, attrs)
+	if err != nil {
+		return err
+	}
+	for _, f := range ty.ClearBeforeDelete {
+		name, a := attrByCanonical(ty, f)
+		if a == nil || isEmpty(current.Attributes[name]) {
+			continue
+		}
+		body := map[string]any{f: nil}
+		if ty.LockField != "" {
+			if la, v := lockValue(ty, current.Attributes); v.Known {
+				body[ty.LockField] = wireValue(la, v)
+			}
+		}
+		resp, err := p.sendPatch(ctx, ty, reqURL, body, []string{f})
+		if err != nil {
+			return fmt.Errorf("gcp: %s: clearing %s before the delete: %w", ty.Name, f, err)
+		}
+		if _, err := p.await(ctx, ty, resp); err != nil {
+			return fmt.Errorf("gcp: %s: clearing %s before the delete: %w", ty.Name, f, err)
+		}
+	}
+	return nil
+}
+
+// isEmpty reports whether v holds nothing: absent, unknown, or an empty list
+// or map.
+func isEmpty(v value.Value) bool {
+	if !v.Known || v.Kind == value.KindInvalid {
+		return true
+	}
+	switch raw := v.Raw.(type) {
+	case []value.Value:
+		return len(raw) == 0
+	case map[string]value.Value:
+		return len(raw) == 0
+	}
+	return false
 }

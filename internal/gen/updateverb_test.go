@@ -631,3 +631,51 @@ func TestOneFieldPerPatchReachesTheCatalog(t *testing.T) {
 		}
 	}
 }
+
+// TestClearBeforeDeleteReachesTheCatalogAndIsChecked. The ruling names the
+// fields; the catalog carries them; a field the type does not have is a
+// build error, not a patch of a field Google has never heard of.
+func TestClearBeforeDeleteReachesTheCatalogAndIsChecked(t *testing.T) {
+	build := func(field string) (*catalog.Type, []Warning) {
+		in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
+			"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\nself_link: projects/{{project}}/patchables/{{name}}\ncustom_code:\n  pre_delete: templates/terraform/pre_delete/detach.tmpl\n"})
+		overlay := "rulings:\n  acme/Patchable:\n    hooks: [pre_delete]\n    clear_before_delete: [" + field + "]\n    note: detaches before delete\naliases: {}\ndiscover_default: []\n"
+		if err := os.WriteFile(in.OverlayPath, []byte(overlay), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Build(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, _ := res.Catalog.Type("gcp.patchable")
+		return ty, res.Warnings
+	}
+	if ty, _ := build("size"); ty == nil || len(ty.ClearBeforeDelete) != 1 || ty.ClearBeforeDelete[0] != "size" {
+		t.Errorf("clear_before_delete [size] reached the catalog as %+v", ty)
+	}
+	ty, warnings := build("nosuchfield")
+	if ty != nil {
+		t.Error("a ruling clearing a field the type does not have still shipped the type")
+	}
+	var named bool
+	for _, w := range warnings {
+		named = named || strings.Contains(w.Reason, "nosuchfield")
+	}
+	if !named {
+		t.Error("the refusal does not name the field")
+	}
+}
+
+// TestACreateURLCarryingAPreCreateTokenIsRefused. compute's NodeGroup create
+// url carries "PRE_CREATE_REPLACE_ME" for its pre_create hook to fill.
+// Shipped, every create would send the token itself.
+func TestACreateURLCarryingAPreCreateTokenIsRefused(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
+		"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\ncreate_url: projects/{{project}}/patchables?count=PRE_CREATE_REPLACE_ME\nself_link: projects/{{project}}/patchables/{{name}}\n"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := res.Catalog.Type("gcp.patchable"); ok {
+		t.Error("gcp.patchable shipped with a create url that sends PRE_CREATE_REPLACE_ME")
+	}
+}
