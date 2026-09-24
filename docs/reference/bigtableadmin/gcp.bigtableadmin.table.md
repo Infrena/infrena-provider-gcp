@@ -28,7 +28,7 @@ A collection of user data indexed by row, column, and timestamp. Each table is s
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/tables/{table}
 ```
 
 ## Attributes

@@ -179,3 +179,86 @@ func TestAnUndeclaredQueryParameterIsRefused(t *testing.T) {
 		t.Error("an attribute was synthesized for a query parameter the API never published")
 	}
 }
+
+// structuredIDDoc publishes two collections whose get is the bare "{+name}"
+// capture, which is how most proto-first APIs address one resource. One has a
+// clean pattern and one has a generic parent that no template can name.
+func structuredIDDoc() string {
+	return `{
+  "name": "acme", "version": "v1", "rootUrl": "https://acme.googleapis.com/", "servicePath": "",
+  "schemas": {
+    "Db": {"id": "Db", "type": "object", "properties": {"name": {"type": "string", "readOnly": true}}},
+    "Feed": {"id": "Feed", "type": "object", "properties": {"name": {"type": "string", "readOnly": true}}},
+    "Operation": {"id": "Operation", "type": "object", "properties": {"status": {"type": "string"}}}
+  },
+  "resources": {"projects": {"resources": {"instances": {"resources": {
+    "databases": {"methods": {
+      "get": {"id": "a.d.get", "path": "v1/{+name}", "httpMethod": "GET", "response": {"$ref": "Db"},
+        "parameters": {"name": {"type": "string", "location": "path", "pattern": "^projects/[^/]+/instances/[^/]+/databases/[^/]+$"}}},
+      "create": {"id": "a.d.create", "path": "v1/{+parent}/databases", "httpMethod": "POST", "request": {"$ref": "Db"}, "response": {"$ref": "Db"},
+        "parameters": {"parent": {"type": "string", "location": "path", "pattern": "^projects/[^/]+/instances/[^/]+$"}}},
+      "delete": {"id": "a.d.delete", "path": "v1/{+name}", "httpMethod": "DELETE",
+        "parameters": {"name": {"type": "string", "location": "path", "pattern": "^projects/[^/]+/instances/[^/]+/databases/[^/]+$"}}}
+    }}}},
+    "feeds": {"methods": {
+      "get": {"id": "a.f.get", "path": "v1/{+name}", "httpMethod": "GET", "response": {"$ref": "Feed"},
+        "parameters": {"name": {"type": "string", "location": "path", "pattern": "^[^/]+/[^/]+/feeds/[^/]+$"}}},
+      "create": {"id": "a.f.create", "path": "v1/{+parent}/feeds", "httpMethod": "POST", "request": {"$ref": "Feed"}, "response": {"$ref": "Feed"},
+        "parameters": {"parent": {"type": "string", "location": "path", "pattern": "^[^/]+/[^/]+$"}}},
+      "delete": {"id": "a.f.delete", "path": "v1/{+name}", "httpMethod": "DELETE",
+        "parameters": {"name": {"type": "string", "location": "path", "pattern": "^[^/]+/[^/]+/feeds/[^/]+$"}}}
+    }}
+  }}}
+}`
+}
+
+// TestABareCaptureDocumentsTheRealIdShape. "{+name}" is what 88 types showed
+// as their import format, which tells a user nothing about what to type. The
+// API's own pattern says, and the placeholders are named after the
+// collections in front of them -- "databases" as {database}, which the naming
+// pass's singularizer would have spelled "databas".
+//
+// SelfLink is asserted untouched because the change is documentation only:
+// a bare capture parses any id, and that must not become a refusal.
+func TestABareCaptureDocumentsTheRealIdShape(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": structuredIDDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The TYPE is named gcp.databas: the naming pass's singularizer is pinned
+	// by gen/names.lock.json and gets "databases" wrong, which is why the real
+	// catalog has gcp.firestore.databas. The placeholder below is spelled
+	// correctly because it uses singularSegment instead, and the contrast is
+	// the point of asserting both.
+	db, ok := res.Catalog.Type("gcp.databas")
+	if !ok {
+		var got []string
+		for _, ty := range res.Catalog.Types {
+			got = append(got, ty.Name)
+		}
+		t.Fatalf("gcp.databas missing; catalog has %v", got)
+	}
+	if got, want := db.ImportFormat, "projects/{project}/instances/{instance}/databases/{database}"; got != want {
+		t.Errorf("import format = %q, want %q", got, want)
+	}
+	if db.SelfLink != "{+name}" {
+		t.Errorf("self_link = %q, want the capture left exactly as it was", db.SelfLink)
+	}
+	feed, ok := res.Catalog.Type("gcp.feed")
+	if !ok {
+		t.Fatal("gcp.feed missing")
+	}
+	if feed.ImportFormat != "{+name}" {
+		t.Errorf("a generic-parent pattern was given a shape: %q; a template cannot name a parent that may be any collection", feed.ImportFormat)
+	}
+}
+
+// TestARepeatedPlaceholderIsNotAShape. A template that names two segments the
+// same cannot be filled by anyone, so it is refused rather than documented.
+func TestARepeatedPlaceholderIsNotAShape(t *testing.T) {
+	col := disco.Collection{Methods: map[string]*disco.Method{"get": {Path: "v1/{+name}",
+		Parameters: map[string]*disco.Parameter{"name": {Location: "path", Pattern: "^widgets/[^/]+/widgets/[^/]+$"}}}}}
+	if got := structuredIDTemplate(col, "{+name}"); got != "" {
+		t.Errorf("got %q, want no shape", got)
+	}
+}

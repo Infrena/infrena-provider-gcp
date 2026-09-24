@@ -28,7 +28,7 @@ The GatewaySecurityPolicyRule resource is in a nested collection within a Gatewa
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/gatewaySecurityPolicies/{gatewaySecurityPolicy}/rules/{rule}
 ```
 
 ## Attributes

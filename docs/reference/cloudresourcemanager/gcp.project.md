@@ -28,7 +28,7 @@ A project is a high-level Google Cloud entity. It is a container for ACLs, APIs,
 ## Import id
 
 ```
-{+name}
+projects/{project}
 ```
 
 ## Attributes

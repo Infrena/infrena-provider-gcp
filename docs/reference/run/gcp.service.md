@@ -28,7 +28,7 @@ Service acts as a top-level container that manages a set of configurations and r
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/services/{service}
 ```
 
 ## Attributes

@@ -28,7 +28,7 @@ The definition of a notebook instance.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/instances/{instance}
 ```
 
 ## Attributes

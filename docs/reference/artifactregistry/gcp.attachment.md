@@ -28,7 +28,7 @@ An Attachment refers to additional metadata that can be attached to artifacts in
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/repositories/{repository}/attachments/{attachment}
 ```
 
 ## Attributes

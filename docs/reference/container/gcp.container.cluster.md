@@ -28,7 +28,7 @@ Container Cluster
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/clusters/{cluster}
 ```
 
 ## Attributes

@@ -28,7 +28,7 @@ A configuration object describing how Cloud Bigtable should treat traffic from a
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/appProfiles/{appProfile}
 ```
 
 ## Attributes

@@ -28,7 +28,7 @@ A session in the Cloud Spanner API.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/databases/{database}/sessions/{session}
 ```
 
 ## Attributes

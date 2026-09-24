@@ -28,7 +28,7 @@ A resizable group of nodes in a particular cloud location, capable of serving al
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/clusters/{cluster}
 ```
 
 ## Attributes

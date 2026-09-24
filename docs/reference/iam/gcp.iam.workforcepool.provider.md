@@ -27,7 +27,7 @@ A configuration for an external identity provider.
 ## Import id
 
 ```
-{+name}
+locations/{location}/workforcePools/{workforcePool}/providers/{provider}
 ```
 
 ## Attributes

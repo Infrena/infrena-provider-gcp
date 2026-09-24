@@ -28,7 +28,7 @@ A backup of a Cloud Spanner database.
 ## Import id
 
 ```
-{+name}
+projects/{project}/instances/{instance}/backups/{backup}
 ```
 
 ## Attributes

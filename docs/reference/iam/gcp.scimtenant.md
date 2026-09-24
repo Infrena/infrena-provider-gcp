@@ -27,7 +27,7 @@ Gemini Enterprise only. Represents a SCIM tenant. Used for provisioning and mana
 ## Import id
 
 ```
-{+name}
+locations/{location}/workforcePools/{workforcePool}/providers/{provider}/scimTenants/{scimTenant}
 ```
 
 ## Attributes

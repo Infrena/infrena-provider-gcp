@@ -28,7 +28,7 @@ A SingleTenantHsmInstanceProposal represents a proposal to perform an operation 
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/singleTenantHsmInstances/{singleTenantHsmInstance}/proposals/{proposal}
 ```
 
 ## Attributes

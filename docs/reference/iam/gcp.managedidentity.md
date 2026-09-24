@@ -28,7 +28,7 @@ Represents a managed identity for a workload identity pool namespace.
 ## Import id
 
 ```
-{+name}
+projects/{project}/locations/{location}/workloadIdentityPools/{workloadIdentityPool}/namespaces/{namespace}/managedIdentities/{managedIdentity}
 ```
 
 ## Attributes
