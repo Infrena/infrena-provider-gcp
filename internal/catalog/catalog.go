@@ -184,6 +184,11 @@ type Type struct {
 	// Discovery document lists.
 	EndpointTemplate string `json:"endpoint_template,omitempty"`
 
+	// ClearBeforeDelete are fields Delete patches to empty before deleting,
+	// because the API refuses to delete the resource while they are set.
+	// From a ruling, which cites the hook that does the same.
+	ClearBeforeDelete []string `json:"clear_before_delete,omitempty"`
+
 	// PatchOneField says the API refuses a patch changing more than one
 	// top-level field, so Update sends one patch per changed field, reading
 	// the lock afresh between them. From the overlay, on evidence.

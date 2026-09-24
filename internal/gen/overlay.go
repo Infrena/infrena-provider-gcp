@@ -20,6 +20,12 @@ type Ruling struct {
 	ReadVia string `yaml:"read_via"`
 	// AllForceNew marks a type with no update path at all.
 	AllForceNew bool `yaml:"all_force_new"`
+	// ClearBeforeDelete names fields the API requires empty before it will
+	// delete the resource, cleared by a patch first: a Cloud DNS policy
+	// cannot be deleted while networks are attached. Configuration cannot
+	// clear them (a field removed from configuration keeps its value here),
+	// so without this such a resource could never be destroyed.
+	ClearBeforeDelete []string `yaml:"clear_before_delete"`
 }
 
 // Patchable is a human decision about a type whose API patches only SOME of
