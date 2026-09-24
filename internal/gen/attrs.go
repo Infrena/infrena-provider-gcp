@@ -366,7 +366,11 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		// `format`). So they are ORed, never one in place of the other. A field
 		// changed that the API will not change must REPLACE the resource; sent
 		// as a patch it is refused, and the plan was wrong before it ran.
-		a.ForceNew = disco.Behaviors(prop)[disco.BehaviorImmutable]
+		behaviors := disco.Behaviors(prop)
+		a.ForceNew = behaviors[disco.BehaviorImmutable]
+		// Never on an output-only field: a field GCP sets is returned by
+		// definition, and there is nothing of the user's to carry.
+		a.InputOnly = behaviors[disco.BehaviorInputOnly] && !a.Output
 		if f := idx[name]; f != nil {
 			a.Required = f.Required
 			a.ForceNew = a.ForceNew || f.Immutable

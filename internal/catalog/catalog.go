@@ -72,6 +72,19 @@ type Attr struct {
 	// prior state rather than expecting GCP to echo it back, and it is
 	// ForceNew because nothing can change it afterwards.
 	CreateOnly bool `json:"create_only,omitempty"`
+	// InputOnly marks a field of the RESOURCE that the API accepts and never
+	// returns: compute's disks[].initializeParams, a certificate's private
+	// key, the tag bindings a resource is created with. Discovery says so in
+	// prose ("Input only." / "[Input Only]"), never as structure.
+	//
+	// It is not CreateOnly. A create-only attribute is not part of the
+	// resource at all and travels beside a create wrapper; an input-only one
+	// is a resource field and travels inside it, and may be patchable.
+	// What they share is the read side: nothing comes back to compare, so the
+	// reconciler carries the value forward from the reference rather than
+	// reporting it missing -- which the next plan would read as drift, for
+	// ever, on a resource that is exactly as configured.
+	InputOnly bool `json:"input_only,omitempty"`
 
 	// Unordered marks a list GCP may return in a different order than it was
 	// sent. Task 15 reorders those to match the reference; an ordered list is

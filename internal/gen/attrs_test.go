@@ -586,3 +586,26 @@ func TestImmutabilityComesFromEitherSource(t *testing.T) {
 		}
 	}
 }
+
+// TestInputOnlyComesFromTheTagInEitherSpelling. The modern APIs write "Input
+// only." and compute writes "[Input Only]" -- disks[].initializeParams, the
+// field behind an instance that planned its own replacement on every run,
+// uses the bracketed form. An output-only field is never input-only: GCP
+// returns what it sets, and there is nothing of the user's to carry.
+func TestInputOnlyComesFromTheTagInEitherSpelling(t *testing.T) {
+	body := &disco.Schema{Properties: map[string]*disco.Schema{
+		"modern":  {Type: "string", Description: "Optional. Input only. Immutable. Tags bound at creation."},
+		"compute": {Type: "string", Description: "[Input Only] Specifies the parameters for a new disk."},
+		"plain":   {Type: "string", Description: "A description that mentions input only in passing."},
+		"output":  {Type: "string", ReadOnly: true, Description: "Input only. A field that contradicts itself."},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{"modern": true, "compute": true, "plain": false, "output": false} {
+		if got := attrs[name].InputOnly; got != want {
+			t.Errorf("%s: InputOnly = %v, want %v", name, got, want)
+		}
+	}
+}
