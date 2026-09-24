@@ -1198,3 +1198,80 @@ func TestARefreshKeepsAnInputOnlyFieldGCPNeverReturns(t *testing.T) {
 		t.Errorf("bootImage after a refresh = %v, want it carried forward; missing, every plan would propose changing it", got)
 	}
 }
+
+// shortNamed is a type whose schema means the SHORT name by `name` -- its id
+// template ends in "/{{name}}" -- created by AIP-133's "?widgetId={{name}}".
+func shortNamed() *catalog.Type {
+	ty := widgetType()
+	ty.CreateURL = "projects/{{project}}/locations/{{region}}/widgets?widgetId={{name}}"
+	return ty
+}
+
+// TestAFullNameForThisResourceIsReportedAsTheShortOne. AIP-133 APIs answer a
+// create with `name` set to the FULL relative resource name. For a type whose
+// schema calls the short name `name`, reporting that as it came back makes
+// state and configuration disagree on a field in the url, and every plan after
+// a create proposes a replacement -- 37 shipping types, Eventarc triggers
+// among them. The fake now answers the way Google does, which is why this can
+// be tested at all.
+func TestAFullNameForThisResourceIsReportedAsTheShortOne(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{shortNamed()}})
+	st, err := p.Create(context.Background(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(10),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, _ := s.Get("/v1/projects/p/locations/r/widgets/one")
+	if stored["name"] != "projects/p/locations/r/widgets/one" {
+		t.Fatalf("the fake answered name %v; this test needs the full name Google sends", stored["name"])
+	}
+	if got := st.Attributes["name"]; !got.Equal(value.String("one", got.Source)) {
+		t.Errorf("state name after create = %v, want the short name configuration wrote", got)
+	}
+	read, err := p.Read(context.Background(), st)
+	if err != nil || read == nil {
+		t.Fatalf("read: %v", err)
+	}
+	if got := read.Attributes["name"]; !got.Equal(value.String("one", got.Source)) {
+		t.Errorf("state name after a refresh = %v, want the short name", got)
+	}
+}
+
+// TestOnlyThisResourcesOwnNameIsShortened. The rule fires on the same
+// collection and the same last segment as the resource's own id, and nowhere
+// else -- including where the answer spells the project by NUMBER, which is
+// still this resource.
+func TestOnlyThisResourcesOwnNameIsShortened(t *testing.T) {
+	ty := shortNamed()
+	for full, want := range map[string]string{
+		"projects/p/locations/r/widgets/one":         "one",
+		"projects/123456789/locations/r/widgets/one": "one",
+		"projects/p/locations/r/widgets/other":       "projects/p/locations/r/widgets/other",
+		"projects/p/locations/r/gadgets/one":         "projects/p/locations/r/gadgets/one",
+	} {
+		attrs := map[string]value.Value{"name": value.String(full, value.SourceProvider)}
+		shortNameFromOwnID(ty, "projects/p/locations/r/widgets/one", attrs)
+		if got, _ := attrs["name"].Raw.(string); got != want {
+			t.Errorf("%s: got %q, want %q", full, got, want)
+		}
+	}
+}
+
+// TestAFullPathNameIsLeftAlone. Where the schema's `name` IS the full path --
+// a Pub/Sub topic, id template "{+topic}" -- or is Google's to set, there is no
+// short name to report, and the full one is the value configuration holds.
+func TestAFullPathNameIsLeftAlone(t *testing.T) {
+	topic := &catalog.Type{SelfLink: "{+topic}", Attributes: map[string]*catalog.Attr{"name": {Kind: value.KindString}}}
+	job := &catalog.Type{SelfLink: "projects/{{project}}/jobs/{{name}}", Attributes: map[string]*catalog.Attr{"name": {Kind: value.KindString, Output: true}}}
+	for _, ty := range []*catalog.Type{topic, job} {
+		attrs := map[string]value.Value{"name": value.String("projects/p/x/one", value.SourceProvider)}
+		shortNameFromOwnID(ty, "projects/p/x/one", attrs)
+		if got, _ := attrs["name"].Raw.(string); got != "projects/p/x/one" {
+			t.Errorf("self_link %q: name shortened to %q", ty.SelfLink, got)
+		}
+	}
+}
