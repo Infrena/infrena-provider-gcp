@@ -41,19 +41,19 @@ projects/{project}/global/networks/{network}
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `IPv4Range` | `ipv4_range` | `string` | optional | — | Deprecated in favor of subnet mode networks. The range of internal addresses that are legal on this network. This range is aCIDR specification, for example:192.168.0.0/16. Provided by the client when … |
+| `IPv4Range` | `ipv4_range` | `string` | optional | force new | Deprecated in favor of subnet mode networks. The range of internal addresses that are legal on this network. This range is aCIDR specification, for example:192.168.0.0/16. Provided by the client when … |
 | `autoCreateSubnetworks` | `auto_subnets`, `auto_create_subnetworks` | `boolean` | optional | force new | Must be set to create a VPC network. If not set, a legacy network is created. When set to true, the VPC network is created in auto mode. When set to false, the VPC network is created in custom mode … |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `description` | — | `string` | optional | force new | An optional description of this resource. Provide this field when you create the resource. |
-| `enableUlaInternalIpv6` | `enable_ula_internal_ipv6` | `boolean` | optional | — | Enable ULA internal ipv6 on this network. Enabling this feature will assign a /48 from google defined ULA prefix fd20::/20. . |
+| `enableUlaInternalIpv6` | `enable_ula_internal_ipv6` | `boolean` | optional | force new | Enable ULA internal ipv6 on this network. Enabling this feature will assign a /48 from google defined ULA prefix fd20::/20. . |
 | `firewallPolicy` | `firewall_policy` | `string` | output only | — | Output only. \[Output Only\] URL of the firewall policy the network is associated with. |
 | `gatewayIPv4` | `gateway_ipv4` | `string` | output only | — | \[Output Only\] The gateway address for default routing out of the network, selected by Google Cloud. |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `internalIpv6Range` | `internal_ipv6_range` | `string` | optional | force new | When enabling ula internal ipv6, caller optionally can specify the /48 range they want from the google defined ULA prefix fd20::/20. The input must be a valid /48 ULA IPv6 address and must be within … |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Always compute#network for networks. |
-| `mtu` | — | `integer` | optional | — | Maximum Transmission Unit in bytes. The minimum value for this field is 1300 and the maximum value is 8896. The suggested value is 1500, which is the default MTU used on the Internet, or 8896 if you … |
+| `mtu` | — | `integer` | optional | force new | Maximum Transmission Unit in bytes. The minimum value for this field is 1300 and the maximum value is 8896. The suggested value is 1500, which is the default MTU used on the Internet, or 8896 if you … |
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
-| `networkFirewallPolicyEnforcementOrder` | `network_firewall_policy_enforcement_order` | `string` | optional | — | The network firewall policy enforcement order. Can be either AFTER_CLASSIC_FIREWALL or BEFORE_CLASSIC_FIREWALL. Defaults to AFTER_CLASSIC_FIREWALL if the field is not specified. |
+| `networkFirewallPolicyEnforcementOrder` | `network_firewall_policy_enforcement_order` | `string` | optional | force new | The network firewall policy enforcement order. Can be either AFTER_CLASSIC_FIREWALL or BEFORE_CLASSIC_FIREWALL. Defaults to AFTER_CLASSIC_FIREWALL if the field is not specified. |
 | `networkProfile` | `network_profile` | `string` | optional | force new | A full or partial URL of the network profile to apply to this network. This field can be set only at resource creation time. For example, the following are valid URLs: - … |
 | `params` | — | `map` | optional | force new | Input only. \[Input Only\] Additional params passed with the request, but not persisted as part of resource payload. |
 | `params.resourceManagerTags` | `resource_manager_tags` | `map` | optional | opaque | Tag keys/values directly bound to this resource. Tag keys and values have the same definition as resource manager tags. The field is allowed for INSERT only. The keys/values to set on the resource … |
