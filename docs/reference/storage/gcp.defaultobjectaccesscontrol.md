@@ -44,7 +44,7 @@ The DefaultObjectAccessControls resources represent the Access Control Lists (AC
 | `etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
 | `generation` | — | `string` | output only | — | The content generation of the object, if applied to an object. |
 | `id` | — | `string` | optional | — | The ID of the access-control entry. |
-| `kind` | — | `string` | optional | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
+| `kind` | — | `string` | output only | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
 | `object` | — | `string` | optional | — | The name of the object, if applied to an object. |
 | `projectTeam` | `project_team` | `map` | output only | — | The project team associated with the entity, if any. |
 | `projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |

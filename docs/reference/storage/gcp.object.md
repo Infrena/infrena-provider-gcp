@@ -46,7 +46,7 @@ b/{bucket}/o/{object}
 | `acl[].etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
 | `acl[].generation` | — | `string` | optional | — | The content generation of the object, if applied to an object. |
 | `acl[].id` | — | `string` | optional | — | The ID of the access-control entry. |
-| `acl[].kind` | — | `string` | optional | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
+| `acl[].kind` | — | `string` | output only | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
 | `acl[].object` | — | `string` | optional | — | The name of the object, if applied to an object. |
 | `acl[].projectTeam` | `project_team` | `map` | optional | — | The project team associated with the entity, if any. |
 | `acl[].projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |
@@ -72,7 +72,7 @@ b/{bucket}/o/{object}
 | `generation` | — | `string` | optional | — | The content generation of this object. Used for object versioning. |
 | `hardDeleteTime` | `hard_delete_time` | `string` | optional | — | This is the time (in the future) when the soft-deleted object will no longer be restorable. It is equal to the soft delete time plus the current soft delete retention duration of the bucket. |
 | `id` | — | `string` | optional | — | The ID of the object, including the bucket name, object name, and generation number. |
-| `kind` | — | `string` | optional | — | The kind of item this is. For objects, this is always storage#object. |
+| `kind` | — | `string` | output only | — | The kind of item this is. For objects, this is always storage#object. |
 | `kmsKeyName` | `kms_key_name` | `string` | optional | — | Not currently supported. Specifying the parameter causes the request to fail with status code 400 - Bad Request. |
 | `md5Hash` | `md5_hash` | `string` | optional | — | MD5 hash of the data; encoded using base64. For more information about using the MD5 hash, see \[Data Validation and Change Detection\](https://cloud.google.com/storage/docs/data-validation). |
 | `mediaLink` | `media_link` | `string` | optional | — | Media download link. |

@@ -45,7 +45,7 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | `acl[].entityId` | `entity_id` | `string` | optional | — | The ID for the entity, if any. |
 | `acl[].etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
 | `acl[].id` | — | `string` | output only | — | The ID of the access-control entry. |
-| `acl[].kind` | — | `string` | optional | — | The kind of item this is. For bucket access control entries, this is always storage#bucketAccessControl. |
+| `acl[].kind` | — | `string` | output only | — | The kind of item this is. For bucket access control entries, this is always storage#bucketAccessControl. |
 | `acl[].projectTeam` | `project_team` | `map` | optional | — | The project team associated with the entity, if any. |
 | `acl[].projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |
 | `acl[].projectTeam.team` | — | `string` | optional | — | The team. |
@@ -81,7 +81,7 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | `defaultObjectAcl[].etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
 | `defaultObjectAcl[].generation` | — | `string` | output only | — | The content generation of the object, if applied to an object. |
 | `defaultObjectAcl[].id` | — | `string` | output only | — | The ID of the access-control entry. |
-| `defaultObjectAcl[].kind` | — | `string` | optional | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
+| `defaultObjectAcl[].kind` | — | `string` | output only | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
 | `defaultObjectAcl[].object` | — | `string` | optional | — | The name of the object, if applied to an object. |
 | `defaultObjectAcl[].projectTeam` | `project_team` | `map` | output only | — | The project team associated with the entity, if any. |
 | `defaultObjectAcl[].projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |
@@ -125,7 +125,7 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | `ipFilter.vpcNetworkSources[].allowedIpCidrRanges` | `allowed_ip_cidr_ranges` | `list` | optional | — | The list of IPv4, IPv6 cidr ranges subnetworks that are allowed to access the bucket. |
 | `ipFilter.vpcNetworkSources[].allowedIpCidrRanges[]` | — | `string` | optional | — | — |
 | `ipFilter.vpcNetworkSources[].network` | — | `string` | optional | — | Name of the network. Format: projects/{PROJECT_ID}/global/networks/{NETWORK_NAME} |
-| `kind` | — | `string` | optional | — | The kind of item this is. For buckets, this is always storage#bucket. |
+| `kind` | — | `string` | output only | — | The kind of item this is. For buckets, this is always storage#bucket. |
 | `labels` | — | `map` | optional | opaque | User-provided labels, in key/value pairs. |
 | `lifecycle_value` | wire `lifecycle` | `map` | optional | — | The bucket's lifecycle configuration. See \[Lifecycle Management\](https://cloud.google.com/storage/docs/lifecycle) for more information. |
 | `lifecycle_value.rule` | — | `list` | optional | — | A lifecycle management rule, which is made of an action to take and the condition(s) under which the action will be taken. |

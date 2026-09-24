@@ -3,6 +3,7 @@ package gen
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -385,7 +386,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		a := &catalog.Attr{
 			Canonical:   name,
 			Kind:        KindOf(prop),
-			Output:      d.OutputOnly(prop),
+			Output:      d.OutputOnly(prop) || isKindConstant(name, prop),
 			Description: strings.TrimSpace(prop.Description),
 		}
 		alias, hasAlias := aliases[name]
@@ -562,4 +563,26 @@ var equivalences = map[string]string{
 // Array of them.
 func isResourceRef(f *mmv1.Field) bool {
 	return f.Type == "ResourceRef" || (f.ItemType != nil && f.ItemType.Type == "ResourceRef")
+}
+
+// kindConstantRE is the "service#type" constant an older Google API puts in
+// every object's `kind`: dns#policyNetwork, storage#bucket.
+var kindConstantRE = regexp.MustCompile(`^[a-z0-9]+#[A-Za-z0-9]+$`)
+
+// isKindConstant reports whether a property is the `kind` constant: the
+// type's own name, which Google fills in and nobody configures. 46 schemas
+// leave it settable. Settable, it is drift wherever reconciliation cannot
+// prune it: Cloud DNS answers every entry of a policy's networks list with
+// kind "dns#policyNetwork", and inside an unordered list nothing is pruned,
+// so the plan after creating a policy proposed an update (live run,
+// 2026-09-24).
+func isKindConstant(name string, prop *disco.Schema) bool {
+	if name != "kind" || prop == nil {
+		return false
+	}
+	if s, ok := prop.Default.(string); ok && kindConstantRE.MatchString(s) {
+		return true
+	}
+	return regexp.MustCompile(`(?i)identifies what kind|the kind of item this is|^type of (the )?resource`).
+		MatchString(strings.TrimSpace(prop.Description))
 }

@@ -42,7 +42,7 @@ b/{bucket}/notificationConfigs/{notification}
 | `event_types` | — | `list` | optional | — | If present, only send notifications about listed event types. If empty, sent notifications for all event types. |
 | `event_types[]` | — | `string` | optional | — | — |
 | `id` | — | `string` | optional | — | The ID of the notification. |
-| `kind` | — | `string` | optional | — | The kind of item this is. For notifications, this is always storage#notification. |
+| `kind` | — | `string` | output only | — | The kind of item this is. For notifications, this is always storage#notification. |
 | `object_name_prefix` | — | `string` | optional | — | If present, only apply this notification configuration to object names that begin with this prefix. |
 | `payload_format` | — | `string` | optional | — | The desired content of the Payload. |
 | `selfLink` | `self_link` | `string` | optional | — | The canonical URL of this notification. |

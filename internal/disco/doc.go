@@ -38,12 +38,15 @@ func (d *Document) ResolvedBaseURL() string { return d.RootURL + d.ServicePath }
 // Schema is one type, or one property of one type. Discovery reuses the same
 // shape for both, and so does this.
 type Schema struct {
-	ID                   string             `json:"id"`
-	Type                 string             `json:"type"`
-	Format               string             `json:"format"`
-	Description          string             `json:"description"`
-	Ref                  string             `json:"$ref"`
-	ReadOnly             bool               `json:"readOnly"`
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Format      string `json:"format"`
+	Description string `json:"description"`
+	Ref         string `json:"$ref"`
+	ReadOnly    bool   `json:"readOnly"`
+	// Default is the value the API assumes when the field is absent. Read
+	// for one purpose: a `kind` whose default is its "service#type" constant.
+	Default              any                `json:"default"`
 	Enum                 []string           `json:"enum"`
 	Required             []string           `json:"required"`
 	Properties           map[string]*Schema `json:"properties"`
