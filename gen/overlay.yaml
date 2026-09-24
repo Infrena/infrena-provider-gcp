@@ -510,70 +510,48 @@ rulings:
       the same rule applies, and the same open question about what
       Terraform additionally patches.
 
-  # ----------------------------------------------------------------------------
-  # NOT RULED. One P0 candidate is left. The names are decided; it now waits on
-  # regional endpoint support. Kept here because this is the file the next
-  # person opens.
-  #
-  # DECIDED 2026-09-24: projects.secrets ships as gcp.secret and
-  # projects.locations.secrets as gcp.regionalsecret (magic-modules'
-  # RegionalSecret, Terraform's google_secret_manager_regional_secret, and our
-  # own gcp.region* compute types). Neither ships until both can: no ruling and
-  # no names.lock entry before then. Two things stand in the way besides the
-  # name, both found while deciding it:
-  #
-  #   - The regional collection is paired with the wrong magic-modules
-  #     resource. Regional secrets are a separate product,
-  #     secretmanagerregional/RegionalSecret, with their own pre_update and
-  #     pre_delete templates. matchResource only searches the product named
-  #     like the Discovery document, so projects.locations.secrets gets the
-  #     global Secret and its hooks. Read RegionalSecret's templates before
-  #     ruling it.
-  #
-  #   - Regional secrets are served from secretmanager.{location}.rep.googleapis.com.
-  #     magic-modules points the regional product there, and the Discovery
-  #     document lists 50 such endpoints under `endpoints`, which the generator
-  #     ignores. absURL builds from the one global APIBaseURL. So this needs a
-  #     catalog field and runtime support, and a live test showing the regional
-  #     type reaching its regional host.
-  #
-  #   Secret versions have no create method (they are added with addVersion),
-  #   so gcp.secret manages the secret and not its value.
-  #
-  # THE NAME COLLISION -- how it was found.
-  #
-  #     Both hooks on secretmanager/Secret are benign: pre_delete is gated on
-  #     `deletion_protection`, a Terraform-only field absent from the v1 Secret
-  #     message, and pre_update only re-masks `replication`, rewrites the
-  #     updateMask query parameter and drops `expireTime` when `ttl` changed --
-  #     all three of which BuildMask already does or does not need.
-  #
-  #     But admitting the resource produces TWO types: projects.secrets and
-  #     projects.locations.secrets are both real collections (global and regional
-  #     secrets) mapping to one magic-modules resource, and both want the name
-  #     gcp.secretmanager.secret. build.go's naming guard refuses that, correctly.
-  #     pathWalker (collisions.go) deliberately skips location-axis words when
-  #     disambiguating -- right almost everywhere, wrong here. Fixing it means
-  #     choosing two published names, and gen/names.lock.json only grows, so that
-  #     is a permanent decision and not one to make in passing.
-  #
-  #     It is a ONE-OFF, not a family. Measured across every pinned Discovery
-  #     document on 2026-09-23: exactly two bare/locations collection pairs exist,
-  #     both in secretmanager, and only projects.secrets vs
-  #     projects.locations.secrets is a real create/get/delete pair. So this needs
-  #     one decision about two names, not a pathWalker redesign.
-  #
-  #     An earlier version of this comment said logging/LogScope has the same
-  #     shape and would hit the same wall. THAT WAS WRONG, and inferred from the
-  #     duplicate warning lines without looking at the collections. LogScope's
-  #     three are projects/folders/organizations.locations.logScopes -- the SCOPE
-  #     variants build.go already separates. Probed by ruling it: it produces
-  #     gcp.logscope, gcp.logging.folder.logscope and
-  #     gcp.logging.organization.logscope with no collision at all. It is blocked
-  #     by something else entirely -- all three are {+parent}-rooted, so all three
-  #     would ship uncreatable.
-  #
-  # ----------------------------------------------------------------------------
+  # Secret Manager, ruled 2026-09-24 with the names James chose on the same
+  # day: projects.secrets is gcp.secret and projects.locations.secrets is
+  # gcp.regionalsecret. Held until both could ship, because regional secrets
+  # are served only by their region's endpoint
+  # (secretmanager.<location>.rep.googleapis.com), which the runtime can now
+  # reach (catalog.Type.EndpointTemplate), and because the regional
+  # collection was paired with the wrong magic-modules resource until
+  # preferExactCollection. Templates read at the pinned mmv1 commit.
+  secretmanager/Secret:
+    hooks: [pre_delete, pre_update]
+    note: >
+      pre_delete (pre_delete/secret_manager_secret.go.tmpl) refuses to delete
+      when `deletion_protection` is set, a Terraform-only field the v1 Secret
+      message does not have. Nothing to act on here.
+
+      pre_update (pre_update/secret_manager_secret.go.tmpl) re-masks
+      `replication` for Terraform's own automatic-to-auto schema upgrade, and
+      drops `expireTime` from the body when only `ttl` changed, because
+      Terraform sends the whole object and the API takes only one of the two.
+      This provider sends only the fields the diff changed, so `expireTime`
+      is never in the body unless it changed, and it has no replication
+      schema to upgrade.
+
+      A secret here is the container. Its value lives in secret versions,
+      which Discovery publishes no create method for (addVersion), so they do
+      not ship.
+
+  secretmanager/RegionalSecret:
+    hooks: [pre_delete, pre_update]
+    note: >
+      Paired with projects.locations.secrets through product_aliases and
+      preferExactCollection: magic-modules keeps it in its own product,
+      secretmanagerregional, whose base_url puts it on
+      secretmanager.{{location}}.rep.googleapis.com. That host is checked
+      against all 50 endpoints the Discovery document lists before the
+      catalog carries it.
+
+      pre_delete (pre_delete/regional_secret.go.tmpl) is the same
+      `deletion_protection` guard as the global secret's. pre_update
+      (pre_update/secret_manager_regional_secret.go.tmpl) is only the
+      `ttl`/`expireTime` half of the global one, with the same reasoning.
+
 
 # patchable: the types whose API publishes a PATCH that only accepts SOME of the
 # resource's fields. Discovery cannot say that -- it publishes the whole
@@ -730,6 +708,11 @@ product_aliases:
   sqladmin: [sql]
   iam: [iam2, iam3, iambeta, iamworkforcepool]
   cloudbuild: [cloudbuildv2]
+  # Regional secrets are their own magic-modules product, served from
+  # secretmanager.{location}.rep.googleapis.com, and Discovery has one
+  # document for both. preferExactCollection pairs projects.locations.secrets
+  # with RegionalSecret, whose base_url walks that collection.
+  secretmanager: [secretmanagerregional]
 
 # The types `discover` scans when an instance names none. Unlike AWS this is not
 # a cost measure — Cloud Asset Inventory returns a whole project in a few calls —

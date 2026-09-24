@@ -2,12 +2,12 @@
 
 # GCP type reference
 
-This plugin serves **253 types** across 35 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
+This plugin serves **255 types** across 36 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
 - Catalog generated: 2026-09-24
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
-**[Types that are not served, and why](not-shipped.md)** — 367 entries. Read that page first if the type you want is missing from this one.
+**[Types that are not served, and why](not-shipped.md)** — 365 entries. Read that page first if the type you want is missing from this one.
 
 ## Services
 
@@ -45,6 +45,7 @@ This plugin serves **253 types** across 35 Google Cloud services. Every page bel
 | [pubsub](pubsub/README.md) | 3 |
 | [redis](redis/README.md) | 1 |
 | [run](run/README.md) | 4 |
+| [secretmanager](secretmanager/README.md) | 2 |
 | [spanner](spanner/README.md) | 2 |
 | [sqladmin](sqladmin/README.md) | 6 |
 | [storage](storage/README.md) | 6 |

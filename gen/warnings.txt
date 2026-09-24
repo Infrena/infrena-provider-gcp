@@ -319,8 +319,6 @@ tier3	run/revisions	no insert or create method
 tier3	run/revisions	no insert or create method
 tier3	run/sourceUploads	no insert or create method
 tier3	run/tasks	no insert or create method
-tier2	secretmanager/Secret	unruled wire hooks: pre_delete, pre_update
-tier2	secretmanager/Secret	unruled wire hooks: pre_delete, pre_update
 tier3	secretmanager/locations	no insert or create method
 tier3	secretmanager/versions	no insert or create method
 tier3	secretmanager/versions	no insert or create method
