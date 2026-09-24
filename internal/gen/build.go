@@ -302,6 +302,7 @@ func Build(in Inputs) (*Result, error) {
 		}
 		resolveRefs(b.t.Attributes, selfProduct, b.t.Service, b.t.Name, refByProduct, refCandidates, &warnings)
 	}
+	dropRefsToMissingAttributes(c.Types, &warnings)
 	// Every shipped type whose create url cannot be built, recorded once,
 	// here, over the catalog as it finally stands. The capability itself is
 	// derived from the same function at load (catalog.Definitions), so this
@@ -332,7 +333,10 @@ func Build(in Inputs) (*Result, error) {
 	sort.Slice(unpatchable, func(i, j int) bool { return unpatchable[i].Type < unpatchable[j].Type })
 
 	sort.Slice(c.Types, func(i, j int) bool { return c.Types[i].Name < c.Types[j].Name })
-	sort.Slice(warnings, func(i, j int) bool {
+	// Stable, so two warnings with the same service and resource keep the
+	// order they were found in (the collection walk, which is sorted) rather
+	// than swapping between runs and showing up in a regeneration's diff.
+	sort.SliceStable(warnings, func(i, j int) bool {
 		if warnings[i].Service != warnings[j].Service {
 			return warnings[i].Service < warnings[j].Service
 		}
@@ -1385,6 +1389,51 @@ func resolveOneRef(a *catalog.Attr, selfProduct, serviceName, typeName string, r
 				target, strings.Join(products, ", ")),
 		})
 		a.Ref = nil
+	}
+}
+
+// dropRefsToMissingAttributes drops a resolved reference whose target type
+// has no attribute by the referenced name, and records it. magic-modules'
+// `imports:` defaults to selfLink, which compute resources have and the
+// proto-first APIs do not: compute/TargetHttpsProxy's serverTlsPolicy
+// imports selfLink from networksecurity's ServerTlsPolicy, whose identity is
+// its name. infrena validates every reference against the target's schema
+// and refuses the WHOLE plugin over one that dangles, so this is not
+// cosmetic.
+//
+// Dropped rather than repointed at the target's name: the short-name rule
+// reports a proto-first name as the short one, and these fields want a path.
+// The attribute stays a settable string the user writes; only the edge goes.
+func dropRefsToMissingAttributes(types []*catalog.Type, warnings *[]Warning) {
+	byName := make(map[string]*catalog.Type, len(types))
+	for _, t := range types {
+		byName[t.Name] = t
+	}
+	var walk func(t *catalog.Type, a *catalog.Attr)
+	walk = func(t *catalog.Type, a *catalog.Attr) {
+		if a.Ref != nil {
+			if target := byName[a.Ref.Type]; target != nil && target.Attributes[a.Ref.Attribute] == nil {
+				*warnings = append(*warnings, Warning{
+					Service:  t.Service,
+					Resource: t.Name + "." + a.Canonical,
+					Tier:     TierGeneric,
+					Reason: fmt.Sprintf("reference to %s.%s dropped: %s has no attribute %q",
+						a.Ref.Type, a.Ref.Attribute, a.Ref.Type, a.Ref.Attribute),
+				})
+				a.Ref = nil
+			}
+		}
+		for _, f := range a.Fields {
+			walk(t, f)
+		}
+		if a.Elem != nil {
+			walk(t, a.Elem)
+		}
+	}
+	for _, t := range types {
+		for _, a := range t.Attributes {
+			walk(t, a)
+		}
 	}
 }
 
