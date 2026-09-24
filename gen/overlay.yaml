@@ -180,16 +180,23 @@ rulings:
       holds records fails, with Google's own error. That is the API's own rule
       and it is loud, not silent; the fix is to remove the records first.
 
-      AN HONEST UNKNOWN, recorded rather than assumed away. dns.managedZones
-      CREATE returns a ManagedZone, so the type's await strategy is None -- but
-      its PATCH returns an Operation, and await is a property of the TYPE, not of
-      the method. Nothing is corrupted by that: Update discards what await
-      returns and takes its state from readAfterPatch's own GET. The risk is only
-      that the read-back happens before the patch has landed, which would show up
-      as one spurious drift rather than as damage. Zone metadata patches look
-      synchronous, but that has NOT been checked against real Google, and this
-      type is not in the live suite. At least six eventarc types have the same
-      create-returns-resource, patch-returns-operation shape.
+      THE ONE THING THAT LOOKED UNKNOWN, AND WAS NOT. dns.managedZones CREATE
+      returns a ManagedZone, so the type's await strategy is None -- but its
+      PATCH returns an Operation, and await is a property of the TYPE, not of
+      the method. Nothing can be corrupted by that, because Update discards
+      what await returns and reads its own state back. The question was only
+      whether that read could come before the patch had landed.
+
+      Google's own description answers it. The dns v1 Operation is "a
+      successful mutation performed on a Cloud DNS resource" -- an audit
+      record of a change already made -- and it carries zoneContext.newValue,
+      "the post-operation ManagedZone resource". Its PENDING/DONE status is
+      about propagation to the authoritative name servers ("the request to
+      update the authoritative servers has been sent, but the servers might
+      not be updated yet"), not about the zone resource. So the read-back sees
+      the patched zone, and name-server propagation is not something a plan
+      should wait on. Settled from the documentation on 2026-09-23; not yet
+      observed against a real zone.
 
       Unblocks gcp.resourcerecordset, which ships today and has nowhere to put a
       record.
