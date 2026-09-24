@@ -21,7 +21,7 @@ Request for the `CreateSnapshot` method.
 | --- | --- | --- |
 | Create | yes | `POST {+name}` |
 | Read | yes | `GET {+snapshot}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH {+snapshot}` |
 | Delete | yes | `DELETE {+snapshot}` |
 | Import | yes | by id, see below |
 

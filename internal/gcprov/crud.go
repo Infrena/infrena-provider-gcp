@@ -72,7 +72,11 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 		return nil, err
 	}
 
-	resp, err := p.client.Do(ctx, http.MethodPost, reqURL, body)
+	verb := ty.CreateVerb
+	if verb == "" {
+		verb = http.MethodPost
+	}
+	resp, err := p.client.Do(ctx, verb, reqURL, body)
 	if err != nil {
 		// The POST itself failed, so nothing was created. Safe to error.
 		return nil, err

@@ -45,7 +45,6 @@ tier3	artifactregistry/projects	no insert or create method
 tier3	artifactregistry/pythonPackages	no insert or create method
 tier3	artifactregistry/versions	no insert or create method
 tier3	artifactregistry/yumArtifacts	no insert or create method
-tier2	bigquery/Dataset	unruled wire hooks: update_encoder
 tier2	bigquery/Job	unruled wire hooks: encoder
 tier2	bigquery/RowAccessPolicy	unruled wire hooks: pre_delete
 tier3	bigquery/models	no insert or create method
@@ -83,7 +82,6 @@ tier2	cloudkms/CryptoKey	unruled wire hooks: custom_delete, custom_import, decod
 tier2	cloudkms/CryptoKeyVersion	unruled wire hooks: custom_delete, custom_import, pre_update
 tier3	cloudkms/EkmConnection	no delete method
 tier3	cloudkms/KeyHandle	no delete method
-tier2	cloudkms/KeyRing	unruled wire hooks: decoder, encoder
 tier3	cloudkms/ekmConfig	no insert or create method
 tier3	cloudkms/folders	no insert or create method
 tier3	cloudkms/importJobs	no delete method
@@ -312,8 +310,6 @@ tier3	osconfig/operations	no insert or create method
 tier3	osconfig/operations	no insert or create method
 tier2	pubsub/Schema	unruled wire hooks: update_encoder
 tier3	pubsub/Subscription	no insert or create method
-tier2	pubsub/Subscription	unruled wire hooks: encoder, pre_update, update_encoder
-tier2	pubsub/Topic	unruled wire hooks: encoder, update_encoder
 tier3	pubsub/snapshots	no insert or create method
 tier2	redis/Cluster	unruled wire hooks: decoder, encoder
 tier2	redis/Instance	unruled wire hooks: decoder, encoder, pre_delete
