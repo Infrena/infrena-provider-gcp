@@ -50,8 +50,8 @@ values do not.
 | Label | `infrena-live-tests=true` — **this is what the guard checks**, and it is the one value you must match exactly |
 | Billing account | `012345-567890-ABCDEF` — needed only if the project is not already billed |
 | Service account | `infrena-live@example-project-1234.iam.gserviceaccount.com` |
-| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
-| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run |
+| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
+| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy |
 
 If `gcloud projects create` returns `QuotaFailure: you have exceeded your
 allotted project quota`, reusing a dormant project works — but verify it is
@@ -59,6 +59,11 @@ genuinely empty first. These tests create and destroy real infrastructure, and
 the guard's label check is the only thing standing between them and whatever
 else lives there. Confirm the compute API has never been enabled and that there
 are no buckets before pointing this at anything.
+
+**A role granted moments ago may not work yet.** IAM takes a few minutes to propagate. A run straight
+after a grant can fail with `PERMISSION_DENIED` on the very permission you just granted, and its cleanup
+reports `CLEANUP FAILED` for the same reason even though nothing was created. Wait, confirm the service
+account can list the resource type, then rerun.
 
 **There is no key file and this suite must never create one.** It
 authenticates as the operator (Application Default Credentials from
