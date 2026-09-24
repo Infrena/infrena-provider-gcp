@@ -429,7 +429,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 			return
 		}
 	}
-	id := resourceID(r, body)
+	id, fromQuery := resourceID(r, body)
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "no id in the request's query parameters or body")
 		return
@@ -437,6 +437,17 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	collection := strings.TrimSuffix(r.URL.Path, "/")
 	path := collection + "/" + id
 	stored := cloneMap(body)
+	if fromQuery {
+		// AIP-133: a resource created with its id as a query parameter comes
+		// back with `name` set to its FULL relative resource name, whatever
+		// the request's body said. The fake used to store the body as sent,
+		// which carries no name at all for these creates -- so every test
+		// saw the short name the id implied, and a type whose schema calls
+		// the short name `name` looked as though it round-tripped. Compute's
+		// insert, which names the resource in the body and answers with the
+		// short name, is untouched.
+		stored["name"] = strings.TrimPrefix(trimVersionPrefix(path), "/")
+	}
 
 	s.mu.Lock()
 	s.resources[path] = stored
@@ -453,21 +464,21 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 // parameter (e.g. "widgetId", "instanceId" — the name varies by API, so any
 // non-reserved parameter is accepted) or, failing that, the last segment of
 // the body's own "name".
-func resourceID(r *http.Request, body map[string]any) string {
+func resourceID(r *http.Request, body map[string]any) (string, bool) {
 	reserved := map[string]bool{"updateMask": true, "pageToken": true, "pageSize": true, "parent": true, "requestId": true}
 	for k, v := range r.URL.Query() {
 		if reserved[k] || len(v) == 0 || v[0] == "" {
 			continue
 		}
-		return v[0]
+		return v[0], true
 	}
 	if name, ok := body["name"].(string); ok && name != "" {
 		if i := strings.LastIndex(name, "/"); i >= 0 {
-			return name[i+1:]
+			return name[i+1:], false
 		}
-		return name
+		return name, false
 	}
-	return ""
+	return "", false
 }
 
 func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {

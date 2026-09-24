@@ -19,7 +19,7 @@ A DeliveryPipeline defines a pipeline through which a Skaffold configuration can
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/deliveryPipelines?deliveryPipelineId={{deliveryPipelineId}}` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/deliveryPipelines?deliveryPipelineId={{name}}` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/deliveryPipelines/{{name}}` |
 | Update | yes | `PATCH projects/{{project}}/locations/{{location}}/deliveryPipelines/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/deliveryPipelines/{{name}}` |
@@ -33,7 +33,7 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{name}}
 
 ## Attributes
 
-147 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+146 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -51,11 +51,10 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{name}}
 | `condition.targetsTypeCondition.errorDetails` | `error_details` | `string` | optional | — | Human readable error message. |
 | `condition.targetsTypeCondition.status` | — | `boolean` | optional | — | True if the targets are all a comparable type. For example this is true if all targets are GKE clusters. This is false if some targets are Cloud Run targets and others are GKE clusters. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. Time at which the pipeline was created. |
-| `deliveryPipelineId` | — | `string` | required | force new, create only | Required. ID of the `DeliveryPipeline`. |
 | `description` | — | `string` | optional | — | Optional. Description of the `DeliveryPipeline`. Max length is 255 characters. |
 | `etag` | — | `string` | optional | — | This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels are attributes that can be set and used by both the user and by Cloud Deploy. Labels must meet the following constraints: * Keys and values can contain only lowercase letters … |
-| `name` | — | `string` | output only | — | Identifier. Name of the `DeliveryPipeline`. Format is `projects/{project}/locations/{location}/deliveryPipelines/{deliveryPipeline}`. The `deliveryPipeline` component must match … |
+| `name` | — | `string` | required | — | Identifier. Name of the `DeliveryPipeline`. Format is `projects/{project}/locations/{location}/deliveryPipelines/{deliveryPipeline}`. The `deliveryPipeline` component must match … |
 | `serialPipeline` | `serial_pipeline` | `map` | optional | — | Optional. SerialPipeline defines a sequential set of stages for a `DeliveryPipeline`. |
 | `serialPipeline.stages` | — | `list` | optional | — | Optional. Each stage specifies configuration for a `Target`. The ordering of this list defines the promotion flow. |
 | `serialPipeline.stages[]` | — | `map` | optional | — | — |

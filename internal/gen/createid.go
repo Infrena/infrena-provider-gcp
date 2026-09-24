@@ -206,6 +206,23 @@ func addCreateIDParameter(t *catalog.Type, attrs map[string]*catalog.Attr, creat
 			return "" // already sent, under the API's spelling or magic-modules'
 		}
 	}
+	sep := "?"
+	if query != "" {
+		sep = "&"
+	}
+	// Where the id template ends in "/{{name}}", this schema's `name` already
+	// IS the short id -- magic-modules' model -- so it fills the parameter
+	// itself, the way magic-modules' own create_url for these types does:
+	// "?customTargetTypeId={{name}}". No second attribute, and so no
+	// collision with a resource field of the parameter's name: Cloud Deploy's
+	// Target has an output-only `targetId` of its own, and a second input
+	// under that key is exactly what the guard below refuses. The full name
+	// Google answers with is reported back as the short one by the runtime
+	// (gcprov.shortNameFromOwnID), so configuration and state agree.
+	if n := attrs["name"]; n != nil && !n.Output && selfLinkEndsInName(t.SelfLink) {
+		t.CreateURL = tmpl + sep + param + "={{name}}"
+		return param
+	}
 	if _, taken := attrs[param]; taken {
 		return ""
 	}
@@ -217,13 +234,15 @@ func addCreateIDParameter(t *catalog.Type, attrs map[string]*catalog.Attr, creat
 		Required:    disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired],
 		Description: strings.TrimSpace(p.Description),
 	}
-	sep := "?"
-	if query != "" {
-		sep = "&"
-	}
 	t.CreateURL = tmpl + sep + param + "={{" + param + "}}"
 	if n := attrs["name"]; n != nil && !n.Output {
 		n.Output, n.Required, n.ForceNew = true, false, false
 	}
 	return param
+}
+
+// selfLinkEndsInName is gcprov's rule, restated: an id template whose last
+// segment is the bare `name` placeholder means `name` is the short id.
+func selfLinkEndsInName(tmpl string) bool {
+	return strings.HasSuffix(tmpl, "/{{name}}") || strings.HasSuffix(tmpl, "/{name}")
 }

@@ -149,6 +149,7 @@ func (p *Provider) bestEffortState(ctx context.Context, ty *catalog.Type, desire
 	for k, v := range p.reconciler(ctx).attrs(ty.Attributes, desired.Attrs, schemaAttrs(ty.Attributes, awaited)) {
 		attrs[k] = v
 	}
+	shortNameFromOwnID(ty, id, attrs)
 	return &resource.ResourceState{
 		Type:       ty.Name,
 		ProviderID: id,
@@ -463,6 +464,7 @@ func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *res
 			attrs[name] = prior
 		}
 	}
+	shortNameFromOwnID(ty, id, attrs)
 	return &resource.ResourceState{
 		Type:       current.Type,
 		ProviderID: id,
@@ -805,4 +807,47 @@ func placeholderNames(tmpl string) map[string]bool {
 		out[strings.TrimSpace(name)] = true
 	}
 	return out
+}
+
+// shortNameFromOwnID reports `name` the way this type's schema means it, when
+// Google answers with the full resource name instead.
+//
+// Where a type's id template ends in "/{{name}}" -- magic-modules' model, and
+// the create sends that short name as its "?<resource>Id=" -- `name` in this
+// schema IS the short name. But AIP-133 APIs answer with `name` set to the
+// FULL relative resource name. Reported as it came back, state and
+// configuration disagree on a field that is part of the url, so every plan
+// after a create proposes a replacement. 37 shipping types have this shape:
+// Eventarc triggers and channels, the networkservices and networksecurity
+// families, Certificate Manager, Cloud Deploy.
+//
+// It fires only when the answer names THIS resource: the same collection and
+// the same last segment as the resource's own provider id. That is the whole
+// test, so a name pointing anywhere else is left as Google sent it, and a
+// project NUMBER in the answer where the id has the project's name does not
+// defeat it. A type whose `name` is the full path (a Pub/Sub topic, whose id
+// template is "{+topic}") or is Google's to set is never touched.
+func shortNameFromOwnID(ty *catalog.Type, id string, attrs map[string]value.Value) {
+	a := ty.Attributes["name"]
+	if a == nil || a.Output || !selfLinkEndsInName(ty.SelfLink) {
+		return
+	}
+	v, ok := attrs["name"]
+	full, isString := v.Raw.(string)
+	if !ok || !v.Known || !isString || !strings.Contains(full, "/") {
+		return
+	}
+	got, want := strings.Split(full, "/"), strings.Split(id, "/")
+	if len(got) < 2 || len(want) < 2 ||
+		got[len(got)-1] != want[len(want)-1] || got[len(got)-2] != want[len(want)-2] {
+		return
+	}
+	attrs["name"] = value.Value{Kind: v.Kind, Known: true, Raw: got[len(got)-1], Source: v.Source}
+}
+
+// selfLinkEndsInName reports whether an id template's last segment is the
+// bare `name` placeholder -- "{{name}}" as magic-modules writes it, "{name}"
+// as a Discovery path does -- rather than a capture of the whole path.
+func selfLinkEndsInName(tmpl string) bool {
+	return strings.HasSuffix(tmpl, "/{{name}}") || strings.HasSuffix(tmpl, "/{name}")
 }
