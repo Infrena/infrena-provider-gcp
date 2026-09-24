@@ -40,9 +40,9 @@ projects/{project}/global/targetTcpProxies/{targetTcpProxy}
 | `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
 | `id` | — | `string` | output only | — | \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Alwayscompute#targetTcpProxy for target TCP proxies. |
-| `loadBalancingScheme` | `load_balancing_scheme` | `string` | optional | — | Specifies the type of load balancing scheme used by this target proxy. |
+| `loadBalancingScheme` | `load_balancing_scheme` | `string` | optional | force new | Specifies the type of load balancing scheme used by this target proxy. |
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
-| `proxyBind` | `proxy_bind` | `boolean` | optional | — | This field only applies when the forwarding rule that references this target proxy has a loadBalancingScheme set toINTERNAL_SELF_MANAGED. When this field is set to true, Envoy proxies set up inbound … |
+| `proxyBind` | `proxy_bind` | `boolean` | optional | force new | This field only applies when the forwarding rule that references this target proxy has a loadBalancingScheme set toINTERNAL_SELF_MANAGED. When this field is set to true, Envoy proxies set up inbound … |
 | `proxyHeader` | `proxy_header` | `string` | optional | — | Specifies the type of proxy header to append before sending data to the backend, either NONE or PROXY_V1. The default is NONE. |
 | `region` | — | `string` | output only | — | Output only. \[Output Only\] URL of the region where the regional TCP proxy resides. This field is not applicable to global TCP proxy. |
 | `selfLink` | `self_link` | `string` | output only | — | \[Output Only\] Server-defined URL for the resource. |

@@ -91,7 +91,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 	st, readErr := p.readAfterCreate(ctx, ty, desired.Attrs, scoped, awaited)
 	switch {
 	case st != nil:
-		return st, nil
+		return p.setAfterCreate(ctx, ty, st, desired.Attrs), nil
 	case awaitErr != nil:
 		// Nothing exists AND the operation failed: the create genuinely did
 		// not happen, so the error is the truth and returning it orphans

@@ -36,21 +36,21 @@ projects/{project}/zones/{zone}/instances/{instance}
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `advancedMachineFeatures` | `advanced_machine_features` | `map` | optional | — | Controls for advanced machine-related behavior features. |
+| `advancedMachineFeatures` | `advanced_machine_features` | `map` | optional | force new | Controls for advanced machine-related behavior features. |
 | `advancedMachineFeatures.enableNestedVirtualization` | `enable_nested_virtualization` | `boolean` | optional | — | Whether to enable nested virtualization or not (default is false). |
 | `advancedMachineFeatures.enableUefiNetworking` | `enable_uefi_networking` | `boolean` | optional | — | Whether to enable UEFI networking for instance creation. |
 | `advancedMachineFeatures.performanceMonitoringUnit` | `performance_monitoring_unit` | `string` | optional | — | Type of Performance Monitoring Unit requested on instance. |
 | `advancedMachineFeatures.threadsPerCore` | `threads_per_core` | `integer` | optional | — | The number of threads per physical core. To disable simultaneous multithreading (SMT) set this to 1. If unset, the maximum number of threads supported per core by the underlying processor is assumed. |
 | `advancedMachineFeatures.turboMode` | `turbo_mode` | `string` | optional | — | Turbo frequency mode to use for the instance. Supported modes include: * ALL_CORE_MAX Using empty string or not setting this field will use the platform-specific default turbo mode. |
 | `advancedMachineFeatures.visibleCoreCount` | `visible_core_count` | `integer` | optional | — | The number of physical cores to expose to an instance. Multiply by the number of threads per core to compute the total number of virtual CPUs to expose to the instance. If unset, the number of cores … |
-| `canIpForward` | `can_ip_forward` | `boolean` | optional | — | Allows this instance to send and receive packets with non-matching destination or source IPs. This is required if you plan to use this instance to forward routes. For more information, seeEnabling IP … |
-| `confidentialInstanceConfig` | `confidential_instance_config` | `map` | optional | — | A set of Confidential Instance options. |
+| `canIpForward` | `can_ip_forward` | `boolean` | optional | force new | Allows this instance to send and receive packets with non-matching destination or source IPs. This is required if you plan to use this instance to forward routes. For more information, seeEnabling IP … |
+| `confidentialInstanceConfig` | `confidential_instance_config` | `map` | optional | force new | A set of Confidential Instance options. |
 | `confidentialInstanceConfig.confidentialInstanceType` | `confidential_instance_type` | `string` | optional | — | Defines the type of technology used by the confidential instance. |
 | `confidentialInstanceConfig.enableConfidentialCompute` | `enable_confidential_compute` | `boolean` | optional | — | Defines whether the instance should have confidential compute enabled. |
 | `cpuPlatform` | `cpu_platform` | `string` | output only | — | Output only. \[Output Only\] The CPU platform used by this instance. |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
-| `deletionProtection` | `deletion_protection` | `boolean` | optional | — | Whether the resource should be protected against deletion. |
-| `description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
+| `deletionProtection` | `deletion_protection` | `boolean` | optional | force new | Whether the resource should be protected against deletion. |
+| `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
 | `disks` | — | `list` | optional | force new | Array of disks associated with this instance. Persistent disks must be created before you can assign them. |
 | `disks[]` | — | `map` | optional | — | — |
 | `disks[].architecture` | — | `string` | output only | — | Output only. \[Output Only\] The architecture of the attached disk. Valid values are ARM64 or X86_64. |
@@ -126,40 +126,40 @@ projects/{project}/zones/{zone}/instances/{instance}
 | `disks[].shieldedInstanceInitialState.pk.fileType` | `file_type` | `string` | optional | — | The file type of source file. |
 | `disks[].source` | — | `string` | optional | — | Specifies a valid partial or full URL to an existing Persistent Disk resource. When creating a new instance boot disk, one ofinitializeParams.sourceImage orinitializeParams.sourceSnapshot or … |
 | `disks[].type_value` | wire `type` | `string` | optional | — | Specifies the type of the disk, either SCRATCH orPERSISTENT. If not specified, the default isPERSISTENT. |
-| `displayDevice` | `display_device` | `map` | optional | — | Enables display device for the instance. |
+| `displayDevice` | `display_device` | `map` | optional | force new | Enables display device for the instance. |
 | `displayDevice.enableDisplay` | `enable_display` | `boolean` | optional | — | Defines whether the instance has Display enabled. |
-| `fingerprint` | — | `string` | optional | — | Specifies a fingerprint for this resource, which is essentially a hash of the instance's contents and used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes … |
-| `guestAccelerators` | `guest_accelerators` | `list` | optional | — | A list of the type and count of accelerator cards attached to the instance. |
+| `fingerprint` | — | `string` | optional | force new | Specifies a fingerprint for this resource, which is essentially a hash of the instance's contents and used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes … |
+| `guestAccelerators` | `guest_accelerators` | `list` | optional | force new | A list of the type and count of accelerator cards attached to the instance. |
 | `guestAccelerators[]` | — | `map` | optional | — | — |
 | `guestAccelerators[].acceleratorCount` | `accelerator_count` | `integer` | optional | — | The number of the guest accelerator cards exposed to this instance. |
 | `guestAccelerators[].acceleratorType` | `accelerator_type` | `string` | optional | — | Full or partial URL of the accelerator type resource to attach to this instance. For example:projects/my-project/zones/us-central1-c/acceleratorTypes/nvidia-tesla-p100 If you are creating an instance … |
-| `hostname` | — | `string` | optional | — | Specifies the hostname of the instance. The specified hostname must be RFC1035 compliant. If hostname is not specified, the default hostname is \[INSTANCE_NAME\].c.\[PROJECT_ID\].internal when using … |
+| `hostname` | — | `string` | optional | force new | Specifies the hostname of the instance. The specified hostname must be RFC1035 compliant. If hostname is not specified, the default hostname is \[INSTANCE_NAME\].c.\[PROJECT_ID\].internal when using … |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
-| `instanceEncryptionKey` | `instance_encryption_key` | `map` | optional | — | Encrypts suspended data for an instance with acustomer-managed encryption key. If you are creating a new instance, this field will encrypt the local SSD and in-memory contents of the instance during … |
+| `instanceEncryptionKey` | `instance_encryption_key` | `map` | optional | force new | Encrypts suspended data for an instance with acustomer-managed encryption key. If you are creating a new instance, this field will encrypt the local SSD and in-memory contents of the instance during … |
 | `instanceEncryptionKey.kmsKeyName` | `kms_key_name` | `string` | optional | — | The name of the encryption key that is stored in Google Cloud KMS. For example: "kmsKeyName": "projects/kms_project_id/locations/region/keyRings/ key_region/cryptoKeys/key The fully-qualifed key name … |
 | `instanceEncryptionKey.kmsKeyServiceAccount` | `kms_key_service_account` | `string` | optional | — | The service account being used for the encryption request for the given KMS key. If absent, the Compute Engine default service account is used. For example: "kmsKeyServiceAccount" … |
 | `instanceEncryptionKey.rawKey` | `raw_key` | `string` | optional | — | \[DEPRECATED\] CSEK is no longer supported. Use CMEK instead. Specifies a 256-bit customer-supplied encryption key, encoded in RFC 4648 base64 to either encrypt or decrypt this resource. You can … |
 | `instanceEncryptionKey.rsaEncryptedKey` | `rsa_encrypted_key` | `string` | optional | — | \[DEPRECATED\] CSEK is no longer supported. Use CMEK instead. Specifies an RFC 4648 base64 encoded, RSA-wrapped 2048-bit customer-supplied encryption key to either encrypt or decrypt this resource … |
 | `instanceEncryptionKey.sha256` | — | `string` | optional | — | \[DEPRECATED\] CSEK is no longer supported. Use CMEK instead. \[Output only\] TheRFC 4648 base64 encoded SHA-256 hash of the customer-supplied encryption key that protects this resource. |
-| `keyRevocationActionType` | `key_revocation_action_type` | `string` | optional | — | KeyRevocationActionType of the instance. Supported options are "STOP" and "NONE". The default value is "NONE" if it is not specified. |
+| `keyRevocationActionType` | `key_revocation_action_type` | `string` | optional | force new | KeyRevocationActionType of the instance. Supported options are "STOP" and "NONE". The default value is "NONE" if it is not specified. |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Always compute#instance for instances. |
 | `labelFingerprint` | `label_fingerprint` | `string` | output only | — | A fingerprint for this request, which is essentially a hash of the label's contents and used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after every … |
 | `labels` | — | `map` | optional | opaque | Labels to apply to this instance. These can be later modified by the setLabels method. |
 | `lastStartTimestamp` | `last_start_timestamp` | `string` | output only | — | Output only. \[Output Only\] Last start timestamp inRFC3339 text format. |
 | `lastStopTimestamp` | `last_stop_timestamp` | `string` | output only | — | Output only. \[Output Only\] Last stop timestamp inRFC3339 text format. |
 | `lastSuspendedTimestamp` | `last_suspended_timestamp` | `string` | output only | — | Output only. \[Output Only\] Last suspended timestamp inRFC3339 text format. |
-| `localSsdEncryptionMode` | `local_ssd_encryption_mode` | `string` | optional | — | Specifies which method should be used for encrypting the Local SSDs attached to the VM. |
+| `localSsdEncryptionMode` | `local_ssd_encryption_mode` | `string` | optional | force new | Specifies which method should be used for encrypting the Local SSDs attached to the VM. |
 | `machineType` | `machine`, `machine_type` | `string` | optional | — | Full or partial URL of the machine type resource to use for this instance, in the format:zones/zone/machineTypes/machine-type. This is provided by the client when the instance is created. For … |
-| `metadata` | — | `map` | optional | — | The metadata key/value pairs assigned to this instance. This includes metadata keys that were explicitly defined for the instance. |
+| `metadata` | — | `map` | optional | force new | The metadata key/value pairs assigned to this instance. This includes metadata keys that were explicitly defined for the instance. |
 | `metadata.fingerprint` | — | `string` | optional | — | Specifies a fingerprint for this request, which is essentially a hash of the metadata's contents and used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes … |
 | `metadata.items` | — | `list` | optional | — | Array of key/value pairs. The total size of all keys and values must be less than 512 KB. |
 | `metadata.items[]` | — | `map` | optional | — | — |
 | `metadata.items[].key` | — | `string` | optional | — | Key for the metadata entry. Keys must conform to the following regexp: \[a-zA-Z0-9-_\]+, and be less than 128 bytes in length. This is reflected as part of a URL in the metadata server. Additionally … |
 | `metadata.items[].value` | — | `string` | optional | — | Value for the metadata entry. These are free-form strings, and only have meaning as interpreted by the image running in the instance. The only restriction placed on values is that their size must be … |
 | `metadata.kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Always compute#metadata for metadata. |
-| `minCpuPlatform` | `min_cpu_platform` | `string` | optional | — | Specifies aminimum CPU platform for the VM instance. Applicable values are the friendly names of CPU platforms, such as minCpuPlatform: "Intel Haswell" or minCpuPlatform: "Intel Sandy Bridge". |
-| `name` | — | `string` | optional | — | The name of the resource, provided by the client when initially creating the resource. The resource name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 … |
-| `networkInterfaces` | `network_interfaces` | `list` | optional | — | An array of network configurations for this instance. These specify how interfaces are configured to interact with other network services, such as connecting to the internet. Multiple interfaces are … |
+| `minCpuPlatform` | `min_cpu_platform` | `string` | optional | force new | Specifies aminimum CPU platform for the VM instance. Applicable values are the friendly names of CPU platforms, such as minCpuPlatform: "Intel Haswell" or minCpuPlatform: "Intel Sandy Bridge". |
+| `name` | — | `string` | optional | force new | The name of the resource, provided by the client when initially creating the resource. The resource name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 … |
+| `networkInterfaces` | `network_interfaces` | `list` | optional | force new | An array of network configurations for this instance. These specify how interfaces are configured to interact with other network services, such as connecting to the internet. Multiple interfaces are … |
 | `networkInterfaces[]` | — | `map` | optional | — | — |
 | `networkInterfaces[].accessConfigs` | `access_configs` | `list` | optional | — | An array of configurations for this interface. Currently, only one access config, ONE_TO_ONE_NAT, is supported. If there are noaccessConfigs specified, then this instance will have no external … |
 | `networkInterfaces[].accessConfigs[]` | — | `map` | optional | — | — |
@@ -211,20 +211,20 @@ projects/{project}/zones/{zone}/instances/{instance}
 | `networkInterfaces[].stackType` | `stack_type` | `string` | optional | — | The stack type for this network interface. To assign only IPv4 addresses, use IPV4_ONLY. To assign both IPv4 and IPv6 addresses, useIPV4_IPV6. If not specified, IPV4_ONLY is used. This field can be … |
 | `networkInterfaces[].subnetwork` | — | `string` | optional | — | The URL of the Subnetwork resource for this instance. If the network resource is inlegacy mode, do not specify this field. If the network is in auto subnet mode, specifying the subnetwork is … |
 | `networkInterfaces[].vlan` | — | `integer` | optional | — | VLAN tag of a dynamic network interface, must be an integer in the range from 2 to 255 inclusively. |
-| `networkPerformanceConfig` | `network_performance_config` | `map` | optional | — | — |
+| `networkPerformanceConfig` | `network_performance_config` | `map` | optional | force new | — |
 | `networkPerformanceConfig.totalEgressBandwidthTier` | `total_egress_bandwidth_tier` | `string` | optional | — | — |
-| `params` | — | `map` | optional | — | Input only. \[Input Only\] Additional params passed with the request, but not persisted as part of resource payload. |
+| `params` | — | `map` | optional | force new | Input only. \[Input Only\] Additional params passed with the request, but not persisted as part of resource payload. |
 | `params.requestValidForDuration` | `request_valid_for_duration` | `map` | optional | — | Relative deadline for waiting for capacity. Relevant only for Instances.Insert API. |
 | `params.requestValidForDuration.nanos` | — | `integer` | optional | — | Span of time that's a fraction of a second at nanosecond resolution. Durations less than one second are represented with a 0 `seconds` field and a positive `nanos` field. Must be from 0 to … |
 | `params.requestValidForDuration.seconds` | — | `string` | optional | — | Span of time at a resolution of a second. Must be from 0 to 315,576,000,000 inclusive. Note: these bounds are computed from: 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years |
 | `params.resourceManagerTags` | `resource_manager_tags` | `map` | optional | opaque | Input only. Resource manager tags to be bound to the instance. Tag keys and values have the same definition as resource manager tags. Keys and values can be either in numeric format, such as … |
-| `privateIpv6GoogleAccess` | `private_ipv6_google_access` | `string` | optional | — | The private IPv6 google access type for the VM. If not specified, use INHERIT_FROM_SUBNETWORK as default. |
-| `reservationAffinity` | `reservation_affinity` | `map` | optional | — | Specifies the reservations that this instance can consume from. |
+| `privateIpv6GoogleAccess` | `private_ipv6_google_access` | `string` | optional | force new | The private IPv6 google access type for the VM. If not specified, use INHERIT_FROM_SUBNETWORK as default. |
+| `reservationAffinity` | `reservation_affinity` | `map` | optional | force new | Specifies the reservations that this instance can consume from. |
 | `reservationAffinity.consumeReservationType` | `consume_reservation_type` | `string` | optional | — | Specifies the type of reservation from which this instance can consume resources: ANY_RESERVATION (default),SPECIFIC_RESERVATION, or NO_RESERVATION. See Consuming reserved instances for examples. |
 | `reservationAffinity.key` | — | `string` | optional | — | Corresponds to the label key of a reservation resource. To target aSPECIFIC_RESERVATION by name, specifygoogleapis.com/reservation-name as the key and specify the name of your reservation as its … |
 | `reservationAffinity.values` | — | `list` | optional | — | Corresponds to the label values of a reservation resource. This can be either a name to a reservation in the same project or "projects/different-project/reservations/some-reservation-name" to target … |
 | `reservationAffinity.values[]` | — | `string` | optional | — | — |
-| `resourcePolicies` | `resource_policies` | `list` | optional | — | Resource policies applied to this instance. |
+| `resourcePolicies` | `resource_policies` | `list` | optional | force new | Resource policies applied to this instance. |
 | `resourcePolicies[]` | — | `string` | optional | — | — |
 | `resourceStatus` | `resource_status` | `map` | output only | — | Output only. \[Output Only\] Specifies values set for instance attributes as compared to the values requested by user in the corresponding input only field. |
 | `resourceStatus.effectiveInstanceMetadata` | `effective_instance_metadata` | `map` | output only | — | Output only. \[Output Only\] Effective metadata is a field that consolidates project, zonal instance settings, and instance-level predefined metadata keys to provide the overridden value for those … |
@@ -272,7 +272,7 @@ projects/{project}/zones/{zone}/instances/{instance}
 | `resourceStatus.upcomingMaintenance.windowStartTime` | `window_start_time` | `string` | optional | — | The current start time of the maintenance window. This timestamp value is in RFC3339 text format. |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. \[Output Only\] Reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. \[Output Only\] Reserved for future use. |
-| `scheduling` | — | `map` | optional | — | Sets the scheduling options for this instance. |
+| `scheduling` | — | `map` | optional | force new | Sets the scheduling options for this instance. |
 | `scheduling.automaticRestart` | `automatic_restart` | `boolean` | optional | — | Specifies whether the instance should be automatically restarted if it is terminated by Compute Engine (not terminated by a user). You can only set the automatic restart option for standard … |
 | `scheduling.availabilityDomain` | `availability_domain` | `integer` | optional | — | Specifies the availability domain to place the instance in. The value must be a number between 1 and the number of availability domains specified in the spread placement policy attached to the … |
 | `scheduling.exposeHostTopology` | `expose_host_topology` | `boolean` | optional | — | This optional flag exposes the hashed physical host ID in the ResourceStatus resource of the VM. |
@@ -308,19 +308,19 @@ projects/{project}/zones/{zone}/instances/{instance}
 | `scheduling.skipGuestOsShutdown` | `skip_guest_os_shutdown` | `boolean` | optional | — | Default is false and there will be 120 seconds between GCE ACPI G2 Soft Off and ACPI G3 Mechanical Off for Standard VMs and 30 seconds for Spot VMs. |
 | `scheduling.terminationTime` | `termination_time` | `string` | optional | — | Specifies the timestamp, when the instance will be terminated, inRFC3339 text format. If specified, the instance termination action will be performed at the termination time. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. \[Output Only\] Server-defined URL for this resource. |
-| `serviceAccounts` | `service_accounts` | `list` | optional | — | A list of service accounts, with their specified scopes, authorized for this instance. Only one service account per VM instance is supported. Service accounts generate access tokens that can be … |
+| `serviceAccounts` | `service_accounts` | `list` | optional | force new | A list of service accounts, with their specified scopes, authorized for this instance. Only one service account per VM instance is supported. Service accounts generate access tokens that can be … |
 | `serviceAccounts[]` | — | `map` | optional | — | — |
 | `serviceAccounts[].email` | — | `string` | optional | — | Email address of the service account. |
 | `serviceAccounts[].scopes` | — | `list` | optional | — | The list of scopes to be made available for this service account. |
 | `serviceAccounts[].scopes[]` | — | `string` | optional | — | — |
-| `shieldedInstanceConfig` | `shielded_instance_config` | `map` | optional | — | A set of Shielded Instance options. |
+| `shieldedInstanceConfig` | `shielded_instance_config` | `map` | optional | force new | A set of Shielded Instance options. |
 | `shieldedInstanceConfig.enableIntegrityMonitoring` | `enable_integrity_monitoring` | `boolean` | optional | — | Defines whether the instance has integrity monitoring enabled.Enabled by default. |
 | `shieldedInstanceConfig.enableSecureBoot` | `enable_secure_boot` | `boolean` | optional | — | Defines whether the instance has Secure Boot enabled.Disabled by default. |
 | `shieldedInstanceConfig.enableVtpm` | `enable_vtpm` | `boolean` | optional | — | Defines whether the instance has the vTPM enabled.Enabled by default. |
-| `shieldedInstanceIntegrityPolicy` | `shielded_instance_integrity_policy` | `map` | optional | — | The policy describes the baseline against which Instance boot integrity is measured. |
+| `shieldedInstanceIntegrityPolicy` | `shielded_instance_integrity_policy` | `map` | optional | force new | The policy describes the baseline against which Instance boot integrity is measured. |
 | `shieldedInstanceIntegrityPolicy.updateAutoLearnPolicy` | `update_auto_learn_policy` | `boolean` | optional | — | Updates the integrity policy baseline using the measurements from the VM instance's most recent boot. |
-| `sourceMachineImage` | `source_machine_image` | `string` | optional | — | Source machine image |
-| `sourceMachineImageEncryptionKey` | `source_machine_image_encryption_key` | `map` | optional | — | Source machine image encryption key when creating an instance from a machine image. |
+| `sourceMachineImage` | `source_machine_image` | `string` | optional | force new | Source machine image |
+| `sourceMachineImageEncryptionKey` | `source_machine_image_encryption_key` | `map` | optional | force new | Source machine image encryption key when creating an instance from a machine image. |
 | `sourceMachineImageEncryptionKey.kmsKeyName` | `kms_key_name` | `string` | optional | — | The name of the encryption key that is stored in Google Cloud KMS. For example: "kmsKeyName": "projects/kms_project_id/locations/region/keyRings/ key_region/cryptoKeys/key The fully-qualifed key name … |
 | `sourceMachineImageEncryptionKey.kmsKeyServiceAccount` | `kms_key_service_account` | `string` | optional | — | The service account being used for the encryption request for the given KMS key. If absent, the Compute Engine default service account is used. For example: "kmsKeyServiceAccount" … |
 | `sourceMachineImageEncryptionKey.rawKey` | `raw_key` | `string` | optional | — | \[DEPRECATED\] CSEK is no longer supported. Use CMEK instead. Specifies a 256-bit customer-supplied encryption key, encoded in RFC 4648 base64 to either encrypt or decrypt this resource. You can … |
@@ -329,11 +329,11 @@ projects/{project}/zones/{zone}/instances/{instance}
 | `startRestricted` | `start_restricted` | `boolean` | output only | — | Output only. \[Output Only\] Whether a VM has been restricted for start because Compute Engine has detected suspicious activity. |
 | `status` | — | `string` | output only | — | Output only. \[Output Only\] The status of the instance. One of the following values: PROVISIONING, STAGING,RUNNING, STOPPING, SUSPENDING,SUSPENDED, REPAIRING, andTERMINATED. For more information … |
 | `statusMessage` | `status_message` | `string` | output only | — | Output only. \[Output Only\] An optional, human-readable explanation of the status. |
-| `tags` | — | `map` | optional | — | Tags to apply to this instance. Tags are used to identify valid sources or targets for network firewalls and are specified by the client during instance creation. The tags can be later modified by … |
+| `tags` | — | `map` | optional | force new | Tags to apply to this instance. Tags are used to identify valid sources or targets for network firewalls and are specified by the client during instance creation. The tags can be later modified by … |
 | `tags.fingerprint` | — | `string` | optional | — | Specifies a fingerprint for this request, which is essentially a hash of the tags' contents and used for optimistic locking. The fingerprint is initially generated by Compute Engine and changes after … |
 | `tags.items` | — | `list` | optional | — | An array of tags. Each tag must be 1-63 characters long, and comply with RFC1035. |
 | `tags.items[]` | — | `string` | optional | — | — |
-| `workloadIdentityConfig` | `workload_identity_config` | `map` | optional | — | — |
+| `workloadIdentityConfig` | `workload_identity_config` | `map` | optional | force new | — |
 | `workloadIdentityConfig.identity` | — | `string` | optional | — | — |
 | `workloadIdentityConfig.identityCertificateEnabled` | `identity_certificate_enabled` | `boolean` | optional | — | — |
 | `zone` | — | `string` | output only | — | Output only. \[Output Only\] URL of the zone where the instance resides. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body. |

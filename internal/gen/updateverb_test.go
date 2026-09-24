@@ -529,3 +529,47 @@ properties:
 		t.Error("gcp.unmasked lost its update and nothing records why")
 	}
 }
+
+// TestAnImmutableResourceWithASetterIsNotRecordedAsReplaced. Once Discovery
+// confirms the setter, the type is updatable through it (compute's global
+// target HTTP proxy through setUrlMap), and the warnings file must not tell a
+// reader every change replaces it.
+func TestAnImmutableResourceWithASetterIsNotRecordedAsReplaced(t *testing.T) {
+	doc := strings.Replace(updateVerbDoc(),
+		`"patch": {"id": "a.u.patch", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}`,
+		`"patch": {"id": "a.u.patch", "path": "projects/{project}/unmaskeds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "setSize": {"id": "a.u.setSize", "path": "projects/{project}/unmaskeds/{id}/setSize", "httpMethod": "POST", "request": {"$ref": "SizeReference"}, "response": {"$ref": "Operation"}}`, 1)
+	doc = strings.Replace(doc, `"Operation": {`, `"SizeReference": {"id": "SizeReference", "type": "object", "properties": {"size": {"type": "integer", "format": "int64"}}},
+    "Operation": {`, 1)
+	res, err := Build(writeRefFixture(t, map[string]string{
+		"schemas/acme.json": doc,
+		"mmv1/products/acme/Unmasked.yaml": `name: Unmasked
+base_url: projects/{{project}}/unmaskeds
+self_link: projects/{{project}}/unmaskeds/{{name}}
+immutable: true
+properties:
+  - name: name
+    type: String
+    required: true
+  - name: size
+    type: Integer
+    update_url: projects/{{project}}/unmaskeds/{{name}}/setSize
+    update_verb: POST
+`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, ok := res.Catalog.Type("gcp.unmasked")
+	if !ok {
+		t.Fatalf("gcp.unmasked missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if u.SetterFor("size") == nil {
+		t.Fatalf("the fixture's setSize was not admitted (setters %+v), so this test proves nothing", u.Setters)
+	}
+	for _, r := range res.Unpatchable {
+		if r.Type == "gcp.unmasked" {
+			t.Errorf("gcp.unmasked is recorded as replaced on every change, but setSize updates it: %q", r.Says)
+		}
+	}
+}

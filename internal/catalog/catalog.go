@@ -161,6 +161,16 @@ type Type struct {
 	// 2026-09-23: 21 types carry one, 19 of them updatable.
 	LockField string `json:"lock_field,omitempty"`
 
+	// Setters change some fields in place through a method of their own
+	// rather than the resource's update: compute's setLabels, setUrlMap,
+	// setSecurityPolicy. magic-modules names them per field (update_url on a
+	// property); the generator admits one only where Discovery publishes the
+	// same method on the resource's own address and its request carries
+	// exactly those fields, plus a lock. A type with setters is updatable
+	// even with no UpdateVerb, and the fields they carry never go into a
+	// patch.
+	Setters []Setter `json:"setters,omitempty"`
+
 	// CreateVerb is the HTTP method a create is sent with. Empty means POST,
 	// which is 355 of the 358 create methods in the pinned documents. The other
 	// three are Pub/Sub's topics, subscriptions and snapshots, which create
@@ -370,7 +380,7 @@ func (c *Catalog) Definitions() []*schema.ResourceDefinition {
 				// answer has to be true.
 				Create: len(t.UnresolvedCreatePlaceholders()) == 0,
 				Read:   true,
-				Update: t.UpdateVerb != "",
+				Update: t.UpdateVerb != "" || len(t.Setters) > 0,
 				Delete: true,
 				Import: t.ImportFormat != "",
 			},
@@ -622,4 +632,36 @@ func urlPlaceholders(tmpl string) []string {
 		i += openLen + rel + len(closeSeq)
 	}
 	return names
+}
+
+// Setter is one method that changes some of a resource's fields in place.
+type Setter struct {
+	// Method is the method's name, for messages: "setLabels".
+	Method string `json:"method"`
+	// Path is the method's own url template, spelled with the resource's
+	// self_link placeholders so the resource's id fills it. Not self_link
+	// plus the method: compute's global target proxies are read at
+	// projects/{project}/global/targetHttpsProxies/{x} and their setUrlMap
+	// lives at projects/{project}/targetHttpsProxies/{x}/setUrlMap.
+	Path string `json:"path"`
+	Verb string `json:"verb"`
+	// Fields are the wire names of the attributes the request carries. A
+	// change to any of them calls the method, with all of them in the body.
+	Fields []string `json:"fields"`
+	// Lock is a request property copied from the current state rather than
+	// from configuration: compute's labelFingerprint.
+	Lock string `json:"lock,omitempty"`
+}
+
+// SetterFor is the setter that carries the attribute with wire name
+// canonical, or nil when its update, if any, is the resource's own.
+func (t *Type) SetterFor(canonical string) *Setter {
+	for i := range t.Setters {
+		for _, f := range t.Setters[i].Fields {
+			if f == canonical {
+				return &t.Setters[i]
+			}
+		}
+	}
+	return nil
 }

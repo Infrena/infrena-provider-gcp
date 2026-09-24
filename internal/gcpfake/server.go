@@ -64,6 +64,9 @@ type Server struct {
 	// modification of a locked resource gets a new one, deterministically.
 	fingerprints int
 
+	// dropOnCreate lists fields an insert ignores, for DropOnCreate.
+	dropOnCreate map[string]bool
+
 	// resources holds every stored resource, keyed by the exact request path
 	// it lives at (e.g. "/v1/projects/p/locations/r/widgets/one"), matching
 	// exactly what Seed and Get take. Keying by the literal path rather than
@@ -326,6 +329,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.handleGet(w, r)
+	case r.Method == http.MethodPost && s.setterTarget(r.URL.Path) != "":
+		s.handleSetter(w, r, bodyBytes)
 	case r.Method == http.MethodPost:
 		s.handleCreate(w, r, bodyBytes)
 	case r.Method == http.MethodPut:
@@ -437,6 +442,11 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	collection := strings.TrimSuffix(r.URL.Path, "/")
 	path := collection + "/" + id
 	stored := cloneMap(body)
+	s.mu.Lock()
+	for f := range s.dropOnCreate {
+		delete(stored, f)
+	}
+	s.mu.Unlock()
 	if fromQuery {
 		// AIP-133: a resource created with its id as a query parameter comes
 		// back with `name` set to its FULL relative resource name, whatever
@@ -820,4 +830,89 @@ func unwrapUpdateEnvelope(body map[string]any) (map[string]any, string, bool) {
 		return nil, "", false
 	}
 	return inner, mask, true
+}
+
+// DropOnCreate makes creates ignore the named fields, as compute's inserts
+// ignore what only a setter changes: a backend service's securityPolicy, an
+// address's labels. The body is stored without them, so the first read after
+// the create does not have them.
+func (s *Server) DropOnCreate(fields ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dropOnCreate == nil {
+		s.dropOnCreate = map[string]bool{}
+	}
+	for _, f := range fields {
+		s.dropOnCreate[f] = true
+	}
+}
+
+// setterTarget is the stored resource a POST to path calls a method of, or
+// "" when path is not "<resource>/<method>". Only method names compute uses
+// for setters count ("set..." and "expand..."), so a create that posts to a
+// child collection under a stored resource is still a create. Compute's
+// global target proxies
+// publish setUrlMap and setSslCertificates without the "global" segment
+// their own address has, so that spelling is tried as well, as the real API
+// serves both.
+var setterNameRE = regexp.MustCompile(`^(?:set|expand)[A-Z][A-Za-z]*$`)
+
+func (s *Server) setterTarget(path string) string {
+	i := strings.LastIndex(path, "/")
+	if i <= 0 || !setterNameRE.MatchString(path[i+1:]) {
+		return ""
+	}
+	parent := path[:i]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.resources[parent]; ok {
+		return parent
+	}
+	if j := strings.Index(parent, "/projects/"); j >= 0 {
+		rest := parent[j+len("/projects/"):]
+		if k := strings.Index(rest, "/"); k >= 0 {
+			global := parent[:j] + "/projects/" + rest[:k] + "/global" + rest[k:]
+			if _, ok := s.resources[global]; ok {
+				return global
+			}
+		}
+	}
+	return ""
+}
+
+// handleSetter answers a compute setter (setLabels, setUrlMap,
+// setSecurityPolicy): the body's fields are written onto the resource. A
+// resource that carries a labelFingerprint refuses a body that quotes a stale
+// one and gets a new one after, which is how compute guards setLabels.
+func (s *Server) handleSetter(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
+	path := s.setterTarget(r.URL.Path)
+	body := map[string]any{}
+	if len(bodyBytes) > 0 {
+		if err := json.Unmarshal(bodyBytes, &body); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "malformed JSON body")
+			return
+		}
+	}
+	s.mu.Lock()
+	existing := s.resources[path]
+	s.mu.Unlock()
+	if fp, locked := existing["labelFingerprint"].(string); locked {
+		if sent, _ := body["labelFingerprint"].(string); sent != fp {
+			writeError(w, http.StatusPreconditionFailed, "FAILED_PRECONDITION",
+				fmt.Sprintf("conditionNotMet: supplied labelFingerprint %q does not match current %q", sent, fp))
+			return
+		}
+	}
+	merged := cloneMap(existing)
+	for k, v := range body {
+		merged[k] = v
+	}
+	s.mu.Lock()
+	if _, locked := existing["labelFingerprint"].(string); locked {
+		s.fingerprints++
+		merged["labelFingerprint"] = fmt.Sprintf("lfp-%d", s.fingerprints)
+	}
+	s.resources[path] = merged
+	s.mu.Unlock()
+	s.respondMutation(w, path, merged, false)
 }

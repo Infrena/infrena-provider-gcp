@@ -22,12 +22,12 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
-| [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 5 |
+| [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
 | [no get method](#no-get-method) | 2 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**372** types did not ship. **62** more ship without a create.
+**371** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -445,7 +445,6 @@ Reported by the generator.
 | `gcp.publicadvertisedprefix` | noupdate | — |
 | `gcp.publicdelegatedprefix` | noupdate | — |
 | `gcp.servicebinding` | noupdate | — |
-| `gcp.targethttpproxy` | noupdate | — |
 
 ## no get method
 
