@@ -459,7 +459,13 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 					"gen: %s.%s is required per magic-modules but output-only per Discovery; treating it as output-only\n",
 					d.Name, name))
 			}
-			if topLevel && f.Type == "ResourceRef" && f.Resource != "" {
+			// Not when the field takes more than one type. magic-modules types
+			// a url map's defaultService as a BackendService reference, and
+			// its custom_expand (reference_to_backend) is what lets a backend
+			// BUCKET through as well, which Google accepts. As a typed
+			// reference, infrena refused a url map pointing at a backend
+			// bucket before anything was sent (live run, 2026-09-24).
+			if topLevel && f.Type == "ResourceRef" && f.Resource != "" && !acceptsSeveralTypes(f) {
 				attr := f.Imports
 				if attr == "" {
 					attr = "selfLink"
@@ -506,4 +512,12 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		out[key] = a
 	}
 	return out, nil
+}
+
+// acceptsSeveralTypes reports whether a magic-modules ResourceRef takes more
+// than the one type it names, which magic-modules says through the expand
+// that builds the url: reference_to_backend accepts a backend service or a
+// backend bucket.
+func acceptsSeveralTypes(f *mmv1.Field) bool {
+	return strings.HasSuffix(f.CustomExpand, "/reference_to_backend.tmpl")
 }
