@@ -14,27 +14,29 @@ import (
 // The type the workflow runs on is gcp.trigger, and the choice is measured
 // rather than arbitrary.
 //
-// It must be creatable, updatable and labelled, and it must complete its
-// mutations synchronously -- gcpfake answers one operation shape per server
-// (SetOperationStyle), so a type whose catalog entry says AwaitComputeOperation
-// would need a differently configured fake than one that says AwaitNone, and
-// the workflow would then be testing the fake's configuration as much as the
-// provider. Of the 233 shipped types, 52 have `labels` and an update verb;
-// seven of those are AwaitNone.
-//
-// gcp.trigger is the one of those seven that makes the suite DIFFERENTIAL. It
-// declares a nested object (`destination`), a list of nested objects
-// (`event_filters`) and an integer inside a nested object
+// It must be creatable, updatable and labelled, and it must make the suite
+// DIFFERENTIAL. It declares a nested object (`destination`), a list of nested
+// objects (`event_filters`) and an integer inside a nested object
 // (`retry_policy.max_attempts`), so the object, list and scalar arms of
 // Reconcile all run. The first fixture this suite had was gcp.channel, whose
-// only interesting attribute is a free-form `labels` map -- and a free-form
-// map is copied verbatim, never reconciled. Removing reconciliation entirely
-// left every subtest passing. A suite that cannot fail when the thing it
-// exists to test is deleted is not testing it, and the type is where that was
-// decided.
+// only interesting attribute is a free-form `labels` map -- and a free-form map
+// is copied verbatim, never reconciled. Removing reconciliation entirely left
+// every subtest passing. A suite that cannot fail when the thing it exists to
+// test is deleted is not testing it, and the type is where that was decided.
+//
+// This comment used to add a third criterion: that the type complete its
+// mutations SYNCHRONOUSLY, because the catalog said gcp.trigger did. It never
+// did. Eventarc answers every mutation with a google.longrunning.Operation,
+// which Discovery publishes as "GoogleLongrunningOperation", and the generator
+// only recognised an operation schema called exactly "Operation". The suite
+// was chosen to match a catalog that was wrong about the API, and a fake that
+// agrees with a wrong catalog is the one failure nothing can see. start()
+// now configures the fake the way Eventarc really answers, so this suite also
+// drives the long-running await path through the real infrena binary.
 //
 // NOT gcp.compute.instance, gcp.firewall or gcp.router, the compute types the
-// brief names as safe: all three are AwaitComputeOperation.
+// brief names as safe: all three await compute-style operations, a shape
+// this fixture's fake is not configured to speak.
 const (
 	workflowType = "gcp.trigger"
 	channelName  = "e2e-trigger"

@@ -130,6 +130,13 @@ func TestTheHostAcceptsACreateReadUpdateDelete(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
+	// Eventarc answers every mutation with a google.longrunning.Operation, so
+	// the fake must too. It used to answer synchronously, which matched what
+	// the catalog then believed about gcp.channel and was wrong about the API:
+	// the generator only recognised an operation schema called exactly
+	// "Operation", and eventarc calls it "GoogleLongrunningOperation". A fake
+	// that agrees with a wrong catalog is the one failure no test can see.
+	s.SetOperationStyle(gcpfake.OpLongRunning)
 	prov := configured(t, s)
 	ctx := context.Background()
 

@@ -13,7 +13,7 @@ An API Configuration is a combination of settings for both the Managed Service a
 | Asset type | `apigateway.googleapis.com/ApigatewayApiConfig` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

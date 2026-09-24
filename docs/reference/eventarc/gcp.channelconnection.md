@@ -13,7 +13,7 @@ A representation of the ChannelConnection resource. A ChannelConnection is a res
 | Asset type | `eventarc.googleapis.com/ChannelConnection` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

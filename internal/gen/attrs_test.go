@@ -171,17 +171,28 @@ func TestNestedImmutabilityReachesTheNestedAttribute(t *testing.T) {
 	}
 }
 
+// props builds a schema with the named properties, which is all AwaitOf reads.
+func props(names ...string) *disco.Schema {
+	s := &disco.Schema{Properties: map[string]*disco.Schema{}}
+	for _, n := range names {
+		s.Properties[n] = &disco.Schema{Type: "string"}
+	}
+	return s
+}
+
+// The shapes below are the real ones, measured across every mutation response
+// in the pinned documents on 2026-09-23: every long-running operation carries
+// done, error, metadata, name and response, and every compute-style one
+// carries error, name, operationType, selfLink, status and targetLink.
+var (
+	lroShape     = []string{"done", "error", "metadata", "name", "response"}
+	computeShape = []string{"error", "name", "operationType", "selfLink", "status", "targetLink"}
+)
+
 func TestAwaitIsChosenFromTheOperationShape(t *testing.T) {
-	longrunning := &disco.Document{Name: "redis", Schemas: map[string]*disco.Schema{
-		"Operation": {Properties: map[string]*disco.Schema{"done": {Type: "boolean"}}},
-	}}
-	compute := &disco.Document{Name: "compute", Schemas: map[string]*disco.Schema{
-		"Operation": {Properties: map[string]*disco.Schema{
-			"status": {Type: "string"}, "targetLink": {Type: "string"}}},
-	}}
-	widget := &disco.Document{Name: "tiny", Schemas: map[string]*disco.Schema{
-		"Widget": {Properties: map[string]*disco.Schema{"name": {Type: "string"}}},
-	}}
+	longrunning := &disco.Document{Name: "redis", Schemas: map[string]*disco.Schema{"Operation": props(lroShape...)}}
+	compute := &disco.Document{Name: "compute", Schemas: map[string]*disco.Schema{"Operation": props(computeShape...)}}
+	widget := &disco.Document{Name: "tiny", Schemas: map[string]*disco.Schema{"Widget": props("name")}}
 	op := &disco.Method{Response: &disco.Ref{Ref: "Operation"}}
 	if k, _ := AwaitOf(longrunning, op); k != catalog.AwaitLongRunning {
 		t.Errorf("longrunning doc gave %v", k)
@@ -191,6 +202,39 @@ func TestAwaitIsChosenFromTheOperationShape(t *testing.T) {
 	}
 	if k, _ := AwaitOf(widget, &disco.Method{Response: &disco.Ref{Ref: "Widget"}}); k != catalog.AwaitNone {
 		t.Errorf("a method returning the resource gave %v, want none", k)
+	}
+}
+
+// TestAwaitDoesNotDependOnWhatTheOperationIsCalled is the defect: AwaitOf used
+// to require a schema named exactly "Operation". Eventarc, Cloud Run v2 and
+// Firestore call google.longrunning.Operation "GoogleLongrunningOperation", and
+// API Gateway calls it "ApigatewayOperation", so 13 shipping types -- Cloud Run
+// services among them -- treated an operation still running as the finished
+// resource.
+func TestAwaitDoesNotDependOnWhatTheOperationIsCalled(t *testing.T) {
+	for _, name := range []string{"GoogleLongrunningOperation", "ApigatewayOperation"} {
+		d := &disco.Document{Name: "run", Schemas: map[string]*disco.Schema{name: props(lroShape...)}}
+		if k, _ := AwaitOf(d, &disco.Method{Response: &disco.Ref{Ref: name}}); k != catalog.AwaitLongRunning {
+			t.Errorf("%s gave %v, want long-running", name, k)
+		}
+	}
+}
+
+// TestAResourceThatLooksLikeAnOperationIsNotOne. Deciding by shape rather than
+// name means a resource can now reach these checks, so they must not be fooled
+// by one field. dataproc's Job has `done` and `status` and is a resource; most
+// resources have `status` and `name`; DNS's own "Operation" has only `status`
+// and is not compute's.
+func TestAResourceThatLooksLikeAnOperationIsNotOne(t *testing.T) {
+	for name, s := range map[string]*disco.Schema{
+		"dataproc Job":       props("done", "status", "reference", "placement"),
+		"resource w/ status": props("name", "status", "selfLink", "description"),
+		"dns Operation":      props("id", "status", "type", "startTime"),
+	} {
+		d := &disco.Document{Name: "x", Schemas: map[string]*disco.Schema{"Thing": s}}
+		if k, _ := AwaitOf(d, &disco.Method{Response: &disco.Ref{Ref: "Thing"}}); k != catalog.AwaitNone {
+			t.Errorf("%s gave %v, want none", name, k)
+		}
 	}
 }
 

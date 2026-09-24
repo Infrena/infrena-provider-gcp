@@ -13,7 +13,7 @@ Job represents the configuration of a single job, which references a container i
 | Asset type | `run.googleapis.com/GoogleCloudRunV2Job` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

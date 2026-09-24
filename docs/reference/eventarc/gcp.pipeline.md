@@ -13,7 +13,7 @@ The Eventarc Pipeline resource
 | Asset type | `eventarc.googleapis.com/Pipeline` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 
