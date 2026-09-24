@@ -609,3 +609,25 @@ func TestADeleteIsAwaitedByItsOwnAnswer(t *testing.T) {
 		t.Errorf("gcp.unmasked records a delete await although its delete answers like its create: %+v", u)
 	}
 }
+
+// TestOneFieldPerPatchReachesTheCatalog. The overlay is the only source: the
+// subnetwork's refusal of a two-field patch is in no Discovery text.
+func TestOneFieldPerPatchReachesTheCatalog(t *testing.T) {
+	for _, flag := range []bool{true, false} {
+		extra := "patchable:\n  gcp.restricted:\n    fields: [size, name]\n    note: the live suite saw a two-field patch refused\n"
+		if flag {
+			extra = "patchable:\n  gcp.restricted:\n    fields: [size, name]\n    one_field_per_patch: true\n    note: the live suite saw a two-field patch refused\n"
+		}
+		res, err := Build(overlayWith(t, extra))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, ok := res.Catalog.Type("gcp.restricted")
+		if !ok {
+			t.Fatal("gcp.restricted missing")
+		}
+		if ty.PatchOneField != flag {
+			t.Errorf("one_field_per_patch: %v in the overlay, PatchOneField = %v in the catalog", flag, ty.PatchOneField)
+		}
+	}
+}

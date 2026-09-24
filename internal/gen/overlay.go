@@ -29,6 +29,12 @@ type Patchable struct {
 	// Fields are the TOP-LEVEL attribute names the API really patches, spelled
 	// as the wire spells them. Everything else settable becomes ForceNew.
 	Fields []string `yaml:"fields"`
+	// OneFieldPerPatch says the API refuses a patch that changes more than
+	// one of those fields at once, so each changed field goes in a patch of
+	// its own. Evidence, never assumed: compute's subnetworks answered a
+	// two-field patch with "Only one field at a time can be modified in the
+	// request" on 2026-09-24, and nothing in their Discovery text says so.
+	OneFieldPerPatch bool `yaml:"one_field_per_patch"`
 	// Note must quote or cite what the API says. Required, for the same reason
 	// a ruling's note is: a list of field names with no source behind it is
 	// indistinguishable from a guess.

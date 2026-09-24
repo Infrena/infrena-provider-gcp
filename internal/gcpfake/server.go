@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -70,6 +71,10 @@ type Server struct {
 	// deleteThenFail lists resources whose next delete is accepted and then
 	// fails, for DeleteThenFailOperation.
 	deleteThenFail map[string]bool
+
+	// oneFieldPatch lists resources that refuse a patch changing more than
+	// one field, for OneFieldPerPatch.
+	oneFieldPatch map[string]bool
 
 	// resources holds every stored resource, keyed by the exact request path
 	// it lives at (e.g. "/v1/projects/p/locations/r/widgets/one"), matching
@@ -546,6 +551,24 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 		}
 	}
 
+	s.mu.Lock()
+	oneField := s.oneFieldPatch[path]
+	s.mu.Unlock()
+	if oneField {
+		var changed []string
+		for k, v := range patchBody {
+			if k != "fingerprint" && !reflect.DeepEqual(existing[k], v) {
+				changed = append(changed, k)
+			}
+		}
+		if len(changed) > 1 {
+			sort.Strings(changed)
+			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", fmt.Sprintf(
+				"Only one field at a time can be modified in the request. The modified fields were: %v.", changed))
+			return
+		}
+	}
+
 	merged := cloneMap(existing)
 	if len(mask) == 0 {
 		for k, v := range patchBody {
@@ -936,4 +959,16 @@ func (s *Server) DeleteThenFailOperation(path, code, message string) {
 	}
 	s.deleteThenFail[path] = true
 	s.createThenFail[path] = apiErrorSpec{Code: code, Message: message}
+}
+
+// OneFieldPerPatch makes path refuse a patch that changes more than one
+// field, as compute's subnetworks do: "Only one field at a time can be
+// modified in the request."
+func (s *Server) OneFieldPerPatch(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.oneFieldPatch == nil {
+		s.oneFieldPatch = map[string]bool{}
+	}
+	s.oneFieldPatch[path] = true
 }

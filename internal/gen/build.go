@@ -1004,6 +1004,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 				t.UpdateMask = false
 				if allow := overlay.Patchable[name]; allow != nil {
 					applyPatchAllowlist(attrs, allow.Fields)
+					t.PatchOneField = allow.OneFieldPerPatch
 				}
 			}
 		}
@@ -1021,6 +1022,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 				// API does with it anyway.
 				t.UpdateVerb, t.UpdateMask = verb, masked
 				applyPatchAllowlist(attrs, allow.Fields)
+				t.PatchOneField = allow.OneFieldPerPatch
 			default:
 				// Left non-updatable on purpose: see patchlimits.go. Recorded
 				// as a noupdate row in gen/warnings.txt by Build.
