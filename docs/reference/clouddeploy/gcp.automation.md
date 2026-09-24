@@ -19,7 +19,7 @@ An `Automation` enables the automation of manually driven actions for a Delivery
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations?automationId={{name}}` needs `name`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations?automationId={{automationId}}` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations/{{name}}` |
 | Update | yes | `PATCH projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipeline}}/automations/{{name}}` |
@@ -33,11 +33,12 @@ projects/{{project}}/locations/{{location}}/deliveryPipelines/{{delivery_pipelin
 
 ## Attributes
 
-66 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+67 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `annotations` | — | `map` | optional | opaque | Optional. User annotations. These attributes can only be set and used by the user, and not by Cloud Deploy. Annotations must meet the following constraints: * Annotations are key/value pairs. * Valid … |
+| `automationId` | — | `string` | optional | force new, create only | Required. ID of the `Automation`. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. Time at which the automation was created. |
 | `delivery_pipeline` | — | `string` | required | force new | The delivery_pipeline this gcp.automation belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `description` | — | `string` | optional | — | Optional. Description of the `Automation`. Max length is 255 characters. |

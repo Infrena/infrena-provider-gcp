@@ -19,7 +19,7 @@ A `DeployPolicy` inhibits manual or DeployPolicy-driven actions within a Deliver
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `projects/{{project}}/locations/{{location}}/deployPolicies?deployPolicyId={{name}}` needs `name`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/deployPolicies?deployPolicyId={{deployPolicyId}}` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/deployPolicies/{{name}}` |
 | Update | yes | `PATCH projects/{{project}}/locations/{{location}}/deployPolicies/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/deployPolicies/{{name}}` |
@@ -33,12 +33,13 @@ projects/{{project}}/locations/{{location}}/deployPolicies/{{name}}
 
 ## Attributes
 
-61 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+62 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `annotations` | — | `map` | optional | opaque | Optional. User annotations. These attributes can only be set and used by the user, and not by Cloud Deploy. Annotations must meet the following constraints: * Annotations are key/value pairs. * Valid … |
 | `createTime` | `create_time` | `string` | output only | — | Output only. Time at which the deploy policy was created. |
+| `deployPolicyId` | — | `string` | optional | force new, create only | Required. ID of the `DeployPolicy`. |
 | `description` | — | `string` | optional | — | Optional. Description of the `DeployPolicy`. Max length is 255 characters. |
 | `etag` | — | `string` | output only | — | The weak etag of the `DeployPolicy` resource. This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an … |
 | `labels` | — | `map` | optional | opaque | Labels are attributes that can be set and used by both the user and by Cloud Deploy. Labels must meet the following constraints: * Keys and values can contain only lowercase letters, numeric … |
