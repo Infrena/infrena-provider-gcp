@@ -18,7 +18,7 @@ A `BlueGreenDeployment` resource represents a Cloud SQL blue-green deployment se
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/blueGreenDeployments` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/blueGreenDeployments?blueGreenDeploymentId={{blueGreenDeploymentId}}` |
 | Read | yes | `GET {+name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
@@ -32,10 +32,11 @@ projects/{project}/locations/{location}/blueGreenDeployments/{blueGreenDeploymen
 
 ## Attributes
 
-39 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+40 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `blueGreenDeploymentId` | — | `string` | required | force new, create only | Required. The ID to use for the blue-green deployment, which will become the final component of the deployment's resource name. The ID must be unique within the given project and location and between … |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The time when the deployment was created. Example: `2024-01-01T00:00:00Z` |
 | `deploymentMappings` | `deployment_mappings` | `list` | output only | — | Output only. A list representing the pairs of source and target instances in the deployment. |
 | `deploymentMappings[]` | — | `map` | optional | — | — |

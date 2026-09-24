@@ -19,7 +19,7 @@ Describes a view over log entries in a bucket.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/views` needs `bucket`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/views?viewId={{viewId}}` needs `bucket`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/buckets/{bucket}/views/{view}
 
 ## Attributes
 
-5 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+6 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -42,3 +42,4 @@ projects/{project}/locations/{location}/buckets/{bucket}/views/{view}
 | `filter` | — | `string` | optional | — | Optional. Filter that restricts which log entries in a bucket are visible in this view.Filters must be logical conjunctions that use the AND operator, and they can use any of the following … |
 | `name` | — | `string` | output only | — | Output only. The resource name of the view.For example:projects/my-project/locations/global/buckets/my-bucket/views/my-view |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last update timestamp of the view. |
+| `viewId` | — | `string` | required | force new, create only | Required. A client-assigned identifier such as "my-view". Identifiers are limited to 100 characters and can include only letters, digits, underscores, and hyphens. |

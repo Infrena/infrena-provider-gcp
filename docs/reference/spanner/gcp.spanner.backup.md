@@ -19,7 +19,7 @@ A backup of a Cloud Spanner database.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/backups` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/backups?backupId={{backupId}}` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,10 +33,11 @@ projects/{project}/instances/{instance}/backups/{backup}
 
 ## Attributes
 
-36 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+37 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `backupId` | — | `string` | required | force new, create only | Required. The id of the backup to be created. The `backup_id` appended to `parent` forms the full backup name of the form `projects/{project}/instances/{instance}/backups/{backup_id}`. |
 | `backupSchedules` | `backup_schedules` | `list` | output only | — | Output only. List of backup schedule URIs that are associated with creating this backup. This is only applicable for scheduled backups, and is empty for on-demand backups. To optimize for storage … |
 | `backupSchedules[]` | — | `string` | optional | — | — |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The time the CreateBackup request is received. If the request does not specify `version_time`, the `version_time` of the backup will be equivalent to the `create_time`. |
@@ -64,7 +65,7 @@ projects/{project}/instances/{instance}/backups/{backup}
 | `instancePartitions[].instancePartition` | `instance_partition` | `string` | optional | — | A unique identifier for the instance partition. Values are of the form `projects/{project}/instances/{instance}/instancePartitions/{instance_partition_id}` |
 | `maxExpireTime` | `max_expire_time` | `string` | output only | — | Output only. The max allowed expiration time of the backup, with microseconds granularity. A backup's expiration time can be configured in multiple APIs: CreateBackup, UpdateBackup, CopyBackup. When … |
 | `minimumRestorableEdition` | `minimum_restorable_edition` | `string` | output only | — | Output only. The minimum edition required to successfully restore the backup. Populated only if the edition is Enterprise or Enterprise Plus. |
-| `name` | — | `string` | optional | — | Output only for the CreateBackup operation. Required for the UpdateBackup operation. A globally unique identifier for the backup which cannot be changed. Values are of the form … |
+| `name` | — | `string` | output only | — | Output only for the CreateBackup operation. Required for the UpdateBackup operation. A globally unique identifier for the backup which cannot be changed. Values are of the form … |
 | `oldestVersionTime` | `oldest_version_time` | `string` | output only | — | Output only. Data deleted at a time older than this is guaranteed not to be retained in order to support this backup. For a backup in an incremental backup chain, this is the version time of the … |
 | `referencingBackups` | `referencing_backups` | `list` | output only | — | Output only. The names of the destination backups being created by copying this source backup. The backup names are of the form `projects/{project}/instances/{instance}/backups/{backup}`. Referencing … |
 | `referencingBackups[]` | — | `string` | optional | — | — |

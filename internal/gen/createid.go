@@ -33,6 +33,7 @@
 package gen
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -157,4 +158,72 @@ func topLevelAttr(attrs map[string]*catalog.Attr, name string) *catalog.Attr {
 		}
 	}
 	return nil
+}
+
+// addCreateIDParameter sends the new resource's id the way the API asks for
+// it, when the create url does not carry it at all.
+//
+// Google's convention (AIP-133) is POST <parent>/<collection>?<resource>Id=x,
+// with the parameter named after the resource: jobs takes jobId, aclPolicies
+// takes aclPolicyId. Measured on 2026-09-24, 21 shipping types the catalog
+// said could create sent no id at all -- mostly types magic-modules does not
+// cover, so there was no create_url to carry one. Most mark it Required, so
+// every create was refused; Cloud Run's is optional, and there the name was
+// sent in the body instead, which Cloud Run refuses outright: "job.name must
+// be empty on CreateJobRequest". The live suite found it, on a Cloud Run job.
+//
+// The id gets its own create-only attribute and the url names it, the same
+// shape bindCreateQueryID gives a key ring. And the resource's own `name`
+// becomes output-only: for every one of these types it is the full resource
+// name, which Google assigns from the parent and this id, so it is not the
+// user's to send.
+//
+// Required follows the parameter's own "Required." tag, so a configuration
+// that leaves out an id Google insists on is refused at plan time rather than
+// by Google after the request is sent.
+func addCreateIDParameter(t *catalog.Type, attrs map[string]*catalog.Attr, create *disco.Method) string {
+	if create == nil || t.CreateVerb == http.MethodPut {
+		return "" // a PUT create names the resource in its own path
+	}
+	tmpl := t.CreateTemplate()
+	path, query, _ := strings.Cut(tmpl, "?")
+	var leaf string
+	for _, seg := range strings.Split(strings.Trim(path, "/"), "/") {
+		if seg != "" && !strings.HasPrefix(seg, "{") {
+			leaf = seg
+		}
+	}
+	if leaf == "" {
+		return ""
+	}
+	param := singularSegment(leaf) + "Id"
+	p := create.Parameters[param]
+	if p == nil || p.Location != "query" {
+		return ""
+	}
+	for _, kv := range strings.Split(query, "&") {
+		if k, _, _ := strings.Cut(kv, "="); k == param || k == snake(param) {
+			return "" // already sent, under the API's spelling or magic-modules'
+		}
+	}
+	if _, taken := attrs[param]; taken {
+		return ""
+	}
+	attrs[param] = &catalog.Attr{
+		Canonical:   param,
+		Kind:        value.KindString,
+		ForceNew:    true,
+		CreateOnly:  true,
+		Required:    disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired],
+		Description: strings.TrimSpace(p.Description),
+	}
+	sep := "?"
+	if query != "" {
+		sep = "&"
+	}
+	t.CreateURL = tmpl + sep + param + "={{" + param + "}}"
+	if n := attrs["name"]; n != nil && !n.Output {
+		n.Output, n.Required, n.ForceNew = true, false, false
+	}
+	return param
 }

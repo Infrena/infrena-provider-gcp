@@ -18,7 +18,7 @@ A saved query which can be shared with others or used later.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/savedQueries` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/savedQueries?savedQueryId={{savedQueryId}}` needs `parent`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -32,7 +32,7 @@ A saved query which can be shared with others or used later.
 
 ## Attributes
 
-28 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+29 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -63,4 +63,5 @@ A saved query which can be shared with others or used later.
 | `labels` | — | `map` | optional | opaque | Labels applied on the resource. This value should not contain more than 10 entries. The key and value of each entry must be non-empty and fewer than 64 characters. |
 | `lastUpdateTime` | `last_update_time` | `string` | output only | — | Output only. The last update time of this saved query. |
 | `lastUpdater` | `last_updater` | `string` | output only | — | Output only. The account's email address who has updated this saved query most recently. |
-| `name` | — | `string` | optional | — | The resource name of the saved query. The format must be: * projects/project_number/savedQueries/saved_query_id * folders/folder_number/savedQueries/saved_query_id * … |
+| `name` | — | `string` | output only | — | The resource name of the saved query. The format must be: * projects/project_number/savedQueries/saved_query_id * folders/folder_number/savedQueries/saved_query_id * … |
+| `savedQueryId` | — | `string` | required | force new, create only | Required. The ID to use for the saved query, which must be unique in the specified parent. It will become the final component of the saved query's resource name. This value should be 4-63 characters … |

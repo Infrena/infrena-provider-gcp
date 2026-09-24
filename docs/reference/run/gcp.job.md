@@ -19,7 +19,7 @@ Job represents the configuration of a single job, which references a container i
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/jobs` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/jobs?jobId={{jobId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}` |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/jobs/{job}
 
 ## Attributes
 
-189 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+190 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -63,6 +63,7 @@ projects/{project}/locations/{location}/jobs/{job}
 | `expireTime` | `expire_time` | `string` | output only | — | Output only. For a deleted resource, the time after which it will be permamently deleted. |
 | `functionalType` | `functional_type` | `string` | optional | — | Optional. The functional type of the Job. |
 | `generation` | — | `string` | output only | — | Output only. A number that monotonically increases every time the user modifies the desired state. |
+| `jobId` | — | `string` | optional | force new, create only | Optional. The unique identifier for the Job. The name of the job becomes {parent}/jobs/{job_id}. If not provided, the server will generate a unique `job_id`. |
 | `labels` | — | `map` | optional | opaque | Unstructured key value map that can be used to organize and categorize objects. User-provided labels are shared with Google's billing system, so they can be used to filter, or break down billing … |
 | `lastModifier` | `last_modifier` | `string` | output only | — | Output only. Email address of the last authenticated modifier. |
 | `latestCreatedExecution` | `latest_created_execution` | `map` | output only | — | Output only. Name of the last created execution. |
@@ -72,7 +73,7 @@ projects/{project}/locations/{location}/jobs/{job}
 | `latestCreatedExecution.deleteTime` | `delete_time` | `string` | optional | — | The deletion time of the execution. It is only populated as a response to a Delete request. |
 | `latestCreatedExecution.name` | — | `string` | optional | — | Name of the execution. |
 | `launchStage` | `launch_stage` | `string` | optional | — | The launch stage as defined by \[Google Cloud Platform Launch Stages\](https://cloud.google.com/terms/launch-stages). Cloud Run supports `ALPHA`, `BETA`, and `GA`. If no value is specified, GA is … |
-| `name` | — | `string` | optional | — | The fully qualified name of this Job. Format: projects/{project}/locations/{location}/jobs/{job} |
+| `name` | — | `string` | output only | — | The fully qualified name of this Job. Format: projects/{project}/locations/{location}/jobs/{job} |
 | `observedGeneration` | `observed_generation` | `string` | output only | — | Output only. The generation of this Job. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. |
 | `reconciling` | — | `boolean` | output only | — | Output only. Returns true if the Job is currently being acted upon by the system to bring it into the desired state. When a new Job is created, or an existing one is updated, Cloud Run will … |
 | `runExecutionToken` | `run_execution_token` | `string` | optional | — | A unique string used as a suffix for creating a new execution. The Job will become ready when the execution is successfully completed. The sum of job name and token length must be fewer than 63 … |

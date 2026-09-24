@@ -19,7 +19,7 @@ A resizable group of nodes in a particular cloud location, capable of serving al
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/clusters` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/clusters?clusterId={{clusterId}}` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/instances/{instance}/clusters/{cluster}
 
 ## Attributes
 
-16 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+17 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -45,11 +45,12 @@ projects/{project}/instances/{instance}/clusters/{cluster}
 | `clusterConfig.clusterAutoscalingConfig.autoscalingTargets` | `autoscaling_targets` | `map` | optional | — | Required. Autoscaling targets for this cluster. |
 | `clusterConfig.clusterAutoscalingConfig.autoscalingTargets.cpuUtilizationPercent` | `cpu_utilization_percent` | `integer` | optional | — | The cpu utilization that the Autoscaler should be trying to achieve. This number is on a scale from 0 (no utilization) to 100 (total utilization), and is limited between 10 and 80, otherwise it will … |
 | `clusterConfig.clusterAutoscalingConfig.autoscalingTargets.storageUtilizationGibPerNode` | `storage_utilization_gib_per_node` | `integer` | optional | — | The storage utilization that the Autoscaler should be trying to achieve. This number is limited between 2560 (2.5TiB) and 5120 (5TiB) for a SSD cluster and between 8192 (8TiB) and 16384 (16TiB) for … |
+| `clusterId` | — | `string` | required | force new, create only | Required. The ID to be used when referring to the new cluster within its instance, e.g., just `mycluster` rather than `projects/myproject/instances/myinstance/clusters/mycluster`. |
 | `defaultStorageType` | `default_storage_type` | `string` | optional | force new | Immutable. The type of storage used by this cluster to serve its parent instance's tables, unless explicitly overridden. |
 | `encryptionConfig` | `encryption_config` | `map` | optional | force new | Immutable. The encryption configuration for CMEK-protected clusters. |
 | `encryptionConfig.kmsKeyName` | `kms_key_name` | `string` | optional | — | Describes the Cloud KMS encryption key that will be used to protect the destination Bigtable cluster. The requirements for this key are: 1) The Cloud Bigtable service account associated with the … |
 | `location` | — | `string` | optional | force new | Immutable. The location where this cluster's nodes and storage reside. For best performance, clients should be located as close as possible to this cluster. Currently only zones are supported, so … |
-| `name` | — | `string` | optional | — | The unique name of the cluster. Values are of the form `projects/{project}/instances/{instance}/clusters/a-z*`. |
+| `name` | — | `string` | output only | — | The unique name of the cluster. Values are of the form `projects/{project}/instances/{instance}/clusters/a-z*`. |
 | `nodeScalingFactor` | `node_scaling_factor` | `string` | optional | force new | Immutable. The node scaling factor of this cluster. |
 | `serveNodes` | `serve_nodes` | `integer` | optional | — | The number of nodes in the cluster. If no value is set, Cloud Bigtable automatically allocates nodes based on your data footprint and optimized for 50% storage utilization. |
 | `state` | — | `string` | output only | — | Output only. The current state of the cluster. |

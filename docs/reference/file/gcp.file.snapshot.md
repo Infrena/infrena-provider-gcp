@@ -19,7 +19,7 @@ A Filestore snapshot.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/snapshots` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/snapshots?snapshotId={{snapshotId}}` needs `instance`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/instances/{instance}/snapshots/{snapshot
 
 ## Attributes
 
-7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+8 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -42,5 +42,6 @@ projects/{project}/locations/{location}/instances/{instance}/snapshots/{snapshot
 | `filesystemUsedBytes` | `filesystem_used_bytes` | `string` | output only | — | Output only. The amount of bytes needed to allocate a full copy of the snapshot content |
 | `labels` | — | `map` | optional | opaque | Resource labels to represent user provided metadata. |
 | `name` | — | `string` | output only | — | Output only. The resource name of the snapshot, in the format `projects/{project_id}/locations/{location_id}/instances/{instance_id}/snapshots/{snapshot_id}`. |
+| `snapshotId` | — | `string` | required | force new, create only | Required. The ID to use for the snapshot. The ID must be unique within the specified instance. This value must start with a lowercase letter followed by up to 62 lowercase letters, numbers, or … |
 | `state` | — | `string` | output only | — | Output only. The snapshot state. |
 | `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |

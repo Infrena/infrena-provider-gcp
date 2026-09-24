@@ -19,7 +19,7 @@
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/producerExtensions` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/producerExtensions?producerExtensionId={{producerExtensionId}}` |
 | Read | yes | `GET {+name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/producerExtensions/{producerExtension}
 
 ## Attributes
 
-13 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+14 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -47,6 +47,7 @@ projects/{project}/locations/{location}/producerExtensions/{producerExtension}
 | `extensionSettings.supportedEvents` | `supported_events` | `list` | optional | — | Required. The event types supported by the extension. |
 | `extensionSettings.supportedEvents[]` | — | `string` | optional | — | — |
 | `labels` | — | `map` | optional | opaque | Optional. Set of labels associated with the `ProducerExtension` resource. The format must comply with \[the following … |
-| `name` | — | `string` | optional | — | Identifier. Name of the `ProducerExtension` resource in the following format: `projects/{project}/locations/{location}/producerExtensions/{producer_extension}`. |
+| `name` | — | `string` | output only | — | Identifier. Name of the `ProducerExtension` resource in the following format: `projects/{project}/locations/{location}/producerExtensions/{producer_extension}`. |
 | `phase` | — | `string` | optional | — | Required. The phase in which this `ProducerExtension` should execute. |
+| `producerExtensionId` | — | `string` | required | force new, create only | Required. Short name of the `ProducerExtension` resource to be created. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the resource was updated. |

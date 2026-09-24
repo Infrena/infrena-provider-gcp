@@ -19,7 +19,7 @@ A Cloud Run Instance represents a single group of containers running in a region
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/instances` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/instances?instanceId={{instanceId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/instances/{instance}
 
 ## Attributes
 
-179 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+180 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -153,12 +153,13 @@ projects/{project}/locations/{location}/instances/{instance}
 | `gpuZonalRedundancyDisabled` | `gpu_zonal_redundancy_disabled` | `boolean` | optional | — | Optional. True if GPU zonal redundancy is disabled on this instance. |
 | `iapEnabled` | `iap_enabled` | `boolean` | optional | — | Optional. IAP settings on the Instance. |
 | `ingress` | — | `string` | optional | — | Optional. Provides the ingress settings for this Instance. On output, returns the currently observed ingress settings, or `INGRESS_TRAFFIC_UNSPECIFIED` if no revision is active. |
+| `instanceId` | — | `string` | optional | force new, create only | Optional. The unique identifier for the Instance. It must begin with letter, and cannot end with hyphen; must contain fewer than 50 characters. The name of the instance becomes … |
 | `invokerIamDisabled` | `invoker_iam_disabled` | `boolean` | optional | — | Optional. Disables IAM permission check for `run.routes.invoke` for callers of this Instance. For more information, visit https://cloud.google.com/run/docs/securing/managing-access#invoker_check. |
 | `labels` | — | `map` | optional | opaque | — |
 | `lastModifier` | `last_modifier` | `string` | output only | — | Output only. Email address of the last authenticated modifier. |
 | `launchStage` | `launch_stage` | `string` | optional | — | The launch stage as defined by \[Google Cloud Platform Launch Stages\](https://cloud.google.com/terms/launch-stages). Cloud Run supports `ALPHA`, `BETA`, and `GA`. If no value is specified, `GA` is … |
 | `logUri` | `log_uri` | `string` | output only | — | Output only. The Google Console URI to obtain logs for the Instance. |
-| `name` | — | `string` | optional | — | The fully qualified name of this Instance. In `CreateInstanceRequest`, this field is ignored, and instead composed from `CreateInstanceRequest.parent` and `CreateInstanceRequest.instance_id`. |
+| `name` | — | `string` | output only | — | The fully qualified name of this Instance. In `CreateInstanceRequest`, this field is ignored, and instead composed from `CreateInstanceRequest.parent` and `CreateInstanceRequest.instance_id`. |
 | `nodeSelector` | `node_selector` | `map` | optional | — | Optional. The node selector for the instance. |
 | `nodeSelector.accelerator` | — | `string` | optional | — | Required. GPU accelerator type to attach to an instance. |
 | `observedGeneration` | `observed_generation` | `string` | output only | — | Output only. The generation of this Instance currently serving traffic. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. Please note that unlike v1 … |

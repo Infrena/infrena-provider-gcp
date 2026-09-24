@@ -19,7 +19,7 @@ Describes a repository in which log entries are stored.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{+parent}/buckets` needs `billingAccount`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
+| Create | **no** | the create url `{+parent}/buckets?bucketId={{bucketId}}` needs `billingAccount`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,11 +33,12 @@ billingAccounts/{billingAccount}/locations/{location}/buckets/{bucket}
 
 ## Attributes
 
-20 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+21 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `analyticsEnabled` | `analytics_enabled` | `boolean` | optional | — | Optional. Whether log analytics is enabled for this bucket.Once enabled, log analytics features cannot be disabled. |
+| `bucketId` | — | `string` | required | force new, create only | Required. A client-assigned identifier such as "my-bucket". Identifiers are limited to 100 characters and can include only letters, digits, underscores, hyphens, and periods. Bucket identifiers must … |
 | `cmekSettings` | `cmek_settings` | `map` | optional | — | Optional. The CMEK settings of the log bucket. If present, new log entries written to this log bucket are encrypted using the CMEK key provided in this configuration. If a log bucket has CMEK … |
 | `cmekSettings.kmsKeyName` | `kms_key_name` | `string` | optional | — | Optional. The resource name for the configured Cloud KMS key.KMS key name format: "projects/\[PROJECT_ID\]/locations/\[LOCATION\]/keyRings/\[KEYRING\]/cryptoKeys/\[KEY\]" For … |
 | `cmekSettings.kmsKeyVersionName` | `kms_key_version_name` | `string` | output only | — | Output only. The CryptoKeyVersion resource name for the configured Cloud KMS key.KMS key name format … |

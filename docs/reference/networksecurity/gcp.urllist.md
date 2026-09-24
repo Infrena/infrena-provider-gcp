@@ -19,7 +19,7 @@ UrlList proto helps users to set reusable, independently manageable lists of hos
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/urlLists` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/urlLists?urlListId={{urlListId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,13 +33,14 @@ projects/{project}/locations/{location}/urlLists/{urlList}
 
 ## Attributes
 
-6 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `createTime` | `create_time` | `string` | output only | — | Output only. Time when the security policy was created. |
 | `description` | — | `string` | optional | — | Optional. Free-text description of the resource. |
-| `name` | — | `string` | optional | — | Required. Name of the resource provided by the user. Name is of the form projects/{project}/locations/{location}/urlLists/{url_list} url_list should match the … |
+| `name` | — | `string` | output only | — | Required. Name of the resource provided by the user. Name is of the form projects/{project}/locations/{location}/urlLists/{url_list} url_list should match the … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Time when the security policy was updated. |
+| `urlListId` | — | `string` | required | force new, create only | Required. Short name of the UrlList resource to be created. This value should be 1-63 characters long, containing only letters, numbers, hyphens, and underscores, and should not start with a number … |
 | `values` | — | `list` | optional | — | Required. FQDNs and URLs. |
 | `values[]` | — | `string` | optional | — | — |

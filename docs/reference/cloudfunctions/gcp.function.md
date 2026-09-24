@@ -19,7 +19,7 @@ Describes a Cloud Function that contains user computation executed in response t
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/locations/{{location}}/functions` |
+| Create | yes | `POST projects/{{project}}/locations/{{location}}/functions?functionId={{functionId}}` |
 | Read | yes | `GET {+name}` |
 | Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE {+name}` |
@@ -33,7 +33,7 @@ projects/{project}/locations/{location}/functions/{function}
 
 ## Attributes
 
-159 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+160 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -95,9 +95,10 @@ projects/{project}/locations/{location}/functions/{function}
 | `eventTrigger.serviceAccountEmail` | `service_account_email` | `string` | optional | — | Optional. The email of the trigger's service account. The service account must have permission to invoke Cloud Run services, the permission is `run.routes.invoke`. If empty, defaults to the Compute … |
 | `eventTrigger.trigger` | — | `string` | output only | — | Output only. The resource name of the Eventarc trigger. The format of this field is `projects/{project}/locations/{region}/triggers/{trigger}`. |
 | `eventTrigger.triggerRegion` | `trigger_region` | `string` | optional | — | The region that the trigger will be in. The trigger will only receive events originating in this region. It can be the same region as the function, a different region or multi-region, or the global … |
+| `functionId` | — | `string` | optional | force new, create only | The ID to use for the function, which will become the final component of the function's resource name. This value should be 4-63 characters, and valid characters are /a-z-/. |
 | `kmsKeyName` | `kms_key_name` | `string` | optional | — | Resource name of a KMS crypto key (managed by the user) used to encrypt/decrypt function resources. It must match the pattern … |
 | `labels` | — | `map` | optional | opaque | Labels associated with this Cloud Function. |
-| `name` | — | `string` | optional | — | A user-defined name of the function. Function names must be unique globally and match pattern `projects/*/locations/*/functions/*` |
+| `name` | — | `string` | output only | — | A user-defined name of the function. Function names must be unique globally and match pattern `projects/*/locations/*/functions/*` |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `serviceConfig` | `service_config` | `map` | optional | — | Describes the Service being deployed. Currently deploys services to Cloud Run (fully managed). |
