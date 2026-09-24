@@ -46,3 +46,44 @@ func TestOutputOnlyUnionsTheFlagAndTheProse(t *testing.T) {
 		t.Errorf("OutputOnly(resolved activeConfig) = false, want true (readOnly at the $ref site)")
 	}
 }
+
+// TestBehaviorsReadsTheWholeLeadingRunAndNothingElse. The AIP convention puts
+// field-behaviour tags at the start of a comment, stacked in any order --
+// "Optional. Input only. Immutable. Tag keys bound to this resource." -- and
+// compute writes its own in brackets. A prefix test sees only the first tag,
+// and a search anywhere in the text reads declarations into ordinary prose.
+func TestBehaviorsReadsTheWholeLeadingRunAndNothingElse(t *testing.T) {
+	for desc, want := range map[string][]Behavior{
+		"Optional. Input only. Immutable. Tag keys bound to this resource.":    {BehaviorOptional, BehaviorInputOnly, BehaviorImmutable},
+		"Immutable. Required. The location where this cluster's nodes reside.": {BehaviorImmutable, BehaviorRequired},
+		"[Output Only] Server-defined URL for the resource.":                   {BehaviorOutputOnly},
+		"[Input Only] Specifies the parameters for a new disk.":                {BehaviorInputOnly},
+		"Identifier. The resource name.":                                       {BehaviorIdentifier},
+		// Declarations after ordinary prose are not declarations.
+		"The deadline for changing this field. Immutable. After that, fixed.": nil,
+		"The name of the file share.":                                         nil,
+	} {
+		got := Behaviors(&Schema{Description: desc})
+		if len(got) != len(want) {
+			t.Errorf("%q: got %v, want %v", desc, got, want)
+			continue
+		}
+		for _, b := range want {
+			if !got[b] {
+				t.Errorf("%q: missing %q in %v", desc, b, got)
+			}
+		}
+	}
+}
+
+// TestOutputOnlyReadsPastTheFirstTag. "Optional. Output only." is output-only;
+// a prefix test on the description would call it settable.
+func TestOutputOnlyReadsPastTheFirstTag(t *testing.T) {
+	d := &Document{}
+	if !d.OutputOnly(&Schema{Description: "Optional. Output only. When it was made."}) {
+		t.Error("a second-position Output only. tag was not read")
+	}
+	if d.OutputOnly(&Schema{Description: "The time. Output only when the job ran."}) {
+		t.Error("prose mentioning output-only was read as a declaration")
+	}
+}

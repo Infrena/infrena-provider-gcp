@@ -43,4 +43,4 @@ A Filestore snapshot.
 | `labels` | — | `map` | optional | opaque | Resource labels to represent user provided metadata. |
 | `name` | — | `string` | output only | — | Output only. The resource name of the snapshot, in the format `projects/{project_id}/locations/{location_id}/instances/{instance_id}/snapshots/{snapshot_id}`. |
 | `state` | — | `string` | output only | — | Output only. The snapshot state. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag key-value pairs bound to this resource. Each key must be a namespaced name and each value a short name. Example: "123456789012/environment" : "production" … |

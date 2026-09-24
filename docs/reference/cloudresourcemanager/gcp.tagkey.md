@@ -43,8 +43,8 @@ tagKeys/{{name}}
 | `createTime` | `create_time` | `string` | output only | — | Output only. Creation time. |
 | `description` | — | `string` | optional | — | Optional. User-assigned description of the TagKey. Must not exceed 256 characters. Read-write. |
 | `etag` | — | `string` | optional | — | Optional. Entity tag which users can pass to prevent race conditions. This field is always set in server responses. See UpdateTagKeyRequest for details. |
-| `name` | — | `string` | output only | — | Immutable. The resource name for a TagKey. Must be in the format `tagKeys/{tag_key_id}`, where `tag_key_id` is the generated numeric id for the TagKey. |
-| `namespacedName` | `namespaced_name` | `string` | output only | — | Output only. Immutable. Namespaced name of the TagKey. |
+| `name` | — | `string` | output only | force new | Immutable. The resource name for a TagKey. Must be in the format `tagKeys/{tag_key_id}`, where `tag_key_id` is the generated numeric id for the TagKey. |
+| `namespacedName` | `namespaced_name` | `string` | output only | force new | Output only. Immutable. Namespaced name of the TagKey. |
 | `parent` | — | `string` | required | force new | Immutable. The resource name of the TagKey's parent. A TagKey can be parented by an Organization or a Project. For a TagKey parented by an Organization, its parent must be in the form … |
 | `purpose` | — | `string` | optional | force new | Optional. A purpose denotes that this Tag is intended for use in policies of a specific policy engine, and will involve that policy engine in management operations involving this Tag. A purpose does … |
 | `purposeData` | `purpose_data` | `map` | optional | force new, opaque | Optional. Purpose data corresponds to the policy system that the tag is intended for. See documentation for `Purpose` for formatting of this field. Purpose data cannot be changed once set. |

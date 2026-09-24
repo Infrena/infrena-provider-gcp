@@ -46,6 +46,6 @@ projects/{{project}}/locations/{{location}}/dnsAuthorizations/{{name}}
 | `domain` | — | `string` | required | force new | Required. Immutable. A domain that is being authorized. A DnsAuthorization resource covers a single domain and its wildcard, e.g. authorization for `example.com` can be used to issue certificates for … |
 | `labels` | — | `map` | optional | opaque | Optional. Set of labels associated with a DnsAuthorization. |
 | `name` | — | `string` | required | force new | Identifier. A user-defined name of the dns authorization. DnsAuthorization names must be unique globally and match pattern `projects/*/locations/*/dnsAuthorizations/*`. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
 | `type_value` | wire `type` | `string` | optional | force new | Optional. Immutable. Type of DnsAuthorization. If unset during resource creation the following default will be used: - in location `global`: FIXED_RECORD, - in other locations: PER_PROJECT_RECORD. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last update timestamp of a DnsAuthorization. |

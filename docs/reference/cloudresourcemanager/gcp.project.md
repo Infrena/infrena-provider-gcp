@@ -47,7 +47,7 @@ A project is a high-level Google Cloud entity. It is a container for ACLs, APIs,
 | `labels` | — | `map` | optional | opaque | Optional. The labels associated with this project. Label keys must be between 1 and 63 characters long and must conform to the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])? … |
 | `name` | — | `string` | output only | — | Output only. The unique resource name of the project. It is an int64 generated number prefixed by "projects/". Example: `projects/415104041262` |
 | `parent` | — | `string` | optional | — | Optional. A reference to a parent Resource. eg., `organizations/123` or `folders/876`. |
-| `projectId` | `project_id` | `string` | optional | — | Immutable. The unique, user-assigned id of the project. It must be 6 to 30 lowercase ASCII letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited. Example … |
+| `projectId` | `project_id` | `string` | optional | force new | Immutable. The unique, user-assigned id of the project. It must be 6 to 30 lowercase ASCII letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited. Example … |
 | `state` | — | `string` | output only | — | Output only. The project lifecycle state. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this project. Each item in the map must be expressed as " : ". For example: "123/environment" : "production", "123/costCenter" … |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this project. Each item in the map must be expressed as " : ". For example: "123/environment" : "production", "123/costCenter" … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The most recent time this resource was modified. |

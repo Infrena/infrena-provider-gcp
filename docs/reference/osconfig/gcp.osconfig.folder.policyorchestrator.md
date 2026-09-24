@@ -42,7 +42,7 @@ A policy orchestrator manages project-level and zone-level policy resources, suc
 | `description` | — | `string` | optional | — | Optional. Freeform text describing the purpose of the resource. |
 | `etag` | — | `string` | output only | — | Output only. This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels as key value pairs |
-| `name` | — | `string` | optional | — | Immutable. Identifier. In the following format: * `organizations/{organization_id}/locations/global/policyOrchestrators/{orchestrator_id}` * … |
+| `name` | — | `string` | optional | force new | Immutable. Identifier. In the following format: * `organizations/{organization_id}/locations/global/policyOrchestrators/{orchestrator_id}` * … |
 | `orchestratedResource` | `orchestrated_resource` | `map` | optional | — | Required. Resource to be orchestrated by the policy orchestrator. |
 | `orchestratedResource.id` | — | `string` | optional | — | Optional. ID of the resource to be used while generating set of affected resources. For UPSERT action the value is auto-generated during PolicyOrchestrator creation when not set. When the value is … |
 | `orchestratedResource.osPolicyAssignmentV1Payload` | `os_policy_assignment_v1_payload` | `map` | optional | — | Optional. OSPolicyAssignment resource to be created, updated or deleted. Name field is ignored and replace with a generated value. With this field set, orchestrator will perform actions on … |

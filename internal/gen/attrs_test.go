@@ -562,3 +562,27 @@ func TestARealFieldNameBeatsAnotherFieldsApiName(t *testing.T) {
 			"claims the name through api_name", a)
 	}
 }
+
+// TestImmutabilityComesFromEitherSource. magic-modules' `immutable:` and
+// Discovery's "Immutable." tag are ORed: on 2026-09-23 the tag caught 55 fields
+// magic-modules had not marked, and magic-modules marks many the API never
+// tags. A field the API will not change must replace the resource rather than
+// be sent as a patch the API refuses.
+func TestImmutabilityComesFromEitherSource(t *testing.T) {
+	body := &disco.Schema{Properties: map[string]*disco.Schema{
+		"tagged":  {Type: "string", Description: "Optional. Input only. Immutable. Tags bound at creation."},
+		"curated": {Type: "string", Description: "The format. Nothing here says so."},
+		"neither": {Type: "string", Description: "A description."},
+		"prose":   {Type: "string", Description: "The deadline. Immutable. After that it is fixed."},
+	}}
+	mm := &mmv1.Resource{Name: "Widget", Properties: []*mmv1.Field{{Name: "curated", Type: "String", Immutable: true}}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{"tagged": true, "curated": true, "neither": false, "prose": false} {
+		if got := attrs[name].ForceNew; got != want {
+			t.Errorf("%s: ForceNew = %v, want %v", name, got, want)
+		}
+	}
+}

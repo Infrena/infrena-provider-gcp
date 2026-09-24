@@ -44,7 +44,7 @@ A Cloud Firestore Database.
 | `cmekConfig.kmsKeyName` | `kms_key_name` | `string` | optional | — | Required. Only keys in the same location as this database are allowed to be used for encryption. For Firestore's nam5 multi-region, this corresponds to Cloud KMS multi-region us. For Firestore's eur3 … |
 | `concurrencyMode` | `concurrency_mode` | `string` | optional | — | The default concurrency control mode to use for this database. If unspecified in a CreateDatabase request, this will default based on the database edition: Optimistic for Enterprise and Pessimistic … |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp at which this database was created. Databases created before 2016 do not populate create_time. |
-| `databaseEdition` | `database_edition` | `string` | optional | — | Immutable. The edition of the database. |
+| `databaseEdition` | `database_edition` | `string` | optional | force new | Immutable. The edition of the database. |
 | `deleteProtectionState` | `delete_protection_state` | `string` | optional | — | State of delete protection for the database. |
 | `deleteTime` | `delete_time` | `string` | output only | — | Output only. The timestamp at which this database was deleted. Only set if the database has been deleted. |
 | `earliestVersionTime` | `earliest_version_time` | `string` | output only | — | Output only. The earliest timestamp at which older versions of the data can be read from the database. See \[version_retention_period\] above; this field is populated with `now - … |
@@ -57,12 +57,12 @@ A Cloud Firestore Database.
 | `name` | — | `string` | optional | — | The resource name of the Database. Format: `projects/{project}/databases/{database}` |
 | `pointInTimeRecoveryEnablement` | `point_in_time_recovery_enablement` | `string` | optional | — | Whether to enable the PITR feature on this database. |
 | `previousId` | `previous_id` | `string` | output only | — | Output only. The database resource's prior database ID. This field is only populated for deleted databases. |
-| `realtimeUpdatesMode` | `realtime_updates_mode` | `string` | optional | — | Immutable. The default Realtime Updates mode to use for this database. |
+| `realtimeUpdatesMode` | `realtime_updates_mode` | `string` | optional | force new | Immutable. The default Realtime Updates mode to use for this database. |
 | `sourceInfo` | `source_info` | `map` | output only | — | Output only. Information about the provenance of this database. |
 | `sourceInfo.backup` | — | `map` | optional | — | If set, this database was restored from the specified backup (or a snapshot thereof). |
 | `sourceInfo.backup.backup` | — | `string` | optional | — | The resource name of the backup that was used to restore this database. Format: `projects/{project}/locations/{location}/backups/{backup}`. |
 | `sourceInfo.operation` | — | `string` | optional | — | The associated long-running operation. This field may not be set after the operation has completed. Format: `projects/{project}/databases/{database}/operations/{operation}`. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
 | `type_value` | wire `type` | `string` | optional | — | Required. The type of the database. See https://cloud.google.com/datastore/docs/firestore-or-datastore for information about how to choose. |
 | `uid` | — | `string` | output only | — | Output only. The system-generated UUID4 for this Database. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp at which this database was most recently updated. Note this only includes updates to the database resource and not data contained by the database. |

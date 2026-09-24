@@ -41,4 +41,4 @@ A materialized view object that can be referenced in SQL queries.
 | `deletionProtection` | `deletion_protection` | `boolean` | optional | — | Set to true to make the MaterializedView protected against deletion. Views: `SCHEMA_VIEW`, `REPLICATION_VIEW`, `FULL`. |
 | `etag` | — | `string` | optional | — | Optional. The etag for this materialized view. This may be sent on update requests to ensure that the client has an up-to-date value before proceeding. The server returns an ABORTED error on a … |
 | `name` | — | `string` | optional | — | Identifier. The unique name of the materialized view. Format: `projects/{project}/instances/{instance}/materializedViews/{materialized_view}` Views: `SCHEMA_VIEW`, `REPLICATION_VIEW`, `FULL`. |
-| `query` | — | `string` | optional | — | Required. Immutable. The materialized view's select query. Views: `SCHEMA_VIEW`, `FULL`. |
+| `query` | — | `string` | optional | force new | Required. Immutable. The materialized view's select query. Views: `SCHEMA_VIEW`, `FULL`. |

@@ -46,7 +46,7 @@ projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}
 | `labels` | — | `map` | optional | opaque | Optional. Set of labels associated with a TrustConfig. |
 | `name` | — | `string` | required | force new | Identifier. A user-defined name of the trust config. TrustConfig names must be unique globally and match pattern `projects/*/locations/*/trustConfigs/*`. |
 | `spiffeTrustStores` | `spiffe_trust_stores` | `map` | optional | opaque | Optional. Defines a mapping from a trust domain to a TrustStore. This is used for SPIFFE certificate validation. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
 | `trustStores` | `trust_stores` | `list` | optional | — | Optional. Set of trust stores to perform validation against. This field is supported when TrustConfig is configured with Load Balancers, currently not supported for SPIFFE certificate validation … |
 | `trustStores[]` | — | `map` | optional | — | — |
 | `trustStores[].intermediateCas` | `intermediate_cas` | `list` | optional | — | Optional. Set of intermediate CA certificates used for the path building phase of chain validation. The field is currently not supported if TrustConfig is used for the workload certificate feature. |

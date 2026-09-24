@@ -8,6 +8,7 @@ package disco
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -93,6 +94,59 @@ func Parse(data []byte) (*Document, error) {
 	return &d, nil
 }
 
+// Behavior is one of the AIP-203 field behaviours Google writes into a
+// property's description when Discovery has no field for it.
+//
+// Proto-first APIs annotate fields with google.api.field_behavior, and
+// Discovery keeps only one of those annotations as structure (OUTPUT_ONLY
+// becomes readOnly). The rest survive as a run of tags at the START of the
+// description -- "Optional. Input only. Immutable. Tag keys bound to this
+// resource." -- and compute writes its own in brackets ("[Output Only]",
+// "[Input Only]"). Measured against googleapis on 2026-09-23: every one of the
+// 19 fields a proto marked IMMUTABLE that the catalog did not treat as
+// ForceNew already said "Immutable." in this run.
+type Behavior string
+
+const (
+	BehaviorOutputOnly Behavior = "output only"
+	BehaviorInputOnly  Behavior = "input only"
+	BehaviorImmutable  Behavior = "immutable"
+	BehaviorIdentifier Behavior = "identifier"
+	BehaviorRequired   Behavior = "required"
+	BehaviorOptional   Behavior = "optional"
+)
+
+// behaviorTag matches ONE leading tag. Only the leading run counts: the tags
+// are a convention for the first words of a field comment, and the same words
+// appear later in ordinary prose ("the deadline for changing ... is immutable
+// after") that declares nothing. Measured: 5 settable properties in the
+// catalog mention immutability mid-sentence, and none of them is a
+// declaration.
+var behaviorTag = regexp.MustCompile(`(?i)^\s*(?:\[(output only|input only)\]|(output only|input only|immutable|identifier|required|optional)\.)\s*`)
+
+// Behaviors reads the leading run of field-behaviour tags from a property's
+// description. It stops at the first word that is not a tag, so the order the
+// tags come in does not matter and prose after them is never read.
+func Behaviors(s *Schema) map[Behavior]bool {
+	out := map[Behavior]bool{}
+	if s == nil {
+		return out
+	}
+	d := s.Description
+	for {
+		m := behaviorTag.FindStringSubmatch(d)
+		if m == nil {
+			return out
+		}
+		tag := m[1]
+		if tag == "" {
+			tag = m[2]
+		}
+		out[Behavior(strings.ToLower(tag))] = true
+		d = d[len(m[0]):]
+	}
+}
+
 // OutputOnly reports whether GCP, not the user, sets this property.
 //
 // It unions two signals because neither is sufficient on its own: compute
@@ -101,14 +155,14 @@ func Parse(data []byte) (*Document, error) {
 // description prefix, against 1,520 carrying the flag, at compute revision
 // 20260910), and the modern APIs use the flag. Trusting either alone marks
 // settable properties read-only, or read-only ones settable.
+//
+// The prose side reads the whole leading tag run rather than just the first
+// tag, so "Optional. Output only." counts too. Measured on 2026-09-23 this
+// changes nothing today -- every such field also carries readOnly -- but a
+// prefix test would have missed one the day the flag did not come with it.
 func (d *Document) OutputOnly(s *Schema) bool {
 	if s == nil {
 		return false
 	}
-	if s.ReadOnly {
-		return true
-	}
-	desc := strings.TrimSpace(s.Description)
-	lower := strings.ToLower(desc)
-	return strings.HasPrefix(lower, "[output only]") || strings.HasPrefix(lower, "output only.")
+	return s.ReadOnly || Behaviors(s)[BehaviorOutputOnly]
 }

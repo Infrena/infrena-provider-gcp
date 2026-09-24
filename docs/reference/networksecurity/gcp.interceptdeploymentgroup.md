@@ -48,7 +48,7 @@ projects/{{project}}/locations/{{location}}/interceptDeploymentGroups/{{intercep
 | `locations[]` | — | `map` | optional | — | — |
 | `locations[].location` | — | `string` | output only | force new | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
 | `locations[].state` | — | `string` | output only | — | Output only. The current state of the association in this location. |
-| `name` | — | `string` | output only | — | Immutable. Identifier. The resource name of this deployment group, for example: `projects/123456789/locations/global/interceptDeploymentGroups/my-dg`. See https://google.aip.dev/122 for more details. |
+| `name` | — | `string` | output only | force new | Immutable. Identifier. The resource name of this deployment group, for example: `projects/123456789/locations/global/interceptDeploymentGroups/my-dg`. See https://google.aip.dev/122 for more details. |
 | `nestedDeployments` | `nested_deployments` | `list` | output only | — | Output only. The list of Intercept Deployments that belong to this group. |
 | `nestedDeployments[]` | — | `map` | optional | — | — |
 | `nestedDeployments[].name` | — | `string` | output only | — | Output only. The name of the Intercept Deployment, in the format: `projects/{project}/locations/{location}/interceptDeployments/{intercept_deployment}`. |

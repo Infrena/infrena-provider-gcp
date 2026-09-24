@@ -42,7 +42,7 @@ tagValues/{{name}}
 | `createTime` | `create_time` | `string` | output only | — | Output only. Creation time. |
 | `description` | — | `string` | optional | — | Optional. User-assigned description of the TagValue. Must not exceed 256 characters. Read-write. |
 | `etag` | — | `string` | optional | — | Optional. Entity tag which users can pass to prevent race conditions. This field is always set in server responses. See UpdateTagValueRequest for details. |
-| `name` | — | `string` | output only | — | Immutable. Resource name for TagValue in the format `tagValues/456`. |
+| `name` | — | `string` | output only | force new | Immutable. Resource name for TagValue in the format `tagValues/456`. |
 | `namespacedName` | `namespaced_name` | `string` | output only | — | Output only. The namespaced name of the TagValue. Can be in the form `{organization_id}/{tag_key_short_name}/{tag_value_short_name}` or `{project_id}/{tag_key_short_name}/{tag_value_short_name}` or … |
 | `parent` | — | `string` | required | force new | Immutable. The resource name of the new TagValue's parent TagKey. Must be of the form `tagKeys/{tag_key_id}`. |
 | `shortName` | `short_name` | `string` | required | force new | Required. Immutable. User-assigned short name for TagValue. The short name should be unique for TagValues within the same parent TagKey. The short name must be 256 characters or less, beginning and … |

@@ -50,5 +50,5 @@ projects/{{project}}/locations/global/certificateMaps/{{name}}
 | `gclbTargets[].targetSslProxy` | `target_ssl_proxy` | `string` | output only | — | Output only. This field returns the resource name in the following format: `//compute.googleapis.com/projects/*/global/targetSslProxies/*`. |
 | `labels` | — | `map` | optional | opaque | Optional. Set of labels associated with a Certificate Map. |
 | `name` | — | `string` | required | force new | Identifier. A user-defined name of the Certificate Map. Certificate Map names must be unique globally and match pattern `projects/*/locations/*/certificateMaps/*`. |
-| `tags` | — | `map` | optional | opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
+| `tags` | — | `map` | optional | force new, opaque | Optional. Input only. Immutable. Tag keys/values directly bound to this resource. For example: "123/environment": "production", "123/costCenter": "marketing" |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The update timestamp of a Certificate Map. |
