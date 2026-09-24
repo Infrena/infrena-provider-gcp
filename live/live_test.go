@@ -518,43 +518,14 @@ resources:
   vm:
     type: gcp.compute.instance
     name: %[9]s
-    lifecycle:
-      # NOT TIDINESS. This is papering over a defect the first live run
-      # found, and it is here only so the rest of the suite can run.
-      #
-      # An instance is created with disks[].initializeParams -- the image,
-      # the size, the disk type -- and compute DOES NOT ECHO THEM BACK. The
-      # get answers disks[] with source, deviceName, index and the rest, and
-      # no initializeParams at all. Reconcile expresses GCP's answer in the
-      # reference's shape and cannot invent a field the answer does not
-      # carry, so state loses initializeParams, the planner sees an attribute
-      # configuration sets and the resource does not have, and disks is
-      # ForceNew -- so every plan after a successful apply proposes
-      # DESTROYING AND RECREATING the instance, forever. networkInterfaces
-      # diverges the same way: nic0's name, fingerprint, stackType and
-      # subnetwork are all added by the server.
-      #
-      # Measured 2026-09-22, first live run. The plan immediately after the
-      # apply said: vm proposes a replace because of [disks [forces new]
-      # networkInterfaces]. No fake can find this, because a fake echoes back
-      # what it was sent.
-      #
-      # HALF OF THAT IS FIXED, AND IT WAS NOT ENOUGH (2026-09-24). Discovery
-      # tags initializeParams "[Input Only]" and the reconciler now carries it
-      # forward. A live run with "disks" no longer ignored still said: vm
-      # proposes a replace because of [disks [forces new]]. The rest of the
-      # cause is the server FILLING IN declared fields configuration never set
-      # -- deviceName, source, mode, interface, type -- and infrena's planner
-      # (internal/planner/diff.go, equalBesidesProviderEmpties) forgives a
-      # nested key configuration does not mention only when it is an EMPTY
-      # collection. At the top level it forgives any computed attribute; inside
-      # a composite there is no per-leaf schema to ask, so it cannot. That is
-      # the same cause as networkInterfaces.
-      #
-      # It has its own follow-up. Do not delete these two lines thinking the
-      # suite got tidier; delete them when the defect is fixed, and the
-      # a_second_plan_is_clean subtest will tell you whether it was.
-      ignore_changes: [disks, networkInterfaces]
+    # No ignore_changes, and that is the test. This instance used to plan its
+    # own REPLACEMENT on every run: compute never returns disks[].
+    # initializeParams, and it fills in disk and network-interface fields the
+    # configuration never set (deviceName, source, mode, a nic's name and
+    # fingerprint), which infrena's planner forgives inside a composite only
+    # when they are empty. The provider now carries input-only fields forward
+    # and drops nested fields nobody asked for, and a_second_plan_is_clean
+    # below is what says whether that is enough.
     machineType: %[12]s
     disks:
       - boot: true
@@ -1673,6 +1644,12 @@ func (g *google) storageURL(rel string) string {
 func (g *google) iamURL(rel string) string {
 	return "https://iam.googleapis.com/v1/" + rel
 }
+func (g *google) pubsubURL(rel string) string {
+	return "https://pubsub.googleapis.com/v1/" + rel
+}
+func (g *google) runURL(rel string) string {
+	return "https://run.googleapis.com/v2/" + rel
+}
 func (g *google) crmURL(rel string) string {
 	return "https://cloudresourcemanager.googleapis.com/v3/" + rel
 }
@@ -2447,6 +2424,74 @@ resources:
 		}
 	})
 
+	// Both halves of the patch path, on real Google. The subnetwork is one of
+	// the 19 compute types that refuse an update without the CURRENT
+	// fingerprint -- which nothing sent until 2026-09-23, and which the fake
+	// did not check -- and its patchable fields come from an allowlist read
+	// out of its own field descriptions. The network may only have its
+	// routingConfig patched, and Google fills in BGP fields beside it that
+	// nobody configures, so a clean plan afterwards also says the nested
+	// pruning holds against a real answer.
+	t.Run("a_patchable_change_is_a_patch_carrying_the_fingerprint", func(t *testing.T) {
+		body := readFile(t, dir, "infrena.yml")
+		body = strings.Replace(body, "    autoCreateSubnetworks: false\n",
+			"    autoCreateSubnetworks: false\n    routingConfig:\n      routingMode: GLOBAL\n", 1)
+		body = strings.Replace(body, "    network: ${net.selfLink}\n",
+			"    network: ${net.selfLink}\n    secondaryIpRanges:\n      - rangeName: extra\n        ipCidrRange: 10.185.0.0/24\n", 1)
+		write(t, dir, "infrena.yml", body)
+
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitChanges, "plan", "live", "--output", out)
+		changes := planChanges(t, out)
+		if len(changes) != 2 {
+			t.Fatalf("plan proposes %v, want exactly an update of net and one of sub", changes)
+		}
+		for _, c := range changes {
+			if c.Kind != "update" {
+				t.Errorf("%s plans a %s; routingConfig and secondaryIpRanges are both patchable, "+
+					"so a replace means the allowlist is wrong: %v", c.Address, c.Kind, c.Reasons)
+			}
+		}
+
+		r := run(t, dir, "apply", "live", "--auto-approve")
+		t.Logf("apply:\n%s", r.combined())
+		if r.ExitCode != exitChanges && r.ExitCode != exitOK {
+			t.Fatalf("the patch failed; a 412 here means the fingerprint was not sent:\n%s", r.combined())
+		}
+
+		var subnet struct {
+			SecondaryIPRanges []struct {
+				RangeName string `json:"rangeName"`
+			} `json:"secondaryIpRanges"`
+		}
+		code, raw, err := g.get(t.Context(), g.computeURL(subPath))
+		if err == nil && code == http.StatusOK {
+			err = json.Unmarshal(raw, &subnet)
+		}
+		if err != nil || len(subnet.SecondaryIPRanges) != 1 || subnet.SecondaryIPRanges[0].RangeName != "extra" {
+			t.Errorf("google's subnetwork does not carry the new secondary range: %d %s %v", code, raw, err)
+		}
+		var network struct {
+			RoutingConfig struct {
+				RoutingMode string `json:"routingMode"`
+			} `json:"routingConfig"`
+		}
+		code, raw, err = g.get(t.Context(), g.computeURL(netPath))
+		if err == nil && code == http.StatusOK {
+			err = json.Unmarshal(raw, &network)
+		}
+		if err != nil || network.RoutingConfig.RoutingMode != "GLOBAL" {
+			t.Errorf("google's network is not in GLOBAL routing mode: %d %s %v", code, raw, err)
+		}
+
+		out = filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after the patch proposes %v; a nested field Google filled in is "+
+				"reading as drift", changes)
+		}
+	})
+
 	t.Run("destroy_removes_both", func(t *testing.T) {
 		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
 		mustRun(t, dir, exitChanges, "apply", "live", "--auto-approve")
@@ -2463,6 +2508,273 @@ resources:
 				}
 				time.Sleep(3 * time.Second)
 			}
+		}
+	})
+}
+
+// TestLiveBucketLabelChangeIsAPatch is the derived update verb on real Google.
+// A bucket is one of the 85 types that had no update path until 2026-09-23
+// because magic-modules never spelled one, so the host REPLACED it on any
+// change -- and replacing a bucket deletes everything in it. The derivation
+// was proven only against the fake until this ran.
+func TestLiveBucketLabelChangeIsAPatch(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	bucket := "infrena-live-lbl-" + n.run
+	path := "b/" + bucket
+	t.Logf("live run %s: creating bucket %s", n.run, bucket)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 5*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.storage.bucket", path, g.storageURL(path))
+	})
+
+	cfg := func(owner string) string {
+		return fmt.Sprintf(`project: infrena-gcp-live-bucket
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    impersonate_service_account: %[3]s
+resources:
+  bucket:
+    type: gcp.storage.bucket
+    name: %[4]s
+    location: US-CENTRAL1
+    storageClass: STANDARD
+    labels:
+      infrena-live: "true"
+      owner: %[5]s
+`, project, region, sa, bucket, owner)
+	}
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", cfg("platform"))
+	if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+		t.Fatalf("apply failed:\n%s", r.combined())
+	}
+
+	write(t, dir, "infrena.yml", cfg("someone-else"))
+	out := filepath.Join(t.TempDir(), "plan.json")
+	mustRun(t, dir, exitChanges, "plan", "live", "--output", out)
+	changes := planChanges(t, out)
+	if len(changes) != 1 || changes[0].Kind != "update" {
+		t.Fatalf("a label change plans %v; it must be exactly one UPDATE -- a replace deletes the bucket's contents", changes)
+	}
+	if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+		t.Fatalf("the patch failed:\n%s", r.combined())
+	}
+
+	var got struct {
+		Labels map[string]string `json:"labels"`
+	}
+	code, raw, err := g.get(t.Context(), g.storageURL(path))
+	if err == nil && code == http.StatusOK {
+		err = json.Unmarshal(raw, &got)
+	}
+	if err != nil || got.Labels["owner"] != "someone-else" {
+		t.Errorf("google's bucket does not carry the new label: %d %s %v", code, raw, err)
+	}
+
+	out = filepath.Join(t.TempDir(), "plan.json")
+	mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+	if changes := planChanges(t, out); len(changes) != 0 {
+		t.Errorf("the plan after the patch proposes %v", changes)
+	}
+}
+
+// TestLivePubSubTopic is the one API whose shape differs at both ends: a
+// topic is created with a PUT to its own path, where every other API in the
+// catalog POSTs to a collection, and it is updated with AIP-134's
+// UpdateTopicRequest envelope, the field mask in the body. Create always sent
+// POST until 2026-09-23, so every Pub/Sub create was refused; and the envelope
+// was proven only against the fake.
+func TestLivePubSubTopic(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	id := "projects/" + project + "/topics/infrena-live-topic-" + n.run
+	t.Logf("live run %s: creating %s", n.run, id)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 5*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.topic", id, g.pubsubURL(id))
+	})
+
+	cfg := func(owner string) string {
+		return fmt.Sprintf(`project: infrena-gcp-live-pubsub
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    impersonate_service_account: %[3]s
+resources:
+  topic:
+    type: gcp.topic
+    name: %[4]s
+    labels:
+      infrena-live: "true"
+      owner: %[5]s
+`, project, region, sa, id, owner)
+	}
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", cfg("platform"))
+	if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+		t.Fatalf("create failed; a POST here instead of a PUT is refused:\n%s", r.combined())
+	}
+	if got := providerIDOf(t, dir, "topic"); got != id {
+		t.Errorf("provider id = %q, want %q", got, id)
+	}
+	if code, body, err := g.get(t.Context(), g.pubsubURL(id)); err != nil || code != http.StatusOK {
+		t.Fatalf("google has no topic at %s after a successful apply: %d %s %v", id, code, body, err)
+	}
+
+	t.Run("a_second_plan_is_clean", func(t *testing.T) {
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after the create proposes %v", changes)
+		}
+	})
+
+	t.Run("a_label_change_goes_out_as_an_update_envelope", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cfg("someone-else"))
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitChanges, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 1 || changes[0].Kind != "update" {
+			t.Fatalf("a label change plans %v, want exactly one update", changes)
+		}
+		if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+			t.Fatalf("the update failed; Pub/Sub rejects a bare topic with the mask on the query string:\n%s", r.combined())
+		}
+		var got struct {
+			Labels map[string]string `json:"labels"`
+		}
+		code, raw, err := g.get(t.Context(), g.pubsubURL(id))
+		if err == nil && code == http.StatusOK {
+			err = json.Unmarshal(raw, &got)
+		}
+		if err != nil || got.Labels["owner"] != "someone-else" {
+			t.Errorf("google's topic does not carry the new label: %d %s %v", code, raw, err)
+		}
+		out = filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after the update proposes %v", changes)
+		}
+	})
+
+	t.Run("destroy_removes_it", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+		if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+			t.Fatalf("destroy failed:\n%s", r.combined())
+		}
+		if code, _, err := g.get(t.Context(), g.pubsubURL(id)); err != nil || code != http.StatusNotFound {
+			t.Errorf("the topic still answers %d after a successful destroy (%v)", code, err)
+		}
+	})
+}
+
+// TestLiveCloudRunJob is a long-running create on an API that names its
+// operation schema "GoogleLongrunningOperation". Until 2026-09-23 the
+// generator recognised only "Operation", so these creates were read as
+// returning the resource: the operation became the resource's state, the host
+// refused it, and the job was orphaned after Google had made it.
+//
+// It found a second defect on its first run. The create sent no jobId and put
+// the job's full name in the body, and Cloud Run answered "job.name must be
+// empty on CreateJobRequest" -- the id travels as a query parameter and Google
+// assigns the name from it. 21 shipping types had the same shape. The job is
+// now named by jobId, and the assertions below on WHERE it was created are
+// what say the id reached Google as the name it asked for.
+//
+// A job that is defined and never executed costs nothing.
+func TestLiveCloudRunJob(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	id := "projects/" + project + "/locations/" + region + "/jobs/infrena-live-job-" + n.run
+	parent := "projects/" + project + "/locations/" + region
+	t.Logf("live run %s: creating %s", n.run, id)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 10*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.job", id, g.runURL(id))
+		// If the server gave the job a name of its own, the delete above found
+		// nothing. List what this run could have made and remove it, loudly.
+		code, raw, err := g.get(ctx, g.runURL(parent+"/jobs"))
+		if err != nil || code != http.StatusOK {
+			t.Logf("could not list jobs to sweep: %d %v", code, err)
+			return
+		}
+		var list struct {
+			Jobs []struct {
+				Name   string            `json:"name"`
+				Labels map[string]string `json:"labels"`
+			} `json:"jobs"`
+		}
+		_ = json.Unmarshal(raw, &list)
+		for _, j := range list.Jobs {
+			if j.Labels["infrena-live-run"] == n.run && j.Name != id {
+				t.Errorf("a job this run made is at %s, not the configured %s -- removing it", j.Name, id)
+				g.deleteAndWait(t, ctx, "gcp.job", j.Name, g.runURL(j.Name))
+			}
+		}
+	})
+
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", fmt.Sprintf(`project: infrena-gcp-live-run
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    impersonate_service_account: %[3]s
+resources:
+  # expected at %[4]s
+  job:
+    type: gcp.job
+    jobId: %[6]s
+    labels:
+      infrena-live: "true"
+      infrena-live-run: "%[5]s"
+    template:
+      template:
+        serviceAccount: %[3]s
+        containers:
+          - image: us-docker.pkg.dev/cloudrun/container/job:latest
+`, project, region, sa, id, n.run, "infrena-live-job-"+n.run))
+
+	r := run(t, dir, "apply", "live", "--auto-approve")
+	t.Logf("apply:\n%s", r.combined())
+	if r.ExitCode != exitChanges && r.ExitCode != exitOK {
+		t.Fatalf("create failed:\n%s", r.combined())
+	}
+	if got := providerIDOf(t, dir, "job"); got != id {
+		t.Errorf("provider id = %q, want the configured %q", got, id)
+	}
+	if code, body, err := g.get(t.Context(), g.runURL(id)); err != nil || code != http.StatusOK {
+		t.Fatalf("google has no job at the configured name %s: %d %s %v", id, code, body, err)
+	}
+
+	t.Run("a_second_plan_is_clean", func(t *testing.T) {
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after the create proposes %v; Cloud Run fills in a great deal of "+
+				"the template nobody configured", changes)
+		}
+	})
+
+	t.Run("destroy_removes_it", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+		if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+			t.Fatalf("destroy failed:\n%s", r.combined())
 		}
 	})
 }
