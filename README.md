@@ -117,7 +117,7 @@ skips with a warning rather than guessing when it cannot.
 
 ## What the tier gate means
 
-**The catalog does not cover all of GCP, and the gap is deliberate.** 253 types ship; 363 entries
+**The catalog does not cover all of GCP, and the gap is deliberate.** 253 types ship; 369 entries
 are listed in [not-shipped.md](docs/reference/not-shipped.md) with the reason for each.
 
 The generator ships a type only when it can vouch for it. Roughly 45% of magic-modules resources
