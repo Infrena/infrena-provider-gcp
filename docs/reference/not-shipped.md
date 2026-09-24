@@ -17,15 +17,16 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 77 |
+| [unruled wire hooks](#unruled-wire-hooks) | 71 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [no get method](#no-get-method) | 2 |
+| [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**372** types did not ship. **62** more ship without a create.
+**367** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -309,8 +310,6 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `cloudscheduler/Job` | 2 | encoder, post_create, post_update, update_encoder |
 | `cloudtasks/Queue` | 2 | post_create, post_update |
 | `compute/Address` | 2 | post_create |
-| `compute/BackendBucket` | 2 | encoder, post_create, post_update |
-| `compute/BackendService` | 2 | decoder, encoder, post_create, post_update |
 | `compute/Disk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
 | `compute/FirewallPolicy` | 2 | post_create, post_delete, post_update |
 | `compute/ForwardingRule` | 2 | post_create, pre_create |
@@ -321,16 +320,12 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `compute/InterconnectAttachment` | 2 | post_create, pre_delete |
 | `compute/NodeGroup` | 2 | pre_create |
 | `compute/OrganizationSecurityPolicy` | 2 | post_create, post_delete, post_update |
-| `compute/RegionBackendService` | 2 | decoder, encoder, post_create |
 | `compute/RegionDisk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
-| `compute/RegionTargetHttpsProxy` | 2 | decoder, encoder, update_encoder |
 | `compute/Reservation` | 2 | decoder, pre_update, update_encoder |
 | `compute/Route` | 2 | decoder |
 | `compute/ServiceAttachment` | 2 | encoder, update_encoder |
 | `compute/Snapshot` | 2 | decoder, pre_create |
-| `compute/SslPolicy` | 2 | update_encoder |
 | `compute/StoragePool` | 2 | pre_delete |
-| `compute/TargetHttpsProxy` | 2 | decoder, encoder, update_encoder |
 | `compute/TargetInstance` | 2 | post_create |
 | `compute/VpnTunnel` | 2 | encoder, post_create |
 | `compute/ZoneVmExtensionPolicy` | 2 | pre_update |
@@ -447,6 +442,14 @@ The API publishes no get. Reading one means listing its parent, which needs a ru
 | --- | --- | --- |
 | `cloudresourcemanager/tagHolds` | 2 | needs a ruling with read_via |
 | `servicenetworking/peeredDnsDomains` | 2 | needs a ruling with read_via |
+
+## reference to gcp.servertlspolicy.selfLink dropped
+
+Reported by the generator.
+
+| Type | Tier | Detail |
+| --- | --- | --- |
+| `compute/gcp.targethttpsproxy.serverTlsPolicy` | 1 | gcp.servertlspolicy has no attribute "selfLink" |
 
 ## Shipped, but cannot be created
 

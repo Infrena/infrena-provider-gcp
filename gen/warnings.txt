@@ -110,8 +110,6 @@ tier3	composer/imageVersions	no insert or create method
 tier3	composer/operations	no insert or create method
 tier3	composer/workloads	no insert or create method
 tier2	compute/Address	unruled wire hooks: post_create
-tier2	compute/BackendBucket	unruled wire hooks: encoder, post_create, post_update
-tier2	compute/BackendService	unruled wire hooks: decoder, encoder, post_create, post_update
 tier2	compute/Disk	unruled wire hooks: custom_update, decoder, encoder, pre_delete, update_encoder
 tier3	compute/DiskType	magic-modules marks it exclude: true
 tier2	compute/FirewallPolicy	unruled wire hooks: post_create, post_delete, post_update
@@ -131,26 +129,23 @@ tier2	compute/OrganizationSecurityPolicy	unruled wire hooks: post_create, post_d
 tier3	compute/PreviewFeature	no insert or create method
 tier3	compute/Region	magic-modules marks it exclude: true
 tier3	compute/RegionBackendBucket	min_version is beta, not ga
-tier2	compute/RegionBackendService	unruled wire hooks: decoder, encoder, post_create
 tier3	compute/RegionCommitment	no delete method
 tier2	compute/RegionDisk	unruled wire hooks: custom_update, decoder, encoder, pre_delete, update_encoder
 tier3	compute/RegionDiskType	magic-modules marks it exclude: true
 tier3	compute/RegionInstanceGroupManager	magic-modules marks it exclude: true
-tier2	compute/RegionTargetHttpsProxy	unruled wire hooks: decoder, encoder, update_encoder
 tier2	compute/Reservation	unruled wire hooks: decoder, pre_update, update_encoder
 tier2	compute/Route	unruled wire hooks: decoder
 tier2	compute/ServiceAttachment	unruled wire hooks: encoder, update_encoder
 tier2	compute/Snapshot	unruled wire hooks: decoder, pre_create
-tier2	compute/SslPolicy	unruled wire hooks: update_encoder
 tier2	compute/StoragePool	unruled wire hooks: pre_delete
 tier3	compute/StoragePoolType	magic-modules marks it exclude: true
-tier2	compute/TargetHttpsProxy	unruled wire hooks: decoder, encoder, update_encoder
 tier2	compute/TargetInstance	unruled wire hooks: post_create
 tier2	compute/VpnTunnel	unruled wire hooks: encoder, post_create
 tier3	compute/Zone	magic-modules marks it exclude: true
 tier2	compute/ZoneVmExtensionPolicy	unruled wire hooks: pre_update
 tier3	compute/acceleratorTypes	no insert or create method
 tier3	compute/advice	no insert or create method
+tier1	compute/gcp.targethttpsproxy.serverTlsPolicy	reference to gcp.servertlspolicy.selfLink dropped: gcp.servertlspolicy has no attribute "selfLink"
 tier3	compute/globalFrontendSettings	no insert or create method
 tier3	compute/globalOperations	no insert or create method
 tier3	compute/globalOrganizationOperations	no insert or create method
@@ -285,8 +280,8 @@ tier3	monitoring/monitoredResourceDescriptors	no insert or create method
 tier3	monitoring/notificationChannelDescriptors	no insert or create method
 tier3	monitoring/snoozes	no delete method
 tier3	monitoring/timeSeries	no insert or create method
-tier3	monitoring/timeSeries	no delete method
 tier3	monitoring/timeSeries	no insert or create method
+tier3	monitoring/timeSeries	no delete method
 tier3	monitoring/uptimeCheckIps	no insert or create method
 tier3	networksecurity/AuthorizationPolicy	min_version is beta, not ga
 tier3	networksecurity/SacAttachment	min_version is beta, not ga

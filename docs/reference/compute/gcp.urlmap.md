@@ -147,7 +147,7 @@ projects/{project}/global/urlMaps/{urlMap}
 | `defaultRouteAction.weightedBackendServices[].headerAction.responseHeadersToRemove` | `response_headers_to_remove` | `list` | optional | — | A list of header names for headers that need to be removed from the response before sending the response back to the client. |
 | `defaultRouteAction.weightedBackendServices[].headerAction.responseHeadersToRemove[]` | — | `string` | optional | — | — |
 | `defaultRouteAction.weightedBackendServices[].weight` | — | `integer` | optional | — | Specifies the fraction of traffic sent to a backend service, computed asweight / (sum of all weightedBackendService weights in routeAction). The selection of a backend service is determined only for … |
-| `defaultService` | `default_service` | `string` | optional | — | The full or partial URL of the defaultService resource to which traffic is directed if none of the hostRules match. If defaultRouteAction is also specified, advanced routing actions, such as URL … |
+| `defaultService` | `default_service` | `string` | optional | refers to `gcp.backendservice.selfLink` | The full or partial URL of the defaultService resource to which traffic is directed if none of the hostRules match. If defaultRouteAction is also specified, advanced routing actions, such as URL … |
 | `defaultUrlRedirect` | `default_url_redirect` | `map` | optional | — | When none of the specified hostRules match, the request is redirected to a URL specified by defaultUrlRedirect. Only one of defaultUrlRedirect, defaultService or … |
 | `defaultUrlRedirect.hostRedirect` | `host_redirect` | `string` | optional | — | The host that is used in the redirect response instead of the one that was supplied in the request. The value must be from 1 to 255 characters. |
 | `defaultUrlRedirect.httpsRedirect` | `https_redirect` | `boolean` | optional | — | If set to true, the URL scheme in the redirected request is set to HTTPS. If set to false, the URL scheme of the redirected request remains the same as that of the request. This must only be set for … |
@@ -302,3 +302,11 @@ projects/{project}/global/urlMaps/{urlMap}
 | `tests[].host` | — | `string` | optional | — | Host portion of the URL. If headers contains a host header, then host must also match the header value. |
 | `tests[].path` | — | `string` | optional | — | Path portion of the URL. |
 | `tests[].service` | — | `string` | optional | — | Expected BackendService or BackendBucket resource the given URL should be mapped to. The service field cannot be set if expectedRedirectResponseCode is set. |
+
+## References
+
+These attributes name another type. infrena uses them to order a plan.
+
+| Attribute | Points at |
+| --- | --- |
+| `defaultService` | `gcp.backendservice.selfLink` |

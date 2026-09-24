@@ -338,6 +338,115 @@ rulings:
       configuration sets `keyRingId` and the full `name` comes back from Google.
       A key ring has no update method; everything settable is set at creation.
 
+  # P1, the load balancer, ruled 2026-09-24. Every template below was read at
+  # the pinned mmv1 commit (2d08a4a7b218c0c9d6c3ba236eae45193d386f44). These six
+  # are the ones whose hooks are Terraform's own bookkeeping. The other four
+  # (Address, GlobalAddress, ForwardingRule, GlobalForwardingRule) wait on
+  # labels: compute accepts a label change only through setLabels, which this
+  # provider does not call.
+  compute/BackendService:
+    hooks: [decoder, encoder, post_create, post_update]
+    note: >
+      encoder (encoders/backend_service.go.tmpl) does two things, both caused by
+      Terraform's schema, not the API. It nulls maxUtilization on any backend
+      whose group is a network endpoint group, because Terraform's schema gives
+      that field a default and the API rejects it for NEGs; this provider has no
+      schema defaults, so the field goes out only if the user writes it, and
+      then Google's own validation error names it. It also deletes the cdnPolicy
+      TTLs under USE_ORIGIN_HEADERS, because Terraform sends a zero for an
+      unset TTL; this provider never sends an unset field.
+
+      decoder (decoders/backend_service.go.tmpl) drops consistentHash from a
+      read when localityLbPolicy is not MAGLEV or RING_HASH. Google keeps a
+      stale consistentHash after the policy changes, and Terraform's next
+      whole-object update would send it back and be refused. Our patch sends
+      only the fields the diff changed, so a stale consistentHash is never
+      sent unless the user changes it.
+
+      post_create and post_update (the same template,
+      compute_backend_service_security_policy.go.tmpl) call setSecurityPolicy
+      and setEdgeSecurityPolicy when security_policy or edge_security_policy
+      changed. Discovery marks both fields "[Output Only]", so here they are
+      output-only and the hook has nothing to act on.
+
+      THE BOUNDED GAP: a Cloud Armor policy cannot be attached from this type.
+      It shows in state once attached some other way. Attaching one needs a
+      setSecurityPolicy call, which is the same missing piece as setLabels.
+
+  compute/RegionBackendService:
+    hooks: [decoder, encoder, post_create]
+    note: >
+      The regional twin of compute/BackendService, with different templates.
+
+      encoder (encoders/region_backend_service.go.tmpl) strips the capacity
+      fields (capacityScaler, maxConnections*, maxRate*, maxUtilization) from
+      every backend when the scheme is not a managed one. Terraform's schema
+      defaults them, and the API refuses them for EXTERNAL and INTERNAL
+      schemes. This provider has no defaults, so they go out only if written,
+      and Google's error names the field. The part that sets subsetting to NONE
+      is inside a TargetVersionName != ga guard, so it is not in the GA
+      provider this catalog mirrors.
+
+      decoder (decoders/region_backend_service.go.tmpl) is the same
+      consistentHash drop as the global one, which our changed-fields-only
+      patch does not need. Its subsetting half is behind the same beta guard.
+
+      post_create (compute_region_backend_service_security_policy.go.tmpl)
+      calls setSecurityPolicy, and securityPolicy is "[Output Only]" in
+      Discovery, so the same bounded gap as the global type applies.
+
+  compute/BackendBucket:
+    hooks: [encoder, post_create, post_update]
+    note: >
+      encoder (encoders/compute_backend_bucket.go.tmpl) is the cdnPolicy TTL
+      deletion from compute/BackendService, with FORCE_CACHE_ALL also dropping
+      maxTtl. It exists because Terraform sends zeros for unset TTLs, and this
+      provider does not send unset fields.
+
+      post_create and post_update
+      (compute_backend_bucket_security_policy.go.tmpl) call
+      setEdgeSecurityPolicy. edgeSecurityPolicy is "[Output Only]" in
+      Discovery, so the same bounded gap as compute/BackendService applies. The
+      API publishes no fingerprint for a backend bucket, so its patch carries
+      no lock.
+
+  compute/TargetHttpsProxy:
+    hooks: [decoder, encoder, update_encoder]
+    note: >
+      encoder and update_encoder (one template,
+      encoders/compute_target_https_proxy.go.tmpl) rename Terraform's
+      certificate_manager_certificates onto the API's sslCertificates. That
+      field is Terraform's invention: the API has one list, sslCertificates,
+      holding either kind of certificate, and that is the field this provider
+      exposes. The decoder (decoders/compute_target_https_proxy.go.tmpl) is
+      the reverse rename on read.
+
+      The encoder also sends serverTlsPolicy as null when it is not
+      configured, so that removing it from a Terraform configuration detaches
+      it. This provider does not remove what configuration stops mentioning
+      (BuildMask's never-removes rule, the same everywhere), so detaching a
+      server TLS policy is not possible from configuration. That is the
+      provider's general behaviour, not a gap specific to this type.
+
+  compute/RegionTargetHttpsProxy:
+    hooks: [decoder, encoder, update_encoder]
+    note: >
+      The regional twin of compute/TargetHttpsProxy. Its templates
+      (compute_region_target_https_proxy.go.tmpl) do the same certificate
+      rename and the same serverTlsPolicy null, so the reasoning above
+      applies unchanged.
+
+  compute/SslPolicy:
+    hooks: [update_encoder]
+    note: >
+      update_encoder (update_encoder/ssl_policy.tmpl) copies the current
+      fingerprint into the update, which this provider already does for every
+      type whose fingerprint says it is required (LockField), and sends
+      customFeatures as null when the list is empty. Clearing customFeatures
+      by writing an empty list therefore sends [] rather than null. Google
+      requires the list empty whenever the profile is not CUSTOM, and whether
+      it treats [] the same as null is not verified.
+
   # ----------------------------------------------------------------------------
   # NOT RULED. One P0 candidate is left. The names are decided; it now waits on
   # regional endpoint support. Kept here because this is the file the next

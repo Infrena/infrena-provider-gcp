@@ -52,7 +52,15 @@ projects/{{project}}/locations/{{location}}/authzExtensions/{{name}}
 | `loadBalancingScheme` | `load_balancing_scheme` | `string` | optional | — | Optional. All backend services and forwarding rules referenced by this extension must share the same load balancing scheme. The supported values are `INTERNAL_MANAGED` and `EXTERNAL_MANAGED`. You can … |
 | `metadata` | — | `map` | optional | opaque | Optional. The metadata provided here is included as part of the `metadata_context` (of type `google.protobuf.Struct`) in the `ProcessingRequest` message sent to the extension server. The metadata is … |
 | `name` | — | `string` | required | — | Required. Identifier. Name of the `AuthzExtension` resource in the following format: `projects/{project}/locations/{location}/authzExtensions/{authz_extension}`. |
-| `service` | — | `string` | required | — | Required. The reference to the service that runs the extension. To configure a callout extension: For global AuthzExtension, `service` must be a fully-qualified reference to a \[backend … |
+| `service` | — | `string` | required | refers to `gcp.backendservice.selfLink` | Required. The reference to the service that runs the extension. To configure a callout extension: For global AuthzExtension, `service` must be a fully-qualified reference to a \[backend … |
 | `timeout` | — | `string` | required | — | Required. Specifies the timeout for each individual message on the stream. The timeout must be between 10-10000 milliseconds. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the resource was updated. |
 | `wireFormat` | `wire_format` | `string` | optional | — | Optional. The format of communication supported by the callout extension. This field is supported only for regional `AuthzExtension` resources. If not specified, the default value `EXT_PROC_GRPC` is … |
+
+## References
+
+These attributes name another type. infrena uses them to order a plan.
+
+| Attribute | Points at |
+| --- | --- |
+| `service` | `gcp.backendservice.selfLink` |

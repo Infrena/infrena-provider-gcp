@@ -2,11 +2,13 @@
 
 # compute
 
-62 type(s). [Back to the index](../README.md).
+68 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.autoscaler`](gcp.autoscaler.md) | yes | yes | yes | Represents an Autoscaler resource. |
+| [`gcp.backendbucket`](gcp.backendbucket.md) | yes | yes | yes | Backend buckets allow you to use Google Cloud Storage buckets with HTTP(S) load balancing. |
+| [`gcp.backendservice`](gcp.backendservice.md) | yes | yes | yes | A Backend Service defines a group of virtual machines that will serve traffic for load balancing. |
 | [`gcp.compute.instance`](gcp.compute.instance.md) | yes | **no** | yes | An instance is a virtual machine (VM) hosted on Google's infrastructure. |
 | [`gcp.crosssitenetwork`](gcp.crosssitenetwork.md) | yes | yes | yes | Represents a cross-site-network resource. |
 | [`gcp.externalvpngateway`](gcp.externalvpngateway.md) | yes | **no** | yes | Represents a VPN gateway managed outside of GCP. |
@@ -34,6 +36,7 @@
 | [`gcp.publicadvertisedprefix`](gcp.publicadvertisedprefix.md) | yes | yes | yes | Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BYOIP). |
 | [`gcp.publicdelegatedprefix`](gcp.publicdelegatedprefix.md) | yes | yes | yes | Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYOIP). |
 | [`gcp.regionautoscaler`](gcp.regionautoscaler.md) | yes | yes | yes | Represents an Autoscaler resource. |
+| [`gcp.regionbackendservice`](gcp.regionbackendservice.md) | yes | yes | yes | A Region Backend Service defines a regionally-scoped group of virtual machines that will serve traffic for load balancing. |
 | [`gcp.regioncompositehealthcheck`](gcp.regioncompositehealthcheck.md) | yes | yes | yes | A composite health check resource specifies the health source resources and the health destination resource to which the aggregated health … |
 | [`gcp.regionhealthaggregationpolicy`](gcp.regionhealthaggregationpolicy.md) | yes | yes | yes | The Health Aggregation Policy specifies how to aggregate the service's constituent source health status to determine an aggregated health … |
 | [`gcp.regionhealthcheck`](gcp.regionhealthcheck.md) | yes | yes | yes | Health Checks determine whether instances are responsive and able to do work. |
@@ -51,6 +54,7 @@
 | [`gcp.regionsslcertificate`](gcp.regionsslcertificate.md) | yes | **no** | yes | A RegionSslCertificate resource, used for HTTPS load balancing. |
 | [`gcp.regionsslpolicy`](gcp.regionsslpolicy.md) | yes | yes | yes | Represents a Regional SSL policy. |
 | [`gcp.regiontargethttpproxy`](gcp.regiontargethttpproxy.md) | yes | **no** | yes | Represents a RegionTargetHttpProxy resource, which is used by one or more forwarding rules to route incoming HTTP requests to a URL map. |
+| [`gcp.regiontargethttpsproxy`](gcp.regiontargethttpsproxy.md) | yes | yes | yes | Represents a RegionTargetHttpsProxy resource, which is used by one or more forwarding rules to route incoming HTTPS requests to a URL map. |
 | [`gcp.regiontargettcpproxy`](gcp.regiontargettcpproxy.md) | yes | **no** | yes | Represents a RegionTargetTcpProxy resource, which is used by one or more forwarding rules to route incoming TCP requests to a regional TCP … |
 | [`gcp.regionurlmap`](gcp.regionurlmap.md) | yes | yes | yes | UrlMaps are used to route requests to a backend service based on rules that you define for the host and path of an incoming URL. |
 | [`gcp.resourcepolicy`](gcp.resourcepolicy.md) | yes | yes | yes | A policy that can be attached to a resource to specify or schedule actions on that resource. |
@@ -58,9 +62,11 @@
 | [`gcp.router`](gcp.router.md) | yes | yes | yes | Represents a Router resource. |
 | [`gcp.securitypolicy`](gcp.securitypolicy.md) | yes | yes | yes | Represents a Google Cloud Armor security policy resource. |
 | [`gcp.sslcertificate`](gcp.sslcertificate.md) | yes | **no** | yes | An SslCertificate resource, used for HTTPS load balancing. |
+| [`gcp.sslpolicy`](gcp.sslpolicy.md) | yes | yes | yes | Represents a SSL policy. |
 | [`gcp.subnetwork`](gcp.subnetwork.md) | yes | yes | yes | A VPC network is a virtual version of the traditional physical networks that exist within and between physical data centers. |
 | [`gcp.targetgrpcproxy`](gcp.targetgrpcproxy.md) | yes | yes | yes | Represents a Target gRPC Proxy resource. |
 | [`gcp.targethttpproxy`](gcp.targethttpproxy.md) | yes | yes | yes | Represents a TargetHttpProxy resource, which is used by one or more global forwarding rule to route incoming HTTP requests to a URL map. |
+| [`gcp.targethttpsproxy`](gcp.targethttpsproxy.md) | yes | yes | yes | Represents a TargetHttpsProxy resource, which is used by one or more global forwarding rule to route incoming HTTPS requests to a URL map. |
 | [`gcp.targetpool`](gcp.targetpool.md) | yes | **no** | yes | Represents a Target Pool resource. |
 | [`gcp.targetsslproxy`](gcp.targetsslproxy.md) | yes | **no** | yes | Represents a TargetSslProxy resource, which is used by one or more global forwarding rule to route incoming SSL requests to a backend … |
 | [`gcp.targettcpproxy`](gcp.targettcpproxy.md) | yes | **no** | yes | Represents a TargetTcpProxy resource, which is used by one or more global forwarding rule to route incoming TCP requests to a Backend … |

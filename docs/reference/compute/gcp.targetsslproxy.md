@@ -44,7 +44,16 @@ projects/{project}/global/targetSslProxies/{targetSslProxy}
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
 | `proxyHeader` | `proxy_header` | `string` | optional | — | Specifies the type of proxy header to append before sending data to the backend, either NONE or PROXY_V1. The default is NONE. |
 | `selfLink` | `self_link` | `string` | output only | — | \[Output Only\] Server-defined URL for the resource. |
-| `service` | — | `string` | required | — | URL to the BackendService resource. |
+| `service` | — | `string` | required | refers to `gcp.backendservice.selfLink` | URL to the BackendService resource. |
 | `sslCertificates` | `ssl_certificates` | `list` | optional | — | URLs to SslCertificate resources that are used to authenticate connections to Backends. At least one SSL certificate must be specified. Currently, you may specify up to 15 SSL certificates … |
 | `sslCertificates[]` | — | `string` | optional | — | — |
-| `sslPolicy` | `ssl_policy` | `string` | optional | — | URL of SslPolicy resource that will be associated with the TargetSslProxy resource. If not set, the TargetSslProxy resource will not have any SSL policy configured. |
+| `sslPolicy` | `ssl_policy` | `string` | optional | refers to `gcp.sslpolicy.selfLink` | URL of SslPolicy resource that will be associated with the TargetSslProxy resource. If not set, the TargetSslProxy resource will not have any SSL policy configured. |
+
+## References
+
+These attributes name another type. infrena uses them to order a plan.
+
+| Attribute | Points at |
+| --- | --- |
+| `service` | `gcp.backendservice.selfLink` |
+| `sslPolicy` | `gcp.sslpolicy.selfLink` |
