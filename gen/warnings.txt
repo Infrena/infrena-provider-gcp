@@ -458,3 +458,13 @@ nocreate	gcp.token	{+parent}/tokens	needs provider, scimTenant, workforcePool
 nocreate	gcp.usercred	{+parent}/userCreds	needs database
 nocreate	gcp.userworkloadssecret	{+parent}/userWorkloadsSecrets	needs environment
 nocreate	gcp.version	{+parent}/versions	needs wasmPlugin
+
+# Types that SHIP and are REPLACED rather than patched, with the API's own
+# sentence saying why. Google publishes the whole resource as the patch
+# request schema and then limits it in prose, which Discovery cannot carry.
+# A patch that silently drops the field you changed never converges, so
+# these are refused until a `patchable:` entry in gen/overlay.yaml names
+# the fields the API really takes. Replacement is destructive, but it is
+# loud and it settles.
+
+noupdate	gcp.subnetwork	Patches the specified subnetwork with the data included in the request. Only certain fields can be updated with a patch request as indicated in the field descriptions. You must specify the current fingerprint of the subnetwork resource being patched.

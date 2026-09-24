@@ -22,10 +22,27 @@ type Ruling struct {
 	AllForceNew bool `yaml:"all_force_new"`
 }
 
+// Patchable is a human decision about a type whose API patches only SOME of
+// its fields. See patchlimits.go for why it is an allowlist and not the
+// opposite.
+type Patchable struct {
+	// Fields are the TOP-LEVEL attribute names the API really patches, spelled
+	// as the wire spells them. Everything else settable becomes ForceNew.
+	Fields []string `yaml:"fields"`
+	// Note must quote or cite what the API says. Required, for the same reason
+	// a ruling's note is: a list of field names with no source behind it is
+	// indistinguishable from a guess.
+	Note string `yaml:"note"`
+}
+
 // Overlay is gen/overlay.yaml: everything a human decided.
 type Overlay struct {
 	// Rulings are keyed by "<product>/<Resource>", matching the vendored path.
 	Rulings map[string]*Ruling `yaml:"rulings"`
+	// Patchable is keyed by infrena type name ("gcp.network"), because it is a
+	// decision about the generated type rather than about a vendored resource
+	// -- the types that need one may have no magic-modules resource at all.
+	Patchable map[string]*Patchable `yaml:"patchable"`
 	// Aliases are friendly names, keyed by infrena type then canonical attribute.
 	Aliases map[string]map[string]string `yaml:"aliases"`
 	// DiscoverDefault is the type list `discover` scans when the instance names none.
@@ -70,6 +87,14 @@ func LoadOverlay(path, mmv1Dir string) (*Overlay, error) {
 		}
 		if len(r.Hooks) == 0 && r.ReadVia == "" {
 			return nil, fmt.Errorf("%s: ruling %q names no hooks and no read_via, so it rules on nothing", path, key)
+		}
+	}
+	for name, p := range o.Patchable {
+		if p.Note == "" {
+			return nil, fmt.Errorf("%s: patchable %q has no note; a field list with no source behind it is a guess", path, name)
+		}
+		if len(p.Fields) == 0 {
+			return nil, fmt.Errorf("%s: patchable %q lists no fields; to make a type non-updatable, leave it out entirely", path, name)
 		}
 	}
 	for api, dirs := range o.ProductAliases {

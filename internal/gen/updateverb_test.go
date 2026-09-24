@@ -1,8 +1,12 @@
 package gen
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+)
 
-// updateVerbDoc is one Discovery document carrying five collections that differ
+// updateVerbDoc is one Discovery document carrying six collections that differ
 // only in how they publish an update. None of them has a magic-modules resource,
 // which is the point: these are the types whose update verb has to come from
 // Discovery or from nowhere.
@@ -11,6 +15,9 @@ import "testing"
 //   - unmaskeds    PATCH with no updateMask parameter       -> updatable, unmasked
 //   - putonlies    PUT only                                 -> NOT updatable
 //   - elsewheres   PATCH at a path the get does not use     -> NOT updatable
+//   - restricteds  PATCH Google documents as partial        -> NOT updatable, unless
+//     an overlay allowlist says
+//     which fields it takes
 //   - wrappeds     PATCH whose request is an envelope       -> NOT updatable
 func updateVerbDoc() string {
 	return `{
@@ -55,6 +62,13 @@ func updateVerbDoc() string {
         "insert": {"id": "a.e.insert", "path": "projects/{project}/elsewheres", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
         "delete": {"id": "a.e.delete", "path": "projects/{project}/elsewheres/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
         "patch": {"id": "a.e.patch", "path": "projects/{project}/elsewheres/{id}:updateConfig", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}
+      }},
+      "restricteds": {"methods": {
+        "get": {"id": "a.r.get", "path": "projects/{project}/restricteds/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.r.insert", "path": "projects/{project}/restricteds", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.r.delete", "path": "projects/{project}/restricteds/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "patch": {"id": "a.r.patch", "path": "projects/{project}/restricteds/{id}", "httpMethod": "PATCH", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"},
+          "description": "Patches the specified thing with the data included in the request. Only size can be modified."}
       }},
       "wrappeds": {"methods": {
         "get": {"id": "a.w.get", "path": "projects/{project}/wrappeds/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
@@ -218,5 +232,104 @@ func TestAPatchAtADifferentPathStaysNonUpdatable(t *testing.T) {
 	if ty.UpdateVerb != "" {
 		t.Errorf("UpdateVerb = %q, want empty: the patch lives at %q, not at the resource's own path",
 			ty.UpdateVerb, "projects/{project}/elsewheres/{id}:updateConfig")
+	}
+}
+
+// overlayWith writes a fixture whose overlay carries an extra block, so the
+// `patchable:` map can be exercised through the real LoadOverlay rather than by
+// constructing an Overlay in memory -- the yaml spelling is half of what this
+// feature is.
+func overlayWith(t *testing.T, extra string) Inputs {
+	t.Helper()
+	in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""})
+	if err := os.WriteFile(in.OverlayPath, []byte("rulings: {}\naliases: {}\ndiscover_default: []\n"+extra), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
+// TestARestrictedPatchIsRefusedWithoutAnAllowlist is the guard that keeps this
+// provider from trading a convergent failure for a non-convergent one. Google
+// publishes the whole resource as the patch request schema and then limits it
+// in prose: compute.networks.patch accepts only routingConfig, while
+// gcp.network declares five settable non-ForceNew attributes. Deriving a verb
+// from the schema alone gives four fields a patch the API drops on the floor,
+// so the plan proposes the same change for ever. Replacement is destructive and
+// loud; a patch that does nothing is neither.
+func TestARestrictedPatchIsRefusedWithoutAnAllowlist(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.restricted")
+	if !ok {
+		t.Fatalf("gcp.restricted missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "" {
+		t.Errorf("UpdateVerb = %q, want empty: the API says only some fields are patchable", ty.UpdateVerb)
+	}
+	var found bool
+	for _, u := range res.Unpatchable {
+		if u.Type == "gcp.restricted" {
+			found = true
+			if !strings.Contains(u.Says, "Only size can be modified") {
+				t.Errorf("the record does not quote the API: %q", u.Says)
+			}
+		}
+	}
+	if !found {
+		t.Error("gcp.restricted was refused an update and recorded nowhere; a silent refusal is indistinguishable from an API with no patch")
+	}
+}
+
+// TestAnAllowlistAdmitsTheTypeAndForceNewsTheRest is the other half: a human
+// read what the API says and wrote the fields down, so the listed field is
+// patched and every other settable one replaces the resource -- which is what
+// the API does with it anyway.
+func TestAnAllowlistAdmitsTheTypeAndForceNewsTheRest(t *testing.T) {
+	res, err := Build(overlayWith(t, `
+patchable:
+  gcp.restricted:
+    fields: [size]
+    note: the fixture's patch description says only size can be modified
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.restricted")
+	if !ok {
+		t.Fatalf("gcp.restricted missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PATCH" {
+		t.Fatalf("UpdateVerb = %q, want PATCH once a human listed the fields", ty.UpdateVerb)
+	}
+	size, name := ty.Attributes["size"], ty.Attributes["name"]
+	if size == nil || name == nil {
+		t.Fatalf("fixture attributes missing: size=%v name=%v", size, name)
+	}
+	if size.ForceNew {
+		t.Error("size is ForceNew, but it is the one field the API does patch")
+	}
+	if !name.ForceNew {
+		t.Error("name is not ForceNew, so a change to it would be sent as a patch the API drops")
+	}
+	for _, u := range res.Unpatchable {
+		if u.Type == "gcp.restricted" {
+			t.Error("gcp.restricted is still recorded as replaced-not-patched after an allowlist admitted it")
+		}
+	}
+}
+
+// TestAPatchableEntryWithoutASourceIsRefused. A list of field names with
+// nothing behind it cannot be reviewed, and this one governs whether a change
+// replaces a resource -- the same reason a ruling's note is mandatory.
+func TestAPatchableEntryWithoutASourceIsRefused(t *testing.T) {
+	for name, extra := range map[string]string{
+		"no note":   "\npatchable:\n  gcp.restricted:\n    fields: [size]\n",
+		"no fields": "\npatchable:\n  gcp.restricted:\n    note: says nothing about which fields\n",
+	} {
+		if _, err := Build(overlayWith(t, extra)); err == nil {
+			t.Errorf("%s: accepted, want a refusal", name)
+		}
 	}
 }

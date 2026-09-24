@@ -36,7 +36,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gen-gcp: %v\n", err)
 		os.Exit(1)
 	}
-	if err := gen.WriteWarnings(*warn, res.Warnings, res.Uncreatable); err != nil {
+	if err := gen.WriteWarnings(*warn, res.Warnings, res.Uncreatable, res.Unpatchable); err != nil {
 		fmt.Fprintf(os.Stderr, "gen-gcp: %v\n", err)
 		os.Exit(1)
 	}
@@ -46,6 +46,6 @@ func main() {
 			tier2++
 		}
 	}
-	fmt.Fprintf(os.Stderr, "%d types; %d refused (%d awaiting a ruling); %d ship without create\n",
-		len(res.Catalog.Types), len(res.Warnings), tier2, len(res.Uncreatable))
+	fmt.Fprintf(os.Stderr, "%d types; %d refused (%d awaiting a ruling); %d ship without create; %d replaced not patched\n",
+		len(res.Catalog.Types), len(res.Warnings), tier2, len(res.Uncreatable), len(res.Unpatchable))
 }
