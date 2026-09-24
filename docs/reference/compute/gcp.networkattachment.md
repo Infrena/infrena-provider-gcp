@@ -38,14 +38,14 @@ projects/{project}/regions/{region}/networkAttachments/{networkAttachment}
 | --- | --- | --- | --- | --- | --- |
 | `connectionEndpoints` | `connection_endpoints` | `list` | output only | — | Output only. \[Output Only\] An array of connections for all the producers connected to this network attachment. |
 | `connectionEndpoints[]` | — | `map` | optional | — | — |
-| `connectionEndpoints[].ipAddress` | `ip_address` | `string` | optional | — | The IPv4 address assigned to the producer instance network interface. This value will be a range in case of Serverless. |
+| `connectionEndpoints[].ipAddress` | `ip_address` | `string` | output only | — | The IPv4 address assigned to the producer instance network interface. This value will be a range in case of Serverless. |
 | `connectionEndpoints[].ipv6Address` | `ipv6_address` | `string` | optional | — | The IPv6 address assigned to the producer instance network interface. This is only assigned when the stack types of both the instance network interface and the consumer subnet are IPv4_IPv6. |
-| `connectionEndpoints[].projectIdOrNum` | `project_id_or_num` | `string` | optional | — | The project id or number of the interface to which the IP was assigned. |
-| `connectionEndpoints[].secondaryIpCidrRanges` | `secondary_ip_cidr_ranges` | `list` | optional | — | Alias IP ranges from the same subnetwork. |
+| `connectionEndpoints[].projectIdOrNum` | `project_id_or_num` | `string` | output only | — | The project id or number of the interface to which the IP was assigned. |
+| `connectionEndpoints[].secondaryIpCidrRanges` | `secondary_ip_cidr_ranges` | `list` | output only | — | Alias IP ranges from the same subnetwork. |
 | `connectionEndpoints[].secondaryIpCidrRanges[]` | — | `string` | optional | — | — |
 | `connectionEndpoints[].serviceClassId` | `service_class_id` | `string` | optional | — | The service class id of the producer service to which the IP was assigned. |
-| `connectionEndpoints[].status` | — | `string` | optional | — | The status of a connected endpoint to this network attachment. |
-| `connectionEndpoints[].subnetwork` | — | `string` | optional | — | The subnetwork used to assign the IP to the producer instance network interface. |
+| `connectionEndpoints[].status` | — | `string` | output only | — | The status of a connected endpoint to this network attachment. |
+| `connectionEndpoints[].subnetwork` | — | `string` | output only | — | The subnetwork used to assign the IP to the producer instance network interface. |
 | `connectionEndpoints[].subnetworkCidrRange` | `subnetwork_cidr_range` | `string` | output only | — | Output only. \[Output Only\] The CIDR range of the subnet from which the IPv4 internal IP was allocated from. |
 | `connectionPreference` | `connection_preference` | `string` | required | force new | — |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |

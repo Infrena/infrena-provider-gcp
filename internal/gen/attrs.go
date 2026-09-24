@@ -245,8 +245,20 @@ func acronymTail(r []rune, i int) bool {
 	return false
 }
 
-// mmIndex flattens one magic-modules resource's fields by name, at every depth,
-// so a Discovery property can find its lifecycle flags wherever they live.
+// mmIndex indexes ONE level of a magic-modules resource's fields by name, so a
+// Discovery property can find its lifecycle flags at the same place in the
+// tree. buildLevel descends in step: an object's fields are looked up in the
+// matched field's own properties, a list's in its item_type.
+//
+// It was once a single flat map over every depth, keyed by bare name, and
+// first-seen won. That let one field's flags land on every other field of the
+// same name anywhere in the resource: the moment list elements were walked,
+// authz policy's required ipBlocks[].prefix made every string-match prefix
+// required too, and gcp.backendservice's top-level name only came out
+// required because a nested "name" stopped shadowing it. magic-modules keeps
+// the API's nesting even where it flattens for Terraform (flatten_object is
+// Terraform-schema only), so looking up by path loses nothing the flat map
+// found honestly.
 //
 // First-seen wins on a name collision. BuildAttributes puts Parameters ahead of
 // Properties in the slice this walks, so a name declared in both (e.g. "name"
@@ -260,34 +272,51 @@ func acronymTail(r []rune, i int) bool {
 // fields in the corpus record the API's own spelling in api_name instead
 // (compute's Firewall "allow"/api_name allowed, eventarc's Trigger
 // "matchingCriteria"/api_name eventFilters). Indexing only by Name loses
-// every lifecycle flag on those — measured on 2026-09-22, 5 of the 35 is_set
-// fields on types this plugin ships were reachable ONLY through api_name, so
-// gcp.firewall's allowed and denied shipped as ordered lists and
-// reconciliation would have proposed reordering them forever.
-//
-// The order is what makes it safe. 14 of the corpus's 942 resources declare a
-// field whose api_name is also some OTHER field's own name (compute's
-// InstanceGroupManager has both "id" and an "instanceGroupManagerId" whose
-// api_name is "id"), and a single pass would resolve those by whichever the
-// walk happened to reach first. A real field name always wins; an api_name
-// only fills a key nothing else claimed. See
+// every lifecycle flag on those. A real field name always wins; an api_name
+// only fills a key nothing else claimed (compute's InstanceGroupManager has
+// both "id" and an "instanceGroupManagerId" whose api_name is "id"). See
 // TestARealFieldNameBeatsAnotherFieldsApiName.
 func mmIndex(fields []*mmv1.Field) map[string]*mmv1.Field {
 	out := map[string]*mmv1.Field{}
-	var walk func(fs []*mmv1.Field, key func(*mmv1.Field) string)
-	walk = func(fs []*mmv1.Field, key func(*mmv1.Field) string) {
-		for _, f := range fs {
+	for _, key := range []func(*mmv1.Field) string{
+		func(f *mmv1.Field) string { return f.Name },
+		func(f *mmv1.Field) string { return f.ApiName },
+	} {
+		for _, f := range fields {
 			if k := key(f); k != "" {
 				if _, seen := out[k]; !seen {
 					out[k] = f
 				}
 			}
-			walk(f.Properties, key)
 		}
 	}
-	walk(fields, func(f *mmv1.Field) string { return f.Name })
-	walk(fields, func(f *mmv1.Field) string { return f.ApiName })
 	return out
+}
+
+// clearNestedRequired clears Required on every attribute below a, not on a.
+func clearNestedRequired(a *catalog.Attr) {
+	for _, f := range a.Fields {
+		f.Required = false
+		clearNestedRequired(f)
+	}
+	if a.Elem != nil {
+		a.Elem.Required = false
+		clearNestedRequired(a.Elem)
+	}
+}
+
+// mmChildren is the index for the level below f: an object's own properties,
+// or a list's element fields, which magic-modules keeps under item_type. nil
+// when magic-modules has no field here, so nothing below inherits a flag from
+// a field it does not describe.
+func mmChildren(f *mmv1.Field) map[string]*mmv1.Field {
+	if f == nil {
+		return nil
+	}
+	if f.ItemType != nil && len(f.ItemType.Properties) > 0 {
+		return mmIndex(f.ItemType.Properties)
+	}
+	return mmIndex(f.Properties)
 }
 
 // BuildAttributes turns one request-body schema plus its magic-modules
@@ -313,6 +342,18 @@ func BuildAttributes(d *disco.Document, body *disco.Schema, mm *mmv1.Resource, a
 	out, err := buildLevel(d, body, idx, aliases, true, &conflicts)
 	if err != nil {
 		return nil, err
+	}
+	if mm != nil && mm.ExcludeResource {
+		// Terraform implements this resource by hand and never runs its YAML,
+		// so nothing has ever enforced the YAML's `required` and it is wrong
+		// in places: compute's Instance marks an access config's name
+		// required, where the API documents a default ("External NAT"), and
+		// storage's Bucket requires `bucket` inside every ACL entry, a field
+		// the server fills. Top level is kept: on every such type that ships
+		// it is only `name`, which the create url needs.
+		for _, a := range out {
+			clearNestedRequired(a)
+		}
 	}
 	// Sorted before being written: the walk that fills conflicts ranges over a Go
 	// map, so the order conflicts arrive in is randomized per run. Regeneration
@@ -374,6 +415,11 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		if f := idx[name]; f != nil {
 			a.Required = f.Required
 			a.ForceNew = a.ForceNew || f.Immutable
+			// Secrets. Discovery has no way to say a field is one, so
+			// magic-modules is the only source: `sensitive` on passwords,
+			// keys and tokens, `write_only` on values Terraform never keeps.
+			// Without this the host prints them in plans and state, in clear.
+			a.Sensitive = f.Sensitive || f.WriteOnly
 			if f.Output {
 				a.Output = true
 			}
@@ -429,7 +475,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// way to address anything nested. Curated aliases are top-level only
 			// because of that, not by oversight. snake_case and the original
 			// spelling still apply at every depth (see TestNestedKeysGetTheSameSpellings).
-			fields, err := buildLevel(d, prop, idx, nil, false, conflicts)
+			fields, err := buildLevel(d, prop, mmChildren(idx[name]), nil, false, conflicts)
 			if err != nil {
 				return nil, err
 			}
@@ -439,7 +485,7 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if prop.Items.Type == "object" && len(prop.Items.Properties) > 0 {
 				// Same nil-aliases reasoning as the object branch above: no path
 				// notation exists to curate an alias for an array element's field.
-				fields, err := buildLevel(d, prop.Items, idx, nil, false, conflicts)
+				fields, err := buildLevel(d, prop.Items, mmChildren(idx[name]), nil, false, conflicts)
 				if err != nil {
 					return nil, err
 				}

@@ -62,14 +62,14 @@ projects/{{project}}/locations/{{location}}/repositories/{{repository_id}}
 | `registryUri` | `registry_uri` | `string` | output only | — | Output only. The repository endpoint, for example: `us-docker.pkg.dev/my-proj/my-repo`. |
 | `remoteRepositoryConfig` | `remote_repository_config` | `map` | optional | force new | Configuration specific for a Remote Repository. |
 | `remoteRepositoryConfig.aptRepository` | `apt_repository` | `map` | optional | force new | Specific settings for an Apt remote repository. |
-| `remoteRepositoryConfig.aptRepository.customRepository` | `custom_repository` | `map` | optional | force new | Customer-specified remote repository. |
-| `remoteRepositoryConfig.aptRepository.customRepository.uri` | — | `string` | optional | force new | An http/https uri reference to the upstream remote repository, for ex: "https://my.apt.registry/". |
+| `remoteRepositoryConfig.aptRepository.customRepository` | `custom_repository` | `map` | optional | — | Customer-specified remote repository. |
+| `remoteRepositoryConfig.aptRepository.customRepository.uri` | — | `string` | optional | — | An http/https uri reference to the upstream remote repository, for ex: "https://my.apt.registry/". |
 | `remoteRepositoryConfig.aptRepository.publicRepository` | `public_repository` | `map` | optional | force new | One of the publicly available Apt repositories supported by Artifact Registry. |
 | `remoteRepositoryConfig.aptRepository.publicRepository.repositoryBase` | `repository_base` | `string` | required | force new | A common public repository base for Apt. |
 | `remoteRepositoryConfig.aptRepository.publicRepository.repositoryPath` | `repository_path` | `string` | required | force new | A custom field to define a path to a specific repository from the base. |
 | `remoteRepositoryConfig.commonRepository` | `common_repository` | `map` | optional | force new | Common remote repository settings. Used as the remote repository upstream URL. |
-| `remoteRepositoryConfig.commonRepository.uri` | — | `string` | optional | force new | Required. A common public repository base for remote repository. |
-| `remoteRepositoryConfig.description` | — | `string` | optional | — | The description of the remote source. |
+| `remoteRepositoryConfig.commonRepository.uri` | — | `string` | required | force new | Required. A common public repository base for remote repository. |
+| `remoteRepositoryConfig.description` | — | `string` | optional | force new | The description of the remote source. |
 | `remoteRepositoryConfig.disableUpstreamValidation` | `disable_upstream_validation` | `boolean` | optional | — | Input only. A create/update remote repo option to avoid making a HEAD/GET request to validate a remote repo and any supplied upstream credentials. |
 | `remoteRepositoryConfig.dockerRepository` | `docker_repository` | `map` | optional | force new | Specific settings for a Docker remote repository. |
 | `remoteRepositoryConfig.dockerRepository.customRepository` | `custom_repository` | `map` | optional | force new | Customer-specified remote repository. |
@@ -93,8 +93,8 @@ projects/{{project}}/locations/{{location}}/repositories/{{repository_id}}
 | `remoteRepositoryConfig.upstreamCredentials.usernamePasswordCredentials.passwordSecretVersion` | `password_secret_version` | `string` | optional | — | The Secret Manager key version that holds the password to access the remote repository. Must be in the format of `projects/{project}/secrets/{secret}/versions/{version}`. |
 | `remoteRepositoryConfig.upstreamCredentials.usernamePasswordCredentials.username` | — | `string` | optional | — | The username to access the remote repository. |
 | `remoteRepositoryConfig.yumRepository` | `yum_repository` | `map` | optional | force new | Specific settings for a Yum remote repository. |
-| `remoteRepositoryConfig.yumRepository.customRepository` | `custom_repository` | `map` | optional | force new | Customer-specified remote repository. |
-| `remoteRepositoryConfig.yumRepository.customRepository.uri` | — | `string` | optional | force new | An http/https uri reference to the upstream remote repository, for ex: "https://my.yum.registry/". |
+| `remoteRepositoryConfig.yumRepository.customRepository` | `custom_repository` | `map` | optional | — | Customer-specified remote repository. |
+| `remoteRepositoryConfig.yumRepository.customRepository.uri` | — | `string` | optional | — | An http/https uri reference to the upstream remote repository, for ex: "https://my.yum.registry/". |
 | `remoteRepositoryConfig.yumRepository.publicRepository` | `public_repository` | `map` | optional | force new | One of the publicly available Yum repositories supported by Artifact Registry. |
 | `remoteRepositoryConfig.yumRepository.publicRepository.repositoryBase` | `repository_base` | `string` | required | force new | A common public repository base for Yum. |
 | `remoteRepositoryConfig.yumRepository.publicRepository.repositoryPath` | `repository_path` | `string` | required | force new | A custom field to define a path to a specific repository from the base. |

@@ -38,13 +38,13 @@ projects/{project}/global/firewalls/{firewall}
 | --- | --- | --- | --- | --- | --- |
 | `allowed` | — | `list` | optional | unordered | The list of ALLOW rules specified by this firewall. Each rule specifies a protocol and port-range tuple that describes a permitted connection. |
 | `allowed[]` | — | `map` | optional | — | — |
-| `allowed[].IPProtocol` | `ip_protocol` | `string` | optional | — | The IP protocol to which this rule applies. The protocol type is required when creating a firewall rule. This value can either be one of the following well known protocol strings (tcp, udp,icmp, esp … |
+| `allowed[].IPProtocol` | `ip_protocol` | `string` | required | — | The IP protocol to which this rule applies. The protocol type is required when creating a firewall rule. This value can either be one of the following well known protocol strings (tcp, udp,icmp, esp … |
 | `allowed[].ports` | — | `list` | optional | — | An optional list of ports to which this rule applies. This field is only applicable for the UDP or TCP protocol. Each entry must be either an integer or a range. If not specified, this rule applies … |
 | `allowed[].ports[]` | — | `string` | optional | — | — |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `denied` | — | `list` | optional | unordered | The list of DENY rules specified by this firewall. Each rule specifies a protocol and port-range tuple that describes a denied connection. |
 | `denied[]` | — | `map` | optional | — | — |
-| `denied[].IPProtocol` | `ip_protocol` | `string` | optional | — | The IP protocol to which this rule applies. The protocol type is required when creating a firewall rule. This value can either be one of the following well known protocol strings (tcp, udp,icmp, esp … |
+| `denied[].IPProtocol` | `ip_protocol` | `string` | required | — | The IP protocol to which this rule applies. The protocol type is required when creating a firewall rule. This value can either be one of the following well known protocol strings (tcp, udp,icmp, esp … |
 | `denied[].ports` | — | `list` | optional | same fields as `allowed[].ports` | An optional list of ports to which this rule applies. This field is only applicable for the UDP or TCP protocol. Each entry must be either an integer or a range. If not specified, this rule applies … |
 | `description` | — | `string` | optional | — | An optional description of this resource. Provide this field when you create the resource. |
 | `destinationRanges` | `destinations`, `destination_ranges` | `list` | optional | unordered | If destination ranges are specified, the firewall rule applies only to traffic that has destination IP address in these ranges. These ranges must be expressed inCIDR format. Both IPv4 and IPv6 are … |

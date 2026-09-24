@@ -134,8 +134,8 @@ projects/{{project}}/locations/global/httpRoutes/{{name}}
 | `rules[].matches[].headers[].prefixMatch` | `prefix_match` | `string` | optional | — | The value of the header must start with the contents of prefix_match. |
 | `rules[].matches[].headers[].presentMatch` | `present_match` | `boolean` | optional | — | A header with header_name must exist. The match takes place whether or not the header has a value. |
 | `rules[].matches[].headers[].rangeMatch` | `range_match` | `map` | optional | — | If specified, the rule will match if the request header value is within the range. |
-| `rules[].matches[].headers[].rangeMatch.end` | — | `integer` | optional | — | End of the range (exclusive) |
-| `rules[].matches[].headers[].rangeMatch.start` | — | `integer` | optional | — | Start of the range (inclusive) |
+| `rules[].matches[].headers[].rangeMatch.end` | — | `integer` | required | — | End of the range (exclusive) |
+| `rules[].matches[].headers[].rangeMatch.start` | — | `integer` | required | — | Start of the range (inclusive) |
 | `rules[].matches[].headers[].regexMatch` | `regex_match` | `string` | optional | — | The value of the header must match the regular expression specified in regex_match. For regular expression grammar, please see: https://github.com/google/re2/wiki/Syntax |
 | `rules[].matches[].headers[].suffixMatch` | `suffix_match` | `string` | optional | — | The value of the header must end with the contents of suffix_match. |
 | `rules[].matches[].ignoreCase` | `ignore_case` | `boolean` | optional | — | Specifies if prefix_match and full_path_match matches are case sensitive. The default value is false. |

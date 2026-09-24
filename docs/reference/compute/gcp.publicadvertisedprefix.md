@@ -50,7 +50,7 @@ projects/{project}/global/publicAdvertisedPrefixes/{publicAdvertisedPrefix}
 | `publicDelegatedPrefixs` | `public_delegated_prefixs` | `list` | output only | — | Output only. \[Output Only\] The list of public delegated prefixes that exist for this public advertised prefix. |
 | `publicDelegatedPrefixs[]` | — | `map` | optional | — | — |
 | `publicDelegatedPrefixs[].ipRange` | `ip_range` | `string` | optional | — | The IP address range of the public delegated prefix |
-| `publicDelegatedPrefixs[].name` | — | `string` | required | — | The name of the public delegated prefix |
+| `publicDelegatedPrefixs[].name` | — | `string` | optional | — | The name of the public delegated prefix |
 | `publicDelegatedPrefixs[].project` | — | `string` | optional | — | The project number of the public delegated prefix |
 | `publicDelegatedPrefixs[].region` | — | `string` | optional | — | The region of the public delegated prefix if it is regional. If absent, the prefix is global. |
 | `publicDelegatedPrefixs[].status` | — | `string` | optional | — | The status of the public delegated prefix. Possible values are: INITIALIZING: The public delegated prefix is being initialized and addresses cannot be created yet. ANNOUNCED: The public delegated … |

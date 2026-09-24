@@ -48,7 +48,7 @@ projects/{{project}}/locations/{{location}}/triggers/{{name}}
 | `destination.cloudRun.service` | — | `string` | required | — | Required. The name of the Cloud Run service being addressed. See https://cloud.google.com/run/docs/reference/rest/v1/namespaces.services. Only services located in the same project as the trigger … |
 | `destination.gke` | — | `map` | optional | — | A GKE service capable of receiving events. The service should be running in the same project as the trigger. |
 | `destination.gke.cluster` | — | `string` | required | — | Required. The name of the cluster the GKE service is running in. The cluster must be running in the same project as the trigger being created. |
-| `destination.gke.location` | — | `string` | required | force new | Required. The name of the Google Compute Engine in which the cluster resides, which can either be compute zone (for example, us-central1-a) for the zonal clusters or region (for example, us-central1) … |
+| `destination.gke.location` | — | `string` | required | — | Required. The name of the Google Compute Engine in which the cluster resides, which can either be compute zone (for example, us-central1-a) for the zonal clusters or region (for example, us-central1) … |
 | `destination.gke.namespace` | — | `string` | required | — | Required. The namespace the GKE service is running in. |
 | `destination.gke.path` | — | `string` | optional | — | Optional. The relative path on the GKE service the events should be sent to. The value must conform to the definition of a URI path segment (section 3.3 of RFC2396). Examples: "/route", "route" … |
 | `destination.gke.service` | — | `string` | required | — | Required. Name of the GKE service. |
@@ -61,9 +61,9 @@ projects/{{project}}/locations/{{location}}/triggers/{{name}}
 | `eventDataContentType` | `event_data_content_type` | `string` | optional | — | Optional. EventDataContentType specifies the type of payload in MIME format that is expected from the CloudEvent data field. This is set to `application/json` if the value is not defined. |
 | `eventFilters` | `event_filters` | `list` | required | unordered | Required. Unordered list. The list of filters that applies to event attributes. Only events that match all the provided filters are sent to the destination. |
 | `eventFilters[]` | — | `map` | optional | — | — |
-| `eventFilters[].attribute` | — | `string` | optional | — | Required. The name of a CloudEvents attribute. Currently, only a subset of attributes are supported for filtering. You can \[retrieve a specific provider's supported event … |
+| `eventFilters[].attribute` | — | `string` | required | force new | Required. The name of a CloudEvents attribute. Currently, only a subset of attributes are supported for filtering. You can \[retrieve a specific provider's supported event … |
 | `eventFilters[].operator` | — | `string` | optional | — | Optional. The operator used for matching the events with the value of the filter. If not specified, only events that have an exact key-value pair specified in the filter are matched. The allowed … |
-| `eventFilters[].value` | — | `string` | optional | — | Required. The value for the attribute. |
+| `eventFilters[].value` | — | `string` | required | force new | Required. The value for the attribute. |
 | `labels` | — | `map` | optional | opaque | Optional. User labels attached to the triggers that can be used to group resources. |
 | `name` | — | `string` | required | force new | Required. The resource name of the trigger. Must be unique within the location of the project and must be in `projects/{project}/locations/{location}/triggers/{trigger}` format. |
 | `retryPolicy` | `retry_policy` | `map` | optional | — | Optional. The retry policy to use in the Trigger. If unset, event delivery will be retried for up to 24 hours by default: https://cloud.google.com/eventarc/docs/retry-events |

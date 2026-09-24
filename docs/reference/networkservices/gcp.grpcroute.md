@@ -73,13 +73,13 @@ projects/{{project}}/locations/{{location}}/grpcRoutes/{{name}}
 | `rules[].matches[]` | — | `map` | optional | — | — |
 | `rules[].matches[].headers` | — | `list` | optional | — | Optional. Specifies a collection of headers to match. |
 | `rules[].matches[].headers[]` | — | `map` | optional | — | — |
-| `rules[].matches[].headers[].key` | — | `string` | optional | — | Required. The key of the header. |
+| `rules[].matches[].headers[].key` | — | `string` | required | — | Required. The key of the header. |
 | `rules[].matches[].headers[].type_value` | wire `type` | `string` | optional | — | Optional. Specifies how to match against the value of the header. If not specified, a default value of EXACT is used. |
-| `rules[].matches[].headers[].value` | — | `string` | optional | — | Required. The value of the header. |
+| `rules[].matches[].headers[].value` | — | `string` | required | — | Required. The value of the header. |
 | `rules[].matches[].method` | — | `map` | optional | — | Optional. A gRPC method to match against. If this field is empty or omitted, will match all methods. |
 | `rules[].matches[].method.caseSensitive` | `case_sensitive` | `boolean` | optional | — | Optional. Specifies that matches are case sensitive. The default value is true. case_sensitive must not be used with a type of REGULAR_EXPRESSION. |
-| `rules[].matches[].method.grpcMethod` | `grpc_method` | `string` | optional | — | Required. Name of the method to match against. If unspecified, will match all methods. |
-| `rules[].matches[].method.grpcService` | `grpc_service` | `string` | optional | — | Required. Name of the service to match against. If unspecified, will match all services. |
+| `rules[].matches[].method.grpcMethod` | `grpc_method` | `string` | required | — | Required. Name of the method to match against. If unspecified, will match all methods. |
+| `rules[].matches[].method.grpcService` | `grpc_service` | `string` | required | — | Required. Name of the service to match against. If unspecified, will match all services. |
 | `rules[].matches[].method.type_value` | wire `type` | `string` | optional | — | Optional. Specifies how to match against the name. If not specified, a default value of "EXACT" is used. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. Server-defined URL of this resource |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the resource was updated. |

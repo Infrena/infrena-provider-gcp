@@ -48,14 +48,14 @@ projects/{{project}}/locations/{{location}}/customTargetTypes/{{name}}
 | `customActions.includeSkaffoldModules[].git` | — | `map` | optional | — | Optional. Remote git repository containing the Skaffold Config modules. |
 | `customActions.includeSkaffoldModules[].git.path` | — | `string` | optional | — | Optional. Relative path from the repository root to the Skaffold file. |
 | `customActions.includeSkaffoldModules[].git.ref` | — | `string` | optional | — | Optional. Git branch or tag to use when cloning the repository. |
-| `customActions.includeSkaffoldModules[].git.repo` | — | `string` | optional | — | Required. Git repository the package should be cloned from. |
+| `customActions.includeSkaffoldModules[].git.repo` | — | `string` | required | — | Required. Git repository the package should be cloned from. |
 | `customActions.includeSkaffoldModules[].googleCloudBuildRepo` | `google_cloud_build_repo` | `map` | optional | — | Optional. Cloud Build V2 repository containing the Skaffold Config modules. |
 | `customActions.includeSkaffoldModules[].googleCloudBuildRepo.path` | — | `string` | optional | — | Optional. Relative path from the repository root to the Skaffold Config file. |
 | `customActions.includeSkaffoldModules[].googleCloudBuildRepo.ref` | — | `string` | optional | — | Optional. Branch or tag to use when cloning the repository. |
-| `customActions.includeSkaffoldModules[].googleCloudBuildRepo.repository` | — | `string` | optional | — | Required. Name of the Cloud Build V2 Repository. Format is projects/{project}/locations/{location}/connections/{connection}/repositories/{repository}. |
+| `customActions.includeSkaffoldModules[].googleCloudBuildRepo.repository` | — | `string` | required | — | Required. Name of the Cloud Build V2 Repository. Format is projects/{project}/locations/{location}/connections/{connection}/repositories/{repository}. |
 | `customActions.includeSkaffoldModules[].googleCloudStorage` | `google_cloud_storage` | `map` | optional | — | Optional. Cloud Storage bucket containing the Skaffold Config modules. |
 | `customActions.includeSkaffoldModules[].googleCloudStorage.path` | — | `string` | optional | — | Optional. Relative path from the source to the Skaffold file. |
-| `customActions.includeSkaffoldModules[].googleCloudStorage.source` | — | `string` | optional | — | Required. Cloud Storage source paths to copy recursively. For example, providing "gs://my-bucket/dir/configs/*" will result in Skaffold copying all files within the "dir/configs" directory in the … |
+| `customActions.includeSkaffoldModules[].googleCloudStorage.source` | — | `string` | required | — | Required. Cloud Storage source paths to copy recursively. For example, providing "gs://my-bucket/dir/configs/*" will result in Skaffold copying all files within the "dir/configs" directory in the … |
 | `customActions.renderAction` | `render_action` | `string` | optional | — | Optional. The Skaffold custom action responsible for render operations. If not provided then Cloud Deploy will perform the render operations via `skaffold render`. |
 | `customTargetTypeId` | `custom_target_type_id` | `string` | output only | — | Output only. Resource id of the `CustomTargetType`. |
 | `description` | — | `string` | optional | — | Optional. Description of the `CustomTargetType`. Max length is 255 characters. |

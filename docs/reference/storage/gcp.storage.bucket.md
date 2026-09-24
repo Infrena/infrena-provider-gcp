@@ -32,22 +32,22 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 
 ## Attributes
 
-146 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+148 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `acl` | — | `list` | optional | — | Access controls on the bucket. |
 | `acl[]` | — | `map` | optional | — | — |
 | `acl[].bucket` | — | `string` | optional | — | The name of the bucket. |
-| `acl[].domain` | — | `string` | optional | — | The domain associated with the entity, if any. |
-| `acl[].email` | — | `string` | optional | — | The email address associated with the entity, if any. |
+| `acl[].domain` | — | `string` | output only | — | The domain associated with the entity, if any. |
+| `acl[].email` | — | `string` | output only | — | The email address associated with the entity, if any. |
 | `acl[].entity` | — | `string` | optional | — | The entity holding the permission, in one of the following forms: - user-userId - user-email - group-groupId - group-email - domain-domain - project-team-projectId - allUsers - allAuthenticatedUsers … |
-| `acl[].entityId` | `entity_id` | `string` | output only | — | The ID for the entity, if any. |
+| `acl[].entityId` | `entity_id` | `string` | optional | — | The ID for the entity, if any. |
 | `acl[].etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
 | `acl[].id` | — | `string` | output only | — | The ID of the access-control entry. |
 | `acl[].kind` | — | `string` | optional | — | The kind of item this is. For bucket access control entries, this is always storage#bucketAccessControl. |
 | `acl[].projectTeam` | `project_team` | `map` | optional | — | The project team associated with the entity, if any. |
-| `acl[].projectTeam.projectNumber` | `project_number` | `string` | output only | — | The project number. |
+| `acl[].projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |
 | `acl[].projectTeam.team` | — | `string` | optional | — | The team. |
 | `acl[].role` | — | `string` | optional | — | The access permission for the entity. |
 | `acl[].selfLink` | `self_link` | `string` | optional | — | The link to this access-control entry. |
@@ -74,16 +74,18 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | `defaultObjectAcl` | `default_object_acl` | `list` | optional | force new | Default access controls to apply to new objects when no ACL is provided. |
 | `defaultObjectAcl[]` | — | `map` | optional | — | — |
 | `defaultObjectAcl[].bucket` | — | `string` | optional | — | The name of the bucket. |
-| `defaultObjectAcl[].domain` | — | `string` | optional | — | The domain associated with the entity, if any. |
-| `defaultObjectAcl[].email` | — | `string` | optional | — | The email address associated with the entity, if any. |
+| `defaultObjectAcl[].domain` | — | `string` | output only | — | The domain associated with the entity, if any. |
+| `defaultObjectAcl[].email` | — | `string` | output only | — | The email address associated with the entity, if any. |
 | `defaultObjectAcl[].entity` | — | `string` | optional | — | The entity holding the permission, in one of the following forms: - user-userId - user-email - group-groupId - group-email - domain-domain - project-team-projectId - allUsers - allAuthenticatedUsers … |
 | `defaultObjectAcl[].entityId` | `entity_id` | `string` | output only | — | The ID for the entity, if any. |
 | `defaultObjectAcl[].etag` | — | `string` | optional | — | HTTP 1.1 Entity tag for the access-control entry. |
-| `defaultObjectAcl[].generation` | — | `string` | optional | — | The content generation of the object, if applied to an object. |
+| `defaultObjectAcl[].generation` | — | `string` | output only | — | The content generation of the object, if applied to an object. |
 | `defaultObjectAcl[].id` | — | `string` | output only | — | The ID of the access-control entry. |
 | `defaultObjectAcl[].kind` | — | `string` | optional | — | The kind of item this is. For object access control entries, this is always storage#objectAccessControl. |
 | `defaultObjectAcl[].object` | — | `string` | optional | — | The name of the object, if applied to an object. |
-| `defaultObjectAcl[].projectTeam` | `project_team` | `map` | optional | same fields as `acl[].projectTeam` | The project team associated with the entity, if any. |
+| `defaultObjectAcl[].projectTeam` | `project_team` | `map` | output only | — | The project team associated with the entity, if any. |
+| `defaultObjectAcl[].projectTeam.projectNumber` | `project_number` | `string` | optional | — | The project number. |
+| `defaultObjectAcl[].projectTeam.team` | — | `string` | optional | — | The team. |
 | `defaultObjectAcl[].role` | — | `string` | optional | — | The access permission for the entity. |
 | `defaultObjectAcl[].selfLink` | `self_link` | `string` | optional | — | The link to this access-control entry. |
 | `encryption` | — | `map` | optional | — | Encryption configuration for a bucket. |

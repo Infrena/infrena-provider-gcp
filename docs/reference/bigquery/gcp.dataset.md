@@ -44,29 +44,29 @@ projects/{{project}}/datasets/{{dataset_id}}
 | `access[]` | — | `map` | optional | — | — |
 | `access[].condition` | — | `map` | optional | — | Optional. condition for the binding. If CEL expression in this field is true, this access binding will be considered |
 | `access[].condition.description` | — | `string` | optional | — | Optional. Description of the expression. This is a longer text which describes the expression, e.g. when hovered over it in a UI. |
-| `access[].condition.expression` | — | `string` | optional | — | Textual representation of an expression in Common Expression Language syntax. |
-| `access[].condition.location` | — | `string` | optional | force new | Optional. String indicating the location of the expression for error reporting, e.g. a file name and a position in the file. |
+| `access[].condition.expression` | — | `string` | required | — | Textual representation of an expression in Common Expression Language syntax. |
+| `access[].condition.location` | — | `string` | optional | — | Optional. String indicating the location of the expression for error reporting, e.g. a file name and a position in the file. |
 | `access[].condition.title` | — | `string` | optional | — | Optional. Title for the expression, i.e. a short string describing its purpose. This can be used e.g. in UIs which allow to enter the expression. |
 | `access[].dataset` | — | `map` | optional | — | \[Pick one\] A grant authorizing all resources of a particular type in a particular dataset access to this dataset. Only views are supported for now. The role field is not required when this field is … |
-| `access[].dataset.dataset` | — | `map` | optional | — | The dataset this entry applies to |
-| `access[].dataset.dataset.datasetId` | `dataset_id` | `string` | required | force new | Required. A unique ID for this dataset, without the project name. The ID must contain only letters (a-z, A-Z), numbers (0-9), or underscores (_). The maximum length is 1,024 characters. |
-| `access[].dataset.dataset.projectId` | `project_id` | `string` | optional | — | Optional. The ID of the project containing this dataset. |
-| `access[].dataset.targetTypes` | `target_types` | `list` | optional | — | Which resources in the dataset this entry applies to. Currently, only views are supported, but additional target types may be added in the future. |
+| `access[].dataset.dataset` | — | `map` | required | — | The dataset this entry applies to |
+| `access[].dataset.dataset.datasetId` | `dataset_id` | `string` | required | — | Required. A unique ID for this dataset, without the project name. The ID must contain only letters (a-z, A-Z), numbers (0-9), or underscores (_). The maximum length is 1,024 characters. |
+| `access[].dataset.dataset.projectId` | `project_id` | `string` | required | — | Optional. The ID of the project containing this dataset. |
+| `access[].dataset.targetTypes` | `target_types` | `list` | required | — | Which resources in the dataset this entry applies to. Currently, only views are supported, but additional target types may be added in the future. |
 | `access[].dataset.targetTypes[]` | — | `string` | optional | — | — |
 | `access[].domain` | — | `string` | optional | — | \[Pick one\] A domain to grant access to. Any users signed in with the domain specified will be granted the specified access. Example: "example.com". Maps to IAM policy member "domain:DOMAIN". |
 | `access[].groupByEmail` | `group_by_email` | `string` | optional | — | \[Pick one\] An email address of a Google Group to grant access to. Maps to IAM policy member "group:GROUP". |
 | `access[].iamMember` | `iam_member` | `string` | optional | — | \[Pick one\] Some other type of member that appears in the IAM Policy but isn't a user, group, domain, or special group. |
 | `access[].role` | — | `string` | optional | — | An IAM role ID that should be granted to the user, group, or domain specified in this access entry. The following legacy mappings will be applied: * `OWNER`: `roles/bigquery.dataOwner` * `WRITER` … |
 | `access[].routine` | — | `map` | optional | — | \[Pick one\] A routine from a different dataset to grant access to. Queries executed against that routine will have read access to views/tables/routines in this dataset. Only UDF is supported for … |
-| `access[].routine.datasetId` | `dataset_id` | `string` | required | force new | Required. The ID of the dataset containing this routine. |
-| `access[].routine.projectId` | `project_id` | `string` | optional | — | Required. The ID of the project containing this routine. |
-| `access[].routine.routineId` | `routine_id` | `string` | optional | — | Required. The ID of the routine. The ID must contain only letters (a-z, A-Z), numbers (0-9), or underscores (_). The maximum length is 256 characters. |
+| `access[].routine.datasetId` | `dataset_id` | `string` | required | — | Required. The ID of the dataset containing this routine. |
+| `access[].routine.projectId` | `project_id` | `string` | required | — | Required. The ID of the project containing this routine. |
+| `access[].routine.routineId` | `routine_id` | `string` | required | — | Required. The ID of the routine. The ID must contain only letters (a-z, A-Z), numbers (0-9), or underscores (_). The maximum length is 256 characters. |
 | `access[].specialGroup` | `special_group` | `string` | optional | — | \[Pick one\] A special group to grant access to. Possible values include: * projectOwners: Owners of the enclosing project. * projectReaders: Readers of the enclosing project. * projectWriters … |
 | `access[].userByEmail` | `user_by_email` | `string` | optional | — | \[Pick one\] An email address of a user to grant access to. For example: fred@example.com. Maps to IAM policy member "user:EMAIL" or "serviceAccount:EMAIL". |
 | `access[].view` | — | `map` | optional | — | \[Pick one\] A view from a different dataset to grant access to. Queries executed against that view will have read access to views/tables/routines in this dataset. The role field is not required when … |
-| `access[].view.datasetId` | `dataset_id` | `string` | required | force new | Required. The ID of the dataset containing this table. |
-| `access[].view.projectId` | `project_id` | `string` | optional | — | Required. The ID of the project containing this table. |
-| `access[].view.tableId` | `table_id` | `string` | optional | — | Required. The ID of the table. The ID can contain Unicode characters in category L (letter), M (mark), N (number), Pc (connector, including underscore), Pd (dash), and Zs (space). For more … |
+| `access[].view.datasetId` | `dataset_id` | `string` | required | — | Required. The ID of the dataset containing this table. |
+| `access[].view.projectId` | `project_id` | `string` | required | — | Required. The ID of the project containing this table. |
+| `access[].view.tableId` | `table_id` | `string` | required | — | Required. The ID of the table. The ID can contain Unicode characters in category L (letter), M (mark), N (number), Pc (connector, including underscore), Pd (dash), and Zs (space). For more … |
 | `catalogSource` | `catalog_source` | `string` | output only | — | Output only. The origin of the dataset, one of: * (Unset) - Native BigQuery Dataset * BIGLAKE - Dataset is backed by a namespace stored natively in Biglake |
 | `creationTime` | `creation_time` | `string` | output only | — | Output only. The time when this dataset was created, in milliseconds since the epoch. |
 | `datasetReference` | `dataset_reference` | `map` | required | force new | Required. A reference that identifies the dataset. |
@@ -96,7 +96,7 @@ projects/{{project}}/datasets/{{dataset_id}}
 | `linkedDatasetMetadata.linkState` | `link_state` | `string` | output only | — | Output only. Specifies whether Linked Dataset is currently in a linked state or not. |
 | `linkedDatasetSource` | `linked_dataset_source` | `map` | optional | — | Optional. The source dataset reference when the dataset is of type LINKED. For all other dataset types it is not set. This field cannot be updated once it is set. Any attempt to update this field … |
 | `linkedDatasetSource.sourceDataset` | `source_dataset` | `map` | optional | — | The source dataset reference contains project numbers and not project ids. |
-| `linkedDatasetSource.sourceDataset.datasetId` | `dataset_id` | `string` | required | force new | Required. A unique ID for this dataset, without the project name. The ID must contain only letters (a-z, A-Z), numbers (0-9), or underscores (_). The maximum length is 1,024 characters. |
+| `linkedDatasetSource.sourceDataset.datasetId` | `dataset_id` | `string` | optional | — | Required. A unique ID for this dataset, without the project name. The ID must contain only letters (a-z, A-Z), numbers (0-9), or underscores (_). The maximum length is 1,024 characters. |
 | `linkedDatasetSource.sourceDataset.projectId` | `project_id` | `string` | optional | — | Optional. The ID of the project containing this dataset. |
 | `location` | — | `string` | optional | force new | The geographic location where the dataset should reside. See https://cloud.google.com/bigquery/docs/locations for supported locations. |
 | `maxTimeTravelHours` | `max_time_travel_hours` | `string` | optional | — | Optional. Defines the time travel window in hours. The value can be from 48 to 168 hours (2 to 7 days). The default value is 168 hours if this is not set. |

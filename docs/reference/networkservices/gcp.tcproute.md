@@ -47,7 +47,7 @@ projects/{{project}}/locations/global/tcpRoutes/{{name}}
 | `name` | — | `string` | required | force new | Identifier. Name of the TcpRoute resource. It matches pattern `projects/*/locations/*/tcpRoutes/tcp_route_name>`. |
 | `rules` | — | `list` | required | — | Required. Rules that define how traffic is routed and handled. At least one RouteRule must be supplied. If there are multiple rules then the action taken will be the first rule to match. |
 | `rules[]` | — | `map` | optional | — | — |
-| `rules[].action` | — | `map` | optional | — | Required. The detailed rule defining how to route matched traffic. |
+| `rules[].action` | — | `map` | required | — | Required. The detailed rule defining how to route matched traffic. |
 | `rules[].action.destinations` | — | `list` | optional | — | Optional. The destination services to which traffic should be forwarded. At least one destination service is required. Only one of route destination or original destination can be set. |
 | `rules[].action.destinations[]` | — | `map` | optional | — | — |
 | `rules[].action.destinations[].serviceName` | `service_name` | `string` | optional | — | Required. The URL of a BackendService to route traffic to. |
@@ -56,7 +56,7 @@ projects/{{project}}/locations/global/tcpRoutes/{{name}}
 | `rules[].action.originalDestination` | `original_destination` | `boolean` | optional | — | Optional. If true, Router will use the destination IP and port of the original connection as the destination of the request. Default is false. Only one of route destinations or original destination … |
 | `rules[].matches` | — | `list` | optional | — | Optional. RouteMatch defines the predicate used to match requests to a given action. Multiple match types are "OR"ed for evaluation. If no routeMatch field is specified, this rule will … |
 | `rules[].matches[]` | — | `map` | optional | — | — |
-| `rules[].matches[].address` | — | `string` | optional | — | Required. Must be specified in the CIDR range format. A CIDR range consists of an IP Address and a prefix length to construct the subnet mask. By default, the prefix length is 32 (i.e. matches a … |
-| `rules[].matches[].port` | — | `string` | optional | — | Required. Specifies the destination port to match against. |
+| `rules[].matches[].address` | — | `string` | required | — | Required. Must be specified in the CIDR range format. A CIDR range consists of an IP Address and a prefix length to construct the subnet mask. By default, the prefix length is 32 (i.e. matches a … |
+| `rules[].matches[].port` | — | `string` | required | — | Required. Specifies the destination port to match against. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. Server-defined URL of this resource |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the resource was updated. |

@@ -53,7 +53,7 @@ projects/{project}/regions/{region}/vpnGateways/{vpnGateway}
 | `vpnInterfaces` | `vpn_interfaces` | `list` | optional | — | The list of VPN interfaces associated with this VPN gateway. |
 | `vpnInterfaces[]` | — | `map` | optional | — | — |
 | `vpnInterfaces[].id` | — | `integer` | output only | — | Output only. \[Output Only\] Numeric identifier for this VPN interface associated with the VPN gateway. |
-| `vpnInterfaces[].interconnectAttachment` | `interconnect_attachment` | `string` | optional | — | URL of the VLAN attachment (interconnectAttachment) resource for this VPN gateway interface. When the value of this field is present, the VPN gateway is used for HA VPN over Cloud Interconnect; all … |
+| `vpnInterfaces[].interconnectAttachment` | `interconnect_attachment` | `string` | optional | force new | URL of the VLAN attachment (interconnectAttachment) resource for this VPN gateway interface. When the value of this field is present, the VPN gateway is used for HA VPN over Cloud Interconnect; all … |
 | `vpnInterfaces[].ipAddress` | `ip_address` | `string` | output only | — | Output only. \[Output Only\] IP address for this VPN interface associated with the VPN gateway. The IP address could be either a regional external IP address or a regional internal IP address. The … |
 | `vpnInterfaces[].ipv6Address` | `ipv6_address` | `string` | output only | — | Output only. \[Output Only\] IPv6 address for this VPN interface associated with the VPN gateway. The IPv6 address must be a regional external IPv6 address. The format is RFC 5952 format (e.g … |
 

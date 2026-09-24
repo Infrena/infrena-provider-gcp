@@ -42,16 +42,16 @@ projects/{{project}}/locations/{{location}}/connections/{{name}}
 | --- | --- | --- | --- | --- | --- |
 | `annotations` | — | `map` | optional | opaque | Optional. Allows clients to store small amounts of arbitrary data. |
 | `bitbucketCloudConfig` | `bitbucket_cloud_config` | `map` | optional | — | Configuration for connections to Bitbucket Cloud. |
-| `bitbucketCloudConfig.authorizerCredential` | `authorizer_credential` | `map` | optional | — | Required. An access token with the `webhook`, `repository`, `repository:admin` and `pullrequest` scope access. It can be either a workspace, project or repository access token. It's recommended to … |
+| `bitbucketCloudConfig.authorizerCredential` | `authorizer_credential` | `map` | required | — | Required. An access token with the `webhook`, `repository`, `repository:admin` and `pullrequest` scope access. It can be either a workspace, project or repository access token. It's recommended to … |
 | `bitbucketCloudConfig.authorizerCredential.userTokenSecretVersion` | `user_token_secret_version` | `string` | required | — | Required. A SecretManager resource containing the user token that authorizes the Cloud Build connection. Format: `projects/*/secrets/*/versions/*`. |
 | `bitbucketCloudConfig.authorizerCredential.username` | — | `string` | output only | — | Output only. The username associated to this token. |
 | `bitbucketCloudConfig.readAuthorizerCredential` | `read_authorizer_credential` | `map` | required | — | Required. An access token with the `repository` access. It can be either a workspace, project or repository access token. It's recommended to use a system account to generate the credentials. |
 | `bitbucketCloudConfig.readAuthorizerCredential.userTokenSecretVersion` | `user_token_secret_version` | `string` | required | — | Required. A SecretManager resource containing the user token that authorizes the Cloud Build connection. Format: `projects/*/secrets/*/versions/*`. |
 | `bitbucketCloudConfig.readAuthorizerCredential.username` | — | `string` | output only | — | Output only. The username associated to this token. |
-| `bitbucketCloudConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | optional | — | Required. SecretManager resource containing the webhook secret used to verify webhook events, formatted as `projects/*/secrets/*/versions/*`. |
+| `bitbucketCloudConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | required | force new | Required. SecretManager resource containing the webhook secret used to verify webhook events, formatted as `projects/*/secrets/*/versions/*`. |
 | `bitbucketCloudConfig.workspace` | — | `string` | required | — | Required. The Bitbucket Cloud Workspace ID to be connected to Google Cloud Platform. |
 | `bitbucketDataCenterConfig` | `bitbucket_data_center_config` | `map` | optional | — | Configuration for connections to Bitbucket Data Center. |
-| `bitbucketDataCenterConfig.authorizerCredential` | `authorizer_credential` | `map` | optional | — | Required. A http access token with the `REPO_ADMIN` scope access. |
+| `bitbucketDataCenterConfig.authorizerCredential` | `authorizer_credential` | `map` | required | — | Required. A http access token with the `REPO_ADMIN` scope access. |
 | `bitbucketDataCenterConfig.authorizerCredential.userTokenSecretVersion` | `user_token_secret_version` | `string` | required | — | Required. A SecretManager resource containing the user token that authorizes the Cloud Build connection. Format: `projects/*/secrets/*/versions/*`. |
 | `bitbucketDataCenterConfig.authorizerCredential.username` | — | `string` | output only | — | Output only. The username associated to this token. |
 | `bitbucketDataCenterConfig.hostUri` | `host_uri` | `string` | required | — | Required. The URI of the Bitbucket Data Center instance or cluster this connection is for. |
@@ -62,7 +62,7 @@ projects/{{project}}/locations/{{location}}/connections/{{name}}
 | `bitbucketDataCenterConfig.serviceDirectoryConfig` | `service_directory_config` | `map` | optional | — | Optional. Configuration for using Service Directory to privately connect to a Bitbucket Data Center. This should only be set if the Bitbucket Data Center is hosted on-premises and not reachable by … |
 | `bitbucketDataCenterConfig.serviceDirectoryConfig.service` | — | `string` | required | — | Required. The Service Directory service name. Format: projects/{project}/locations/{location}/namespaces/{namespace}/services/{service}. |
 | `bitbucketDataCenterConfig.sslCa` | `ssl_ca` | `string` | optional | — | Optional. SSL certificate to use for requests to the Bitbucket Data Center. |
-| `bitbucketDataCenterConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | optional | force new | Required. Immutable. SecretManager resource containing the webhook secret used to verify webhook events, formatted as `projects/*/secrets/*/versions/*`. |
+| `bitbucketDataCenterConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | required | force new | Required. Immutable. SecretManager resource containing the webhook secret used to verify webhook events, formatted as `projects/*/secrets/*/versions/*`. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. Server assigned timestamp for when the connection was created. |
 | `disabled` | — | `boolean` | optional | — | Optional. If disabled is set to true, functionality is disabled for this connection. Repository based API methods and webhooks processing for repositories in this connection will be disabled. |
 | `etag` | — | `string` | optional | — | This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
@@ -84,10 +84,10 @@ projects/{{project}}/locations/{{location}}/connections/{{name}}
 | `githubEnterpriseConfig.sslCa` | `ssl_ca` | `string` | optional | — | Optional. SSL certificate to use for requests to GitHub Enterprise. |
 | `githubEnterpriseConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | optional | — | Optional. SecretManager resource containing the webhook secret of the GitHub App, formatted as `projects/*/secrets/*/versions/*`. |
 | `gitlabConfig` | `gitlab_config` | `map` | optional | — | Configuration for connections to gitlab.com or an instance of GitLab Enterprise. |
-| `gitlabConfig.authorizerCredential` | `authorizer_credential` | `map` | optional | — | Required. A GitLab personal access token with the `api` scope access. |
+| `gitlabConfig.authorizerCredential` | `authorizer_credential` | `map` | required | — | Required. A GitLab personal access token with the `api` scope access. |
 | `gitlabConfig.authorizerCredential.userTokenSecretVersion` | `user_token_secret_version` | `string` | required | — | Required. A SecretManager resource containing the user token that authorizes the Cloud Build connection. Format: `projects/*/secrets/*/versions/*`. |
 | `gitlabConfig.authorizerCredential.username` | — | `string` | output only | — | Output only. The username associated to this token. |
-| `gitlabConfig.hostUri` | `host_uri` | `string` | required | — | Optional. The URI of the GitLab Enterprise host this connection is for. If not specified, the default value is https://gitlab.com. |
+| `gitlabConfig.hostUri` | `host_uri` | `string` | optional | — | Optional. The URI of the GitLab Enterprise host this connection is for. If not specified, the default value is https://gitlab.com. |
 | `gitlabConfig.readAuthorizerCredential` | `read_authorizer_credential` | `map` | required | — | Required. A GitLab personal access token with the minimum `read_api` scope access. |
 | `gitlabConfig.readAuthorizerCredential.userTokenSecretVersion` | `user_token_secret_version` | `string` | required | — | Required. A SecretManager resource containing the user token that authorizes the Cloud Build connection. Format: `projects/*/secrets/*/versions/*`. |
 | `gitlabConfig.readAuthorizerCredential.username` | — | `string` | output only | — | Output only. The username associated to this token. |
@@ -95,7 +95,7 @@ projects/{{project}}/locations/{{location}}/connections/{{name}}
 | `gitlabConfig.serviceDirectoryConfig` | `service_directory_config` | `map` | optional | — | Optional. Configuration for using Service Directory to privately connect to a GitLab Enterprise server. This should only be set if the GitLab Enterprise server is hosted on-premises and not reachable … |
 | `gitlabConfig.serviceDirectoryConfig.service` | — | `string` | required | — | Required. The Service Directory service name. Format: projects/{project}/locations/{location}/namespaces/{namespace}/services/{service}. |
 | `gitlabConfig.sslCa` | `ssl_ca` | `string` | optional | — | Optional. SSL certificate to use for requests to GitLab Enterprise. |
-| `gitlabConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | optional | force new | Required. Immutable. SecretManager resource containing the webhook secret of a GitLab Enterprise project, formatted as `projects/*/secrets/*/versions/*`. |
+| `gitlabConfig.webhookSecretSecretVersion` | `webhook_secret_secret_version` | `string` | required | force new | Required. Immutable. SecretManager resource containing the webhook secret of a GitLab Enterprise project, formatted as `projects/*/secrets/*/versions/*`. |
 | `installationState` | `installation_state` | `map` | output only | — | Output only. Installation state of the Connection. |
 | `installationState.actionUri` | `action_uri` | `string` | output only | — | Output only. Link to follow for next action. Empty string if the installation is already complete. |
 | `installationState.message` | — | `string` | output only | — | Output only. Message of what the user should do next to continue the installation. Empty string if the installation is already complete. |

@@ -38,7 +38,7 @@ projects/{{project}}/regions/{{region}}/packetMirrorings/{{name}}
 | --- | --- | --- | --- | --- | --- |
 | `collectorIlb` | `collector_ilb` | `map` | required | — | The Forwarding Rule resource of typeloadBalancingScheme=INTERNAL that will be used as collector for mirrored traffic. The specified forwarding rule must have isMirroringCollector set to true. |
 | `collectorIlb.canonicalUrl` | `canonical_url` | `string` | output only | — | Output only. \[Output Only\] Unique identifier for the forwarding rule; defined by the server. |
-| `collectorIlb.url` | — | `string` | required | force new | Resource URL to the forwarding rule representing the ILB configured as destination of the mirrored traffic. |
+| `collectorIlb.url` | — | `string` | required | — | Resource URL to the forwarding rule representing the ILB configured as destination of the mirrored traffic. |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
 | `enable` | — | `string` | optional | — | Indicates whether or not this packet mirroring takes effect. If set to FALSE, this packet mirroring policy will not be enforced on the network. The default is TRUE. |
@@ -54,11 +54,11 @@ projects/{{project}}/regions/{{region}}/packetMirrorings/{{name}}
 | `mirroredResources.instances` | — | `list` | optional | unordered | A set of virtual machine instances that are being mirrored. They must live in zones contained in the same region as this packetMirroring. Note that this config will apply only to those network … |
 | `mirroredResources.instances[]` | — | `map` | optional | — | — |
 | `mirroredResources.instances[].canonicalUrl` | `canonical_url` | `string` | output only | — | Output only. \[Output Only\] Unique identifier for the instance; defined by the server. |
-| `mirroredResources.instances[].url` | — | `string` | required | force new | Resource URL to the virtual machine instance which is being mirrored. |
+| `mirroredResources.instances[].url` | — | `string` | required | — | Resource URL to the virtual machine instance which is being mirrored. |
 | `mirroredResources.subnetworks` | — | `list` | optional | unordered | A set of subnetworks for which traffic from/to all VM instances will be mirrored. They must live in the same region as this packetMirroring. You may specify a maximum of 5 subnetworks. |
 | `mirroredResources.subnetworks[]` | — | `map` | optional | — | — |
 | `mirroredResources.subnetworks[].canonicalUrl` | `canonical_url` | `string` | output only | — | Output only. \[Output Only\] Unique identifier for the subnetwork; defined by the server. |
-| `mirroredResources.subnetworks[].url` | — | `string` | required | force new | Resource URL to the subnetwork for which traffic from/to all VM instances will be mirrored. |
+| `mirroredResources.subnetworks[].url` | — | `string` | required | — | Resource URL to the subnetwork for which traffic from/to all VM instances will be mirrored. |
 | `mirroredResources.tags` | — | `list` | optional | — | A set of mirrored tags. Traffic from/to all VM instances that have one or more of these tags will be mirrored. |
 | `mirroredResources.tags[]` | — | `string` | optional | — | — |
 | `name` | — | `string` | required | — | Name of the resource; provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |

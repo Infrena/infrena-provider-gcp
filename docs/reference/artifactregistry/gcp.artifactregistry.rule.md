@@ -41,7 +41,7 @@ projects/{{project}}/locations/{{location}}/repositories/{{repository_id}}/rules
 | `condition` | — | `map` | optional | — | Optional. A CEL expression for conditions that must be met in order for the rule to apply. If not provided, the rule matches all objects. |
 | `condition.description` | — | `string` | optional | — | Optional. Description of the expression. This is a longer text which describes the expression, e.g. when hovered over it in a UI. |
 | `condition.expression` | — | `string` | required | — | Textual representation of an expression in Common Expression Language syntax. |
-| `condition.location` | — | `string` | optional | force new | Optional. String indicating the location of the expression for error reporting, e.g. a file name and a position in the file. |
+| `condition.location` | — | `string` | optional | — | Optional. String indicating the location of the expression for error reporting, e.g. a file name and a position in the file. |
 | `condition.title` | — | `string` | optional | — | Optional. Title for the expression, i.e. a short string describing its purpose. This can be used e.g. in UIs which allow to enter the expression. |
 | `name` | — | `string` | output only | — | The name of the rule, for example: `projects/p1/locations/us-central1/repositories/repo1/rules/rule1`. |
 | `operation` | — | `string` | optional | — | — |

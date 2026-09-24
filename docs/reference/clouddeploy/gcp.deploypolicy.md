@@ -49,31 +49,31 @@ projects/{{project}}/locations/{{location}}/deployPolicies/{{name}}
 | `rules[].rolloutRestriction` | `rollout_restriction` | `map` | optional | — | Optional. Rollout restrictions. |
 | `rules[].rolloutRestriction.actions` | — | `list` | optional | — | Optional. Rollout actions to be restricted as part of the policy. If left empty, all actions will be restricted. |
 | `rules[].rolloutRestriction.actions[]` | — | `string` | optional | — | — |
-| `rules[].rolloutRestriction.id` | — | `string` | optional | — | Required. Restriction rule ID. Required and must be unique within a DeployPolicy. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
+| `rules[].rolloutRestriction.id` | — | `string` | required | — | Required. Restriction rule ID. Required and must be unique within a DeployPolicy. The format is `\[a-z\](\[a-z0-9-\]{0,61}\[a-z0-9\])?`. |
 | `rules[].rolloutRestriction.invokers` | — | `list` | optional | — | Optional. What invoked the action. If left empty, all invoker types will be restricted. |
 | `rules[].rolloutRestriction.invokers[]` | — | `string` | optional | — | — |
 | `rules[].rolloutRestriction.timeWindows` | `time_windows` | `map` | optional | — | Required. Time window within which actions are restricted. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows` | `one_time_windows` | `list` | optional | — | Optional. One-time windows within which actions are restricted. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[]` | — | `map` | optional | — | — |
-| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endDate` | `end_date` | `map` | optional | — | Required. End date. |
+| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endDate` | `end_date` | `map` | required | — | Required. End date. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endDate.day` | — | `integer` | optional | — | Day of a month. Must be from 1 to 31 and valid for the year and month, or 0 to specify a year by itself or a year and month where the day isn't significant. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endDate.month` | — | `integer` | optional | — | Month of a year. Must be from 1 to 12, or 0 to specify a year without a month and day. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endDate.year` | — | `integer` | optional | — | Year of the date. Must be from 1 to 9999, or 0 to specify a date without a year. |
-| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endTime` | `end_time` | `map` | optional | — | Required. End time (exclusive). You may use 24:00 for the end of the day. |
+| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endTime` | `end_time` | `map` | required | — | Required. End time (exclusive). You may use 24:00 for the end of the day. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endTime.hours` | — | `integer` | optional | — | Hours of a day in 24 hour format. Must be greater than or equal to 0 and typically must be less than or equal to 23. An API may choose to allow the value "24:00:00" for scenarios like business … |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endTime.minutes` | — | `integer` | optional | — | Minutes of an hour. Must be greater than or equal to 0 and less than or equal to 59. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endTime.nanos` | — | `integer` | optional | — | Fractions of seconds, in nanoseconds. Must be greater than or equal to 0 and less than or equal to 999,999,999. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].endTime.seconds` | — | `integer` | optional | — | Seconds of a minute. Must be greater than or equal to 0 and typically must be less than or equal to 59. An API may allow the value 60 if it allows leap-seconds. |
-| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startDate` | `start_date` | `map` | optional | — | Required. Start date. |
+| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startDate` | `start_date` | `map` | required | — | Required. Start date. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startDate.day` | — | `integer` | optional | — | Day of a month. Must be from 1 to 31 and valid for the year and month, or 0 to specify a year by itself or a year and month where the day isn't significant. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startDate.month` | — | `integer` | optional | — | Month of a year. Must be from 1 to 12, or 0 to specify a year without a month and day. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startDate.year` | — | `integer` | optional | — | Year of the date. Must be from 1 to 9999, or 0 to specify a date without a year. |
-| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startTime` | `start_time` | `map` | optional | — | Required. Start time (inclusive). Use 00:00 for the beginning of the day. |
+| `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startTime` | `start_time` | `map` | required | — | Required. Start time (inclusive). Use 00:00 for the beginning of the day. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startTime.hours` | — | `integer` | optional | — | Hours of a day in 24 hour format. Must be greater than or equal to 0 and typically must be less than or equal to 23. An API may choose to allow the value "24:00:00" for scenarios like business … |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startTime.minutes` | — | `integer` | optional | — | Minutes of an hour. Must be greater than or equal to 0 and less than or equal to 59. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startTime.nanos` | — | `integer` | optional | — | Fractions of seconds, in nanoseconds. Must be greater than or equal to 0 and less than or equal to 999,999,999. |
 | `rules[].rolloutRestriction.timeWindows.oneTimeWindows[].startTime.seconds` | — | `integer` | optional | — | Seconds of a minute. Must be greater than or equal to 0 and typically must be less than or equal to 59. An API may allow the value 60 if it allows leap-seconds. |
-| `rules[].rolloutRestriction.timeWindows.timeZone` | `time_zone` | `string` | optional | — | Required. The time zone in IANA format \[IANA Time Zone Database\](https://www.iana.org/time-zones) (e.g. America/New_York). |
+| `rules[].rolloutRestriction.timeWindows.timeZone` | `time_zone` | `string` | required | — | Required. The time zone in IANA format \[IANA Time Zone Database\](https://www.iana.org/time-zones) (e.g. America/New_York). |
 | `rules[].rolloutRestriction.timeWindows.weeklyWindows` | `weekly_windows` | `list` | optional | — | Optional. Recurring weekly windows within which actions are restricted. |
 | `rules[].rolloutRestriction.timeWindows.weeklyWindows[]` | — | `map` | optional | — | — |
 | `rules[].rolloutRestriction.timeWindows.weeklyWindows[].daysOfWeek` | `days_of_week` | `list` | optional | — | Optional. Days of week. If left empty, all days of the week will be included. |

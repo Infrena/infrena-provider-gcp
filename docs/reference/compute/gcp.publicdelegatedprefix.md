@@ -56,11 +56,11 @@ projects/{project}/regions/{region}/publicDelegatedPrefixes/{publicDelegatedPref
 | `publicDelegatedSubPrefixs[].delegateeProject` | `delegatee_project` | `string` | optional | — | Name of the project scoping this PublicDelegatedSubPrefix. |
 | `publicDelegatedSubPrefixs[].description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
 | `publicDelegatedSubPrefixs[].enableEnhancedIpv4Allocation` | `enable_enhanced_ipv4_allocation` | `boolean` | output only | — | Output only. \[Output Only\] Whether this PDP supports enhanced IPv4 allocations. Applicable for IPv4 PDPs only. |
-| `publicDelegatedSubPrefixs[].ipCidrRange` | `ip_cidr_range` | `string` | required | — | The IP address range, in CIDR format, represented by this sub public delegated prefix. |
+| `publicDelegatedSubPrefixs[].ipCidrRange` | `ip_cidr_range` | `string` | optional | — | The IP address range, in CIDR format, represented by this sub public delegated prefix. |
 | `publicDelegatedSubPrefixs[].ipv6AccessType` | `ipv6_access_type` | `string` | output only | — | Output only. \[Output Only\] The internet access type for IPv6 Public Delegated Sub Prefixes. Inherited from parent prefix. |
 | `publicDelegatedSubPrefixs[].isAddress` | `is_address` | `boolean` | optional | — | Whether the sub prefix is delegated to create Address resources in the delegatee project. |
 | `publicDelegatedSubPrefixs[].mode` | — | `string` | optional | — | The PublicDelegatedSubPrefix mode for IPv6 only. |
-| `publicDelegatedSubPrefixs[].name` | — | `string` | required | — | The name of the sub public delegated prefix. |
+| `publicDelegatedSubPrefixs[].name` | — | `string` | optional | — | The name of the sub public delegated prefix. |
 | `publicDelegatedSubPrefixs[].region` | — | `string` | output only | — | Output only. \[Output Only\] The region of the sub public delegated prefix if it is regional. If absent, the sub prefix is global. |
 | `publicDelegatedSubPrefixs[].status` | — | `string` | output only | — | Output only. \[Output Only\] The status of the sub public delegated prefix. |
 | `region` | — | `string` | output only | — | Output only. \[Output Only\] URL of the region where the public delegated prefix resides. This field applies only to the region resource. You must specify this field as part of the HTTP request URL … |

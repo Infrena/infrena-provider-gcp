@@ -41,7 +41,7 @@ projects/{{project}}/global/firewallPolicies/{{name}}
 | `associations[].attachmentTarget` | `attachment_target` | `string` | optional | — | The target that the firewall policy is attached to. |
 | `associations[].displayName` | `display_name` | `string` | output only | — | \[Output Only\] Deprecated, please use short name instead. The display name of the firewall policy of the association. |
 | `associations[].firewallPolicyId` | `firewall_policy_id` | `string` | output only | — | Output only. \[Output Only\] The firewall policy ID of the association. |
-| `associations[].name` | — | `string` | required | force new | The name for an association. |
+| `associations[].name` | — | `string` | optional | — | The name for an association. |
 | `associations[].priority` | — | `integer` | optional | — | An integer indicating the priority of an association. The priority must be a positive value between 1 and 2147483647. Firewall Policies are evaluated from highest to lowest priority where 1 is the … |
 | `associations[].shortName` | `short_name` | `string` | output only | — | Output only. \[Output Only\] The short name of the firewall policy of the association. |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
@@ -91,7 +91,7 @@ projects/{{project}}/global/firewallPolicies/{{name}}
 | `packetMirroringRules[].match.srcRegionCodes[]` | — | `string` | optional | — | — |
 | `packetMirroringRules[].match.srcSecureTags` | `src_secure_tags` | `list` | optional | — | List of secure tag values, which should be matched at the source of the traffic. For INGRESS rule, if all the srcSecureTag are INEFFECTIVE, and there is no srcIpRange, this rule will be ignored … |
 | `packetMirroringRules[].match.srcSecureTags[]` | — | `map` | optional | — | — |
-| `packetMirroringRules[].match.srcSecureTags[].name` | — | `string` | required | force new | Name of the secure tag, created with TagManager's TagValue API. |
+| `packetMirroringRules[].match.srcSecureTags[].name` | — | `string` | optional | — | Name of the secure tag, created with TagManager's TagValue API. |
 | `packetMirroringRules[].match.srcSecureTags[].state` | — | `string` | output only | — | Output only. \[Output Only\] State of the secure tag, either `EFFECTIVE` or `INEFFECTIVE`. A secure tag is `INEFFECTIVE` when it is deleted or its network is deleted. |
 | `packetMirroringRules[].match.srcThreatIntelligences` | `src_threat_intelligences` | `list` | optional | — | Names of Network Threat Intelligence lists. The IPs in these lists will be matched against traffic source. |
 | `packetMirroringRules[].match.srcThreatIntelligences[]` | — | `string` | optional | — | — |
@@ -105,7 +105,7 @@ projects/{{project}}/global/firewallPolicies/{{name}}
 | `packetMirroringRules[].targetResources[]` | — | `string` | optional | — | — |
 | `packetMirroringRules[].targetSecureTags` | `target_secure_tags` | `list` | optional | — | A list of secure tags that controls which instances the firewall rule applies to. If targetSecureTag are specified, then the firewall rule applies only to instances in the VPC network that have one … |
 | `packetMirroringRules[].targetSecureTags[]` | — | `map` | optional | — | — |
-| `packetMirroringRules[].targetSecureTags[].name` | — | `string` | required | force new | Name of the secure tag, created with TagManager's TagValue API. |
+| `packetMirroringRules[].targetSecureTags[].name` | — | `string` | optional | — | Name of the secure tag, created with TagManager's TagValue API. |
 | `packetMirroringRules[].targetSecureTags[].state` | — | `string` | output only | — | Output only. \[Output Only\] State of the secure tag, either `EFFECTIVE` or `INEFFECTIVE`. A secure tag is `INEFFECTIVE` when it is deleted or its network is deleted. |
 | `packetMirroringRules[].targetServiceAccounts` | `target_service_accounts` | `list` | optional | — | A list of service accounts indicating the sets of instances that are applied with this rule. |
 | `packetMirroringRules[].targetServiceAccounts[]` | — | `string` | optional | — | — |

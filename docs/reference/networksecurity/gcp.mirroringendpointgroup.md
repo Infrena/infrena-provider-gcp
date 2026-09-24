@@ -39,16 +39,16 @@ projects/{{project}}/locations/{{location}}/mirroringEndpointGroups/{{mirroring_
 | --- | --- | --- | --- | --- | --- |
 | `associations` | — | `list` | output only | unordered | Output only. List of associations to this endpoint group. |
 | `associations[]` | — | `map` | optional | — | — |
-| `associations[].name` | — | `string` | output only | force new | Output only. The connected association's resource name, for example: `projects/123456789/locations/global/mirroringEndpointGroupAssociations/my-ega`. See https://google.aip.dev/124. |
+| `associations[].name` | — | `string` | output only | — | Output only. The connected association's resource name, for example: `projects/123456789/locations/global/mirroringEndpointGroupAssociations/my-ega`. See https://google.aip.dev/124. |
 | `associations[].network` | — | `string` | output only | — | Output only. The associated network, for example: projects/123456789/global/networks/my-network. See https://google.aip.dev/124. |
 | `associations[].state` | — | `string` | output only | — | Output only. Most recent known state of the association. |
 | `connectedDeploymentGroups` | `connected_deployment_groups` | `list` | output only | unordered | Output only. List of details about the connected deployment groups to this endpoint group. |
 | `connectedDeploymentGroups[]` | — | `map` | optional | — | — |
-| `connectedDeploymentGroups[].locations` | — | `list` | output only | — | Output only. The list of locations where the deployment group is present. |
+| `connectedDeploymentGroups[].locations` | — | `list` | output only | unordered | Output only. The list of locations where the deployment group is present. |
 | `connectedDeploymentGroups[].locations[]` | — | `map` | optional | — | — |
-| `connectedDeploymentGroups[].locations[].location` | — | `string` | output only | force new | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
+| `connectedDeploymentGroups[].locations[].location` | — | `string` | output only | — | Output only. The cloud location, e.g. "us-central1-a" or "asia-south1". |
 | `connectedDeploymentGroups[].locations[].state` | — | `string` | output only | — | Output only. The current state of the association in this location. |
-| `connectedDeploymentGroups[].name` | — | `string` | output only | force new | Output only. The connected deployment group's resource name, for example: `projects/123456789/locations/global/mirroringDeploymentGroups/my-dg`. See https://google.aip.dev/124. |
+| `connectedDeploymentGroups[].name` | — | `string` | output only | — | Output only. The connected deployment group's resource name, for example: `projects/123456789/locations/global/mirroringDeploymentGroups/my-dg`. See https://google.aip.dev/124. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the resource was created. See https://google.aip.dev/148#timestamps. |
 | `description` | — | `string` | optional | — | Optional. User-provided description of the endpoint group. Used as additional context for the endpoint group. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels are key/value pairs that help to organize and filter resources. |

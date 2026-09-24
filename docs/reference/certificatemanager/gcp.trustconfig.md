@@ -39,7 +39,7 @@ projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}
 | --- | --- | --- | --- | --- | --- |
 | `allowlistedCertificates` | `allowlisted_certificates` | `list` | optional | — | Optional. A certificate matching an allowlisted certificate is always considered valid as long as the certificate is parseable, proof of private key possession is established, and constraints on the … |
 | `allowlistedCertificates[]` | — | `map` | optional | — | — |
-| `allowlistedCertificates[].pemCertificate` | `pem_certificate` | `string` | optional | — | Required. PEM certificate that is allowlisted. The certificate can be up to 5k bytes, and must be a parseable X.509 certificate. |
+| `allowlistedCertificates[].pemCertificate` | `pem_certificate` | `string` | required | — | Required. PEM certificate that is allowlisted. The certificate can be up to 5k bytes, and must be a parseable X.509 certificate. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation timestamp of a TrustConfig. |
 | `description` | — | `string` | optional | — | Optional. One or more paragraphs of text description of a TrustConfig. |
 | `etag` | — | `string` | optional | — | This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
@@ -51,8 +51,8 @@ projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}
 | `trustStores[]` | — | `map` | optional | — | — |
 | `trustStores[].intermediateCas` | `intermediate_cas` | `list` | optional | — | Optional. Set of intermediate CA certificates used for the path building phase of chain validation. The field is currently not supported if TrustConfig is used for the workload certificate feature. |
 | `trustStores[].intermediateCas[]` | — | `map` | optional | — | — |
-| `trustStores[].intermediateCas[].pemCertificate` | `pem_certificate` | `string` | optional | — | PEM intermediate certificate used for building up paths for validation. Each certificate provided in PEM format may occupy up to 5kB. |
+| `trustStores[].intermediateCas[].pemCertificate` | `pem_certificate` | `string` | optional | sensitive | PEM intermediate certificate used for building up paths for validation. Each certificate provided in PEM format may occupy up to 5kB. |
 | `trustStores[].trustAnchors` | `trust_anchors` | `list` | optional | — | Optional. List of Trust Anchors to be used while performing validation against a given TrustStore. |
 | `trustStores[].trustAnchors[]` | — | `map` | optional | — | — |
-| `trustStores[].trustAnchors[].pemCertificate` | `pem_certificate` | `string` | optional | — | PEM root certificate of the PKI used for validation. Each certificate provided in PEM format may occupy up to 5kB. |
+| `trustStores[].trustAnchors[].pemCertificate` | `pem_certificate` | `string` | optional | sensitive | PEM root certificate of the PKI used for validation. Each certificate provided in PEM format may occupy up to 5kB. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last update timestamp of a TrustConfig. |
