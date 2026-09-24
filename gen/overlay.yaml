@@ -276,6 +276,22 @@ rulings:
   #     choosing two published names, and gen/names.lock.json only grows, so that
   #     is a permanent decision and not one to make in passing.
   #
+  #     It is a ONE-OFF, not a family. Measured across every pinned Discovery
+  #     document on 2026-09-23: exactly two bare/locations collection pairs exist,
+  #     both in secretmanager, and only projects.secrets vs
+  #     projects.locations.secrets is a real create/get/delete pair. So this needs
+  #     one decision about two names, not a pathWalker redesign.
+  #
+  #     An earlier version of this comment said logging/LogScope has the same
+  #     shape and would hit the same wall. THAT WAS WRONG, and inferred from the
+  #     duplicate warning lines without looking at the collections. LogScope's
+  #     three are projects/folders/organizations.locations.logScopes -- the SCOPE
+  #     variants build.go already separates. Probed by ruling it: it produces
+  #     gcp.logscope, gcp.logging.folder.logscope and
+  #     gcp.logging.organization.logscope with no collision at all. It is blocked
+  #     by something else entirely -- all three are {+parent}-rooted, so all three
+  #     would ship uncreatable.
+  #
   # (3) THE REQUEST ENVELOPE -- blocks pubsub/Topic and pubsub/Subscription.
   #
   #     Their update_encoder templates are three lines that wrap the resource:

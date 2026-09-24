@@ -1939,6 +1939,25 @@ func idTemplateFromDelete(col disco.Collection) string {
 // The mask is read separately from the verb rather than implied by it: 15 of
 // the types that were already updatable PATCH without a mask, and sending a
 // query parameter an API never asked for is its own bug.
+//
+// WHAT IT DOES NOT CHECK, and should. A method can publish a PATCH that only
+// accepts SOME of the resource's fields, and Discovery says so only in prose.
+// Read from the pinned documents on 2026-09-23, 3 of the 153 updatable types
+// that could be matched to their patch method carry such a restriction:
+//
+//	compute.networks.patch     "Only routingConfig can be modified."
+//	compute.subnetworks.patch  "Only certain fields can be updated ... You must
+//	                            specify the current fingerprint"
+//	compute.images.patch       "Only the following fields can be modified:
+//	                            family, description, deprecation status."
+//
+// gcp.network declares five settable non-ForceNew attributes and only one of
+// them is patchable; gcp.subnetwork declares eighteen and we send no
+// fingerprint. For those three, deriving a verb trades a REPLACEMENT — which is
+// destructive but converges — for a patch the API may ignore, which does not
+// converge and shows as drift nobody caused. The right answer is per-type: mark
+// the fields Google will not patch as ForceNew in gen/overlay.yaml, so each
+// field gets the behaviour the API actually gives it. Not done yet.
 func discoveredUpdate(col disco.Collection) (verb string, masked bool) {
 	patch := col.Methods["patch"]
 	get := col.Methods["get"]
