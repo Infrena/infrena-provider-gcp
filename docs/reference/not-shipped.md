@@ -23,10 +23,9 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [no get method](#no-get-method) | 2 |
-| [Patches the specified subnetwork with the data included in the request. Only certain fields can be updated with a patch request as indicated in the field descriptions. You must specify the current fingerprint of the subnetwork resource being patched.](#patches-the-specified-subnetwork-with-the-data-included-in-the-request-only-certain-fields-can-be-updated-with-a-patch-request-as-indicated-in-the-field-descriptions-you-must-specify-the-current-fingerprint-of-the-subnetwork-resource-being-patched) | 1 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**377** types did not ship. **62** more ship without a create.
+**376** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -452,14 +451,6 @@ The API publishes no get. Reading one means listing its parent, which needs a ru
 | --- | --- | --- |
 | `cloudresourcemanager/tagHolds` | 2 | needs a ruling with read_via |
 | `servicenetworking/peeredDnsDomains` | 2 | needs a ruling with read_via |
-
-## Patches the specified subnetwork with the data included in the request. Only certain fields can be updated with a patch request as indicated in the field descriptions. You must specify the current fingerprint of the subnetwork resource being patched.
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `gcp.subnetwork` | noupdate | — |
 
 ## Shipped, but cannot be created
 

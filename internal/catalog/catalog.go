@@ -152,6 +152,14 @@ type Type struct {
 	// not always the same word: six of the eight say "updateMask" and
 	// spanner's instances and instancePartitions say "fieldMask".
 	UpdateMaskField string `json:"update_mask_field,omitempty"`
+	// LockField names the top-level field the API requires, up to date, in
+	// every update: compute's optimistic-locking fingerprint. "An up-to-date
+	// fingerprint must be provided in order to update the Subnetwork,
+	// otherwise the request will fail with error 412 conditionNotMet." A user
+	// never writes one, so it is never in the diff; Update copies the current
+	// value from the observation it was handed instead. Measured on
+	// 2026-09-23: 21 types carry one, 19 of them updatable.
+	LockField string `json:"lock_field,omitempty"`
 
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`

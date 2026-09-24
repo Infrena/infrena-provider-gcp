@@ -270,6 +270,18 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 	// gcp.firewall, gcp.storage.bucket, gcp.network and gcp.router among
 	// them -- PATCH without one. Appending the parameter unconditionally
 	// sends a query argument those APIs never asked for.
+	// Compute's optimistic lock, AFTER the empty-mask return above: a
+	// fingerprint alone is never a reason to patch. Copied from the
+	// observation Update was handed, which the host takes immediately before
+	// planning, so it is as current as a value can be without the extra read
+	// this function deliberately does not make. Without it every patch to the
+	// 19 locked compute types is a 412.
+	if ty.LockField != "" {
+		if a, v := lockValue(ty, current.Attributes); v.Known {
+			body[ty.LockField] = wireValue(a, v)
+		}
+	}
+
 	switch {
 	case ty.UpdateWrapper != "":
 		// AIP-134's UpdateXRequest shape: the resource is wrapped and the field
@@ -364,4 +376,15 @@ func maskQuery(reqURL string, mask []string) string {
 		sep = "&"
 	}
 	return sep + "updateMask=" + url.QueryEscape(strings.Join(mask, ","))
+}
+
+// lockValue finds the lock field's current value in state, which is keyed by
+// schema name while LockField is the wire name.
+func lockValue(ty *catalog.Type, state map[string]value.Value) (*catalog.Attr, value.Value) {
+	for name, a := range ty.Attributes {
+		if a.Canonical == ty.LockField || name == ty.LockField {
+			return a, state[name]
+		}
+	}
+	return nil, value.Value{}
 }

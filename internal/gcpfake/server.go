@@ -60,6 +60,10 @@ type Server struct {
 
 	mu sync.Mutex
 
+	// fingerprints counts compute-style fingerprints handed out, so each
+	// modification of a locked resource gets a new one, deterministically.
+	fingerprints int
+
 	// resources holds every stored resource, keyed by the exact request path
 	// it lives at (e.g. "/v1/projects/p/locations/r/widgets/one"), matching
 	// exactly what Seed and Get take. Keying by the literal path rather than
@@ -494,6 +498,19 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 		}
 	}
 
+	// Compute's optimistic locking. A resource that carries a fingerprint
+	// refuses a modification that does not quote the CURRENT one, and gets a
+	// new one after every change. The fake did not do this, and 19 patchable
+	// compute types went without ever sending one -- every patch to them
+	// would have been a 412 from real Google while every test here passed.
+	if fp, locked := existing["fingerprint"].(string); locked {
+		if sent, _ := patchBody["fingerprint"].(string); sent != fp {
+			writeError(w, http.StatusPreconditionFailed, "FAILED_PRECONDITION",
+				fmt.Sprintf("conditionNotMet: supplied fingerprint %q does not match current fingerprint %q", sent, fp))
+			return
+		}
+	}
+
 	merged := cloneMap(existing)
 	if len(mask) == 0 {
 		for k, v := range patchBody {
@@ -504,6 +521,13 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 			v, _ := lookupDotted(patchBody, m)
 			setDotted(merged, m, v)
 		}
+	}
+
+	if _, locked := existing["fingerprint"].(string); locked {
+		s.mu.Lock()
+		s.fingerprints++
+		merged["fingerprint"] = fmt.Sprintf("fp-%d", s.fingerprints)
+		s.mu.Unlock()
 	}
 
 	s.mu.Lock()

@@ -958,6 +958,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		}
 	}
 
+	t.LockField = lockFieldOf(attrs)
+
 	// UpdateVerb used to come from magic-modules and from nowhere else, which
 	// meant it usually came from nowhere: magic-modules relies on its own
 	// default when a resource's yaml omits `update_verb:`, and most omit it. A

@@ -733,3 +733,67 @@ func TestAWrappedUpdateSendsTheMaskInTheBody(t *testing.T) {
 		t.Errorf("body fieldMask = %v, want \"sizeGb\"", got)
 	}
 }
+
+// lockedWidget is a widget whose API locks updates on a fingerprint, the way
+// 19 compute types' do, seeded in a fake that enforces it the way compute
+// does: a patch quoting anything but the current fingerprint is a 412.
+func lockedWidget(t *testing.T) (*gcpfake.Server, *Provider, *catalog.Type, string) {
+	t.Helper()
+	s := gcpfake.New(t)
+	path := "/v1/projects/p/locations/r/widgets/one"
+	s.Seed(path, map[string]any{"name": "one", "sizeGb": float64(10), "fingerprint": "fp-current"})
+	ty := widgetType()
+	ty.UpdateMask = false // compute patches without one
+	ty.LockField = "fingerprint"
+	ty.Attributes["fingerprint"] = &catalog.Attr{Canonical: "fingerprint", Kind: value.KindString, Output: true}
+	return s, testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}}), ty, path
+}
+
+func lockedState() *resource.ResourceState {
+	st := widgetState()
+	st.Attributes["fingerprint"] = value.String("fp-current", value.SourceProvider)
+	return st
+}
+
+// TestAnUpdateCarriesTheCurrentFingerprint. compute: "An up-to-date
+// fingerprint must be provided in order to update the Subnetwork, otherwise
+// the request will fail with error 412 conditionNotMet." A user never writes
+// one, so it is never in the diff; without this every patch to the 19 locked
+// types failed on real Google, and passed here because the fake did not check.
+func TestAnUpdateCarriesTheCurrentFingerprint(t *testing.T) {
+	gcptest.Isolate(t)
+	s, p, _, path := lockedWidget(t)
+	defer s.Close()
+
+	if _, err := p.Update(context.Background(), lockedState(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(20),
+	})); err != nil {
+		t.Fatalf("update of a fingerprint-locked resource: %v", err)
+	}
+	var sent map[string]any
+	if err := json.Unmarshal(requestOf(t, s, "PATCH", path).Body, &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent["fingerprint"] != "fp-current" {
+		t.Errorf("patch body fingerprint = %v, want the current one", sent["fingerprint"])
+	}
+}
+
+// TestAFingerprintAloneIsNeverAPatch. The lock is added after the check for
+// an empty diff, so a resource whose only difference is its fingerprint --
+// which changes on every modification -- is not patched.
+func TestAFingerprintAloneIsNeverAPatch(t *testing.T) {
+	gcptest.Isolate(t)
+	s, p, _, _ := lockedWidget(t)
+	defer s.Close()
+	if _, err := p.Update(context.Background(), lockedState(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(10),
+	})); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range s.Requests() {
+		if r.Method == "PATCH" {
+			t.Errorf("sent a patch with nothing configured changed: %s", r.Body)
+		}
+	}
+}
