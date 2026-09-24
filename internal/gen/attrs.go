@@ -423,6 +423,14 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if f.Output {
 				a.Output = true
 			}
+			// Input only has two sources, like immutability. magic-modules'
+			// ignore_read marks a field Google never returns, which Discovery
+			// often does not say: an SSL certificate's privateKey is required
+			// and ForceNew, and without this every plan after a create read
+			// it as removed and proposed replacing the certificate. Carrying
+			// is safe even where magic-modules is wrong, because a value
+			// Google does return is believed (gcprov.carryInputOnly).
+			a.InputOnly = (a.InputOnly || f.IgnoreRead) && !a.Output
 			// A set-typed list may come back reordered. Without this the
 			// reconciler treats every list as ordered, so a pure reordering
 			// reads as drift and the plan never converges — the exact failure

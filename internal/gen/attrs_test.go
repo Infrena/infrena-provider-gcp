@@ -732,3 +732,39 @@ func TestAHandWrittenResourcesNestedRequiredIsNotTrusted(t *testing.T) {
 		t.Error("an ordinary resource lost a nested required flag")
 	}
 }
+
+// TestAFieldGoogleNeverReturnsIsCarried. magic-modules' ignore_read is the
+// second source for input only, and the one that covers compute: an SSL
+// certificate's privateKey is never returned, and read as removed it replaced
+// the certificate on every plan. Nested too, where most of these live.
+func TestAFieldGoogleNeverReturnsIsCarried(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"privateKey":  str,
+		"certificate": str,
+		"iap":         {Type: "object", Properties: map[string]*disco.Schema{"oauth2ClientSecret": str}},
+		"selfLink":    str,
+	}}
+	mm := &mmv1.Resource{Name: "W", Properties: []*mmv1.Field{
+		{Name: "privateKey", IgnoreRead: true, Required: true, Immutable: true},
+		{Name: "certificate"},
+		{Name: "iap", Type: "NestedObject", Properties: []*mmv1.Field{{Name: "oauth2ClientSecret", IgnoreRead: true}}},
+		{Name: "selfLink", IgnoreRead: true, Output: true},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !attrs["privateKey"].InputOnly {
+		t.Error("privateKey is ignore_read in magic-modules and is not carried forward")
+	}
+	if attrs["certificate"].InputOnly {
+		t.Error("certificate became input only, so the flag is not coming from the field")
+	}
+	if !attrs["iap"].Fields["oauth2ClientSecret"].InputOnly {
+		t.Error("iap.oauth2ClientSecret is ignore_read and is not carried forward")
+	}
+	if attrs["selfLink"].InputOnly {
+		t.Error("an output field became input only; there is nothing of the user's to carry")
+	}
+}
