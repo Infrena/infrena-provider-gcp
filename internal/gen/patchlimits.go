@@ -36,7 +36,11 @@ import (
 // restrictionProse are the shapes Google writes when a patch takes only some
 // fields. Measured against every patch description in the pinned documents on
 // 2026-09-23: they match 3 of the 153 updatable types that could be matched to
-// their own patch method, and nothing else.
+// their own patch method, and nothing else. The "can only patch" shape was
+// added on 2026-09-24 for compute's forwarding rules ("Currently, you can only
+// patch the network_tier field."), which the first shape misses because no
+// "can be" follows the "only". Measured the same way, it matches those two
+// collections and nothing else.
 //
 // Prose matching is a poor instrument and it is used here in the SAFE
 // direction only: a match REFUSES an update, it never permits one. A false
@@ -45,6 +49,7 @@ import (
 // the allowlist is how a human overrides either.
 var restrictionProse = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bonly\b[^.]{0,90}\b(?:can be|are)\b[^.]{0,40}\b(?:modified|updated|changed|mutable)`),
+	regexp.MustCompile(`(?i)\bcan only (?:patch|update|modify|change)\b`),
 	regexp.MustCompile(`(?i)only certain fields`),
 	regexp.MustCompile(`(?i)fingerprint`),
 }
@@ -220,7 +225,10 @@ func normalizePathShape(p string) string {
 // always provide an up-to-date fingerprint hash in order to update the
 // instance", "An up-to-date fingerprint must be provided in order to update
 // the Subnetwork". It is prose because Discovery has no structure for it.
-var lockFieldRE = regexp.MustCompile(`(?i)in order to (?:update|patch)`)
+// Any whitespace between the words: backend services break the line inside
+// "in order to\nupdate", and a literal space shipped both of them without
+// their lock.
+var lockFieldRE = regexp.MustCompile(`(?i)in\s+order\s+to\s+(?:update|patch)`)
 
 // lockFieldOf names the field t's API requires, current, in every update, or
 // "". Only a top-level `fingerprint` that says so counts: labelFingerprint
