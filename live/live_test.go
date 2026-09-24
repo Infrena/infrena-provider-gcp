@@ -539,6 +539,18 @@ resources:
       # networkInterfaces]. No fake can find this, because a fake echoes back
       # what it was sent.
       #
+      # HALF OF THAT IS FIXED, AND IT WAS NOT ENOUGH (2026-09-24). Discovery
+      # tags initializeParams "[Input Only]" and the reconciler now carries it
+      # forward. A live run with "disks" no longer ignored still said: vm
+      # proposes a replace because of [disks [forces new]]. The rest of the
+      # cause is the server FILLING IN declared fields configuration never set
+      # -- deviceName, source, mode, interface, type -- and infrena's planner
+      # (internal/planner/diff.go, equalBesidesProviderEmpties) forgives a
+      # nested key configuration does not mention only when it is an EMPTY
+      # collection. At the top level it forgives any computed attribute; inside
+      # a composite there is no per-leaf schema to ask, so it cannot. That is
+      # the same cause as networkInterfaces.
+      #
       # It has its own follow-up. Do not delete these two lines thinking the
       # suite got tidier; delete them when the defect is fixed, and the
       # a_second_plan_is_clean subtest will tell you whether it was.
