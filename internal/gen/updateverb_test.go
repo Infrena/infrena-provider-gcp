@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 )
 
 // updateVerbDoc is one Discovery document carrying six collections that differ
@@ -571,5 +573,39 @@ properties:
 		if r.Type == "gcp.unmasked" {
 			t.Errorf("gcp.unmasked is recorded as replaced on every change, but setSize updates it: %q", r.Says)
 		}
+	}
+}
+
+// TestADeleteIsAwaitedByItsOwnAnswer. A type's Await is read from its
+// create, and sqladmin's sslCerts create answers with the resource while its
+// delete answers with an operation. The catalog records the delete's own
+// kind, only where it differs, and gives the type the longer timeout that
+// kind needs.
+func TestADeleteIsAwaitedByItsOwnAnswer(t *testing.T) {
+	doc := strings.Replace(updateVerbDoc(),
+		`"delete": {"id": "a.p.delete", "path": "projects/{project}/patchables/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}}`,
+		`"delete": {"id": "a.p.delete", "path": "projects/{project}/patchables/{id}", "httpMethod": "DELETE", "response": {"$ref": "ComputeOp"}}`, 1)
+	doc = strings.Replace(doc, `"Operation": {`, `"ComputeOp": {"id": "ComputeOp", "type": "object", "properties": {"status": {"type": "string"}, "targetLink": {"type": "string"}, "operationType": {"type": "string"}}},
+    "Operation": {`, 1)
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": doc, "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, ok := res.Catalog.Type("gcp.patchable")
+	if !ok {
+		t.Fatalf("gcp.patchable missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if p.Await != catalog.AwaitNone {
+		t.Fatalf("the fixture is wrong: create await = %v, want none", p.Await)
+	}
+	if got := p.DeleteAwaitKind(); got != catalog.AwaitComputeOperation {
+		t.Errorf("delete await = %v, want the compute operation its delete answers with", got)
+	}
+	if p.TimeoutSeconds < 600 {
+		t.Errorf("timeout = %ds, too short for the compute operation its delete waits on", p.TimeoutSeconds)
+	}
+	u, _ := res.Catalog.Type("gcp.unmasked")
+	if u == nil || u.DeleteAwait != nil {
+		t.Errorf("gcp.unmasked records a delete await although its delete answers like its create: %+v", u)
 	}
 }

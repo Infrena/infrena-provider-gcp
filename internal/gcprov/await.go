@@ -21,7 +21,13 @@ import (
 // from the API's name -- container, dns and sqladmin all use compute-style
 // operations without being compute.
 func (p *Provider) await(ctx context.Context, ty *catalog.Type, resp map[string]any) (map[string]any, error) {
-	if ty.Await == catalog.AwaitNone {
+	return p.awaitAs(ctx, ty, ty.Await, resp)
+}
+
+// awaitAs is await for a mutation whose completion is kind rather than the
+// type's create-time Await: Delete passes ty.DeleteAwaitKind().
+func (p *Provider) awaitAs(ctx context.Context, ty *catalog.Type, kind catalog.AwaitKind, resp map[string]any) (map[string]any, error) {
+	if kind == catalog.AwaitNone {
 		// The mutation returned the resource. Polling anything here would be a
 		// request against a quota that belongs to the whole project, for an
 		// answer we already hold.
@@ -35,13 +41,13 @@ func (p *Provider) await(ctx context.Context, ty *catalog.Type, resp map[string]
 		time.Duration(ty.TimeoutSeconds)*time.Second)
 	defer cancel()
 
-	switch ty.Await {
+	switch kind {
 	case catalog.AwaitLongRunning:
 		return p.awaitLongRunning(ctx, ty, resp)
 	case catalog.AwaitComputeOperation:
 		return p.awaitComputeOperation(ctx, ty, resp)
 	default:
-		return nil, fmt.Errorf("%s: unknown await strategy %d", ty.Name, ty.Await)
+		return nil, fmt.Errorf("%s: unknown await strategy %d", ty.Name, kind)
 	}
 }
 

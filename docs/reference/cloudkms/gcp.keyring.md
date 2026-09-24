@@ -17,7 +17,7 @@ encoder (encoders/send_nil_body.go.tmpl) is literally `return nil, nil`: the cre
 decoder (decoders/kms.go.tmpl) overwrites the `name` Google returns with the short name the user typed, and its own comment says it does so only because a Terraform linter demands a field be set. Provider ids here are relative resource names, so the full name Google returns is the value wanted; not applying this is correct, not a tolerated gap.
 Held back until it could be created: the id travels in a `keyRingId` query parameter, and `name` -- the only candidate -- is output-only. The generator now gives a query-carried id its own create-only attribute, so configuration sets `keyRingId` and the full `name` comes back from Google. A key ring has no update method; everything settable is set at creation.
 ) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

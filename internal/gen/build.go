@@ -1132,6 +1132,17 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 
 	await, _ := AwaitOf(doc, create)
 	t.Await = await
+	// The delete's own answer, which is not always the create's: see
+	// catalog.Type.DeleteAwait. Recorded only where it differs.
+	if deleteAwait, _ := AwaitOf(doc, col.Methods["delete"]); deleteAwait != await {
+		t.DeleteAwait = &deleteAwait
+	}
+	// The paths and the timeout below serve whichever await is not none. The
+	// measured mismatches pair none with one kind, never two different
+	// kinds, so the create's kind wins only where both exist.
+	if await == catalog.AwaitNone && t.DeleteAwait != nil {
+		await = *t.DeleteAwait
+	}
 	// TimeoutSeconds is a GUESS, not derived from any input source: nothing in
 	// Discovery, magic-modules or the overlay says how long a mutation may
 	// take. The three buckets below are keyed only off how the mutation is
@@ -1177,7 +1188,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// publishes that path itself, as operations.get — store it verbatim rather
 	// than rebuilding it from a version segment, because a reconstruction can
 	// drift from what the API accepts and this cannot.
-	if t.Await == catalog.AwaitLongRunning {
+	if await == catalog.AwaitLongRunning {
 		t.OperationPollPath = operationPollPath(doc)
 	}
 
