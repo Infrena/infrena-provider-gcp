@@ -747,3 +747,100 @@ func countRequests(s *gcpfake.Server, path string) int {
 	}
 	return n
 }
+
+// inputOnlyAttrs is a small schema with an input-only field at each of the
+// places the catalog has them today: top level, inside a nested object, and
+// inside the elements of an ordered list -- the last being compute's
+// disks[].initializeParams, the field that made an instance plan its own
+// replacement on every run. Plus one inside an UNORDERED list, where the
+// reference element is chosen by position and cannot be trusted to copy from.
+func inputOnlyAttrs() map[string]*catalog.Attr {
+	str := func(inputOnly bool) *catalog.Attr {
+		return &catalog.Attr{Kind: value.KindString, InputOnly: inputOnly}
+	}
+	disk := &catalog.Attr{Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+		"source":           str(false),
+		"initializeParams": str(true),
+	}}
+	return map[string]*catalog.Attr{
+		"secret":   str(true),
+		"plain":    str(false),
+		"settings": {Kind: value.KindMap, Fields: map[string]*catalog.Attr{"key": str(true), "mode": str(false)}},
+		"disks":    {Kind: value.KindList, Elem: disk},
+		"rules":    {Kind: value.KindList, Unordered: true, Elem: disk},
+	}
+}
+
+func s(v string) value.Value { return value.String(v, value.SourceExplicit) }
+func obj(m map[string]value.Value) value.Value {
+	return value.Map(m, value.SourceExplicit)
+}
+func lst(vs ...value.Value) value.Value { return value.List(vs, value.SourceExplicit) }
+
+// TestAnInputOnlyFieldIsCarriedForwardWhereverItSits. GCP never returns these
+// fields, so reporting them missing is drift on every plan against a resource
+// that is exactly as configured. Carried at the top level, inside an object,
+// and inside an ordered list's elements.
+func TestAnInputOnlyFieldIsCarriedForwardWhereverItSits(t *testing.T) {
+	reference := map[string]value.Value{
+		"secret":   s("hunter2"),
+		"plain":    s("configured"),
+		"settings": obj(map[string]value.Value{"key": s("k1"), "mode": s("fast")}),
+		"disks":    lst(obj(map[string]value.Value{"source": s("d1"), "initializeParams": s("image-a")})),
+	}
+	// What GCP answers: every input-only field missing, and so is `plain`,
+	// which is NOT input-only and must stay missing.
+	incoming := map[string]value.Value{
+		"settings": obj(map[string]value.Value{"mode": s("fast")}),
+		"disks":    lst(obj(map[string]value.Value{"source": s("d1")})),
+	}
+	got := ReconcileAttrs(inputOnlyAttrs(), reference, incoming)
+
+	if !got["secret"].Equal(s("hunter2")) {
+		t.Errorf("top-level input-only not carried: %v", got["secret"])
+	}
+	if _, present := got["plain"]; present {
+		t.Error("a field that is NOT input-only was carried forward; GCP not returning it is real")
+	}
+	if settings, _ := got["settings"].Raw.(map[string]value.Value); !settings["key"].Equal(s("k1")) {
+		t.Errorf("nested input-only not carried: %v", got["settings"])
+	}
+	disks, _ := got["disks"].Raw.([]value.Value)
+	if len(disks) != 1 {
+		t.Fatalf("disks = %v", got["disks"])
+	}
+	if d, _ := disks[0].Raw.(map[string]value.Value); !d["initializeParams"].Equal(s("image-a")) {
+		t.Errorf("input-only inside an ordered list's element not carried: %v", disks[0])
+	}
+	if !got["disks"].Equal(reference["disks"]) {
+		t.Errorf("the replan-forever case still diffs: got %v, configured %v", got["disks"], reference["disks"])
+	}
+}
+
+// TestAnInputOnlyAnswerIsBelieved. If the API does return the field, its
+// answer is the truth, the same rule CreateOnly follows.
+func TestAnInputOnlyAnswerIsBelieved(t *testing.T) {
+	got := ReconcileAttrs(inputOnlyAttrs(),
+		map[string]value.Value{"secret": s("old")},
+		map[string]value.Value{"secret": s("rotated-by-someone")})
+	if !got["secret"].Equal(s("rotated-by-someone")) {
+		t.Errorf("secret = %v, want the API's answer", got["secret"])
+	}
+}
+
+// TestNothingIsCopiedFromAnUnmatchedListElement. In an unordered list the
+// reference element is chosen by POSITION before the list is matched, so it
+// may be a sibling; copying its input-only value would attribute one element's
+// configuration to another. None of the catalog's input-only fields sit in an
+// unordered list today, and this is what keeps one from being mishandled.
+func TestNothingIsCopiedFromAnUnmatchedListElement(t *testing.T) {
+	got := ReconcileAttrs(inputOnlyAttrs(),
+		map[string]value.Value{"rules": lst(obj(map[string]value.Value{"source": s("a"), "initializeParams": s("for-a")}))},
+		map[string]value.Value{"rules": lst(obj(map[string]value.Value{"source": s("b")}))})
+	rules, _ := got["rules"].Raw.([]value.Value)
+	for _, r := range rules {
+		if m, _ := r.Raw.(map[string]value.Value); m["initializeParams"].Known {
+			t.Errorf("copied %v into an element of an unordered list", m["initializeParams"])
+		}
+	}
+}

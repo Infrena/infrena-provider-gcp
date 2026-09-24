@@ -47,6 +47,18 @@ type reconciler struct {
 	// can cost a request, so it is only called once a value is already known
 	// to be a project resource name that disagrees.
 	aliases func() ProjectAliases
+	// unmatched is true inside the elements of an UNORDERED list. There the
+	// reference element an incoming element is reconciled against is chosen by
+	// position before the list is matched and reordered, so it may be a
+	// sibling. Anything that COPIES from the reference -- carrying an
+	// input-only field forward -- must not trust it. Nothing that reads the
+	// reference only to decide spelling or order is affected.
+	//
+	// The zero value is the safe, ordinary case on purpose: the reconciler
+	// is constructed in more than one place (projects.go builds the one the
+	// runtime uses), and a flag every constructor had to remember to set is
+	// a flag that is off in production and on in the tests.
+	unmatched bool
 }
 
 func (r reconciler) value(attr *catalog.Attr, reference, incoming value.Value) value.Value {
@@ -144,7 +156,33 @@ func (r reconciler) attrs(attrs map[string]*catalog.Attr, reference, incoming ma
 		a := attrs[name]
 		out[name] = withoutReservedLabels(a, r.value(a, reference[name], v))
 	}
+	for name, a := range attrs {
+		if carried, ok := r.carryInputOnly(a, reference[name], incoming, name); ok {
+			out[name] = carried
+		}
+	}
 	return out
+}
+
+// carryInputOnly is the whole of input-only handling: a field the API never
+// returns is reported as the reference holds it, because there is nothing of
+// GCP's to compare it against. Reported missing instead, it is drift on every
+// plan against a resource that is exactly as configured -- the compute
+// instance that proposed replacing itself for ever was this, on
+// disks[].initializeParams.
+//
+// Only when the API really did leave it out: an answer that carries the field
+// is believed, the same rule CreateOnly follows. And only a KNOWN reference
+// value is carried; an unknown one would be a claim about something nobody
+// has resolved.
+func (r reconciler) carryInputOnly(a *catalog.Attr, ref value.Value, in map[string]value.Value, name string) (value.Value, bool) {
+	if a == nil || !a.InputOnly || r.unmatched || !ref.Known {
+		return value.Value{}, false
+	}
+	if _, answered := in[name]; answered {
+		return value.Value{}, false
+	}
+	return ref, true
 }
 
 // reconcileObject drops keys the schema does not declare and recurses into the
@@ -165,6 +203,9 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 	for name, field := range attr.Fields {
 		v, found := in[name]
 		if !found {
+			if carried, ok := r.carryInputOnly(field, ref[name], in, name); ok {
+				out[name] = carried
+			}
 			continue
 		}
 		out[name] = r.value(field, ref[name], v)
@@ -197,7 +238,9 @@ func (r reconciler) list(attr *catalog.Attr, reference, incoming value.Value) va
 		if i < len(ref) {
 			refItem = ref[i]
 		}
-		items[i] = r.value(attr.Elem, refItem, item)
+		elem := r
+		elem.unmatched = r.unmatched || attr.Unordered
+		items[i] = elem.value(attr.Elem, refItem, item)
 	}
 	if !attr.Unordered {
 		return value.Value{Kind: value.KindList, Known: true, Raw: items, Source: incoming.Source}

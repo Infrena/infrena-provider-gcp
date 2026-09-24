@@ -1160,3 +1160,41 @@ func firstPost(s *gcpfake.Server) (gcpfake.Request, bool) {
 	}
 	return gcpfake.Request{}, false
 }
+
+// TestARefreshKeepsAnInputOnlyFieldGCPNeverReturns goes through Read and the
+// reconciler the runtime ACTUALLY builds (projects.go), not the package-level
+// ReconcileAttrs. That distinction nearly shipped wrong: the first version of
+// the carry-forward was gated on a flag only ReconcileAttrs set, so the unit
+// tests passed and production would have dropped the field.
+//
+// The fake is SEEDED with a body that lacks the field rather than created
+// through, because the fake stores whatever it is sent and would hand the
+// field straight back -- the one behaviour Google does not have, and the one
+// that would make this test pass with the feature deleted.
+func TestARefreshKeepsAnInputOnlyFieldGCPNeverReturns(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty := widgetType()
+	ty.Attributes["bootImage"] = &catalog.Attr{Canonical: "bootImage", Kind: value.KindString, InputOnly: true}
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+	const id = "projects/p/locations/r/widgets/one"
+	s.Seed("/v1/"+id, map[string]any{"name": "one", "sizeGb": float64(10)})
+
+	st, err := p.Read(context.Background(), &resource.ResourceState{
+		Type: "gcp.widget", ProviderID: id,
+		Attributes: map[string]value.Value{
+			"name":      value.String("one", value.SourceExplicit),
+			"bootImage": value.String("debian-12", value.SourceExplicit),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("the seeded resource read as absent")
+	}
+	if got := st.Attributes["bootImage"]; !got.Equal(value.String("debian-12", value.SourceExplicit)) {
+		t.Errorf("bootImage after a refresh = %v, want it carried forward; missing, every plan would propose changing it", got)
+	}
+}
