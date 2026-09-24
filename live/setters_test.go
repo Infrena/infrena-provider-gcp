@@ -86,10 +86,20 @@ func applyOK(t *testing.T, dir, what string) {
 	}
 }
 
+// planIs plans and returns the changes, failing unless the exit code is
+// want. On a mismatch it logs what the plan proposed first: a bare exit code
+// cost a whole live run to learn nothing from.
 func planIs(t *testing.T, dir string, want int) []change {
 	t.Helper()
 	out := filepath.Join(t.TempDir(), "plan.json")
-	mustRun(t, dir, want, "plan", "live", "--output", out)
+	r := run(t, dir, "plan", "live", "--output", out)
+	if r.ExitCode != want {
+		t.Logf("plan exited %d, want %d:\n%s", r.ExitCode, want, r.combined())
+		if _, err := os.Stat(out); err == nil {
+			t.Logf("changes: %+v", planChanges(t, out))
+		}
+		t.FailNow()
+	}
 	return planChanges(t, out)
 }
 

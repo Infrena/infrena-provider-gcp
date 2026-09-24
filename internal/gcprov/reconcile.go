@@ -313,6 +313,16 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 				continue
 			}
 		}
+		// An output-only field can never be in configuration, so inside
+		// an element that answers a configured one it is always drift, even
+		// in an unordered list where the pruning above is off (a sibling
+		// picked by position still holds only what configuration can write).
+		// Cloud DNS answers every network of a policy with kind
+		// "dns#policyNetwork", and the plan after each create proposed an
+		// update (live run, 2026-09-24).
+		if hasRef && r.unmatched && field.Output {
+			continue
+		}
 		out[name] = r.value(field, ref[name], v)
 	}
 	return value.Value{Kind: value.KindMap, Known: true, Raw: out, Source: incoming.Source}
