@@ -768,3 +768,28 @@ func TestAFieldGoogleNeverReturnsIsCarried(t *testing.T) {
 		t.Error("an output field became input only; there is nothing of the user's to carry")
 	}
 }
+
+// TestAReferenceThatTakesSeveralTypesIsNotTyped. A url map's defaultService
+// is a BackendService reference in magic-modules and takes a backend bucket
+// too. Typed, infrena refused a valid configuration before sending anything.
+// The ordinary reference beside it keeps its type, so a change that drops
+// every reference fails here too.
+func TestAReferenceThatTakesSeveralTypesIsNotTyped(t *testing.T) {
+	str := &disco.Schema{Type: "string"}
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{"defaultService": str, "network": str}}
+	mm := &mmv1.Resource{Name: "UrlMap", Properties: []*mmv1.Field{
+		{Name: "defaultService", Type: "ResourceRef", Resource: "BackendService",
+			CustomExpand: "templates/terraform/custom_expand/reference_to_backend.tmpl"},
+		{Name: "network", Type: "ResourceRef", Resource: "Network"},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, mm, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := attrs["defaultService"].Ref; r != nil {
+		t.Errorf("defaultService refers only to %s, but it takes a backend bucket as well", r.Type)
+	}
+	if attrs["network"].Ref == nil {
+		t.Error("network lost its reference")
+	}
+}
