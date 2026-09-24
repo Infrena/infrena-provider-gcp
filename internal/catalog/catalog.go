@@ -161,6 +161,13 @@ type Type struct {
 	// 2026-09-23: 21 types carry one, 19 of them updatable.
 	LockField string `json:"lock_field,omitempty"`
 
+	// CreateVerb is the HTTP method a create is sent with. Empty means POST,
+	// which is 355 of the 358 create methods in the pinned documents. The other
+	// three are Pub/Sub's topics, subscriptions and snapshots, which create
+	// with a PUT to the new resource's OWN path: a POST there is refused, and
+	// gcp.pubsub.snapshot shipped doing exactly that until 2026-09-23.
+	CreateVerb string `json:"create_verb,omitempty"`
+
 	UpdateVerb string `json:"update_verb,omitempty"`
 	UpdateMask bool   `json:"update_mask,omitempty"`
 

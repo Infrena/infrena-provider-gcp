@@ -2,9 +2,10 @@
 
 # bigquery
 
-2 type(s). [Back to the index](../README.md).
+3 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.bigquery.table`](gcp.bigquery.table.md) | yes | yes | yes | A Table that belongs to a Dataset |
+| [`gcp.dataset`](gcp.dataset.md) | yes | yes | yes | Datasets allow you to organize and control access to your tables. |
 | [`gcp.routine`](gcp.routine.md) | yes | **no** | yes | A user-defined function or a stored procedure that belongs to a Dataset |

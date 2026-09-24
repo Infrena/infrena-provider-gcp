@@ -2,8 +2,9 @@
 
 # cloudkms
 
-1 type(s). [Back to the index](../README.md).
+2 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
+| [`gcp.keyring`](gcp.keyring.md) | yes | **no** | yes | A `KeyRing` is a toplevel logical grouping of `CryptoKeys`. |
 | [`gcp.proposal`](gcp.proposal.md) | **no** | **no** | yes | A SingleTenantHsmInstanceProposal represents a proposal to perform an operation on a SingleTenantHsmInstance. |

@@ -115,7 +115,7 @@ func discoveredUpdateWrapper(d *disco.Document, col disco.Collection) (wrapper, 
 	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
 		return "", ""
 	}
-	if patch.Path != get.Path || patch.Request == nil || get.Response == nil {
+	if !sameAddress(patch, get) || patch.Request == nil || get.Response == nil {
 		return "", ""
 	}
 	resourceRef := get.Response.Ref
@@ -232,4 +232,54 @@ func lockFieldOf(attrs map[string]*catalog.Attr) string {
 		return ""
 	}
 	return a.Canonical
+}
+
+// sameAddress reports whether two methods address the same resource, which is
+// not the same as their paths being the same string. Pub/Sub's topics.get is
+// "v1/{+topic}" and topics.patch is "v1/{+name}": two spellings of one
+// address, since both parameters carry the pattern
+// "^projects/[^/]+/topics/[^/]+$". A string comparison refused the update
+// envelope for both Pub/Sub types on that difference alone.
+//
+// Each placeholder is replaced by its parameter's published pattern when it
+// has one, and by a bare wildcard when it does not; the version prefix is
+// dropped. A method at a genuinely different address -- a ":verb" custom
+// method, a collection path -- still compares unequal.
+func sameAddress(a, b *disco.Method) bool {
+	return a != nil && b != nil && addressOf(a) == addressOf(b)
+}
+
+var placeholderRE = regexp.MustCompile(`\{\+?(\w+)\}`)
+
+func addressOf(m *disco.Method) string {
+	path := strings.TrimPrefix(m.Path, pathPrefixOf(m.Path))
+	return placeholderRE.ReplaceAllStringFunc(path, func(ph string) string {
+		name := placeholderRE.FindStringSubmatch(ph)[1]
+		if p := m.Parameters[name]; p != nil && p.Pattern != "" {
+			return "<" + strings.Trim(p.Pattern, "^$") + ">"
+		}
+		return "<*>"
+	})
+}
+
+// templateAddressesMethod reports whether a url template names the same
+// address as a method, comparing shapes -- literal segments and wildcards --
+// with the method's placeholders read through their published patterns.
+//
+// It exists for magic-modules' update_url on Pub/Sub's Topic and
+// Subscription: "projects/{{project}}/topics/{{name}}", where {{name}} means
+// the SHORT name. The catalog's `name` for those types is the FULL resource
+// path, because that is what the API's own create path and every response
+// use, so expanding magic-modules' template with it would address
+// ".../topics/projects%2Fp%2Ftopics%2Ft". When the template and the API's
+// patch method are the same address, the API's spelling is the one to use.
+func templateAddressesMethod(tmpl string, m *disco.Method) bool {
+	if m == nil {
+		return false
+	}
+	path, _, _ := strings.Cut(tmpl, "?")
+	want := normalizePathShape(path)
+	got := addressOf(m)
+	got = strings.NewReplacer("<*>", "*", "[^/]+", "*", "<", "", ">", "").Replace(got)
+	return want != "" && normalizePathShape(got) == want
 }

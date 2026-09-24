@@ -328,6 +328,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleGet(w, r)
 	case r.Method == http.MethodPost:
 		s.handleCreate(w, r, bodyBytes)
+	case r.Method == http.MethodPut:
+		// Pub/Sub creates with a PUT to the new resource's own path. The
+		// resource is stored at exactly that path, and a second PUT to it is
+		// the ALREADY_EXISTS the real API answers.
+		s.handleCreateAt(w, r, bodyBytes)
 	case r.Method == http.MethodPatch:
 		s.handlePatch(w, r, bodyBytes)
 	case r.Method == http.MethodDelete:
@@ -486,6 +491,11 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 	var mask []string
 	if m := r.URL.Query().Get("updateMask"); m != "" {
 		mask = strings.Split(m, ",")
+	} else if inner, m, ok := unwrapUpdateEnvelope(patchBody); ok {
+		// AIP-134's UpdateXRequest: {"topic": {...}, "updateMask": "a,b"}.
+		// The resource is patched from the inner object, under the mask the
+		// envelope carries, exactly as a query-string mask would be.
+		patchBody, mask = inner, strings.Split(m, ",")
 	}
 	// A mask naming a field the body does not carry is exactly the bug a mask
 	// built from the wrong side of a diff produces (Task 14 depends on this
@@ -744,4 +754,59 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 
 func writeNotFound(w http.ResponseWriter, path string) {
 	writeError(w, http.StatusNotFound, "NOT_FOUND", fmt.Sprintf("%s not found", path))
+}
+
+// handleCreateAt is a create addressed to the item's own path rather than to
+// its collection -- Pub/Sub's topics, subscriptions and snapshots.
+func (s *Server) handleCreateAt(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
+	path := r.URL.Path
+	body := map[string]any{}
+	if len(bodyBytes) > 0 {
+		if err := json.Unmarshal(bodyBytes, &body); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "malformed JSON body")
+			return
+		}
+	}
+	s.mu.Lock()
+	_, exists := s.resources[path]
+	if !exists {
+		body["name"] = strings.TrimPrefix(trimVersionPrefix(path), "/")
+		s.resources[path] = body
+	}
+	s.mu.Unlock()
+	if exists {
+		writeError(w, http.StatusConflict, "ALREADY_EXISTS", "Resource already exists in the project (resource="+path+").")
+		return
+	}
+	s.respondMutation(w, path, body, false)
+}
+
+// unwrapUpdateEnvelope recognises AIP-134's update request: exactly one
+// object-valued field (the resource) beside a non-empty field mask named
+// updateMask or fieldMask -- the two spellings the pinned documents use. A
+// body that is anything else is a bare resource and is left alone.
+func unwrapUpdateEnvelope(body map[string]any) (map[string]any, string, bool) {
+	var mask string
+	var inner map[string]any
+	for k, v := range body {
+		switch vv := v.(type) {
+		case string:
+			if k == "updateMask" || k == "fieldMask" {
+				mask = vv
+				continue
+			}
+			return nil, "", false
+		case map[string]any:
+			if inner != nil {
+				return nil, "", false
+			}
+			inner = vv
+		default:
+			return nil, "", false
+		}
+	}
+	if inner == nil || mask == "" {
+		return nil, "", false
+	}
+	return inner, mask, true
 }

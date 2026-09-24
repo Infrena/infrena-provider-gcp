@@ -54,6 +54,7 @@ type Resource struct {
 	UpdateURL    string               `yaml:"update_url"`
 	DeleteURL    string               `yaml:"delete_url"`
 	SelfLink     string               `yaml:"self_link"`
+	CreateVerb   string               `yaml:"create_verb"`
 	UpdateVerb   string               `yaml:"update_verb"`
 	UpdateMask   bool                 `yaml:"update_mask"`
 	Exclude      bool                 `yaml:"exclude"`

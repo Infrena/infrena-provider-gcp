@@ -17,7 +17,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 81 |
+| [unruled wire hooks](#unruled-wire-hooks) | 77 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
@@ -25,7 +25,7 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [no get method](#no-get-method) | 2 |
 | [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
 
-**376** types did not ship. **62** more ship without a create.
+**372** types did not ship. **62** more ship without a create.
 
 ## no insert or create method
 
@@ -299,14 +299,12 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `alloydb/Cluster` | 2 | pre_create, pre_delete, pre_update |
 | `alloydb/Instance` | 2 | custom_import, decoder, pre_create, pre_delete |
 | `alloydb/User` | 2 | custom_import, pre_update |
-| `bigquery/Dataset` | 2 | update_encoder |
 | `bigquery/Job` | 2 | encoder |
 | `bigquery/RowAccessPolicy` | 2 | pre_delete |
 | `binaryauthorization/Policy` | 2 | pre_delete |
 | `cloudbuild/Repository` | 2 | encoder |
 | `cloudkms/CryptoKey` | 2 | custom_delete, custom_import, decoder, encoder, update_encoder |
 | `cloudkms/CryptoKeyVersion` | 2 | custom_delete, custom_import, pre_update |
-| `cloudkms/KeyRing` | 2 | decoder, encoder |
 | `cloudresourcemanager/Lien` | 2 | decoder, pre_delete |
 | `cloudscheduler/Job` | 2 | encoder, post_create, post_update, update_encoder |
 | `cloudtasks/Queue` | 2 | post_create, post_update |
@@ -357,8 +355,6 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `monitoring/UptimeCheckConfig` | 2 | custom_delete, custom_import, encoder |
 | `networkservices/Gateway` | 2 | post_delete, update_encoder |
 | `pubsub/Schema` | 2 | update_encoder |
-| `pubsub/Subscription` | 2 | encoder, pre_update, update_encoder |
-| `pubsub/Topic` | 2 | encoder, update_encoder |
 | `redis/Cluster` | 2 | decoder, encoder |
 | `redis/Instance` | 2 | decoder, encoder, pre_delete |
 | `secretmanager/Secret` | 2 | pre_delete, pre_update |

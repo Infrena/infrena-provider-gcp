@@ -2,8 +2,10 @@
 
 # pubsub
 
-1 type(s). [Back to the index](../README.md).
+3 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.pubsub.snapshot`](gcp.pubsub.snapshot.md) | yes | **no** | yes | Request for the `CreateSnapshot` method. |
+| [`gcp.pubsub.snapshot`](gcp.pubsub.snapshot.md) | yes | yes | yes | Request for the `CreateSnapshot` method. |
+| [`gcp.subscription`](gcp.subscription.md) | yes | yes | yes | A named resource representing the stream of messages from a single, specific topic, to be delivered to the subscribing application. |
+| [`gcp.topic`](gcp.topic.md) | yes | yes | yes | A named resource to which messages are sent by publishers. |

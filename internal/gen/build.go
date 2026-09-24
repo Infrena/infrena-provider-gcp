@@ -5,6 +5,7 @@ package gen
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -973,13 +974,27 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	//
 	// So ask the collection. See discoveredUpdate for what it refuses, which is
 	// the more important half.
-	if t.UpdateVerb == "" && t.UpdateURL == "" {
-		// The envelope shape first, because discoveredUpdate refuses it by
-		// design and would otherwise leave these eight collections silently
-		// non-updatable.
+	// The envelope is a fact about the REQUEST, not about which verb was
+	// chosen, so it applies whether magic-modules declared the verb or not.
+	// It used to run only when magic-modules said nothing, and Pub/Sub's Topic
+	// and Subscription both declare update_verb: PATCH -- so they would have
+	// shipped sending a bare Topic with the mask on the query string, the one
+	// request Pub/Sub rejects. Checked first because discoveredUpdate refuses
+	// the envelope shape by design.
+	//
+	// A declared update_url is no obstacle when it names the same address as
+	// the API's own patch method: it is then dropped, and the update goes to
+	// the API's spelling of that address through self_link. See
+	// templateAddressesMethod for why magic-modules' spelling cannot be kept.
+	if (t.UpdateVerb == "" || t.UpdateVerb == http.MethodPatch) &&
+		(t.UpdateURL == "" || templateAddressesMethod(t.UpdateURL, col.Methods["patch"])) {
 		if wrapper, maskField := discoveredUpdateWrapper(doc, col); wrapper != "" {
 			if restricted, _ := restrictedPatch(col); !restricted || overlay.Patchable[name] != nil {
-				t.UpdateVerb, t.UpdateWrapper, t.UpdateMaskField = "PATCH", wrapper, maskField
+				t.UpdateVerb, t.UpdateWrapper, t.UpdateMaskField = http.MethodPatch, wrapper, maskField
+				t.UpdateURL = ""
+				// The mask travels inside the envelope; a query-string one
+				// as well would be a second mask the API never asked for.
+				t.UpdateMask = false
 				if allow := overlay.Patchable[name]; allow != nil {
 					applyPatchAllowlist(attrs, allow.Fields)
 				}
@@ -1078,6 +1093,20 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.BaseURL = create.Path
 	}
 	t.Scope = ScopeOf(t.BaseURL)
+
+	// The verb a create is sent with, from the API itself. magic-modules says
+	// so too where it matters (Pub/Sub's Topic declares create_verb: PUT), but
+	// Discovery is the one that always does, and it is the method we call.
+	//
+	// A PUT create is sent to the new resource's OWN path, so the create url is
+	// that method's path and not the collection magic-modules calls base_url.
+	// The PathPrefix pass below strips the version from it with the rest.
+	if create.HTTPMethod != "" && create.HTTPMethod != http.MethodPost {
+		t.CreateVerb = create.HTTPMethod
+		if t.CreateVerb == http.MethodPut {
+			t.CreateURL = create.Path
+		}
+	}
 
 	await, _ := AwaitOf(doc, create)
 	t.Await = await
@@ -2073,7 +2102,7 @@ func discoveredUpdate(col disco.Collection, updateURL string) (verb string, mask
 	// published on the COLLECTION and names the resource in a query parameter,
 	// so its path never equals the get's.
 	if updateURL == "" {
-		if patch.Path != get.Path {
+		if !sameAddress(patch, get) {
 			return "", false
 		}
 	} else if !updateURLMatchesPatch(updateURL, patch) {
