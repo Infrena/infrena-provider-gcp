@@ -1650,6 +1650,9 @@ func (g *google) pubsubURL(rel string) string {
 func (g *google) runURL(rel string) string {
 	return "https://run.googleapis.com/v2/" + rel
 }
+func (g *google) deployURL(rel string) string {
+	return "https://clouddeploy.googleapis.com/v1/" + rel
+}
 func (g *google) crmURL(rel string) string {
 	return "https://cloudresourcemanager.googleapis.com/v3/" + rel
 }
@@ -2776,5 +2779,95 @@ resources:
 		if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
 			t.Fatalf("destroy failed:\n%s", r.combined())
 		}
+	})
+}
+
+// TestLiveCloudDeployTarget settles a question nothing offline could.
+//
+// 37 shipping types -- Eventarc, Certificate Manager, the networkservices and
+// networksecurity families, Cloud Deploy -- create with "?<resource>Id=" set
+// from a SHORT `name`, and their APIs document `name` as the full resource
+// path. If Google answers with the full path, state and configuration disagree
+// on a field in the url after every create, and every plan proposes a
+// replacement. The provider now reports a full name that is this resource's
+// own id as the short name its schema means; this test is whether Google's
+// answer needs that, and whether it is enough.
+//
+// gcp.target is also the one type that could not create at all: its create
+// parameter, targetId, collides with an output-only field of its own. It now
+// sends its id from `name`. A target definition deploys nothing and costs
+// nothing.
+func TestLiveCloudDeployTarget(t *testing.T) {
+	project, sa := guard(t)
+	n := newNames()
+	g := newGoogle(t, project, sa)
+	short := "infrena-live-tgt-" + n.run
+	id := "projects/" + project + "/locations/" + region + "/targets/" + short
+	t.Logf("live run %s: creating %s", n.run, id)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(context.Background()), 10*time.Minute)
+		defer cancel()
+		g.deleteAndWait(t, ctx, "gcp.target", id, g.deployURL(id))
+	})
+
+	dir := t.TempDir()
+	write(t, dir, "infrena.yml", fmt.Sprintf(`project: infrena-gcp-live-deploy
+environments:
+  live: {}
+providers:
+  - plugin: gcp
+    project: %[1]s
+    region: %[2]s
+    impersonate_service_account: %[3]s
+resources:
+  target:
+    type: gcp.target
+    name: %[4]s
+    run:
+      location: projects/%[1]s/locations/%[2]s
+    labels:
+      infrena-live: "true"
+`, project, region, sa, short))
+
+	r := run(t, dir, "apply", "live", "--auto-approve")
+	t.Logf("apply:\n%s", r.combined())
+	if r.ExitCode != exitChanges && r.ExitCode != exitOK {
+		t.Fatalf("create failed:\n%s", r.combined())
+	}
+	if got := providerIDOf(t, dir, "target"); got != id {
+		t.Errorf("provider id = %q, want %q", got, id)
+	}
+
+	// The evidence, logged whichever way it falls.
+	var answer struct {
+		Name string `json:"name"`
+	}
+	code, raw, err := g.get(t.Context(), g.deployURL(id))
+	if err == nil && code == http.StatusOK {
+		err = json.Unmarshal(raw, &answer)
+	}
+	if err != nil || code != http.StatusOK {
+		t.Fatalf("google has no target at %s: %d %s %v", id, code, raw, err)
+	}
+	t.Logf("GOOGLE ANSWERED name=%q (configuration wrote %q)", answer.Name, short)
+
+	t.Run("a_second_plan_is_clean", func(t *testing.T) {
+		out := filepath.Join(t.TempDir(), "plan.json")
+		mustRun(t, dir, exitOK, "plan", "live", "--output", out)
+		if changes := planChanges(t, out); len(changes) != 0 {
+			t.Errorf("the plan after the create proposes %v; if it names `name`, the full name "+
+				"Google answered with is reading as a change", changes)
+		}
+	})
+
+	t.Run("destroy_removes_it", func(t *testing.T) {
+		write(t, dir, "infrena.yml", cut(readFile(t, dir, "infrena.yml"), "resources:"))
+		if r := run(t, dir, "apply", "live", "--auto-approve"); r.ExitCode != exitChanges && r.ExitCode != exitOK {
+			t.Fatalf("destroy failed:\n%s", r.combined())
+		}
+		waitFor(t, 5*time.Minute, func() bool {
+			code, _, err := g.get(t.Context(), g.deployURL(id))
+			return err == nil && code == http.StatusNotFound
+		}, "the target to be gone")
 	})
 }
