@@ -14,9 +14,9 @@
 | [`gcp.crosssitenetwork`](gcp.crosssitenetwork.md) | yes | yes | yes | Represents a cross-site-network resource. |
 | [`gcp.externalvpngateway`](gcp.externalvpngateway.md) | yes | **no** | yes | Represents a VPN gateway managed outside of GCP. |
 | [`gcp.firewall`](gcp.firewall.md) | yes | yes | yes | Each network has its own firewall controlling access to and from the instances. |
-| [`gcp.forwardingrule`](gcp.forwardingrule.md) | yes | **no** | yes | A ForwardingRule resource. |
+| [`gcp.forwardingrule`](gcp.forwardingrule.md) | yes | yes | yes | A ForwardingRule resource. |
 | [`gcp.globaladdress`](gcp.globaladdress.md) | yes | **no** | yes | Represents a Global Address resource. |
-| [`gcp.globalforwardingrule`](gcp.globalforwardingrule.md) | yes | **no** | yes | Represents a GlobalForwardingRule resource. |
+| [`gcp.globalforwardingrule`](gcp.globalforwardingrule.md) | yes | yes | yes | Represents a GlobalForwardingRule resource. |
 | [`gcp.globalnetworkendpointgroup`](gcp.globalnetworkendpointgroup.md) | yes | **no** | yes | A global network endpoint group contains endpoints that reside outside of Google Cloud. |
 | [`gcp.globalpublicdelegatedprefix`](gcp.globalpublicdelegatedprefix.md) | yes | yes | yes | A PublicDelegatedPrefix resource represents an IP block within a PublicAdvertisedPrefix that is configured within a single cloud scope … |
 | [`gcp.healthcheck`](gcp.healthcheck.md) | yes | yes | yes | Health Checks determine whether instances are responsive and able to do work. |
