@@ -24,7 +24,7 @@ The other three entries in this resource's custom_code -- constants, extra_schem
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/regions/{{region}}/subnetworks` |
 | Read | yes | `GET projects/{project}/regions/{region}/subnetworks/{subnetwork}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/regions/{region}/subnetworks/{subnetwork}` |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/subnetworks/{subnetwork}` |
 | Import | yes | by id, see below |
 
@@ -40,22 +40,22 @@ projects/{project}/regions/{region}/subnetworks/{subnetwork}
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `allowSubnetCidrRoutesOverlap` | `allow_subnet_cidr_routes_overlap` | `boolean` | optional | — | Whether this subnetwork's ranges can conflict with existing custom routes. Setting this to true allows this subnetwork's primary and secondary ranges to overlap with (and contain) custom routes that … |
+| `allowSubnetCidrRoutesOverlap` | `allow_subnet_cidr_routes_overlap` | `boolean` | optional | force new | Whether this subnetwork's ranges can conflict with existing custom routes. Setting this to true allows this subnetwork's primary and secondary ranges to overlap with (and contain) custom routes that … |
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
-| `description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. This field can be set only at resource creation time. |
-| `enableFlowLogs` | `enable_flow_logs` | `boolean` | optional | — | Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there … |
-| `externalIpv6Prefix` | `external_ipv6_prefix` | `string` | optional | — | The external IPv6 address range that is owned by this subnetwork. |
-| `fingerprint` | — | `string` | optional | — | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a Subnetwork. An up-to-date fingerprint … |
+| `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. This field can be set only at resource creation time. |
+| `enableFlowLogs` | `enable_flow_logs` | `boolean` | optional | force new | Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there … |
+| `externalIpv6Prefix` | `external_ipv6_prefix` | `string` | optional | force new | The external IPv6 address range that is owned by this subnetwork. |
+| `fingerprint` | — | `string` | optional | force new | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a Subnetwork. An up-to-date fingerprint … |
 | `gatewayAddress` | `gateway_address` | `string` | output only | — | Output only. \[Output Only\] The gateway address for default routes to reach destination addresses outside this subnetwork. |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
-| `internalIpv6Prefix` | `internal_ipv6_prefix` | `string` | optional | — | The internal IPv6 address range that is owned by this subnetwork. |
-| `ipCidrRange` | `cidr`, `ip_cidr_range` | `string` | optional | — | The range of internal addresses that are owned by this subnetwork. Provide this property when you create the subnetwork. For example,10.0.0.0/8 or 100.64.0.0/10. Ranges must be unique and … |
-| `ipCollection` | `ip_collection` | `string` | optional | — | Reference to the source of IP, like a PublicDelegatedPrefix (PDP) for BYOIP. The PDP must be a sub-PDP in EXTERNAL_IPV6_SUBNETWORK_CREATION or INTERNAL_IPV6_SUBNETWORK_CREATION mode. Use one of the … |
-| `ipv6AccessType` | `ipv6_access_type` | `string` | optional | — | The access type of IPv6 address this subnet holds. It's immutable and can only be specified during creation or the first time the subnet is updated into IPV4_IPV6 dual stack. |
+| `internalIpv6Prefix` | `internal_ipv6_prefix` | `string` | optional | force new | The internal IPv6 address range that is owned by this subnetwork. |
+| `ipCidrRange` | `cidr`, `ip_cidr_range` | `string` | optional | force new | The range of internal addresses that are owned by this subnetwork. Provide this property when you create the subnetwork. For example,10.0.0.0/8 or 100.64.0.0/10. Ranges must be unique and … |
+| `ipCollection` | `ip_collection` | `string` | optional | force new | Reference to the source of IP, like a PublicDelegatedPrefix (PDP) for BYOIP. The PDP must be a sub-PDP in EXTERNAL_IPV6_SUBNETWORK_CREATION or INTERNAL_IPV6_SUBNETWORK_CREATION mode. Use one of the … |
+| `ipv6AccessType` | `ipv6_access_type` | `string` | optional | force new | The access type of IPv6 address this subnet holds. It's immutable and can only be specified during creation or the first time the subnet is updated into IPV4_IPV6 dual stack. |
 | `ipv6CidrRange` | `ipv6_cidr_range` | `string` | output only | — | Output only. \[Output Only\] This field is for internal use. |
 | `ipv6GceEndpoint` | `ipv6_gce_endpoint` | `string` | output only | — | Output only. \[Output Only\] Possible endpoints of this subnetwork. It can be one of the following: - VM_ONLY: The subnetwork can be used for creating instances and IPv6 addresses with VM endpoint … |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Always compute#subnetwork for Subnetwork resources. |
-| `logConfig` | `log_config` | `map` | optional | — | This field denotes the VPC flow logging options for this subnetwork. If logging is enabled, logs are exported to Cloud Logging. |
+| `logConfig` | `log_config` | `map` | optional | force new | This field denotes the VPC flow logging options for this subnetwork. If logging is enabled, logs are exported to Cloud Logging. |
 | `logConfig.aggregationInterval` | `aggregation_interval` | `string` | optional | — | Can only be specified if VPC flow logging for this subnetwork is enabled. Toggles the aggregation interval for collecting flow logs. Increasing the interval time will reduce the amount of generated … |
 | `logConfig.enable` | — | `boolean` | optional | — | Whether to enable flow logging for this subnetwork. If this field is not explicitly set, it will not appear in get listings. If not set the default behavior is determined by the org policy, if there … |
 | `logConfig.filterExpr` | `filter_expr` | `string` | optional | — | Can only be specified if VPC flow logs for this subnetwork is enabled. The filter expression is used to define which VPC flow logs should be exported to Cloud Logging. |
@@ -63,15 +63,15 @@ projects/{project}/regions/{region}/subnetworks/{subnetwork}
 | `logConfig.metadata` | — | `string` | optional | — | Can only be specified if VPC flow logs for this subnetwork is enabled. Configures whether all, none or a subset of metadata fields should be added to the reported VPC flow logs. Default … |
 | `logConfig.metadataFields` | `metadata_fields` | `list` | optional | unordered | Can only be specified if VPC flow logs for this subnetwork is enabled and "metadata" was set to CUSTOM_METADATA. |
 | `logConfig.metadataFields[]` | — | `string` | optional | — | — |
-| `name` | — | `string` | required | — | The name of the resource, provided by the client when initially creating the resource. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters … |
+| `name` | — | `string` | required | force new | The name of the resource, provided by the client when initially creating the resource. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters … |
 | `network` | — | `string` | required | force new, refers to `gcp.network.selfLink` | The URL of the network to which this subnetwork belongs, provided by the client when initially creating the subnetwork. This field can be set only at resource creation time. |
 | `params` | — | `map` | optional | force new | Input only. \[Input Only\] Additional params passed with the request, but not persisted as part of resource payload. |
 | `params.resourceManagerTags` | `resource_manager_tags` | `map` | optional | force new, opaque | Tag keys/values directly bound to this resource. Tag keys and values have the same definition as resource manager tags. The field is allowed for INSERT only. The keys/values to set on the resource … |
-| `privateIpGoogleAccess` | `private_ip_google_access` | `boolean` | optional | — | Whether the VMs in this subnet can access Google services without assigned external IP addresses. This field can be both set at resource creation time and updated using setPrivateIpGoogleAccess. |
+| `privateIpGoogleAccess` | `private_ip_google_access` | `boolean` | optional | force new | Whether the VMs in this subnet can access Google services without assigned external IP addresses. This field can be both set at resource creation time and updated using setPrivateIpGoogleAccess. |
 | `privateIpv6GoogleAccess` | `private_ipv6_google_access` | `string` | optional | — | This field is for internal use. This field can be both set at resource creation time and updated usingpatch. |
-| `purpose` | — | `string` | optional | — | — |
+| `purpose` | — | `string` | optional | force new | — |
 | `region` | — | `string` | optional | force new | URL of the region where the Subnetwork resides. This field can be set only at resource creation time. |
-| `reservedInternalRange` | `reserved_internal_range` | `string` | optional | — | The URL of the reserved internal range. |
+| `reservedInternalRange` | `reserved_internal_range` | `string` | optional | force new | The URL of the reserved internal range. |
 | `resolveSubnetMask` | `resolve_subnet_mask` | `string` | optional | force new | Configures subnet mask resolution for this subnetwork. |
 | `role` | — | `string` | optional | — | The role of subnetwork. Currently, this field is only used when purpose is set to GLOBAL_MANAGED_PROXY orREGIONAL_MANAGED_PROXY. The value can be set toACTIVE or BACKUP. An ACTIVE subnetwork is one … |
 | `secondaryIpRanges` | `secondary_ip_ranges` | `list` | optional | — | An array of configurations for secondary IP ranges for VM instances contained in this subnetwork. The primary IP of such VM must belong to the primary ipCidrRange of the subnetwork. The alias IPs may … |
