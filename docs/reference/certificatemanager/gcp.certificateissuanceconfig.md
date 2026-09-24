@@ -21,7 +21,7 @@ Certificate represents a HTTP-reachable backend for a Certificate.
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/certificateIssuanceConfigs?certificateIssuanceConfigId={{name}}` |
 | Read | yes | `GET {+name}` |
-| Update | yes | `PATCH {+name}`, with an update mask naming the changed fields |
+| Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

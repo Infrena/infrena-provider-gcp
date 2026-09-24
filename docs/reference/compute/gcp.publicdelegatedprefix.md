@@ -20,7 +20,7 @@ Represents a PublicDelegatedPrefix for use with bring your own IP addresses (BYO
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/regions/{{region}}/publicDelegatedPrefixes` |
 | Read | yes | `GET projects/{project}/regions/{region}/publicDelegatedPrefixes/{publicDelegatedPrefix}` |
-| Update | yes | `PATCH projects/{project}/regions/{region}/publicDelegatedPrefixes/{publicDelegatedPrefix}` |
+| Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE projects/{project}/regions/{region}/publicDelegatedPrefixes/{publicDelegatedPrefix}` |
 | Import | yes | by id, see below |
 

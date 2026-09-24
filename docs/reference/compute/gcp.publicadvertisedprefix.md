@@ -20,7 +20,7 @@ Represents a PublicAdvertisedPrefix for use with bring your own IP addresses (BY
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/global/publicAdvertisedPrefixes` |
 | Read | yes | `GET projects/{project}/global/publicAdvertisedPrefixes/{publicAdvertisedPrefix}` |
-| Update | yes | `PATCH projects/{project}/global/publicAdvertisedPrefixes/{publicAdvertisedPrefix}` |
+| Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE projects/{project}/global/publicAdvertisedPrefixes/{publicAdvertisedPrefix}` |
 | Import | yes | by id, see below |
 
