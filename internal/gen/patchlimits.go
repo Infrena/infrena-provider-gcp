@@ -215,3 +215,21 @@ func normalizePathShape(p string) string {
 	}
 	return strings.Join(out, "/")
 }
+
+// lockFieldRE is how compute says a field is its optimistic lock: "You must
+// always provide an up-to-date fingerprint hash in order to update the
+// instance", "An up-to-date fingerprint must be provided in order to update
+// the Subnetwork". It is prose because Discovery has no structure for it.
+var lockFieldRE = regexp.MustCompile(`(?i)in order to (?:update|patch)`)
+
+// lockFieldOf names the field t's API requires, current, in every update, or
+// "". Only a top-level `fingerprint` that says so counts: labelFingerprint
+// guards setLabels, a separate method this provider does not call, and
+// sending it in a patch is not what the API asks for.
+func lockFieldOf(attrs map[string]*catalog.Attr) string {
+	a := attrs["fingerprint"]
+	if a == nil || !lockFieldRE.MatchString(a.Description) {
+		return ""
+	}
+	return a.Canonical
+}

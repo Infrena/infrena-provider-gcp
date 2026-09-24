@@ -376,18 +376,35 @@ patchable:
       not through patch, so a label change replaces the image until somebody
       implements that call.
 
-# gcp.subnetwork is deliberately ABSENT, and it is the interesting one.
-# compute.subnetworks.patch says "Only certain fields can be updated with a
-# patch request as indicated in the field descriptions. You must specify the
-# current fingerprint of the subnetwork resource being patched." The fingerprint
-# is the blocker, not the field list: Subnetwork.fingerprint's own description
-# says "An up-to-date fingerprint must be provided in order to update the
-# Subnetwork, otherwise the request will fail with error 412". BuildMask sends
-# only the attributes that CHANGED, so it never sends a fingerprint, and every
-# subnetwork patch would 412. Listing fields here would ship a type whose every
-# update fails. The real fix is to carry compute's optimistic-locking
-# fingerprint from the observation Update was handed, which is a runtime change
-# and not a line in this file.
+  gcp.subnetwork:
+    fields: [secondaryIpRanges, role, stackType, privateIpv6GoogleAccess]
+    note: >
+      compute.subnetworks.patch, read from the pinned Discovery document on
+      2026-09-23: "Only certain fields can be updated with a patch request as
+      indicated in the field descriptions. You must specify the current
+      fingerprint of the subnetwork resource being patched."
+
+      The field descriptions name four: secondaryIpRanges and role ("can be
+      updated with a patch request"), stackType and privateIpv6GoogleAccess
+      ("can be both set at resource creation time and updated using patch").
+      privateIpGoogleAccess is updated by a separate method,
+      setPrivateIpGoogleAccess, and ipCidrRange by expandIpCidrRange; this
+      provider calls neither, so both replace. ipv6AccessType is "immutable
+      and can only be specified during creation or the first time the subnet
+      is updated into IPV4_IPV6 dual stack", a transition this list does not
+      try to model.
+
+      NOT LISTED, AND WORTH CONFIRMING LIVE: logConfig. Turning flow logs on
+      and off is the commonest subnetwork change there is, and compute's own
+      documentation elsewhere does it by patch -- but its field description
+      here says nothing either way, and the rule for this list is Google's
+      text. So today a flow-log change plans a REPLACEMENT, loudly. If the live
+      suite shows a patch accepts it, add it here.
+
+      This entry was held back until 2026-09-23 because of the fingerprint,
+      not the field list. Every update needs the current one, and the update
+      body carries only changed fields, so it never did. catalog.Type.LockField
+      now names it and Update copies it from the observation it was handed.
 
 # Curated aliases: the short word people actually say, for attributes they write
 # constantly. The generator already emits a snake_case alias for EVERY camelCase

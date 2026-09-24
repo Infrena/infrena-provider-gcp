@@ -533,3 +533,36 @@ func TestSeedTagBindingsIsListedByParent(t *testing.T) {
 		t.Errorf("tagBindings = %+v", got.TagBindings)
 	}
 }
+
+// TestALockedResourceRefusesAStaleFingerprint is compute's optimistic
+// locking. Without it here, 19 patchable compute types never sent a
+// fingerprint and every test passed, while real Google would have answered
+// every one of those patches with a 412.
+func TestALockedResourceRefusesAStaleFingerprint(t *testing.T) {
+	s := New(t)
+	defer s.Close()
+	path := "/compute/v1/projects/p/global/urlMaps/m"
+	s.Seed(path, map[string]any{"name": "m", "fingerprint": "fp-a"})
+	patch := func(body string) int {
+		req, _ := http.NewRequest(http.MethodPatch, s.URL()+path, strings.NewReader(body))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := patch(`{"description": "x"}`); code != http.StatusPreconditionFailed {
+		t.Errorf("patch with no fingerprint = %d, want 412", code)
+	}
+	if code := patch(`{"description": "x", "fingerprint": "fp-a"}`); code != http.StatusOK {
+		t.Fatalf("patch with the current fingerprint = %d, want 200", code)
+	}
+	stored, _ := s.Get(path)
+	if stored["fingerprint"] == "fp-a" {
+		t.Error("the fingerprint did not change after a modification")
+	}
+	if code := patch(`{"description": "y", "fingerprint": "fp-a"}`); code != http.StatusPreconditionFailed {
+		t.Errorf("patch quoting the superseded fingerprint = %d, want 412", code)
+	}
+}
