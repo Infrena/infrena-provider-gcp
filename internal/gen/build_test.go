@@ -357,7 +357,7 @@ properties:
   - name: target
     type: ResourceRef
     resource: Target
-    imports: selfLink
+    imports: name
 `,
 		"mmv1/products/samesvc/Target.yaml": `name: Target
 description: the same-product reference target.
@@ -424,7 +424,7 @@ properties:
   - name: shared
     type: ResourceRef
     resource: Shared
-    imports: selfLink
+    imports: name
 `,
 		"mmv1/products/crossb/Shared.yaml": `name: Shared
 description: ships in a different product than its referrer.
@@ -1620,5 +1620,35 @@ func TestADeletePathWithNoAnchoringPatternIsNotWidened(t *testing.T) {
 	if got := idTemplateFromDelete(col); got != "{+name}" {
 		t.Errorf("id template = %q; only a \"^<collection>/.*$\" pattern says which literal "+
 			"segment anchors the name, and this one does not", got)
+	}
+}
+
+// TestAReferenceToAnAttributeTheTargetLacksIsDropped. compute/TargetHttpsProxy's
+// serverTlsPolicy imports selfLink from networksecurity's ServerTlsPolicy,
+// which has none, and infrena refused the whole plugin over that one edge. The
+// kept reference is there so a pass that drops every reference fails too.
+func TestAReferenceToAnAttributeTheTargetLacksIsDropped(t *testing.T) {
+	proxy := &catalog.Type{Name: "gcp.targethttpsproxy", Service: "compute", Attributes: map[string]*catalog.Attr{
+		"serverTlsPolicy": {Canonical: "serverTlsPolicy", Kind: value.KindString,
+			Ref: &catalog.RefTarget{Type: "gcp.servertlspolicy", Attribute: "selfLink"}},
+		"urlMap": {Canonical: "urlMap", Kind: value.KindString,
+			Ref: &catalog.RefTarget{Type: "gcp.urlmap", Attribute: "selfLink"}},
+	}}
+	tls := &catalog.Type{Name: "gcp.servertlspolicy", Attributes: map[string]*catalog.Attr{
+		"name": {Canonical: "name", Kind: value.KindString}}}
+	urlmap := &catalog.Type{Name: "gcp.urlmap", Attributes: map[string]*catalog.Attr{
+		"selfLink": {Canonical: "selfLink", Kind: value.KindString, Output: true}}}
+
+	var warnings []Warning
+	dropRefsToMissingAttributes([]*catalog.Type{proxy, tls, urlmap}, &warnings)
+
+	if r := proxy.Attributes["serverTlsPolicy"].Ref; r != nil {
+		t.Errorf("serverTlsPolicy still refers to %s.%s, an attribute that does not exist", r.Type, r.Attribute)
+	}
+	if proxy.Attributes["urlMap"].Ref == nil {
+		t.Error("urlMap's reference was dropped, but gcp.urlmap does have selfLink")
+	}
+	if len(warnings) != 1 || warnings[0].Resource != "gcp.targethttpsproxy.serverTlsPolicy" {
+		t.Errorf("warnings = %+v, want exactly one, naming the dropped edge", warnings)
 	}
 }
