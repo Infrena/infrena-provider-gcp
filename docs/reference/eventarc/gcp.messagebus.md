@@ -13,7 +13,7 @@ The Eventarc MessageBus resource
 | Asset type | `eventarc.googleapis.com/MessageBus` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

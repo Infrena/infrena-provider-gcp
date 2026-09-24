@@ -13,7 +13,7 @@ A Cloud Firestore Database.
 | Asset type | `firestore.googleapis.com/GoogleFirestoreAdminV1Database` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

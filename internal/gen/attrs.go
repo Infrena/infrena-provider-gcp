@@ -61,24 +61,56 @@ func ScopeOf(baseURL string) catalog.Scope {
 
 // AwaitOf picks the await strategy from the shape of the method's response.
 //
-// Deciding from the Operation SCHEMA rather than from the API's name is what
-// makes this generic: container, dns and sqladmin all use compute-style
+// Deciding from the operation schema's SHAPE rather than from the API's name
+// is what makes this generic: container and sqladmin use compute-style
 // operations without being compute.
+//
+// And from its shape rather than its NAME, too. This used to demand a response
+// schema called exactly "Operation", which is what most APIs publish -- but not
+// all. Eventarc, Cloud Run v2 and Firestore publish google.longrunning.Operation
+// as "GoogleLongrunningOperation", and API Gateway as "ApigatewayOperation". 13
+// shipping types in those APIs -- gcp.service, gcp.job, every Eventarc type,
+// gcp.firestore.databas among them -- were classified as returning the finished
+// resource, so a create handed back an operation still running and Create took
+// it as done.
+//
+// The shape tests are strict on purpose, because a resource can look like an
+// operation from one field. dataproc's Job has `done` and `status` and is a
+// resource, not an operation, so "has done" is not enough; DNS publishes its own
+// "Operation" with only a `status`, which is not compute's.
 func AwaitOf(d *disco.Document, m *disco.Method) (catalog.AwaitKind, string) {
-	if m == nil || m.Response == nil || m.Response.Ref != "Operation" {
+	if m == nil || m.Response == nil || m.Response.Ref == "" {
 		return catalog.AwaitNone, ""
 	}
-	op, ok := d.Schemas["Operation"]
-	if !ok {
+	op, ok := d.Schemas[m.Response.Ref]
+	if !ok || op == nil {
 		return catalog.AwaitNone, ""
 	}
-	if _, isLRO := op.Properties["done"]; isLRO {
+	switch {
+	case isLongRunningOperation(op):
 		return catalog.AwaitLongRunning, ""
-	}
-	if _, isCompute := op.Properties["status"]; isCompute {
+	case isComputeOperation(op):
 		return catalog.AwaitComputeOperation, ""
 	}
 	return catalog.AwaitNone, ""
+}
+
+// isLongRunningOperation is google.longrunning.Operation, whatever the API
+// called it: a name to poll, a done flag, and a response or an error to finish
+// with. A resource that merely has a `done` field (dataproc's Job) has no name
+// of this kind and no response.
+func isLongRunningOperation(s *disco.Schema) bool {
+	p := s.Properties
+	return p["done"] != nil && p["name"] != nil && (p["response"] != nil || p["error"] != nil)
+}
+
+// isComputeOperation is the compute-style operation compute, container and
+// sqladmin share: a status to watch, the resource it acts on, and what kind of
+// operation it is. All three are required, so a resource with a `status` field
+// -- which is most of them -- is never mistaken for one.
+func isComputeOperation(s *disco.Schema) bool {
+	p := s.Properties
+	return p["status"] != nil && p["targetLink"] != nil && p["operationType"] != nil
 }
 
 // listFieldBlocklist names array-valued list-response properties that are
