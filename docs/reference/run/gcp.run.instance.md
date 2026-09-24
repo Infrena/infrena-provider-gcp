@@ -13,7 +13,7 @@ A Cloud Run Instance represents a single group of containers running in a region
 | Asset type | `run.googleapis.com/GoogleCloudRunV2Instance` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

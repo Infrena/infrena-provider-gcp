@@ -13,7 +13,7 @@ The Eventarc GoogleApiSource resource
 | Asset type | `eventarc.googleapis.com/GoogleApiSource` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

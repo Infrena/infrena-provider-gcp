@@ -13,7 +13,7 @@ WorkerPool acts as a top-level container that manages a set of configurations an
 | Asset type | `run.googleapis.com/GoogleCloudRunV2WorkerPool` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 
