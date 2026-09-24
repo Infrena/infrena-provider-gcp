@@ -2,7 +2,7 @@
 
 ## The most useful contribution: a ruling
 
-[235 types ship and 380 do not](docs/reference/not-shipped.md). Most of the gap is types whose
+[Many more types are held back than ship](docs/reference/not-shipped.md), and that page counts them. Most of the gap is types whose
 magic-modules definition declares hand-written Terraform hooks that change what goes on the wire,
 and which therefore wait for a human to read those hooks and decide.
 
