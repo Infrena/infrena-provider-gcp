@@ -12,7 +12,7 @@ SslCerts insert request.
 | Scope | global |
 | Asset type | `sqladmin.googleapis.com/SslCertsInsertRequest` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 600s |
 
 ## What it can do
 

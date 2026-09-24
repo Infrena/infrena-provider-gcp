@@ -498,11 +498,36 @@ func (p *Provider) Delete(ctx context.Context, current *resource.ResourceState) 
 	if err != nil {
 		return err
 	}
-	_, err = p.await(ctx, ty, resp)
+	_, err = p.awaitAs(ctx, ty, ty.DeleteAwaitKind(), resp)
 	if isNotFound(err) {
-		return nil
+		return p.confirmGone(ctx, ty, current.ProviderID, attrs, err)
 	}
 	return err
+}
+
+// confirmGone decides what a NOT_FOUND during a delete's wait means, by
+// asking. It is ambiguous: the operation can finish NOT_FOUND because the
+// resource was already gone, which is success, but a 404 on the POLL of the
+// operation (an operation Google has expired, a poll url that addresses
+// nothing) says nothing about the resource at all. Reported as success, that
+// second case tells infrena a delete happened that did not, and infrena then
+// drops the Deposed record that is the only handle on a replaced object.
+//
+// So read the resource: gone is success, anything else returns the
+// original error. Uncancellable and bounded, like every read after a
+// mutation was sent.
+func (p *Provider) confirmGone(ctx context.Context, ty *catalog.Type, id string, attrs map[string]value.Value, awaitErr error) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Duration(ty.TimeoutSeconds)*time.Second)
+	defer cancel()
+	getURL, err := p.itemURL(ty, "", id, attrs)
+	if err != nil {
+		return awaitErr
+	}
+	if _, err := p.client.Do(ctx, http.MethodGet, getURL, nil); isNotFound(err) {
+		return nil
+	}
+	return fmt.Errorf("gcp: %s: the delete's operation could not be followed, and %s is still there: %w",
+		ty.Name, id, awaitErr)
 }
 
 // Import adopts an existing resource by its provider id.

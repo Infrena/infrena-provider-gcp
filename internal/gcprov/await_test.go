@@ -554,7 +554,13 @@ func TestEveryOperationURLTheRuntimeBuildsAddressesAnOperation(t *testing.T) {
 // built by the runtime's own code from an operation body shaped the way ty's
 // own API answers one.
 func pollPathTheRuntimeWouldRequest(p *Provider, ty *catalog.Type) (string, error) {
-	switch ty.Await {
+	// The kind that polls: a type whose create answers synchronously can
+	// still poll for its delete (gcp.sslcert, gcp.keyring).
+	kind := ty.Await
+	if kind == catalog.AwaitNone {
+		kind = ty.DeleteAwaitKind()
+	}
+	switch kind {
 	case catalog.AwaitComputeOperation:
 		_, url, err := p.operationRequestURL(ty, computeOperationAsItsAPIAnswersIt(ty))
 		if err != nil {
@@ -574,7 +580,7 @@ func pollPathTheRuntimeWouldRequest(p *Provider, ty *catalog.Type) (string, erro
 		}
 		return rel, nil
 	default:
-		return "", fmt.Errorf("has an operation path but await strategy %d never polls one", ty.Await)
+		return "", fmt.Errorf("has an operation path but await strategy %d never polls one", kind)
 	}
 }
 

@@ -213,6 +213,16 @@ type Type struct {
 	OperationParamPatterns map[string]string `json:"operation_param_patterns,omitempty"`
 
 	Await AwaitKind `json:"await"`
+	// DeleteAwait is how a delete completes, when that differs from Await.
+	// Await is read from the CREATE method's response and a delete's can be
+	// different: sqladmin's sslCerts insert answers with the resource and
+	// its delete with an operation, so a delete that reused Await returned
+	// as soon as Google accepted it -- and infrena drops a replaced object's
+	// Deposed record on that success, the only handle on it. Eight
+	// Bigtable, Spanner and KMS types go the other way and reported a
+	// failure for a delete that worked. Nil means "the same as Await";
+	// DeleteAwaitKind is how to read it.
+	DeleteAwait *AwaitKind `json:"delete_await,omitempty"`
 	// OperationWaitPath is the API's own operations wait path for this type's
 	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
 	// EMPTY means the API publishes no wait method — container and sqladmin do
@@ -664,4 +674,12 @@ func (t *Type) SetterFor(canonical string) *Setter {
 		}
 	}
 	return nil
+}
+
+// DeleteAwaitKind is how this type's delete completes.
+func (t *Type) DeleteAwaitKind() AwaitKind {
+	if t.DeleteAwait != nil {
+		return *t.DeleteAwait
+	}
+	return t.Await
 }

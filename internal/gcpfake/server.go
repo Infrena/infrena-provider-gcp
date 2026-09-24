@@ -67,6 +67,10 @@ type Server struct {
 	// dropOnCreate lists fields an insert ignores, for DropOnCreate.
 	dropOnCreate map[string]bool
 
+	// deleteThenFail lists resources whose next delete is accepted and then
+	// fails, for DeleteThenFailOperation.
+	deleteThenFail map[string]bool
+
 	// resources holds every stored resource, keyed by the exact request path
 	// it lives at (e.g. "/v1/projects/p/locations/r/widgets/one"), matching
 	// exactly what Seed and Get take. Keying by the literal path rather than
@@ -572,7 +576,10 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	s.mu.Lock()
 	_, existed := s.resources[path]
-	delete(s.resources, path)
+	failing := s.deleteThenFail[path]
+	if !failing {
+		delete(s.resources, path)
+	}
 	s.mu.Unlock()
 	if !existed {
 		// A real delete of something already gone is a 404, same as a get.
@@ -915,4 +922,18 @@ func (s *Server) handleSetter(w http.ResponseWriter, r *http.Request, bodyBytes 
 	s.resources[path] = merged
 	s.mu.Unlock()
 	s.respondMutation(w, path, merged, false)
+}
+
+// DeleteThenFailOperation makes the next delete of path accepted and then
+// failed: Google answers with an operation, the operation finishes with the
+// given error, and the resource is still there. Under the default
+// synchronous style there is no operation to fail, so set a style first.
+func (s *Server) DeleteThenFailOperation(path, code, message string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deleteThenFail == nil {
+		s.deleteThenFail = map[string]bool{}
+	}
+	s.deleteThenFail[path] = true
+	s.createThenFail[path] = apiErrorSpec{Code: code, Message: message}
 }
