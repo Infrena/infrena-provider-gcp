@@ -354,6 +354,10 @@ func roundTrip(t *testing.T, ty *catalog.Type, counts *discoStyleCounts) (msg st
 		}
 	}
 
+	if missing := missingRequiredQuery(t, ty, s.Requests()); len(missing) > 0 {
+		return "sent a request without a parameter Google requires: " + missing[0], changed
+	}
+
 	s.SetOperationStyle(styleFor(ty.DeleteAwaitKind()))
 	began := time.Now()
 	if err := p.Delete(ctx, read); err != nil {

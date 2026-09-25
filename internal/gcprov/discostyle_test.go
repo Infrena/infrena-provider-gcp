@@ -24,6 +24,10 @@ type discoMethod struct {
 	// literals is how much of the address is fixed text, so the most
 	// specific of several matching methods wins.
 	literals int
+	// requiredQuery are the query parameters the method requires, by
+	// structure or by its "Required." prose (trustConfigs.patch's updateMask
+	// is required only in prose).
+	requiredQuery []string
 }
 
 var (
@@ -71,12 +75,20 @@ func loadDiscoMethods() (map[string][]discoMethod, error) {
 						path = m.Path
 					}
 					kind, _ := gen.AwaitOf(d, m)
+					var required []string
+					for name, p := range m.Parameters {
+						if p.Location == "query" && (p.Required ||
+							disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired]) {
+							required = append(required, name)
+						}
+					}
 					discoMethods[d.Name] = append(discoMethods[d.Name], discoMethod{
-						id:       m.ID,
-						verb:     m.HTTPMethod,
-						pattern:  discoPathPattern(path),
-						style:    styleFor(kind),
-						literals: len(discoPlaceholderRE.ReplaceAllString(path, "")),
+						id:            m.ID,
+						verb:          m.HTTPMethod,
+						pattern:       discoPathPattern(path),
+						style:         styleFor(kind),
+						literals:      len(discoPlaceholderRE.ReplaceAllString(path, "")),
+						requiredQuery: required,
 					})
 				}
 			}
@@ -147,6 +159,42 @@ func discoStyleResolver(t *testing.T, ty *catalog.Type, counts *discoStyleCounts
 	}
 }
 
+// missingRequiredQuery names, for each mutation the fake received, a query
+// parameter its Discovery method requires and the request left out. A
+// PATCH with no updateMask where the API requires one is a 400 from Google
+// and was a success here.
+func missingRequiredQuery(t *testing.T, ty *catalog.Type, reqs []gcpfake.Request) []string {
+	t.Helper()
+	all, err := loadDiscoMethods()
+	if err != nil {
+		t.Fatalf("loading the Discovery documents: %v", err)
+	}
+	var out []string
+	for _, r := range reqs {
+		if r.Method == "GET" {
+			continue
+		}
+		var best *discoMethod
+		for i := range all[ty.Service] {
+			m := &all[ty.Service][i]
+			if m.verb == r.Method && m.pattern.MatchString(r.Path) && (best == nil || m.literals > best.literals) {
+				best = m
+			}
+		}
+		if best == nil {
+			continue
+		}
+		for _, q := range best.requiredQuery {
+			// Google takes a query parameter in either spelling: the live
+			// Artifact Registry create sent repository_id for repositoryId.
+			if r.Query.Get(q) == "" && r.Query.Get(snakeCase(q)) == "" {
+				out = append(out, r.Method+" "+r.Path+" without "+q+" ("+best.id+")")
+			}
+		}
+	}
+	return out
+}
+
 // TestTheDiscoveryResolverTellsSharedPathsApart. Every proto-first delete is
 // "v1/{+name}"; only flatPath says whose it is. Artifact Registry's
 // repository patch answers with the repository, and its create with an
@@ -169,4 +217,18 @@ func TestTheDiscoveryResolverTellsSharedPathsApart(t *testing.T) {
 			t.Errorf("%s %s answers as %v (found %v), want %v", c.verb, c.path, got, ok, c.want)
 		}
 	}
+}
+
+func snakeCase(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
