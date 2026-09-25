@@ -70,11 +70,12 @@ func TestEveryRenamedAttributeSurvivesARoundTrip(t *testing.T) {
 	// that loops over a set the generator controls and asserts nothing about
 	// its size passes perfectly for a catalog that stopped renaming anything,
 	// which is the moment this test's subject disappears and its green tick
-	// becomes a lie. 306 measured on 2026-09-22; the floor is well below that
-	// so ordinary drift in Google's Discovery documents does not trip it.
-	if len(renamed) < 200 {
-		t.Fatalf("the corpus has %d renamed attributes; 306 were measured on 2026-09-22, so "+
-			"anything under 200 means the generator changed its renaming strategy and this "+
+	// becomes a lie. 26 measured on 2026-09-25, all top-level; the floor is
+	// below that so ordinary drift in Google's Discovery documents does not
+	// trip it.
+	if len(renamed) < 15 {
+		t.Fatalf("the corpus has %d renamed attributes; 26 were measured on 2026-09-25, so "+
+			"anything under 15 means the generator changed its renaming strategy and this "+
 			"test is no longer exercising what it claims to", len(renamed))
 	}
 
@@ -88,37 +89,17 @@ func TestEveryRenamedAttributeSurvivesARoundTrip(t *testing.T) {
 	}
 }
 
-// TestRenamedAttributesAreNotOnlyATopLevelProblem pins the two facts that
-// decide how far the translation has to recurse, so a later simplification
-// down to "translate the top level" or "translate Fields" fails here with
-// the reason attached rather than passing and hiding two thirds of the
-// corpus.
-func TestRenamedAttributesAreNotOnlyATopLevelProblem(t *testing.T) {
-	var nested, viaList, deepest int
+// TestRenamesStayAtTheTopLevel. The host reserves `type`, `provider` and
+// `lifecycle` only among a resource's own keys, so only a top-level
+// attribute is renamed. Until 2026-09-25 every nested one was renamed too
+// (a BigQuery schema field's `type` had to be written type_value), and the
+// live suite found it. The nested translation in names.go stays, tested by
+// the fixtures below, but the real corpus must not need it.
+func TestRenamesStayAtTheTopLevel(t *testing.T) {
 	for _, r := range everyRenamedAttribute(t) {
-		if r.depth > 0 {
-			nested++
+		if r.depth > 0 || r.viaList {
+			t.Errorf("%s%s is renamed below the top level", r.ty, r.path)
 		}
-		if r.viaList {
-			viaList++
-		}
-		if r.depth > deepest {
-			deepest = r.depth
-		}
-	}
-	// 286 nested, 263 of them inside a list, deepest 9, measured 2026-09-22.
-	if nested == 0 {
-		t.Error("no renamed attribute is nested; a top-level-only translation would be enough " +
-			"and this test should be deleted rather than loosened")
-	}
-	if viaList == 0 {
-		t.Error("no renamed attribute is reached through a list; recursing into Fields alone " +
-			"would be enough and names.go's Elem handling should be deleted rather than kept " +
-			"untested")
-	}
-	if deepest < 5 {
-		t.Errorf("the deepest renamed attribute is at depth %d; 9 was measured, and a shallow "+
-			"corpus would make this suite stop exercising real recursion", deepest)
 	}
 }
 

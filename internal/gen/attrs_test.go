@@ -128,6 +128,31 @@ func TestAKeywordCollisionIsRenamed(t *testing.T) {
 	}
 }
 
+// TestANestedKeywordKeepsItsName. The host reserves `type`, `provider` and
+// `lifecycle` only among a resource's own keys. A BigQuery schema field's
+// `type` sits two levels down and is written as `type` by everyone.
+func TestANestedKeywordKeepsItsName(t *testing.T) {
+	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+		"schema": {Type: "object", Properties: map[string]*disco.Schema{
+			"fields": {Type: "array", Items: &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
+				"type": {Type: "string"},
+			}}},
+			"type": {Type: "string"},
+		}},
+	}}
+	attrs, err := BuildAttributes(&disco.Document{Name: "tiny"}, body, &mmv1.Resource{Name: "W"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := attrs["schema"]
+	if _, ok := s.Fields["type"]; !ok {
+		t.Errorf("a nested object's type was renamed: %v", keys(s.Fields))
+	}
+	if _, ok := s.Fields["fields"].Elem.Fields["type"]; !ok {
+		t.Errorf("a list element's type was renamed: %v", keys(s.Fields["fields"].Elem.Fields))
+	}
+}
+
 func TestAFreeFormMapIsOpaque(t *testing.T) {
 	body := &disco.Schema{Type: "object", Properties: map[string]*disco.Schema{
 		"labels": {Type: "object", AdditionalProperties: &disco.Schema{Type: "string"}},

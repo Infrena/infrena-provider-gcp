@@ -795,13 +795,11 @@ func TestAReadKeysStateBySchemaName(t *testing.T) {
 	}
 }
 
-// TestAReadKeysAListElementBySchemaNameToo is the same claim one level in,
-// on the shape two thirds of the corpus's renames actually have. gcp.router
-// is one of the three updatable types (with gcp.grpcroute and
-// gcp.responsepolicyrule) whose ONLY renamed attribute lives inside a list,
-// so a translation that recursed into Fields but not Elem would leave this
-// exactly as broken as it was while passing every top-level test above.
-func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
+// TestAReadKeepsANestedTypeAsType. Only a top-level attribute shares a map
+// with the resource's own keys, so only a top-level `type` is renamed. Until
+// 2026-09-25 every nested one was too (794 of them), and a router's
+// nats[].type had to be written type_value. It now reads back as `type`.
+func TestAReadKeepsANestedTypeAsType(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
@@ -810,8 +808,9 @@ func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
 	if !ok || nats.Elem == nil {
 		t.Fatalf("%s no longer declares nats as a list", ty.Name)
 	}
-	requireRenamedAt(t, &catalog.Type{Name: ty.Name + ".nats[]", Attributes: nats.Elem.Fields},
-		"type_value", "type")
+	if a, ok := nats.Elem.Fields["type"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s.nats[] no longer declares a plain `type`: %v", ty.Name, nats.Elem.Fields["type"])
+	}
 
 	// "router", not "name": gcp.router's self_link captures its own id under
 	// the API's own placeholder name ("projects/{project}/regions/{region}/routers/{router}").
@@ -840,24 +839,18 @@ func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
 	if !ok {
 		t.Fatalf("state[nats][0] = %#v, want an object", list[0])
 	}
-	if _, leaked := fields["type"]; leaked {
-		t.Errorf("a list element in state is keyed by the WIRE name: %#v", fields)
+	if _, renamed := fields["type_value"]; renamed {
+		t.Errorf("a list element in state is keyed by a rename it no longer has: %#v", fields)
 	}
-	if got, ok := fields["type_value"].AsString(); !ok || got != "PUBLIC" {
-		t.Errorf("state[nats][0] = %#v, want %q carrying the value", fields, "type_value")
+	if got, ok := fields["type"].AsString(); !ok || got != "PUBLIC" {
+		t.Errorf("state[nats][0] = %#v, want %q carrying the value", fields, "type")
 	}
 }
 
-// TestACreateSendsWireNamesBelowTheTopLevelToo. requestBody translating only
-// its own top-level keys passes every other create test in this file and
-// still sends "type_value" inside every nested object and list element it
-// writes -- which for 263 of the corpus's 306 renamed attributes is the only
-// place they ever appear.
-//
-// gcp.regionsecuritypolicy carries both halves at once: a renamed attribute
-// at the top level, and another two levels down inside a list
-// (rules[].redirectOptions.type_value), so one create exercises the whole
-// descent.
+// TestACreateSendsWireNamesBelowTheTopLevelToo. gcp.regionsecuritypolicy
+// has a `type` at the top level, renamed type_value, and another two levels
+// down inside a list (rules[].redirectOptions.type), which keeps its name.
+// One create must send both as `type`.
 func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
@@ -865,9 +858,8 @@ func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
 	ty, c := syncCatalogFor(t, "gcp.regionsecuritypolicy")
 	requireRenamedAt(t, ty, "type_value", "type")
 	redirect := ty.Attributes["rules"].Elem.Fields["redirectOptions"]
-	if a, ok := redirect.Fields["type_value"]; !ok || a.Canonical != "type" {
-		t.Fatalf("%s no longer renames rules[].redirectOptions.type; this test is not "+
-			"exercising a nested rename", ty.Name)
+	if a, ok := redirect.Fields["type"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s no longer declares rules[].redirectOptions.type", ty.Name)
 	}
 	p := testProviderWithCatalog(t, s, c)
 
@@ -880,7 +872,7 @@ func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
 			"type_value": "CLOUD_ARMOR",
 			"rules": []any{map[string]any{
 				"priority":        int64(1000),
-				"redirectOptions": map[string]any{"type_value": "GOOGLE_RECAPTCHA"},
+				"redirectOptions": map[string]any{"type": "GOOGLE_RECAPTCHA"},
 			}},
 		}),
 	})
