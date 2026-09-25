@@ -934,9 +934,9 @@ gcp.bigtableadmin.cluster		lock_field	none	default
 gcp.bigtableadmin.cluster		patch_one_field	false	default
 gcp.bigtableadmin.cluster		setters	none	default
 gcp.bigtableadmin.cluster		timeout	1200	default
-gcp.bigtableadmin.cluster		update_await	none	default
-gcp.bigtableadmin.cluster		update_mask	none	default
-gcp.bigtableadmin.cluster		update_verb	none	default
+gcp.bigtableadmin.cluster		update_await	longrunning	discovery
+gcp.bigtableadmin.cluster		update_mask	query	discovery
+gcp.bigtableadmin.cluster		update_verb	PATCH	discovery
 gcp.bigtableadmin.cluster	clusterId	immutable	true	discovery
 gcp.bigtableadmin.cluster	clusterId	required	true	discovery
 gcp.bigtableadmin.cluster	defaultStorageType	immutable	true	discovery
@@ -955,9 +955,9 @@ gcp.bigtableadmin.instance		lock_field	none	default
 gcp.bigtableadmin.instance		patch_one_field	false	default
 gcp.bigtableadmin.instance		setters	none	default
 gcp.bigtableadmin.instance		timeout	1200	default
-gcp.bigtableadmin.instance		update_await	none	default
-gcp.bigtableadmin.instance		update_mask	none	default
-gcp.bigtableadmin.instance		update_verb	none	default
+gcp.bigtableadmin.instance		update_await	longrunning	discovery
+gcp.bigtableadmin.instance		update_mask	query	discovery
+gcp.bigtableadmin.instance		update_verb	PATCH	discovery
 gcp.bigtableadmin.instance	clusters	immutable	true	discovery
 gcp.bigtableadmin.instance	createTime	output	true	discovery
 gcp.bigtableadmin.instance	instanceId	immutable	true	discovery
@@ -1472,6 +1472,7 @@ gcp.compute.instance	description	immutable	true	discovery
 gcp.compute.instance	disks	immutable	true	mm+discovery
 gcp.compute.instance	disks[].architecture	output	true	discovery
 gcp.compute.instance	disks[].diskEncryptionKey	immutable	true	mm
+gcp.compute.instance	disks[].diskEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.compute.instance	disks[].diskEncryptionKey.rawKey	sensitive	true	mm
 gcp.compute.instance	disks[].diskEncryptionKey.rsaEncryptedKey	sensitive	true	mm
 gcp.compute.instance	disks[].diskEncryptionKey.sha256	output	true	discovery+mm
@@ -1484,8 +1485,10 @@ gcp.compute.instance	disks[].initializeParams.replicaZones	equivalence	self_link
 gcp.compute.instance	disks[].initializeParams.replicaZones[]	equivalence	self_link	mm
 gcp.compute.instance	disks[].initializeParams.resourceManagerTags	input_only	true	discovery
 gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey	immutable	true	mm
+gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey.rawKey	sensitive	true	mm
 gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey.sha256	output	true	discovery+mm
+gcp.compute.instance	disks[].initializeParams.sourceSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.compute.instance	disks[].initializeParams.sourceSnapshotEncryptionKey.sha256	output	true	discovery
 gcp.compute.instance	disks[].initializeParams.storagePool	immutable	true	mm
 gcp.compute.instance	disks[].kind	output	true	discovery
@@ -1499,6 +1502,7 @@ gcp.compute.instance	guestAccelerators	immutable	true	discovery
 gcp.compute.instance	hostname	immutable	true	discovery
 gcp.compute.instance	id	output	true	discovery+mm
 gcp.compute.instance	instanceEncryptionKey	immutable	true	discovery
+gcp.compute.instance	instanceEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.compute.instance	instanceEncryptionKey.sha256	output	true	discovery
 gcp.compute.instance	keyRevocationActionType	immutable	true	discovery
 gcp.compute.instance	kind	output	true	discovery
@@ -1558,6 +1562,7 @@ gcp.compute.instance	shieldedInstanceConfig	immutable	true	discovery
 gcp.compute.instance	shieldedInstanceIntegrityPolicy	immutable	true	discovery
 gcp.compute.instance	sourceMachineImage	immutable	true	discovery
 gcp.compute.instance	sourceMachineImageEncryptionKey	immutable	true	discovery
+gcp.compute.instance	sourceMachineImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.compute.instance	sourceMachineImageEncryptionKey.sha256	output	true	discovery
 gcp.compute.instance	startRestricted	output	true	discovery
 gcp.compute.instance	status	output	true	discovery
@@ -3102,7 +3107,7 @@ gcp.image	guestOsFeatures	unordered	true	mm
 gcp.image	guestOsFeatures[].type	required	true	mm
 gcp.image	id	output	true	discovery
 gcp.image	imageEncryptionKey	immutable	true	mm+ruling
-gcp.image	imageEncryptionKey.kmsKeyName	equivalence	self_link	mm
+gcp.image	imageEncryptionKey.kmsKeyName	equivalence	kms_key	!mm+discovery
 gcp.image	imageEncryptionKey.rawKey	input_only	true	mm
 gcp.image	imageEncryptionKey.rawKey	sensitive	true	mm
 gcp.image	imageEncryptionKey.rsaEncryptedKey	input_only	true	mm
@@ -3136,7 +3141,7 @@ gcp.image	sourceDisk	equivalence	self_link	mm
 gcp.image	sourceDisk	immutable	true	ruling
 gcp.image	sourceDiskEncryptionKey	immutable	true	mm+ruling
 gcp.image	sourceDiskEncryptionKey	input_only	true	mm
-gcp.image	sourceDiskEncryptionKey.kmsKeyName	equivalence	self_link	mm
+gcp.image	sourceDiskEncryptionKey.kmsKeyName	equivalence	kms_key	!mm+discovery
 gcp.image	sourceDiskEncryptionKey.rawKey	sensitive	true	mm
 gcp.image	sourceDiskEncryptionKey.rsaEncryptedKey	sensitive	true	mm
 gcp.image	sourceDiskEncryptionKey.sha256	output	true	discovery
@@ -3145,7 +3150,7 @@ gcp.image	sourceImage	equivalence	self_link	mm
 gcp.image	sourceImage	immutable	true	ruling
 gcp.image	sourceImageEncryptionKey	immutable	true	mm+ruling
 gcp.image	sourceImageEncryptionKey	input_only	true	mm
-gcp.image	sourceImageEncryptionKey.kmsKeyName	equivalence	self_link	mm
+gcp.image	sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	!mm+discovery
 gcp.image	sourceImageEncryptionKey.rawKey	sensitive	true	mm
 gcp.image	sourceImageEncryptionKey.rsaEncryptedKey	sensitive	true	mm
 gcp.image	sourceImageEncryptionKey.sha256	output	true	discovery
@@ -3154,7 +3159,7 @@ gcp.image	sourceSnapshot	equivalence	self_link	mm
 gcp.image	sourceSnapshot	immutable	true	ruling
 gcp.image	sourceSnapshotEncryptionKey	immutable	true	mm+ruling
 gcp.image	sourceSnapshotEncryptionKey	input_only	true	mm
-gcp.image	sourceSnapshotEncryptionKey.kmsKeyName	equivalence	self_link	mm
+gcp.image	sourceSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	!mm+discovery
 gcp.image	sourceSnapshotEncryptionKey.rawKey	sensitive	true	mm
 gcp.image	sourceSnapshotEncryptionKey.rsaEncryptedKey	sensitive	true	mm
 gcp.image	sourceSnapshotEncryptionKey.sha256	output	true	discovery
@@ -3218,12 +3223,15 @@ gcp.instancetemplate	kind	output	true	discovery
 gcp.instancetemplate	name	immutable	true	mm
 gcp.instancetemplate	name	required	true	mm
 gcp.instancetemplate	properties.disks[].architecture	output	true	discovery
+gcp.instancetemplate	properties.disks[].diskEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.instancetemplate	properties.disks[].diskEncryptionKey.sha256	output	true	discovery
 gcp.instancetemplate	properties.disks[].forceAttach	input_only	true	discovery
 gcp.instancetemplate	properties.disks[].index	output	true	discovery
 gcp.instancetemplate	properties.disks[].initializeParams	input_only	true	discovery
 gcp.instancetemplate	properties.disks[].initializeParams.resourceManagerTags	input_only	true	discovery
+gcp.instancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.instancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.sha256	output	true	discovery
+gcp.instancetemplate	properties.disks[].initializeParams.sourceSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.instancetemplate	properties.disks[].initializeParams.sourceSnapshotEncryptionKey.sha256	output	true	discovery
 gcp.instancetemplate	properties.disks[].kind	output	true	discovery
 gcp.instancetemplate	properties.disks[].licenses	output	true	discovery
@@ -3727,9 +3735,9 @@ gcp.licens		lock_field	none	default
 gcp.licens		patch_one_field	false	default
 gcp.licens		setters	none	default
 gcp.licens		timeout	600	default
-gcp.licens		update_await	none	default
-gcp.licens		update_mask	none	default
-gcp.licens		update_verb	none	default
+gcp.licens		update_await	compute_operation	discovery
+gcp.licens		update_mask	query	discovery
+gcp.licens		update_verb	PATCH	discovery
 gcp.licens	chargesUseFee	output	true	discovery
 gcp.licens	creationTimestamp	output	true	discovery
 gcp.licens	id	output	true	discovery
@@ -5900,12 +5908,15 @@ gcp.regioninstancetemplate	creationTimestamp	output	true	discovery
 gcp.regioninstancetemplate	id	output	true	discovery
 gcp.regioninstancetemplate	kind	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].architecture	output	true	discovery
+gcp.regioninstancetemplate	properties.disks[].diskEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regioninstancetemplate	properties.disks[].diskEncryptionKey.sha256	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].forceAttach	input_only	true	discovery
 gcp.regioninstancetemplate	properties.disks[].index	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams	input_only	true	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams.resourceManagerTags	input_only	true	discovery
+gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.sha256	output	true	discovery
+gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceSnapshotEncryptionKey.sha256	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].kind	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].licenses	output	true	discovery
@@ -6145,11 +6156,14 @@ gcp.regionsnapshot	region	output	true	discovery
 gcp.regionsnapshot	satisfiesPzi	output	true	discovery
 gcp.regionsnapshot	satisfiesPzs	output	true	discovery
 gcp.regionsnapshot	selfLink	output	true	discovery
+gcp.regionsnapshot	snapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regionsnapshot	snapshotEncryptionKey.sha256	output	true	discovery
 gcp.regionsnapshot	snapshotGroupId	output	true	discovery
 gcp.regionsnapshot	snapshotGroupName	output	true	discovery
+gcp.regionsnapshot	sourceDiskEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regionsnapshot	sourceDiskEncryptionKey.sha256	output	true	discovery
 gcp.regionsnapshot	sourceDiskId	output	true	discovery
+gcp.regionsnapshot	sourceInstantSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regionsnapshot	sourceInstantSnapshotEncryptionKey.sha256	output	true	discovery
 gcp.regionsnapshot	sourceInstantSnapshotId	output	true	discovery
 gcp.regionsnapshot	sourceSnapshotSchedulePolicy	output	true	discovery
@@ -7976,7 +7990,7 @@ gcp.trustconfig		patch_one_field	false	default
 gcp.trustconfig		setters	none	default
 gcp.trustconfig		timeout	1200	default
 gcp.trustconfig		update_await	longrunning	discovery
-gcp.trustconfig		update_mask	none	default
+gcp.trustconfig		update_mask	query	discovery
 gcp.trustconfig		update_verb	PATCH	mm
 gcp.trustconfig	allowlistedCertificates[].pemCertificate	required	true	mm
 gcp.trustconfig	createTime	output	true	discovery+mm

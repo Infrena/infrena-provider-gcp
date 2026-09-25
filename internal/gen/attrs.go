@@ -461,6 +461,21 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if a.Equivalence != "" {
 				addSource(a, "equivalence", SourceMM)
 			}
+		}
+		// A KMS key name Google may answer with the key version appended.
+		// Discovery says so in the field's own text; no magic-modules
+		// diff_suppress covers every such field, and an image, instance or
+		// snapshot whose immutable key name drifted planned its own
+		// replacement for ever.
+		if name == "kmsKeyName" && strings.Contains(prop.Description, "cryptoKeyVersions") {
+			if a.Equivalence != "" && a.Equivalence != catalog.EquivalenceKMSKey {
+				overrule(a, "equivalence", SourceDiscovery)
+			} else {
+				addSource(a, "equivalence", SourceDiscovery)
+			}
+			a.Equivalence = catalog.EquivalenceKMSKey
+		}
+		if f := idx[name]; f != nil {
 			if f.Output {
 				a.Output = true
 			}

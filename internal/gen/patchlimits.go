@@ -58,7 +58,7 @@ var restrictionProse = []*regexp.Regexp{
 // it accepts only some of the resource's fields, and returns Google's own
 // sentence so the refusal can quote it rather than paraphrase it.
 func restrictedPatch(col disco.Collection) (bool, string) {
-	patch := col.Methods["patch"]
+	patch := patchMethodOf(col)
 	if patch == nil {
 		return false, ""
 	}
@@ -117,7 +117,7 @@ func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string, src st
 // envelope is refused, because a request sent in a shape we only half recognise
 // is a request we cannot predict the effect of.
 func discoveredUpdateWrapper(d *disco.Document, col disco.Collection) (wrapper, maskField string) {
-	patch, get := col.Methods["patch"], col.Methods["get"]
+	patch, get := patchMethodOf(col), col.Methods["get"]
 	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
 		return "", ""
 	}
