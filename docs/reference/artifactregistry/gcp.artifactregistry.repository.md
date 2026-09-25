@@ -60,7 +60,7 @@ projects/{{project}}/locations/{{location}}/repositories/{{repository_id}}
 | `platformLogsConfig.loggingState` | `logging_state` | `string` | optional | — | Optional. The state of the platform logs: enabled or disabled. |
 | `platformLogsConfig.severityLevel` | `severity_level` | `string` | optional | — | Optional. The severity level for the logs. Logs will be generated if their severity level is >= than the value of the severity level mentioned here. |
 | `registryUri` | `registry_uri` | `string` | output only | — | Output only. The repository endpoint, for example: `us-docker.pkg.dev/my-proj/my-repo`. |
-| `remoteRepositoryConfig` | `remote_repository_config` | `map` | optional | force new | Configuration specific for a Remote Repository. |
+| `remoteRepositoryConfig` | `remote_repository_config` | `map` | optional | — | Configuration specific for a Remote Repository. |
 | `remoteRepositoryConfig.aptRepository` | `apt_repository` | `map` | optional | force new | Specific settings for an Apt remote repository. |
 | `remoteRepositoryConfig.aptRepository.customRepository` | `custom_repository` | `map` | optional | — | Customer-specified remote repository. |
 | `remoteRepositoryConfig.aptRepository.customRepository.uri` | — | `string` | optional | — | An http/https uri reference to the upstream remote repository, for ex: "https://my.apt.registry/". |

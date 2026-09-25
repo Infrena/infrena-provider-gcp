@@ -1833,3 +1833,42 @@ func TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest(t *testing.T) {
 		}
 	}
 }
+
+// TestInPlaceFreesOnlyTheNamedLeafOfAnImmutableBlock. magic-modules marks an
+// Artifact Registry repository's remoteRepositoryConfig immutable as a whole,
+// which here replaced the repository (and deleted its artifacts) for a change
+// to the upstream credentials Terraform patches in place.
+func TestInPlaceFreesOnlyTheNamedLeafOfAnImmutableBlock(t *testing.T) {
+	attrs := map[string]*catalog.Attr{"remoteRepositoryConfig": {Canonical: "remoteRepositoryConfig", ForceNew: true,
+		Fields: map[string]*catalog.Attr{
+			"upstreamCredentials": {Canonical: "upstreamCredentials"},
+			"dockerRepository":    {Canonical: "dockerRepository"},
+			"state":               {Canonical: "state", Output: true},
+		}}}
+	if err := markInPlace(attrs, "remoteRepositoryConfig.upstreamCredentials"); err != nil {
+		t.Fatal(err)
+	}
+	r := attrs["remoteRepositoryConfig"]
+	if r.ForceNew || r.Fields["upstreamCredentials"].ForceNew {
+		t.Error("the path to the in-place leaf still replaces the resource")
+	}
+	if !r.Fields["dockerRepository"].ForceNew {
+		t.Error("a sibling the block's immutability covered now changes in place")
+	}
+	if r.Fields["state"].ForceNew {
+		t.Error("an output field became ForceNew")
+	}
+	if err := markInPlace(attrs, "remoteRepositoryConfig.nope"); err == nil {
+		t.Error("a path the type does not have was accepted")
+	}
+}
+
+// TestSettableAndRequiredFindAKeywordRenamedField. A health check's `type` is
+// keyed type_value (a keyword clash) and named type by the ruling, as the API
+// names it. Looked up by key alone, the ruling refused the type.
+func TestSettableAndRequiredFindAKeywordRenamedField(t *testing.T) {
+	attrs := map[string]*catalog.Attr{"type_value": {Canonical: "type", Output: true}}
+	if a := attrNamed(attrs, "type"); a == nil || a != attrs["type_value"] {
+		t.Fatalf("attrNamed(type) = %+v, want the type_value attribute", a)
+	}
+}

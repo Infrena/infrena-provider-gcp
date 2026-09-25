@@ -13,7 +13,7 @@ Represents a GlobalForwardingRule resource. Global forwarding rules are used to 
 | Asset type | `compute.googleapis.com/ForwardingRule` |
 | Tier | 1 (ruled: The global twin. post_create is labels.tmpl and target has setTarget, as on compute/ForwardingRule.
 pre_create (pre_create/compute_global_forwarding_rule.go.tmpl) removes labels from the insert when the target is a PSC service attachment or one of the Google API bundles "all-apis" and "vpc-sc". The same bounded gap as the regional rule applies: labels on those fail the create loudly.
-Its patch carries the same prose restriction as the regional one, so the same rule applies, and the same open question about what Terraform additionally patches.
+Its patch carries the same prose restriction as the regional one, and its own patchable: entry lists what does patch (a different set from the regional rule's).
 ) |
 | Mutation timeout | 600s |
 

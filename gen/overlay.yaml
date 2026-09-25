@@ -122,6 +122,7 @@ rulings:
 
   artifactregistry/Repository:
     hooks: [encoder, pre_update]
+    in_place: [remoteRepositoryConfig.upstreamCredentials, remoteRepositoryConfig.disableUpstreamValidation]
     note: >
       One hook is scope resolution this provider already performs, and the
       other hand-writes mask paths that buildNested produces natively.
@@ -209,6 +210,8 @@ rulings:
 
   compute/HealthCheck:
     hooks: [encoder]
+    settable: [type]
+    required: [type]
     note: >
       One hook, doing two convenience jobs, both of which this provider asks the
       user to do explicitly instead.
@@ -229,7 +232,10 @@ rulings:
       have sent.
 
       THE BOUNDED GAP: `type` must be set in configuration. Terraform infers it;
-      we do not. Omitting it produces Google's own required-field error at create
+      we do not. magic-modules marks `type` output because the encoder derives
+      it, and until 2026-09-24 the generator obeyed that, so the one field
+      Google requires could not be written and every health check create
+      failed. `settable` and `required` above make it the user's. Omitting it produces Google's own required-field error at create
       time, which is loud and names the field. Inferring it would mean the
       generator writing per-resource Go, which is the thing the tier gate exists
       to keep out.
@@ -238,6 +244,8 @@ rulings:
 
   compute/RegionHealthCheck:
     hooks: [encoder]
+    settable: [type]
+    required: [type]
     note: >
       The regional twin of compute/HealthCheck, and the same template --
       encoders/health_check_type.tmpl, one file referenced by both resources. The
@@ -383,7 +391,8 @@ rulings:
 
       THE BOUNDED GAP: a Cloud Armor policy cannot be attached from this type.
       It shows in state once attached some other way. Attaching one needs a
-      setSecurityPolicy call, which is the same missing piece as setLabels.
+      setSecurityPolicy call, and magic-modules names no per-field setter for
+      it on the global backend service (it does on the regional one).
 
   compute/RegionBackendService:
     hooks: [decoder, encoder, post_create]
@@ -501,10 +510,9 @@ rulings:
       Google's own error. Leave labels off it.
 
       Its patch is restricted in prose ("Currently, you can only patch the
-      network_tier field"), so without a patchable: list every field no setter
-      carries replaces the rule. Terraform patches allowGlobalAccess and
-      allowPscGlobalAccess as well; which list is right is open and will be
-      settled live.
+      network_tier field"), and understated: see its patchable: entry, which
+      lists what does patch. Every other field no setter carries replaces the
+      rule.
 
   compute/GlobalForwardingRule:
     hooks: [post_create, pre_create]
@@ -518,9 +526,9 @@ rulings:
       gap as the regional rule applies: labels on those fail the create
       loudly.
 
-      Its patch carries the same prose restriction as the regional one, so
-      the same rule applies, and the same open question about what
-      Terraform additionally patches.
+      Its patch carries the same prose restriction as the regional one, and
+      its own patchable: entry lists what does patch (a different set from
+      the regional rule's).
 
   # P2, ruled 2026-09-24: the one-hook types, plus cloudtasks/Queue and
   # monitoring/Service, which unblock gcp.task and the service-level
@@ -775,8 +783,8 @@ patchable:
       `deprecated` (the deprecation status) is readOnly in Discovery, so it is
       output-only here and cannot be listed. `labels` is deliberately NOT
       listed: compute changes image labels through a separate setLabels method,
-      not through patch, so a label change replaces the image until somebody
-      implements that call.
+      not through patch. Since 2026-09-24 that method is a setter here, so a
+      label change is an update, not a replacement.
 
   gcp.forwardingrule:
     fields: [allowGlobalAccess, allowPscGlobalAccess]
