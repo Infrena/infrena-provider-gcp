@@ -60,6 +60,13 @@ func ExpandURL(tmpl string, attrs map[string]value.Value) (string, error) {
 		// it is already a valid multi-segment path (e.g. "projects/p/locations/l").
 		reserved := !double && strings.HasPrefix(content, "+")
 		name := strings.TrimPrefix(content, "+")
+		// magic-modules' {{%name}} asks for the value url-escaped, which a
+		// {{...}} placeholder already is; the % only marks it. Read as the
+		// name "%name" it was never set, and logging.metric's self_link
+		// could not be built.
+		if double {
+			name = strings.TrimPrefix(name, "%")
+		}
 
 		v, ok := attrs[name]
 		if !ok || !v.Known {

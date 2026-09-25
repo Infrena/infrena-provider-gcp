@@ -126,7 +126,7 @@ func (p *Provider) Create(ctx context.Context, desired *resource.DesiredResource
 // effort, not authoritative -- the next ordinary Read fills in whatever
 // awaited did not carry.
 func (p *Provider) bestEffortState(ctx context.Context, ty *catalog.Type, desired *resource.DesiredResource, scoped map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
-	id, err := p.createdID(ty, awaited, scoped)
+	id, err := p.createdID(ty, awaited, withCreateBindings(ty, scoped))
 	if err != nil {
 		return nil, fmt.Errorf("gcp: %s: created, but the resource cannot be read back: %w",
 			desired.Type, err)
@@ -149,7 +149,7 @@ func (p *Provider) bestEffortState(ctx context.Context, ty *catalog.Type, desire
 	for k, v := range p.reconciler(ctx).attrs(ty.Attributes, desired.Attrs, schemaAttrs(ty.Attributes, awaited)) {
 		attrs[k] = v
 	}
-	shortNameFromOwnID(ty, id, attrs)
+	shortNameFromOwnID(ty, id, attrs, desired.Attrs["name"])
 	return &resource.ResourceState{
 		Type:       ty.Name,
 		ProviderID: id,
@@ -257,6 +257,12 @@ func outsideCreatedCollection(ty *catalog.Type, id string, attrs map[string]valu
 		// gcp.bigquery.table's collection template is the item's own path.
 		return ""
 	}
+	// Compared unescaped, as nameInOwnCollection does: a bound {{parent}}
+	// expands escaped ("projects%2Fp"), and a saved query's correct id was
+	// rejected as outside its own collection.
+	if u, err := url.PathUnescape(coll); err == nil {
+		coll = u
+	}
 	rest, under := strings.CutPrefix(id, coll+"/")
 	if !under {
 		return fmt.Sprintf("names %q, which is not in %q, the collection this create posted to", id, coll)
@@ -301,7 +307,10 @@ func pathPart(tmpl string) string {
 // that state is handed back to the host, and the host refuses an attribute
 // its own schema does not declare.
 func (p *Provider) readAfterCreate(ctx context.Context, ty *catalog.Type, desiredAttrs, scopedAttrs map[string]value.Value, awaited map[string]any) (*resource.ResourceState, error) {
-	id, err := p.createdID(ty, awaited, scopedAttrs)
+	// With the create's bindings: a self_link that starts {{parent}} is
+	// filled the same way the create url was, or the id of a resource that
+	// was just created cannot be computed and Create fails after the fact.
+	id, err := p.createdID(ty, awaited, withCreateBindings(ty, scopedAttrs))
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +425,10 @@ func (p *Provider) Read(ctx context.Context, current *resource.ResourceState) (*
 // error it replaces, so the failure still goes to stderr, naming the type
 // and the reason.
 func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *resource.ResourceState, idAttrs map[string]value.Value, body map[string]any) (*resource.ResourceState, error) {
-	id, err := ProviderID(ty, body, idAttrs)
+	// With the instance's scope: a bare "{+name}" id parses to the name
+	// alone, and rebuilding a logging exclusion's id from the short name it
+	// is answered with needs the project its collection names.
+	id, err := ProviderID(ty, body, p.withScope(idAttrs))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gcp: %s: the response's identity could not be reduced to a provider id (%v); "+
 			"keeping the id this resource was read at\n", ty.Name, err)
@@ -464,7 +476,7 @@ func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *res
 			attrs[name] = prior
 		}
 	}
-	shortNameFromOwnID(ty, id, attrs)
+	shortNameFromOwnID(ty, id, attrs, current.Attributes["name"])
 	return &resource.ResourceState{
 		Type:       current.Type,
 		ProviderID: id,
@@ -855,10 +867,21 @@ func placeholderNames(tmpl string) map[string]bool {
 // project NUMBER in the answer where the id has the project's name does not
 // defeat it. A type whose `name` is the full path (a Pub/Sub topic, whose id
 // template is "{+topic}") or is Google's to set is never touched.
-func shortNameFromOwnID(ty *catalog.Type, id string, attrs map[string]value.Value) {
+func shortNameFromOwnID(ty *catalog.Type, id string, attrs map[string]value.Value, ref value.Value) {
 	a := ty.Attributes["name"]
-	if a == nil || a.Output || !selfLinkEndsInName(ty.SelfLink) {
+	if a == nil || a.Output {
 		return
+	}
+	if !selfLinkEndsInName(ty.SelfLink) {
+		// A bare "{+name}" id says nothing about which spelling the
+		// resource's name takes, and APIs differ: a certificate issuance
+		// config is configured short and answered in full, a Cloud Tasks
+		// queue must be configured in full. So shorten only what
+		// configuration wrote short.
+		refName, isString := ref.Raw.(string)
+		if !isBareCapture(ty.SelfLink) || !ref.Known || !isString || refName == "" || strings.Contains(refName, "/") {
+			return
+		}
 	}
 	v, ok := attrs["name"]
 	full, isString := v.Raw.(string)
@@ -947,4 +970,10 @@ func isEmpty(v value.Value) bool {
 		return len(raw) == 0
 	}
 	return false
+}
+
+// isBareCapture reports whether an id template is one reserved placeholder,
+// "{+name}": the whole id is one value, the resource's full name.
+func isBareCapture(tmpl string) bool {
+	return len(tmpl) > 3 && strings.HasPrefix(tmpl, "{+") && strings.HasSuffix(tmpl, "}") && !strings.ContainsAny(tmpl[2:len(tmpl)-1], "{}/")
 }
