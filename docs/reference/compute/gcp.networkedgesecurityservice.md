@@ -18,7 +18,7 @@ Google Cloud Armor network edge security service resource.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices?networkEdgeSecurityService={{name}}` |
+| Create | yes | `POST projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices` |
 | Read | yes | `GET projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices/{{name}}` |
 | Update | yes | `PATCH projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices/{{name}}` |

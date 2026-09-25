@@ -301,6 +301,12 @@ rulings:
   bigquery/Dataset:
     hooks: [update_encoder]
     note: >
+      THE BOUNDED GAP, found 2026-09-24: magic-modules' delete_url adds
+      ?deleteContents={{delete_contents_on_destroy}}, a Terraform-only field,
+      and every dataset delete failed building its url until the generator
+      dropped query parameters nothing can fill. Without it, Google refuses
+      to delete a dataset that still has tables, loudly; empty it first.
+
       One hook, and the generic path already does what it does.
 
       update_encoder (update_encoder/bigquery_dataset.go.tmpl) drops `access`
