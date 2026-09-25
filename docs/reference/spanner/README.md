@@ -2,9 +2,11 @@
 
 # spanner
 
-2 type(s). [Back to the index](../README.md).
+4 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.spanner.backup`](gcp.spanner.backup.md) | **no** | yes | yes | A backup of a Cloud Spanner database. |
+| [`gcp.spanner.backupschedule`](gcp.spanner.backupschedule.md) | yes | yes | yes | A backup schedule for a Cloud Spanner Database. |
+| [`gcp.spanner.instance`](gcp.spanner.instance.md) | yes | yes | yes | An isolated set of Cloud Spanner resources on which databases can be hosted. |
 | [`gcp.spanner.session`](gcp.spanner.session.md) | **no** | **no** | yes | A session in the Cloud Spanner API. |

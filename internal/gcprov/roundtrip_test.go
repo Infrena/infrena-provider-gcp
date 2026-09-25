@@ -217,6 +217,8 @@ func TestEveryCreatableTypeRoundTripsAgainstTheFake(t *testing.T) {
 		"gcp.topic":              true, // name is projects/{p}/topics/{t}
 		"gcp.subscription":       true, // name is projects/{p}/subscriptions/{s}
 		"gcp.container.nodepool": true, // parent is projects/{p}/locations/{l}/clusters/{c}
+		"gcp.alloydb.user":       true, // cluster is projects/{p}/locations/{l}/clusters/{c}
+		"gcp.alloydb.instance":   true, // cluster is projects/{p}/locations/{l}/clusters/{c}
 	}
 	for name, reqs := range counts.unmatchedByType {
 		if harness[name] {

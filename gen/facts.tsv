@@ -183,6 +183,135 @@ gcp.alertpolicy	creationRecord.mutateTime	output	true	mm
 gcp.alertpolicy	creationRecord.mutatedBy	output	true	mm
 gcp.alertpolicy	displayName	required	true	mm
 gcp.alertpolicy	name	output	true	mm
+gcp.alloydb.backup		clear_before_delete	none	default
+gcp.alloydb.backup		create_await	longrunning	discovery
+gcp.alloydb.backup		create_url	projects/{{project}}/locations/{{location}}/backups?backupId={{backup_id}}	mm
+gcp.alloydb.backup		create_verb	POST	discovery
+gcp.alloydb.backup		delete_await	longrunning	discovery
+gcp.alloydb.backup		delete_url	projects/{{project}}/locations/{{location}}/backups/{{backup_id}}	mm
+gcp.alloydb.backup		lock_field	none	default
+gcp.alloydb.backup		patch_one_field	false	default
+gcp.alloydb.backup		setters	none	default
+gcp.alloydb.backup		timeout	1200	default
+gcp.alloydb.backup		update_await	longrunning	discovery
+gcp.alloydb.backup		update_mask	query	mm
+gcp.alloydb.backup		update_verb	PATCH	mm
+gcp.alloydb.backup	backup_id	immutable	true	mm
+gcp.alloydb.backup	backup_id	required	true	mm
+gcp.alloydb.backup	clusterName	immutable	true	mm
+gcp.alloydb.backup	clusterName	required	true	mm
+gcp.alloydb.backup	clusterUid	output	true	discovery+mm
+gcp.alloydb.backup	createCompletionTime	output	true	discovery
+gcp.alloydb.backup	createTime	output	true	discovery+mm
+gcp.alloydb.backup	databaseVersion	output	true	discovery
+gcp.alloydb.backup	deleteTime	output	true	discovery+mm
+gcp.alloydb.backup	encryptionConfig.kmsKeyName	immutable	true	mm
+gcp.alloydb.backup	encryptionInfo	output	true	discovery+mm
+gcp.alloydb.backup	encryptionInfo.encryptionType	output	true	discovery+mm
+gcp.alloydb.backup	encryptionInfo.kmsKeyVersions	output	true	discovery+mm
+gcp.alloydb.backup	etag	output	true	mm
+gcp.alloydb.backup	expiryQuantity	output	true	discovery+mm
+gcp.alloydb.backup	expiryQuantity.retentionCount	output	true	discovery+mm
+gcp.alloydb.backup	expiryQuantity.totalRetentionCount	output	true	discovery+mm
+gcp.alloydb.backup	expiryTime	output	true	discovery+mm
+gcp.alloydb.backup	name	output	true	discovery+mm
+gcp.alloydb.backup	reconciling	output	true	discovery+mm
+gcp.alloydb.backup	satisfiesPzs	output	true	discovery
+gcp.alloydb.backup	sizeBytes	output	true	discovery+mm
+gcp.alloydb.backup	state	output	true	discovery+mm
+gcp.alloydb.backup	tags	immutable	true	discovery
+gcp.alloydb.backup	tags	input_only	true	discovery
+gcp.alloydb.backup	type_value	required	true	ruling
+gcp.alloydb.backup	uid	output	true	discovery+mm
+gcp.alloydb.backup	updateTime	output	true	discovery+mm
+gcp.alloydb.instance		clear_before_delete	none	default
+gcp.alloydb.instance		create_await	longrunning	discovery
+gcp.alloydb.instance		create_url	{{cluster}}/instances?instanceId={{instance_id}}	mm
+gcp.alloydb.instance		create_verb	POST	discovery
+gcp.alloydb.instance		delete_await	longrunning	discovery
+gcp.alloydb.instance		delete_url	{{cluster}}/instances/{{instance_id}}	mm
+gcp.alloydb.instance		lock_field	none	default
+gcp.alloydb.instance		patch_one_field	false	default
+gcp.alloydb.instance		setters	none	default
+gcp.alloydb.instance		timeout	1200	default
+gcp.alloydb.instance		update_await	longrunning	discovery
+gcp.alloydb.instance		update_mask	query	mm
+gcp.alloydb.instance		update_verb	PATCH	mm
+gcp.alloydb.instance	cluster	immutable	true	mm
+gcp.alloydb.instance	cluster	required	true	mm
+gcp.alloydb.instance	connectionPoolConfig.authproxyPoolerCount	output	true	discovery
+gcp.alloydb.instance	connectionPoolConfig.enabled	required	true	mm
+gcp.alloydb.instance	connectionPoolConfig.poolerCount	output	true	discovery+mm
+gcp.alloydb.instance	createTime	output	true	discovery+mm
+gcp.alloydb.instance	deleteTime	output	true	discovery
+gcp.alloydb.instance	displayName	input_only	true	mm
+gcp.alloydb.instance	instanceType	immutable	true	mm
+gcp.alloydb.instance	instanceType	required	true	mm
+gcp.alloydb.instance	instance_id	immutable	true	mm
+gcp.alloydb.instance	instance_id	required	true	mm
+gcp.alloydb.instance	ipAddress	output	true	discovery+mm
+gcp.alloydb.instance	maintenanceVersionName	output	true	discovery
+gcp.alloydb.instance	name	output	true	discovery+mm
+gcp.alloydb.instance	networkConfig.allocatedIpRangeOverride	immutable	true	mm
+gcp.alloydb.instance	networkConfig.network	output	true	discovery
+gcp.alloydb.instance	nodes	output	true	discovery
+gcp.alloydb.instance	nodes[].id	output	true	discovery
+gcp.alloydb.instance	nodes[].ip	output	true	discovery
+gcp.alloydb.instance	nodes[].isHotStandby	output	true	discovery
+gcp.alloydb.instance	nodes[].state	output	true	discovery
+gcp.alloydb.instance	nodes[].zoneId	output	true	discovery
+gcp.alloydb.instance	observabilityConfig.trackWaitEventTypes	output	true	discovery
+gcp.alloydb.instance	outboundPublicIpAddresses	output	true	discovery+mm
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].consumerNetworkStatus	output	true	discovery+mm
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].dnsAutomationInfos	output	true	discovery
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].dnsAutomationInfos[].fullyQualifiedDomainName	output	true	discovery
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].dnsAutomationInfos[].state	output	true	discovery
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].ipAddress	output	true	discovery+mm
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].serviceConnectionPolicy	output	true	discovery
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].serviceConnectionPolicyCreationState	output	true	discovery
+gcp.alloydb.instance	pscInstanceConfig.pscAutoConnections[].status	output	true	discovery+mm
+gcp.alloydb.instance	pscInstanceConfig.pscDnsName	output	true	discovery+mm
+gcp.alloydb.instance	pscInstanceConfig.serviceAttachmentLink	output	true	discovery+mm
+gcp.alloydb.instance	pscInstanceInfo	output	true	discovery
+gcp.alloydb.instance	pscInstanceInfo.effectivePscAutoConnectionPolicy	output	true	discovery
+gcp.alloydb.instance	pscInstanceInfo.effectivePscAutoDnsEnabled	output	true	discovery
+gcp.alloydb.instance	pscInstanceInfo.pscAutoDnsNames	output	true	discovery
+gcp.alloydb.instance	pscInstanceInfo.serviceConnectionPolicy	output	true	discovery
+gcp.alloydb.instance	publicIpAddress	output	true	discovery+mm
+gcp.alloydb.instance	reconciling	output	true	discovery+mm
+gcp.alloydb.instance	satisfiesPzs	output	true	discovery
+gcp.alloydb.instance	state	output	true	discovery+mm
+gcp.alloydb.instance	uid	output	true	discovery+mm
+gcp.alloydb.instance	updateTime	output	true	discovery+mm
+gcp.alloydb.instance	writableNode	output	true	discovery
+gcp.alloydb.instance	writableNode.id	output	true	discovery
+gcp.alloydb.instance	writableNode.ip	output	true	discovery
+gcp.alloydb.instance	writableNode.isHotStandby	output	true	discovery
+gcp.alloydb.instance	writableNode.state	output	true	discovery
+gcp.alloydb.instance	writableNode.zoneId	output	true	discovery
+gcp.alloydb.user		clear_before_delete	none	default
+gcp.alloydb.user		create_await	none	discovery
+gcp.alloydb.user		create_url	{{cluster}}/users?userId={{user_id}}	mm
+gcp.alloydb.user		create_verb	POST	discovery
+gcp.alloydb.user		delete_await	none	discovery
+gcp.alloydb.user		delete_url	{{cluster}}/users/{{user_id}}	mm
+gcp.alloydb.user		lock_field	none	default
+gcp.alloydb.user		patch_one_field	false	default
+gcp.alloydb.user		setters	none	default
+gcp.alloydb.user		timeout	60	default
+gcp.alloydb.user		update_await	none	discovery
+gcp.alloydb.user		update_mask	query	mm
+gcp.alloydb.user		update_verb	PATCH	mm
+gcp.alloydb.user	cluster	immutable	true	mm
+gcp.alloydb.user	cluster	required	true	mm
+gcp.alloydb.user	keepExtraRoles	input_only	true	discovery
+gcp.alloydb.user	name	output	true	discovery+mm
+gcp.alloydb.user	password	input_only	true	discovery+mm
+gcp.alloydb.user	password	sensitive	true	mm
+gcp.alloydb.user	userType	immutable	true	mm
+gcp.alloydb.user	userType	required	true	mm
+gcp.alloydb.user	user_id	immutable	true	mm
+gcp.alloydb.user	user_id	required	true	mm
 gcp.appprofile		clear_before_delete	none	default
 gcp.appprofile		create_await	none	discovery
 gcp.appprofile		create_url	{+parent}/appProfiles?appProfileId={{appProfileId}}	discovery
@@ -3499,6 +3628,70 @@ gcp.interconnect	selfLink	output	true	discovery
 gcp.interconnect	selfLinkWithId	output	true	discovery
 gcp.interconnect	state	output	true	discovery+mm
 gcp.interconnect	wireGroups	output	true	discovery+mm
+gcp.interconnectattachment		clear_before_delete	none	default
+gcp.interconnectattachment		create_await	compute_operation	discovery
+gcp.interconnectattachment		create_url	projects/{{project}}/regions/{{region}}/interconnectAttachments	mm
+gcp.interconnectattachment		create_verb	POST	discovery
+gcp.interconnectattachment		delete_await	compute_operation	discovery
+gcp.interconnectattachment		delete_url	projects/{project}/regions/{region}/interconnectAttachments/{interconnectAttachment}	discovery
+gcp.interconnectattachment		lock_field	none	default
+gcp.interconnectattachment		patch_one_field	false	default
+gcp.interconnectattachment		setters	labels=setLabels	mm+discovery
+gcp.interconnectattachment		timeout	600	default
+gcp.interconnectattachment		update_await	compute_operation	discovery
+gcp.interconnectattachment		update_mask	none	default
+gcp.interconnectattachment		update_verb	PATCH	mm
+gcp.interconnectattachment	attachmentGroup	output	true	discovery+mm
+gcp.interconnectattachment	candidateCloudRouterIpAddress	immutable	true	mm
+gcp.interconnectattachment	candidateCloudRouterIpv6Address	immutable	true	mm
+gcp.interconnectattachment	candidateCustomerRouterIpAddress	immutable	true	mm
+gcp.interconnectattachment	candidateCustomerRouterIpv6Address	immutable	true	mm
+gcp.interconnectattachment	candidateSubnets	immutable	true	mm
+gcp.interconnectattachment	candidateSubnets	input_only	true	discovery+mm
+gcp.interconnectattachment	cloudRouterIpAddress	output	true	discovery+mm
+gcp.interconnectattachment	cloudRouterIpv6Address	output	true	discovery+mm
+gcp.interconnectattachment	configurationConstraints	output	true	discovery
+gcp.interconnectattachment	configurationConstraints.bgpMd5	output	true	discovery
+gcp.interconnectattachment	configurationConstraints.bgpPeerAsnRanges	output	true	discovery
+gcp.interconnectattachment	creationTimestamp	output	true	discovery+mm
+gcp.interconnectattachment	customerRouterIpAddress	output	true	discovery+mm
+gcp.interconnectattachment	customerRouterIpv6Address	output	true	discovery+mm
+gcp.interconnectattachment	dataplaneVersion	output	true	discovery
+gcp.interconnectattachment	edgeAvailabilityDomain	immutable	true	mm
+gcp.interconnectattachment	edgeAvailabilityDomain	input_only	true	discovery
+gcp.interconnectattachment	encryption	immutable	true	mm
+gcp.interconnectattachment	googleReferenceId	output	true	discovery+mm
+gcp.interconnectattachment	id	output	true	discovery
+gcp.interconnectattachment	interconnect	equivalence	self_link	mm
+gcp.interconnectattachment	interconnect	immutable	true	mm
+gcp.interconnectattachment	ipsecInternalAddresses	equivalence	self_link	mm
+gcp.interconnectattachment	ipsecInternalAddresses	immutable	true	mm
+gcp.interconnectattachment	ipsecInternalAddresses[]	equivalence	self_link	mm
+gcp.interconnectattachment	kind	output	true	discovery
+gcp.interconnectattachment	l2Forwarding.network	equivalence	self_link	mm
+gcp.interconnectattachment	labelFingerprint	output	true	mm
+gcp.interconnectattachment	name	immutable	true	mm
+gcp.interconnectattachment	name	required	true	mm
+gcp.interconnectattachment	operationalStatus	output	true	discovery
+gcp.interconnectattachment	pairingKey	output	true	mm
+gcp.interconnectattachment	params	immutable	true	mm
+gcp.interconnectattachment	params	input_only	true	discovery+mm
+gcp.interconnectattachment	params.resourceManagerTags	input_only	true	mm
+gcp.interconnectattachment	partnerAsn	output	true	mm
+gcp.interconnectattachment	privateInterconnectInfo	output	true	discovery+mm
+gcp.interconnectattachment	privateInterconnectInfo.tag8021q	output	true	discovery+mm
+gcp.interconnectattachment	region	equivalence	self_link	mm
+gcp.interconnectattachment	region	output	true	discovery
+gcp.interconnectattachment	remoteService	output	true	discovery
+gcp.interconnectattachment	router	equivalence	self_link	mm
+gcp.interconnectattachment	router	immutable	true	mm
+gcp.interconnectattachment	satisfiesPzs	output	true	discovery
+gcp.interconnectattachment	selfLink	output	true	discovery
+gcp.interconnectattachment	state	output	true	discovery+mm
+gcp.interconnectattachment	subnetLength	immutable	true	mm
+gcp.interconnectattachment	subnetLength	input_only	true	discovery+mm
+gcp.interconnectattachment	type_value	immutable	true	mm
+gcp.interconnectattachment	vlanTag8021q	immutable	true	mm
 gcp.interconnectattachmentgroup		clear_before_delete	none	default
 gcp.interconnectattachmentgroup		create_await	compute_operation	discovery
 gcp.interconnectattachmentgroup		create_url	projects/{{project}}/global/interconnectAttachmentGroups	mm
@@ -3964,6 +4157,27 @@ gcp.logging.folder.link	lifecycleState	output	true	discovery
 gcp.logging.folder.link	linkId	immutable	true	discovery
 gcp.logging.folder.link	linkId	required	true	discovery
 gcp.logging.folder.link	name	output	true	discovery
+gcp.logging.folder.logscope		clear_before_delete	none	default
+gcp.logging.folder.logscope		create_await	none	discovery
+gcp.logging.folder.logscope		create_url	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
+gcp.logging.folder.logscope		create_verb	POST	discovery
+gcp.logging.folder.logscope		delete_await	none	discovery
+gcp.logging.folder.logscope		delete_url	{{parent}}/locations/{{location}}/logScopes/{{name}}	mm
+gcp.logging.folder.logscope		lock_field	none	default
+gcp.logging.folder.logscope		patch_one_field	false	default
+gcp.logging.folder.logscope		setters	none	default
+gcp.logging.folder.logscope		timeout	60	default
+gcp.logging.folder.logscope		update_await	none	discovery
+gcp.logging.folder.logscope		update_mask	query	mm
+gcp.logging.folder.logscope		update_verb	PATCH	mm
+gcp.logging.folder.logscope	createTime	output	true	discovery+mm
+gcp.logging.folder.logscope	logScopeId	immutable	true	discovery
+gcp.logging.folder.logscope	name	equivalence	resource_name	mm
+gcp.logging.folder.logscope	name	immutable	true	mm
+gcp.logging.folder.logscope	name	output	true	discovery
+gcp.logging.folder.logscope	name	required	false	!mm+discovery
+gcp.logging.folder.logscope	resourceNames	required	true	mm
+gcp.logging.folder.logscope	updateTime	output	true	discovery+mm
 gcp.logging.folder.savedquery		clear_before_delete	none	default
 gcp.logging.folder.savedquery		create_await	none	discovery
 gcp.logging.folder.savedquery		create_url	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
@@ -4132,6 +4346,27 @@ gcp.logging.organization.link	lifecycleState	output	true	discovery
 gcp.logging.organization.link	linkId	immutable	true	discovery
 gcp.logging.organization.link	linkId	required	true	discovery
 gcp.logging.organization.link	name	output	true	discovery
+gcp.logging.organization.logscope		clear_before_delete	none	default
+gcp.logging.organization.logscope		create_await	none	discovery
+gcp.logging.organization.logscope		create_url	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
+gcp.logging.organization.logscope		create_verb	POST	discovery
+gcp.logging.organization.logscope		delete_await	none	discovery
+gcp.logging.organization.logscope		delete_url	{{parent}}/locations/{{location}}/logScopes/{{name}}	mm
+gcp.logging.organization.logscope		lock_field	none	default
+gcp.logging.organization.logscope		patch_one_field	false	default
+gcp.logging.organization.logscope		setters	none	default
+gcp.logging.organization.logscope		timeout	60	default
+gcp.logging.organization.logscope		update_await	none	discovery
+gcp.logging.organization.logscope		update_mask	query	mm
+gcp.logging.organization.logscope		update_verb	PATCH	mm
+gcp.logging.organization.logscope	createTime	output	true	discovery+mm
+gcp.logging.organization.logscope	logScopeId	immutable	true	discovery
+gcp.logging.organization.logscope	name	equivalence	resource_name	mm
+gcp.logging.organization.logscope	name	immutable	true	mm
+gcp.logging.organization.logscope	name	output	true	discovery
+gcp.logging.organization.logscope	name	required	false	!mm+discovery
+gcp.logging.organization.logscope	resourceNames	required	true	mm
+gcp.logging.organization.logscope	updateTime	output	true	discovery+mm
 gcp.logging.organization.savedquery		clear_before_delete	none	default
 gcp.logging.organization.savedquery		create_await	none	discovery
 gcp.logging.organization.savedquery		create_url	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
@@ -4270,6 +4505,27 @@ gcp.logicalview		update_verb	PATCH	discovery
 gcp.logicalview	logicalViewId	immutable	true	discovery
 gcp.logicalview	logicalViewId	required	true	discovery
 gcp.logicalview	name	output	true	discovery
+gcp.logscope		clear_before_delete	none	default
+gcp.logscope		create_await	none	discovery
+gcp.logscope		create_url	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
+gcp.logscope		create_verb	POST	discovery
+gcp.logscope		delete_await	none	discovery
+gcp.logscope		delete_url	{{parent}}/locations/{{location}}/logScopes/{{name}}	mm
+gcp.logscope		lock_field	none	default
+gcp.logscope		patch_one_field	false	default
+gcp.logscope		setters	none	default
+gcp.logscope		timeout	60	default
+gcp.logscope		update_await	none	discovery
+gcp.logscope		update_mask	query	mm
+gcp.logscope		update_verb	PATCH	mm
+gcp.logscope	createTime	output	true	discovery+mm
+gcp.logscope	logScopeId	immutable	true	discovery
+gcp.logscope	name	equivalence	resource_name	mm
+gcp.logscope	name	immutable	true	mm
+gcp.logscope	name	output	true	discovery
+gcp.logscope	name	required	false	!mm+discovery
+gcp.logscope	resourceNames	required	true	mm
+gcp.logscope	updateTime	output	true	discovery+mm
 gcp.managedidentity		clear_before_delete	none	default
 gcp.managedidentity		create_await	longrunning	discovery
 gcp.managedidentity		create_url	{+parent}/managedIdentities	discovery
@@ -5605,6 +5861,170 @@ gcp.pubsub.snapshot	snapshot	immutable	true	mm
 gcp.pubsub.snapshot	snapshot	required	true	mm
 gcp.pubsub.snapshot	tags	immutable	true	discovery
 gcp.pubsub.snapshot	tags	input_only	true	discovery
+gcp.redis.cluster		clear_before_delete	none	default
+gcp.redis.cluster		create_await	longrunning	discovery
+gcp.redis.cluster		create_url	projects/{{project}}/locations/{{region}}/clusters?clusterId={{name}}	mm
+gcp.redis.cluster		create_verb	POST	discovery
+gcp.redis.cluster		delete_await	longrunning	discovery
+gcp.redis.cluster		delete_url	projects/{{project}}/locations/{{region}}/clusters/{{name}}	mm
+gcp.redis.cluster		lock_field	none	default
+gcp.redis.cluster		patch_one_field	false	default
+gcp.redis.cluster		setters	none	default
+gcp.redis.cluster		timeout	1200	default
+gcp.redis.cluster		update_await	longrunning	discovery
+gcp.redis.cluster		update_mask	query	mm
+gcp.redis.cluster		update_verb	PATCH	mm
+gcp.redis.cluster	aclPolicyInSync	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.aclPolicyRevisionStatuses	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.aclPolicyRevisionStatuses[].aclPolicyRevision	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.aclPolicyRevisionStatuses[].aclPolicyRevisionNumber	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.aclPolicyRevisionStatuses[].errorMessage	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.aclPolicyRevisionStatuses[].state	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.appliedAclPolicy	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.appliedAclPolicyRevision	output	true	discovery
+gcp.redis.cluster	aclPolicyInfo.appliedAclPolicyRevisionNumber	output	true	discovery
+gcp.redis.cluster	allowFewerZonesDeployment	immutable	true	discovery
+gcp.redis.cluster	authorizationMode	immutable	true	mm
+gcp.redis.cluster	automatedBackupConfig.fixedFrequencySchedule	required	true	mm
+gcp.redis.cluster	automatedBackupConfig.fixedFrequencySchedule.startTime	required	true	mm
+gcp.redis.cluster	automatedBackupConfig.fixedFrequencySchedule.startTime.hours	required	true	mm
+gcp.redis.cluster	automatedBackupConfig.retention	required	true	mm
+gcp.redis.cluster	availableMaintenanceVersions	output	true	discovery+mm
+gcp.redis.cluster	backupCollection	output	true	discovery+mm
+gcp.redis.cluster	clusterEndpoints[].connections[].pscAutoConnection.address	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscAutoConnection.connectionType	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscAutoConnection.forwardingRule	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscAutoConnection.pscConnectionId	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscAutoConnection.pscConnectionStatus	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscAutoConnection.serviceAttachment	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscConnection.connectionType	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscConnection.port	output	true	discovery
+gcp.redis.cluster	clusterEndpoints[].connections[].pscConnection.pscConnectionStatus	output	true	discovery
+gcp.redis.cluster	createTime	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.clusterRole	output	true	discovery
+gcp.redis.cluster	crossClusterReplicationConfig.membership	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.membership.primaryCluster	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.membership.primaryCluster.cluster	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.membership.primaryCluster.uid	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.membership.secondaryClusters	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.membership.secondaryClusters[].cluster	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.membership.secondaryClusters[].uid	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.primaryCluster.cluster	output	true	discovery
+gcp.redis.cluster	crossClusterReplicationConfig.primaryCluster.uid	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.secondaryClusters[].cluster	output	true	discovery
+gcp.redis.cluster	crossClusterReplicationConfig.secondaryClusters[].uid	output	true	discovery+mm
+gcp.redis.cluster	crossClusterReplicationConfig.updateTime	output	true	discovery+mm
+gcp.redis.cluster	discoveryEndpoints	output	true	discovery+mm
+gcp.redis.cluster	discoveryEndpoints[].address	output	true	discovery
+gcp.redis.cluster	discoveryEndpoints[].port	output	true	discovery
+gcp.redis.cluster	discoveryEndpoints[].pscConfig	output	true	discovery
+gcp.redis.cluster	effectiveMaintenanceVersion	output	true	discovery+mm
+gcp.redis.cluster	encryptionInfo	output	true	discovery
+gcp.redis.cluster	encryptionInfo.encryptionType	output	true	discovery
+gcp.redis.cluster	encryptionInfo.kmsKeyPrimaryState	output	true	discovery
+gcp.redis.cluster	encryptionInfo.kmsKeyVersions	output	true	discovery
+gcp.redis.cluster	encryptionInfo.lastUpdateTime	output	true	discovery
+gcp.redis.cluster	gcsSource	immutable	true	mm
+gcp.redis.cluster	gcsSource	input_only	true	mm
+gcp.redis.cluster	gcsSource.uris	immutable	true	mm
+gcp.redis.cluster	gcsSource.uris	required	true	mm
+gcp.redis.cluster	gcsSource.uris	unordered	true	mm
+gcp.redis.cluster	maintenancePolicy.createTime	output	true	discovery+mm
+gcp.redis.cluster	maintenancePolicy.updateTime	output	true	discovery+mm
+gcp.redis.cluster	maintenancePolicy.weeklyMaintenanceWindow[].day	required	true	mm
+gcp.redis.cluster	maintenancePolicy.weeklyMaintenanceWindow[].startTime	required	true	mm
+gcp.redis.cluster	maintenanceSchedule	output	true	discovery+mm
+gcp.redis.cluster	maintenanceSchedule.endTime	output	true	discovery+mm
+gcp.redis.cluster	maintenanceSchedule.startTime	output	true	discovery+mm
+gcp.redis.cluster	managedBackupSource	immutable	true	mm
+gcp.redis.cluster	managedBackupSource	input_only	true	mm
+gcp.redis.cluster	managedBackupSource.backup	immutable	true	mm
+gcp.redis.cluster	managedBackupSource.backup	required	true	mm
+gcp.redis.cluster	name	immutable	true	mm
+gcp.redis.cluster	name	required	true	mm
+gcp.redis.cluster	ondemandMaintenance	input_only	true	discovery
+gcp.redis.cluster	preciseSizeGb	output	true	discovery+mm
+gcp.redis.cluster	pscConfigs	input_only	true	mm
+gcp.redis.cluster	pscConfigs[].network	required	true	mm
+gcp.redis.cluster	pscConnections	output	true	discovery+mm
+gcp.redis.cluster	pscConnections[].connectionType	output	true	discovery
+gcp.redis.cluster	pscConnections[].port	output	true	discovery
+gcp.redis.cluster	pscConnections[].pscConnectionStatus	output	true	discovery
+gcp.redis.cluster	pscServiceAttachments	output	true	discovery+mm
+gcp.redis.cluster	pscServiceAttachments[].connectionType	output	true	discovery+mm
+gcp.redis.cluster	pscServiceAttachments[].serviceAttachment	output	true	discovery+mm
+gcp.redis.cluster	rotateServerCertificate	input_only	true	discovery
+gcp.redis.cluster	satisfiesPzi	output	true	discovery
+gcp.redis.cluster	satisfiesPzs	output	true	discovery
+gcp.redis.cluster	shardCount	required	true	mm
+gcp.redis.cluster	simulateMaintenanceEvent	input_only	true	discovery
+gcp.redis.cluster	sizeGb	output	true	discovery+mm
+gcp.redis.cluster	state	immutable	true	mm
+gcp.redis.cluster	state	output	true	discovery+mm
+gcp.redis.cluster	stateInfo	output	true	discovery+mm
+gcp.redis.cluster	transitEncryptionMode	immutable	true	mm
+gcp.redis.cluster	uid	output	true	discovery+mm
+gcp.redis.cluster	zoneDistributionConfig	immutable	true	mm
+gcp.redis.instance		clear_before_delete	none	default
+gcp.redis.instance		create_await	longrunning	discovery
+gcp.redis.instance		create_url	projects/{{project}}/locations/{{region}}/instances?instanceId={{name}}	mm
+gcp.redis.instance		create_verb	POST	discovery
+gcp.redis.instance		delete_await	longrunning	discovery
+gcp.redis.instance		delete_url	{+name}	discovery
+gcp.redis.instance		lock_field	none	default
+gcp.redis.instance		patch_one_field	false	default
+gcp.redis.instance		setters	none	default
+gcp.redis.instance		timeout	1200	default
+gcp.redis.instance		update_await	longrunning	discovery
+gcp.redis.instance		update_mask	query	mm
+gcp.redis.instance		update_verb	PATCH	mm
+gcp.redis.instance	alternativeLocationId	immutable	true	mm
+gcp.redis.instance	authorizedNetwork	equivalence	self_link	mm
+gcp.redis.instance	authorizedNetwork	immutable	true	mm
+gcp.redis.instance	connectMode	immutable	true	mm
+gcp.redis.instance	createTime	output	true	discovery+mm
+gcp.redis.instance	currentLocationId	output	true	discovery+mm
+gcp.redis.instance	customerManagedKey	immutable	true	mm
+gcp.redis.instance	host	output	true	discovery+mm
+gcp.redis.instance	locationId	immutable	true	mm
+gcp.redis.instance	maintenancePolicy.createTime	output	true	discovery+mm
+gcp.redis.instance	maintenancePolicy.updateTime	output	true	discovery+mm
+gcp.redis.instance	maintenancePolicy.weeklyMaintenanceWindow[].day	required	true	mm
+gcp.redis.instance	maintenancePolicy.weeklyMaintenanceWindow[].duration	output	true	discovery+mm
+gcp.redis.instance	maintenancePolicy.weeklyMaintenanceWindow[].startTime	required	true	mm
+gcp.redis.instance	maintenanceSchedule	output	true	discovery+mm
+gcp.redis.instance	maintenanceSchedule.endTime	output	true	discovery+mm
+gcp.redis.instance	maintenanceSchedule.scheduleDeadlineTime	output	true	discovery+mm
+gcp.redis.instance	maintenanceSchedule.startTime	output	true	discovery+mm
+gcp.redis.instance	memorySizeGb	required	true	mm
+gcp.redis.instance	name	immutable	true	mm
+gcp.redis.instance	name	required	true	mm
+gcp.redis.instance	nodes	output	true	discovery+mm
+gcp.redis.instance	nodes[].id	output	true	discovery+mm
+gcp.redis.instance	nodes[].zone	output	true	discovery+mm
+gcp.redis.instance	persistenceConfig.persistenceMode	required	true	mm
+gcp.redis.instance	persistenceConfig.rdbNextSnapshotTime	output	true	discovery+mm
+gcp.redis.instance	persistenceIamIdentity	output	true	discovery+mm
+gcp.redis.instance	port	output	true	discovery+mm
+gcp.redis.instance	readEndpoint	output	true	discovery+mm
+gcp.redis.instance	readEndpointPort	output	true	discovery+mm
+gcp.redis.instance	reservedIpRange	immutable	true	mm
+gcp.redis.instance	reservedIpRange	input_only	true	mm
+gcp.redis.instance	satisfiesPzi	output	true	discovery
+gcp.redis.instance	satisfiesPzs	output	true	discovery
+gcp.redis.instance	serverCaCerts	output	true	discovery+mm
+gcp.redis.instance	serverCaCerts[].cert	output	true	mm
+gcp.redis.instance	serverCaCerts[].createTime	output	true	discovery+mm
+gcp.redis.instance	serverCaCerts[].expireTime	output	true	discovery+mm
+gcp.redis.instance	serverCaCerts[].serialNumber	output	true	mm
+gcp.redis.instance	serverCaCerts[].sha1Fingerprint	output	true	mm
+gcp.redis.instance	state	output	true	discovery
+gcp.redis.instance	statusMessage	output	true	discovery
+gcp.redis.instance	tags	immutable	true	discovery
+gcp.redis.instance	tags	input_only	true	discovery
+gcp.redis.instance	tier	immutable	true	mm
+gcp.redis.instance	transitEncryptionMode	immutable	true	mm
 gcp.regionalsecret		clear_before_delete	none	default
 gcp.regionalsecret		create_await	none	discovery
 gcp.regionalsecret		create_url	projects/{{project}}/locations/{{location}}/secrets?secretId={{secret_id}}	mm
@@ -7097,6 +7517,61 @@ gcp.spanner.backup	referencingBackups	output	true	discovery
 gcp.spanner.backup	referencingDatabases	output	true	discovery
 gcp.spanner.backup	sizeBytes	output	true	discovery
 gcp.spanner.backup	state	output	true	discovery
+gcp.spanner.backupschedule		clear_before_delete	none	default
+gcp.spanner.backupschedule		create_await	none	discovery
+gcp.spanner.backupschedule		create_url	projects/{{project}}/instances/{{instance}}/databases/{{database}}/backupSchedules?backup_schedule_id={{name}}	mm
+gcp.spanner.backupschedule		create_verb	POST	discovery
+gcp.spanner.backupschedule		delete_await	none	discovery
+gcp.spanner.backupschedule		delete_url	projects/{{project}}/instances/{{instance}}/databases/{{database}}/backupSchedules/{{name}}	mm
+gcp.spanner.backupschedule		lock_field	none	default
+gcp.spanner.backupschedule		patch_one_field	false	default
+gcp.spanner.backupschedule		setters	none	default
+gcp.spanner.backupschedule		timeout	60	default
+gcp.spanner.backupschedule		update_await	none	discovery
+gcp.spanner.backupschedule		update_mask	query	mm
+gcp.spanner.backupschedule		update_verb	PATCH	mm
+gcp.spanner.backupschedule	database	immutable	true	mm
+gcp.spanner.backupschedule	database	required	true	mm
+gcp.spanner.backupschedule	encryptionConfig.encryptionType	required	true	mm
+gcp.spanner.backupschedule	fullBackupSpec	immutable	true	mm
+gcp.spanner.backupschedule	incrementalBackupSpec	immutable	true	mm
+gcp.spanner.backupschedule	instance	immutable	true	mm
+gcp.spanner.backupschedule	instance	required	true	mm
+gcp.spanner.backupschedule	name	immutable	true	mm
+gcp.spanner.backupschedule	name	required	true	ruling
+gcp.spanner.backupschedule	retentionDuration	required	true	mm
+gcp.spanner.backupschedule	spec.cronSpec.creationWindow	output	true	discovery
+gcp.spanner.backupschedule	spec.cronSpec.timeZone	output	true	discovery
+gcp.spanner.backupschedule	updateTime	output	true	discovery
+gcp.spanner.instance		clear_before_delete	none	default
+gcp.spanner.instance		create_await	longrunning	discovery
+gcp.spanner.instance		create_url	projects/{{project}}/instances	mm
+gcp.spanner.instance		create_verb	POST	discovery
+gcp.spanner.instance		delete_await	none	discovery
+gcp.spanner.instance		delete_url	{+name}	discovery
+gcp.spanner.instance		lock_field	none	default
+gcp.spanner.instance		patch_one_field	false	default
+gcp.spanner.instance		setters	none	default
+gcp.spanner.instance		timeout	1200	default
+gcp.spanner.instance		update_await	longrunning	discovery
+gcp.spanner.instance		update_mask	body:fieldMask	discovery
+gcp.spanner.instance		update_verb	PATCH	discovery
+gcp.spanner.instance	autoscalingConfig.asymmetricAutoscalingOptions[].overrides	required	true	mm
+gcp.spanner.instance	autoscalingConfig.asymmetricAutoscalingOptions[].replicaSelection	required	true	mm
+gcp.spanner.instance	autoscalingConfig.asymmetricAutoscalingOptions[].replicaSelection.location	required	true	mm
+gcp.spanner.instance	config	equivalence	self_link	mm
+gcp.spanner.instance	config	immutable	true	mm
+gcp.spanner.instance	config	required	true	mm
+gcp.spanner.instance	createTime	output	true	discovery
+gcp.spanner.instance	displayName	required	true	mm
+gcp.spanner.instance	freeInstanceMetadata.expireTime	output	true	discovery
+gcp.spanner.instance	freeInstanceMetadata.upgradeTime	output	true	discovery
+gcp.spanner.instance	instanceId	immutable	true	discovery
+gcp.spanner.instance	instanceId	required	true	ruling
+gcp.spanner.instance	name	immutable	true	mm
+gcp.spanner.instance	replicaComputeCapacity	output	true	discovery
+gcp.spanner.instance	state	output	true	discovery+mm
+gcp.spanner.instance	updateTime	output	true	discovery
 gcp.spanner.session		clear_before_delete	none	default
 gcp.spanner.session		create_await	none	discovery
 gcp.spanner.session		create_url	{+database}/sessions	discovery
@@ -8254,6 +8729,32 @@ gcp.version	createTime	output	true	discovery
 gcp.version	imageDigest	output	true	discovery
 gcp.version	pluginConfigDigest	output	true	discovery
 gcp.version	updateTime	output	true	discovery
+gcp.vpcaccess.connector		clear_before_delete	none	default
+gcp.vpcaccess.connector		create_await	longrunning	discovery
+gcp.vpcaccess.connector		create_url	projects/{{project}}/locations/{{region}}/connectors?connectorId={{name}}	mm
+gcp.vpcaccess.connector		create_verb	POST	discovery
+gcp.vpcaccess.connector		delete_await	longrunning	discovery
+gcp.vpcaccess.connector		delete_url	{+name}	discovery
+gcp.vpcaccess.connector		lock_field	none	default
+gcp.vpcaccess.connector		patch_one_field	false	default
+gcp.vpcaccess.connector		setters	none	default
+gcp.vpcaccess.connector		timeout	1200	default
+gcp.vpcaccess.connector		update_await	longrunning	discovery
+gcp.vpcaccess.connector		update_mask	query	mm
+gcp.vpcaccess.connector		update_verb	PATCH	mm
+gcp.vpcaccess.connector	connectedProjects	output	true	discovery+mm
+gcp.vpcaccess.connector	ipCidrRange	immutable	true	mm
+gcp.vpcaccess.connector	maxThroughput	immutable	true	mm
+gcp.vpcaccess.connector	minThroughput	immutable	true	mm
+gcp.vpcaccess.connector	name	immutable	true	mm
+gcp.vpcaccess.connector	name	required	true	mm
+gcp.vpcaccess.connector	network	equivalence	resource_name	mm
+gcp.vpcaccess.connector	network	immutable	true	mm
+gcp.vpcaccess.connector	state	immutable	true	mm
+gcp.vpcaccess.connector	state	output	true	discovery+mm
+gcp.vpcaccess.connector	subnet	immutable	true	mm
+gcp.vpcaccess.connector	subnet.name	immutable	true	mm
+gcp.vpcaccess.connector	subnet.projectId	immutable	true	mm
 gcp.vpngateway		clear_before_delete	none	default
 gcp.vpngateway		create_await	compute_operation	discovery
 gcp.vpngateway		create_url	projects/{{project}}/regions/{{region}}/vpnGateways	mm
@@ -8291,6 +8792,58 @@ gcp.vpngateway	vpnInterfaces[].interconnectAttachment	equivalence	self_link	mm
 gcp.vpngateway	vpnInterfaces[].interconnectAttachment	immutable	true	mm
 gcp.vpngateway	vpnInterfaces[].ipAddress	output	true	discovery+mm
 gcp.vpngateway	vpnInterfaces[].ipv6Address	output	true	discovery
+gcp.vpntunnel		clear_before_delete	none	default
+gcp.vpntunnel		create_await	compute_operation	discovery
+gcp.vpntunnel		create_url	projects/{{project}}/regions/{{region}}/vpnTunnels	mm
+gcp.vpntunnel		create_verb	POST	discovery
+gcp.vpntunnel		delete_await	compute_operation	discovery
+gcp.vpntunnel		delete_url	projects/{project}/regions/{region}/vpnTunnels/{vpnTunnel}	discovery
+gcp.vpntunnel		lock_field	none	default
+gcp.vpntunnel		patch_one_field	false	default
+gcp.vpntunnel		setters	labels=setLabels	mm+discovery
+gcp.vpntunnel		timeout	600	default
+gcp.vpntunnel		update_await	none	default
+gcp.vpntunnel		update_mask	none	default
+gcp.vpntunnel		update_verb	none	default
+gcp.vpntunnel	cipherSuite	immutable	true	discovery
+gcp.vpntunnel	creationTimestamp	output	true	discovery+mm
+gcp.vpntunnel	description	immutable	true	mm+discovery
+gcp.vpntunnel	detailedStatus	output	true	discovery+mm
+gcp.vpntunnel	id	output	true	discovery+mm
+gcp.vpntunnel	ikeVersion	immutable	true	discovery
+gcp.vpntunnel	kind	output	true	discovery
+gcp.vpntunnel	labelFingerprint	immutable	true	discovery
+gcp.vpntunnel	localTrafficSelector	immutable	true	discovery
+gcp.vpntunnel	localTrafficSelector	unordered	true	mm
+gcp.vpntunnel	name	immutable	true	discovery
+gcp.vpntunnel	name	required	true	mm
+gcp.vpntunnel	params	immutable	true	mm+discovery
+gcp.vpntunnel	params	input_only	true	discovery+mm
+gcp.vpntunnel	params.resourceManagerTags	input_only	true	mm
+gcp.vpntunnel	peerExternalGateway	equivalence	self_link	mm
+gcp.vpntunnel	peerExternalGateway	immutable	true	mm+discovery
+gcp.vpntunnel	peerExternalGatewayInterface	immutable	true	discovery
+gcp.vpntunnel	peerGcpGateway	equivalence	self_link	mm
+gcp.vpntunnel	peerGcpGateway	immutable	true	discovery
+gcp.vpntunnel	peerIp	immutable	true	discovery
+gcp.vpntunnel	region	equivalence	self_link	mm
+gcp.vpntunnel	region	output	true	discovery
+gcp.vpntunnel	remoteTrafficSelector	immutable	true	discovery
+gcp.vpntunnel	remoteTrafficSelector	unordered	true	mm
+gcp.vpntunnel	router	equivalence	self_link	mm
+gcp.vpntunnel	router	immutable	true	mm+discovery
+gcp.vpntunnel	selfLink	output	true	discovery
+gcp.vpntunnel	sharedSecret	immutable	true	discovery
+gcp.vpntunnel	sharedSecret	input_only	true	mm
+gcp.vpntunnel	sharedSecret	required	true	mm
+gcp.vpntunnel	sharedSecret	sensitive	true	mm
+gcp.vpntunnel	sharedSecretHash	output	true	mm
+gcp.vpntunnel	status	output	true	discovery
+gcp.vpntunnel	targetVpnGateway	equivalence	self_link	mm
+gcp.vpntunnel	targetVpnGateway	immutable	true	mm+discovery
+gcp.vpntunnel	vpnGateway	equivalence	self_link	mm
+gcp.vpntunnel	vpnGateway	immutable	true	mm+discovery
+gcp.vpntunnel	vpnGatewayInterface	immutable	true	mm+discovery
 gcp.wasmplugin		clear_before_delete	none	default
 gcp.wasmplugin		create_await	longrunning	discovery
 gcp.wasmplugin		create_url	projects/{{project}}/locations/{{location}}/wasmPlugins?wasmPluginId={{name}}	mm
@@ -8394,3 +8947,56 @@ gcp.workerpool	threatDetectionEnabled	output	true	discovery
 gcp.workerpool	uid	output	true	discovery
 gcp.workerpool	updateTime	output	true	discovery
 gcp.workerpool	workerPoolId	immutable	true	discovery
+gcp.workflow		clear_before_delete	none	default
+gcp.workflow		create_await	longrunning	discovery
+gcp.workflow		create_url	projects/{{project}}/locations/{{region}}/workflows?workflowId={{name}}	mm
+gcp.workflow		create_verb	POST	discovery
+gcp.workflow		delete_await	longrunning	discovery
+gcp.workflow		delete_url	projects/{{project}}/locations/{{region}}/workflows/{{name}}	mm
+gcp.workflow		lock_field	none	default
+gcp.workflow		patch_one_field	false	default
+gcp.workflow		setters	none	default
+gcp.workflow		timeout	1200	default
+gcp.workflow		update_await	longrunning	discovery
+gcp.workflow		update_mask	query	mm
+gcp.workflow		update_verb	PATCH	mm
+gcp.workflow	allKmsKeys	output	true	discovery
+gcp.workflow	allKmsKeysVersions	output	true	discovery
+gcp.workflow	createTime	output	true	discovery+mm
+gcp.workflow	cryptoKeyVersion	output	true	discovery
+gcp.workflow	name	immutable	true	mm
+gcp.workflow	name	required	true	ruling
+gcp.workflow	revisionCreateTime	output	true	discovery
+gcp.workflow	revisionId	output	true	discovery+mm
+gcp.workflow	serviceAccount	equivalence	self_link	mm
+gcp.workflow	sourceContents	required	true	mm
+gcp.workflow	state	output	true	discovery+mm
+gcp.workflow	stateError	output	true	discovery
+gcp.workflow	tags	immutable	true	discovery+mm
+gcp.workflow	tags	input_only	true	discovery+mm
+gcp.workflow	updateTime	output	true	discovery+mm
+gcp.zonevmextensionpolicy		clear_before_delete	none	default
+gcp.zonevmextensionpolicy		create_await	compute_operation	discovery
+gcp.zonevmextensionpolicy		create_url	projects/{{project}}/zones/{{zone}}/vmExtensionPolicies	mm
+gcp.zonevmextensionpolicy		create_verb	POST	discovery
+gcp.zonevmextensionpolicy		delete_await	compute_operation	discovery
+gcp.zonevmextensionpolicy		delete_url	projects/{{project}}/zones/{{zone}}/vmExtensionPolicies/{{name}}	mm
+gcp.zonevmextensionpolicy		lock_field	none	default
+gcp.zonevmextensionpolicy		patch_one_field	false	default
+gcp.zonevmextensionpolicy		setters	none	default
+gcp.zonevmextensionpolicy		timeout	600	default
+gcp.zonevmextensionpolicy		update_await	none	default
+gcp.zonevmextensionpolicy		update_mask	none	discovery+!mm
+gcp.zonevmextensionpolicy		update_verb	none	discovery+!mm
+gcp.zonevmextensionpolicy	creationTimestamp	output	true	discovery+mm
+gcp.zonevmextensionpolicy	extensionPolicies	required	true	mm
+gcp.zonevmextensionpolicy	globalResourceLink	output	true	discovery
+gcp.zonevmextensionpolicy	id	output	true	discovery+mm
+gcp.zonevmextensionpolicy	kind	output	true	discovery+mm
+gcp.zonevmextensionpolicy	managedByGlobal	output	true	discovery+mm
+gcp.zonevmextensionpolicy	name	immutable	true	mm
+gcp.zonevmextensionpolicy	name	required	true	mm
+gcp.zonevmextensionpolicy	selfLink	output	true	discovery
+gcp.zonevmextensionpolicy	selfLinkWithId	output	true	discovery
+gcp.zonevmextensionpolicy	state	output	true	discovery+mm
+gcp.zonevmextensionpolicy	updateTimestamp	output	true	discovery

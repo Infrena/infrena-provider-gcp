@@ -2,7 +2,7 @@
 
 # logging
 
-25 type(s). [Back to the index](../README.md).
+28 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
@@ -17,6 +17,7 @@
 | [`gcp.logging.folder.bucket`](gcp.logging.folder.bucket.md) | **no** | yes | yes | Describes a repository in which log entries are stored. |
 | [`gcp.logging.folder.exclusion`](gcp.logging.folder.exclusion.md) | **no** | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
 | [`gcp.logging.folder.link`](gcp.logging.folder.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
+| [`gcp.logging.folder.logscope`](gcp.logging.folder.logscope.md) | **no** | yes | yes | Describes a group of resources to read log entries from |
 | [`gcp.logging.folder.savedquery`](gcp.logging.folder.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
 | [`gcp.logging.folder.sink`](gcp.logging.folder.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
 | [`gcp.logging.folder.view`](gcp.logging.folder.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
@@ -25,9 +26,11 @@
 | [`gcp.logging.organization.bucket`](gcp.logging.organization.bucket.md) | **no** | yes | yes | Describes a repository in which log entries are stored. |
 | [`gcp.logging.organization.exclusion`](gcp.logging.organization.exclusion.md) | **no** | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
 | [`gcp.logging.organization.link`](gcp.logging.organization.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
+| [`gcp.logging.organization.logscope`](gcp.logging.organization.logscope.md) | **no** | yes | yes | Describes a group of resources to read log entries from |
 | [`gcp.logging.organization.savedquery`](gcp.logging.organization.savedquery.md) | **no** | yes | yes | Describes a query that has been saved by a user. |
 | [`gcp.logging.organization.sink`](gcp.logging.organization.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
 | [`gcp.logging.organization.view`](gcp.logging.organization.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
 | [`gcp.logging.savedquery`](gcp.logging.savedquery.md) | yes | yes | yes | Describes a query that has been saved by a user. |
 | [`gcp.logging.sink`](gcp.logging.sink.md) | yes | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
 | [`gcp.logging.view`](gcp.logging.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
+| [`gcp.logscope`](gcp.logscope.md) | yes | yes | yes | Describes a group of resources to read log entries from |

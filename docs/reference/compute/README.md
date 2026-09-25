@@ -2,7 +2,7 @@
 
 # compute
 
-77 type(s). [Back to the index](../README.md).
+80 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
@@ -28,6 +28,7 @@
 | [`gcp.instantsnapshot`](gcp.instantsnapshot.md) | yes | **no** | yes | Represents an instant snapshot resource. |
 | [`gcp.instantsnapshotgroup`](gcp.instantsnapshotgroup.md) | yes | **no** | yes | Represents an InstantSnapshotGroup resource. |
 | [`gcp.interconnect`](gcp.interconnect.md) | yes | yes | yes | Represents an Interconnect resource. |
+| [`gcp.interconnectattachment`](gcp.interconnectattachment.md) | yes | yes | yes | Represents an InterconnectAttachment (VLAN attachment) resource. |
 | [`gcp.interconnectattachmentgroup`](gcp.interconnectattachmentgroup.md) | yes | yes | yes | An interconnect attachment group resource allows customers to create, analyze, and expand highly available deployments. |
 | [`gcp.interconnectgroup`](gcp.interconnectgroup.md) | yes | yes | yes | An interconnect group resource allows customers to create, analyze, and expand their redundant connections. |
 | [`gcp.licens`](gcp.licens.md) | yes | yes | yes | Represents a License resource. |
@@ -82,4 +83,6 @@
 | [`gcp.targetvpngateway`](gcp.targetvpngateway.md) | yes | **no** | yes | Represents a Target VPN Gateway resource. |
 | [`gcp.urlmap`](gcp.urlmap.md) | yes | yes | yes | UrlMaps are used to route requests to a backend service based on rules that you define for the host and path of an incoming URL. |
 | [`gcp.vpngateway`](gcp.vpngateway.md) | yes | **no** | yes | Represents a VPN gateway running in GCP. |
+| [`gcp.vpntunnel`](gcp.vpntunnel.md) | yes | **no** | yes | VPN tunnel resource. |
 | [`gcp.wiregroup`](gcp.wiregroup.md) | yes | yes | yes | The WireGroup resource represents a group of redundant wires between interconnects in two different metros. |
+| [`gcp.zonevmextensionpolicy`](gcp.zonevmextensionpolicy.md) | yes | **no** | yes | A Zone VM Extension Policy. |

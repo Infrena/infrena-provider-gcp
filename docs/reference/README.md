@@ -2,18 +2,19 @@
 
 # GCP type reference
 
-This plugin serves **274 types** across 37 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
+This plugin serves **289 types** across 40 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
 - Catalog generated: 2026-09-25
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
-**[Types that are not served, and why](not-shipped.md)** — 346 entries. Read that page first if the type you want is missing from this one.
+**[Types that are not served, and why](not-shipped.md)** — 331 entries. Read that page first if the type you want is missing from this one.
 
 ## Services
 
 | Service | Types |
 | --- | --- |
 | [accesscontextmanager](accesscontextmanager/README.md) | 1 |
+| [alloydb](alloydb/README.md) | 3 |
 | [apigateway](apigateway/README.md) | 1 |
 | [artifactregistry](artifactregistry/README.md) | 4 |
 | [bigquery](bigquery/README.md) | 5 |
@@ -28,7 +29,7 @@ This plugin serves **274 types** across 37 Google Cloud services. Every page bel
 | [cloudresourcemanager](cloudresourcemanager/README.md) | 8 |
 | [cloudtasks](cloudtasks/README.md) | 2 |
 | [composer](composer/README.md) | 3 |
-| [compute](compute/README.md) | 77 |
+| [compute](compute/README.md) | 80 |
 | [container](container/README.md) | 2 |
 | [dataproc](dataproc/README.md) | 5 |
 | [dns](dns/README.md) | 5 |
@@ -36,7 +37,7 @@ This plugin serves **274 types** across 37 Google Cloud services. Every page bel
 | [file](file/README.md) | 3 |
 | [firestore](firestore/README.md) | 4 |
 | [iam](iam/README.md) | 13 |
-| [logging](logging/README.md) | 25 |
+| [logging](logging/README.md) | 28 |
 | [memcache](memcache/README.md) | 1 |
 | [monitoring](monitoring/README.md) | 5 |
 | [networksecurity](networksecurity/README.md) | 26 |
@@ -44,12 +45,14 @@ This plugin serves **274 types** across 37 Google Cloud services. Every page bel
 | [notebooks](notebooks/README.md) | 1 |
 | [osconfig](osconfig/README.md) | 3 |
 | [pubsub](pubsub/README.md) | 4 |
-| [redis](redis/README.md) | 1 |
+| [redis](redis/README.md) | 3 |
 | [run](run/README.md) | 4 |
 | [secretmanager](secretmanager/README.md) | 2 |
-| [spanner](spanner/README.md) | 2 |
+| [spanner](spanner/README.md) | 4 |
 | [sqladmin](sqladmin/README.md) | 6 |
 | [storage](storage/README.md) | 6 |
+| [vpcaccess](vpcaccess/README.md) | 1 |
+| [workflows](workflows/README.md) | 1 |
 
 ## How to read a type page
 
