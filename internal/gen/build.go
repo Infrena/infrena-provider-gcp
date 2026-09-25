@@ -1157,6 +1157,19 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		}
 	}
 
+	// A POST create goes to the COLLECTION. magic-modules' BigQuery Table
+	// base_url is the table's own item path (Terraform implements the table
+	// by hand and never runs that YAML), and a POST there is a 404: found
+	// live on 2026-09-25. Where Discovery's insert ends at the collection and
+	// the template ends at an id, the id is dropped.
+	if t.CreateVerb == "" {
+		if t.CreateURL != "" {
+			t.CreateURL = withoutItemTail(t.CreateURL, create.Path)
+		} else {
+			t.BaseURL = withoutItemTail(t.BaseURL, create.Path)
+		}
+	}
+
 	await, _ := AwaitOf(doc, create)
 	t.Await = await
 	// The delete's own answer, which is not always the create's: see
@@ -1164,11 +1177,27 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	if deleteAwait, _ := AwaitOf(doc, col.Methods["delete"]); deleteAwait != await {
 		t.DeleteAwait = &deleteAwait
 	}
+	// And the update's, from the patch method it is sent to. Only a PATCH
+	// is ever sent (see discoveredUpdate), so that is the method to ask.
+	if patch := col.Methods["patch"]; t.UpdateVerb == http.MethodPatch && patch != nil && patch.HTTPMethod == http.MethodPatch {
+		if updateAwait, _ := AwaitOf(doc, patch); updateAwait != await {
+			t.UpdateAwait = &updateAwait
+		}
+	}
 	// The paths and the timeout below serve whichever await is not none. The
 	// measured mismatches pair none with one kind, never two different
 	// kinds, so the create's kind wins only where both exist.
-	if await == catalog.AwaitNone && t.DeleteAwait != nil {
-		await = *t.DeleteAwait
+	for _, other := range []*catalog.AwaitKind{t.DeleteAwait, t.UpdateAwait} {
+		if other == nil || *other == catalog.AwaitNone {
+			continue
+		}
+		if await == catalog.AwaitNone {
+			await = *other
+		} else if *other != await {
+			// One set of poll paths per type. Never measured; refused
+			// rather than polled at the wrong place.
+			return nil, fmt.Errorf("its mutations complete as two different kinds of operation")
+		}
 	}
 	// TimeoutSeconds is a GUESS, not derived from any input source: nothing in
 	// Discovery, magic-modules or the overlay says how long a mutation may
@@ -1241,6 +1270,18 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			if err := markInPlace(attrs, path); err != nil {
 				return nil, err
 			}
+		}
+		for _, path := range ruling.SendWithUpdate {
+			a := attrAtPath(attrs, path)
+			if a == nil || strings.Contains(path, "[]") {
+				return nil, fmt.Errorf("send_with_update names %q, which is not an attribute outside a list", path)
+			}
+			// An option Google returns is state, not an option, and would
+			// be patched like any other field.
+			if !a.InputOnly || a.Output {
+				return nil, fmt.Errorf("send_with_update names %q, which is not input-only", path)
+			}
+			a.SendWithUpdate = true
 		}
 		for _, f := range ruling.Required {
 			a := attrNamed(attrs, f)
@@ -2456,6 +2497,27 @@ var bareMMPlaceholderRE = regexp.MustCompile(`^(?:v[0-9][0-9a-z]*/)?\{\{[a-z_]+\
 
 // versionPrefixOf is a path's leading version segment with its slash
 // ("v3/"), or "".
+// withoutItemTail drops a create template's trailing id segment when the
+// API's own create path ends at the collection: a template that names the
+// new resource's id where the insert takes none. Anything else is returned
+// unchanged, including a custom method (":insert") and a path that itself
+// ends in a placeholder.
+func withoutItemTail(tmpl, discoPath string) string {
+	path, query, hasQuery := strings.Cut(tmpl, "?")
+	path = strings.TrimSuffix(path, "/")
+	dp := strings.TrimSuffix(discoPath, "/")
+	last := path[strings.LastIndex(path, "/")+1:]
+	dlast := dp[strings.LastIndex(dp, "/")+1:]
+	if !strings.Contains(last, "{") || strings.ContainsAny(dlast, "{:") || !strings.Contains(path, "/") {
+		return tmpl
+	}
+	path = path[:strings.LastIndex(path, "/")]
+	if hasQuery {
+		return path + "?" + query
+	}
+	return path
+}
+
 func versionPrefixOf(path string) string {
 	if m := regexp.MustCompile(`^v[0-9][0-9a-z]*/`).FindString(path); m != "" {
 		return m

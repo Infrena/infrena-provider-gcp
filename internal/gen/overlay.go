@@ -43,6 +43,12 @@ type Ruling struct {
 	// these leaves (an Artifact Registry repository's upstream
 	// credentials), and replacing the repository deletes its artifacts.
 	InPlace []string `yaml:"in_place"`
+	// SendWithUpdate names dotted paths of input-only request options that
+	// every update carries in its body, outside the mask. Terraform's
+	// Artifact Registry update re-sends the whole remote config, so its
+	// disableUpstreamValidation always reaches Google; a patch of only what
+	// changed drops it, and Google validates upstream credentials anyway.
+	SendWithUpdate []string `yaml:"send_with_update"`
 }
 
 // Patchable is a human decision about a type whose API patches only SOME of

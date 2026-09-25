@@ -90,6 +90,13 @@ type Attr struct {
 	// reporting it missing -- which the next plan would read as drift, for
 	// ever, on a resource that is exactly as configured.
 	InputOnly bool `json:"input_only,omitempty"`
+	// SendWithUpdate marks an input-only REQUEST OPTION that goes in the body
+	// of every update, changed or not, and never in the mask: an Artifact
+	// Registry repository's disableUpstreamValidation. A patch carries only
+	// what changed, so without this the option was left out of every update
+	// after the create, and Google validated credentials the user had asked
+	// it not to (live, 2026-09-25). Only a ruling sets it.
+	SendWithUpdate bool `json:"send_with_update,omitempty"`
 
 	// Unordered marks a list GCP may return in a different order than it was
 	// sent. Task 15 reorders those to match the reference; an ordered list is
@@ -246,6 +253,13 @@ type Type struct {
 	// failure for a delete that worked. Nil means "the same as Await";
 	// DeleteAwaitKind is how to read it.
 	DeleteAwait *AwaitKind `json:"delete_await,omitempty"`
+	// UpdateAwait is how an update completes, when that differs from Await,
+	// for the same reason as DeleteAwait. Artifact Registry's create answers
+	// with an operation and its patch with the repository itself; awaited as
+	// an operation, the repository's own name was polled for a `done` it
+	// never has until the type's twenty-minute timeout (live, 2026-09-25).
+	// Nil means "the same as Await"; UpdateAwaitKind is how to read it.
+	UpdateAwait *AwaitKind `json:"update_await,omitempty"`
 	// OperationWaitPath is the API's own operations wait path for this type's
 	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
 	// EMPTY means the API publishes no wait method — container and sqladmin do
@@ -697,6 +711,14 @@ func (t *Type) SetterFor(canonical string) *Setter {
 		}
 	}
 	return nil
+}
+
+// UpdateAwaitKind is how this type's update completes.
+func (t *Type) UpdateAwaitKind() AwaitKind {
+	if t.UpdateAwait != nil {
+		return *t.UpdateAwait
+	}
+	return t.Await
 }
 
 // DeleteAwaitKind is how this type's delete completes.

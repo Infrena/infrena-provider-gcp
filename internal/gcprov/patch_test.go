@@ -793,3 +793,50 @@ func TestAFingerprintAloneIsNeverAPatch(t *testing.T) {
 		}
 	}
 }
+
+// TestAnUpdateCarriesItsRequestOptions. An Artifact Registry repository's
+// disableUpstreamValidation is input-only and asks Google not to check the
+// upstream credentials. A patch of only what changed left it out of every
+// update after the create, and Google checked them anyway: "Failed to
+// validate remote upstream" on a username change (live, 2026-09-25). It
+// rides in the body of every update, never in the mask, and an update with
+// nothing else changed still sends nothing.
+func TestAnUpdateCarriesItsRequestOptions(t *testing.T) {
+	ty, ok := mustCatalog(t).Type("gcp.artifactregistry.repository")
+	if !ok {
+		t.Fatal("the catalog no longer ships gcp.artifactregistry.repository")
+	}
+	cfg := func(user string) map[string]value.Value {
+		return map[string]value.Value{"remoteRepositoryConfig": mapValue(map[string]any{
+			"disableUpstreamValidation": true,
+			"upstreamCredentials": map[string]any{"usernamePasswordCredentials": map[string]any{
+				"username": user, "passwordSecretVersion": "projects/p/secrets/s/versions/1",
+			}},
+		})}
+	}
+	body, mask := BuildMask(ty, cfg("user-a"), cfg("user-b"))
+	want := "remoteRepositoryConfig.upstreamCredentials.usernamePasswordCredentials.username"
+	if len(mask) != 1 || mask[0] != want {
+		t.Fatalf("mask = %v, want only [%s]: a request option is never masked", mask, want)
+	}
+	rrc, _ := body["remoteRepositoryConfig"].(map[string]any)
+	if rrc["disableUpstreamValidation"] != true {
+		t.Errorf("the update body does not carry disableUpstreamValidation: %v", body)
+	}
+	creds, _ := rrc["upstreamCredentials"].(map[string]any)
+	upc, _ := creds["usernamePasswordCredentials"].(map[string]any)
+	if upc["username"] != "user-b" {
+		t.Errorf("the update body lost the change itself: %v", body)
+	}
+
+	// And the patch answers with the repository, not an operation: see
+	// TestAnUpdateWaitsOnlyForItsOwnAnswer.
+	if ty.Await == catalog.AwaitNone || ty.UpdateAwaitKind() != catalog.AwaitNone {
+		t.Errorf("%s awaits its create as %v and its update as %v; the create is an operation and the patch is not",
+			ty.Name, ty.Await, ty.UpdateAwaitKind())
+	}
+
+	if body, mask := BuildMask(ty, cfg("user-a"), cfg("user-a")); len(mask) != 0 || len(body) != 0 {
+		t.Errorf("an update that changed nothing built body %v mask %v; an option alone is no reason to patch", body, mask)
+	}
+}

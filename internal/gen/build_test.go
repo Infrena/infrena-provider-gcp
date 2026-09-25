@@ -1872,3 +1872,26 @@ func TestSettableAndRequiredFindAKeywordRenamedField(t *testing.T) {
 		t.Fatalf("attrNamed(type) = %+v, want the type_value attribute", a)
 	}
 }
+
+// TestAPostCreateGoesToTheCollection. BigQuery's tables.insert POSTs to
+// .../tables; magic-modules' base_url is .../tables/{{table_id}}, and a POST
+// there is a 404 (live, 2026-09-25). Only a trailing id where the API's own
+// path ends at the collection is dropped.
+func TestAPostCreateGoesToTheCollection(t *testing.T) {
+	for _, c := range []struct{ tmpl, disco, want string }{
+		{"projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+			"projects/{+projectId}/datasets/{+datasetId}/tables",
+			"projects/{{project}}/datasets/{{dataset_id}}/tables"},
+		{"projects/{{project}}/x/{{id}}?a={{b}}", "projects/{project}/x", "projects/{{project}}/x?a={{b}}"},
+		// Already the collection.
+		{"projects/{{project}}/datasets", "projects/{+projectId}/datasets", "projects/{{project}}/datasets"},
+		// The API's own path ends in a placeholder: nothing to compare.
+		{"{{parent}}/things/{{id}}", "v1/{+parent}", "{{parent}}/things/{{id}}"},
+		// A custom create method.
+		{"projects/{{project}}/x/{{id}}", "v1/{+name}:create", "projects/{{project}}/x/{{id}}"},
+	} {
+		if got := withoutItemTail(c.tmpl, c.disco); got != c.want {
+			t.Errorf("withoutItemTail(%q, %q) = %q, want %q", c.tmpl, c.disco, got, c.want)
+		}
+	}
+}

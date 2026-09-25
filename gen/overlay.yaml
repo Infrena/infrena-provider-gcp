@@ -123,6 +123,7 @@ rulings:
   artifactregistry/Repository:
     hooks: [encoder, pre_update]
     in_place: [remoteRepositoryConfig.upstreamCredentials, remoteRepositoryConfig.disableUpstreamValidation]
+    send_with_update: [remoteRepositoryConfig.disableUpstreamValidation]
     note: >
       One hook is scope resolution this provider already performs, and the
       other hand-writes mask paths that buildNested produces natively.
@@ -142,7 +143,13 @@ rulings:
       far down a nested block. BuildMask's buildNested recurses through every
       declared Fields level and emits exactly these dotted paths for the leaves
       that changed (internal/gcprov/patch.go), and the mask goes on the query
-      string the same way, so the generic path reaches the same request.
+      string the same way. The MASK is the same; the body was not. Terraform's
+      body carries the whole remote config, so disableUpstreamValidation, an
+      input-only option, reaches every update. A patch of only the changed
+      leaves dropped it, and Google validated the upstream credentials the
+      user had told it not to: "Failed to validate remote upstream" on a
+      username change (live, 2026-09-25). send_with_update puts it in every
+      update body, outside the mask.
 
       Unblocks gcp.artifactregistry.rule, gcp.artifactregistry.tag and
       gcp.attachment, all three of which ship and all three of which hang off a
