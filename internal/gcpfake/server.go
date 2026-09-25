@@ -445,11 +445,22 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	}
 	id, fromQuery := resourceID(r, body)
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "no id in the request's query parameters or body")
-		return
+		// Google assigns the id itself for some APIs (Cloud Monitoring's
+		// alert policies and groups, Resource Manager's tag keys), and
+		// answers with the full resource name. So does the fake.
+		s.mu.Lock()
+		s.opCounter++
+		id = fmt.Sprintf("assigned-%d", s.opCounter)
+		s.mu.Unlock()
+		fromQuery = true
 	}
 	collection := strings.TrimSuffix(r.URL.Path, "/")
 	path := collection + "/" + id
+	if !queryNamesTheResource(r) {
+		if _, inner, ok := unwrapCreate(body); ok {
+			body = inner
+		}
+	}
 	stored := cloneMap(body)
 	s.mu.Lock()
 	for f := range s.dropOnCreate {
@@ -486,10 +497,22 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 func resourceID(r *http.Request, body map[string]any) (string, bool) {
 	reserved := map[string]bool{"updateMask": true, "pageToken": true, "pageSize": true, "parent": true, "requestId": true}
 	for k, v := range r.URL.Query() {
-		if reserved[k] || len(v) == 0 || v[0] == "" {
+		// Only an id parameter names the resource: a bucket's ?project= and
+		// a node group's ?initialNodeCount= are not ids, and the fake once
+		// stored both under them.
+		// Either spelling: Google's transcoding takes repository_id as well
+		// as repositoryId, and magic-modules writes the snake form.
+		if reserved[k] || len(v) == 0 || v[0] == "" || !(strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "_id") || k == "id") {
 			continue
 		}
 		return v[0], true
+	}
+	// AIP's wrapped create, {roleId: "x", role: {...}}: the id is the one
+	// "...Id" field beside the object. Only when no query parameter named the
+	// resource: a wasm plugin's body has mainVersionId beside its versions
+	// map, and is not a wrapper. See unwrapCreate for the body.
+	if id, _, ok := unwrapCreate(body); ok {
+		return id, true
 	}
 	if name, ok := body["name"].(string); ok && name != "" {
 		if i := strings.LastIndex(name, "/"); i >= 0 {
@@ -971,4 +994,54 @@ func (s *Server) OneFieldPerPatch(path string) {
 		s.oneFieldPatch = map[string]bool{}
 	}
 	s.oneFieldPatch[path] = true
+}
+
+// unwrapCreate recognises AIP's wrapped create body, as IAM roles, service
+// accounts and Bigtable instances take it: exactly one string field named
+// "...Id" and exactly one object field, the resource. Anything else is a
+// plain create body.
+func unwrapCreate(body map[string]any) (id string, inner map[string]any, ok bool) {
+	// {roleId, role}, {instanceId, instance, clusters}: the id field is the
+	// object's own name plus "Id".
+	for k, v := range body {
+		obj, isObj := v.(map[string]any)
+		if !isObj {
+			continue
+		}
+		if s, _ := body[k+"Id"].(string); s != "" {
+			return s, obj, true
+		}
+	}
+	// {cluster: {name}, projectId, zone} (GKE): no id field, and the one
+	// object among plain request strings names itself.
+	var objs []map[string]any
+	for _, v := range body {
+		switch x := v.(type) {
+		case map[string]any:
+			objs = append(objs, x)
+		case string:
+		default:
+			return "", nil, false
+		}
+	}
+	if len(objs) == 1 && len(body) > 1 {
+		if n, _ := objs[0]["name"].(string); n != "" {
+			if i := strings.LastIndex(n, "/"); i >= 0 {
+				n = n[i+1:]
+			}
+			return n, objs[0], true
+		}
+	}
+	return "", nil, false
+}
+
+// queryNamesTheResource reports whether a create's query string carries its
+// id, by resourceID's rule.
+func queryNamesTheResource(r *http.Request) bool {
+	for k, v := range r.URL.Query() {
+		if len(v) > 0 && v[0] != "" && (strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "_id") || k == "id") && k != "requestId" {
+			return true
+		}
+	}
+	return false
 }
