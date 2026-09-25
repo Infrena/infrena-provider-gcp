@@ -78,7 +78,7 @@ func restrictedPatch(col disco.Collection) (bool, string) {
 // Top level only, and deliberately: every restriction Google documents is a
 // top-level field, and a nested allowlist would need path syntax the overlay
 // has no way to spell (the same limit the alias table carries).
-func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string) {
+func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string, src string) {
 	allowed := make(map[string]bool, len(fields))
 	for _, f := range fields {
 		allowed[f] = true
@@ -88,6 +88,7 @@ func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string) {
 			continue
 		}
 		a.ForceNew = true
+		addSource(a, "immutable", src)
 	}
 }
 

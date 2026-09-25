@@ -87,6 +87,7 @@ func bindCreateQueryID(t *catalog.Type, attrs map[string]*catalog.Attr, create *
 			CreateOnly:  true,
 			Description: strings.TrimSpace(p.Description),
 		}
+		addSource(attrs[param], "immutable", SourceDiscovery)
 		query = strings.ReplaceAll(query, "{{"+ph+"}}", "{{"+param+"}}")
 		bound = append(bound, param)
 	}
@@ -234,9 +235,21 @@ func addCreateIDParameter(t *catalog.Type, attrs map[string]*catalog.Attr, creat
 		Required:    disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired],
 		Description: strings.TrimSpace(p.Description),
 	}
+	addSource(attrs[param], "immutable", SourceDiscovery)
+	if attrs[param].Required {
+		addSource(attrs[param], "required", SourceDiscovery)
+	}
 	t.CreateURL = tmpl + sep + param + "={{" + param + "}}"
 	if n := attrs["name"]; n != nil && !n.Output {
+		// The id travels in the query, so Google names the resource.
+		if n.Required {
+			overrule(n, "required", SourceDiscovery)
+		}
+		if n.ForceNew {
+			overrule(n, "immutable", SourceDiscovery)
+		}
 		n.Output, n.Required, n.ForceNew = true, false, false
+		addSource(n, "output", SourceDiscovery)
 	}
 	return param
 }
@@ -278,6 +291,10 @@ func fillPreCreateTokens(t *catalog.Type, attrs map[string]*catalog.Attr, create
 				CreateOnly:  true,
 				Required:    p.Required,
 				Description: strings.TrimSpace(p.Description),
+			}
+			addSource(attrs[k], "immutable", SourceDiscovery)
+			if p.Required {
+				addSource(attrs[k], "required", SourceDiscovery)
 			}
 		} else if a.Output {
 			continue

@@ -108,6 +108,22 @@ type Overlay struct {
 	// with [] for a list element. A path the type does not have fails the
 	// build.
 	Sensitive map[string]SensitiveFields `yaml:"sensitive"`
+	// Observed is what live tests saw Google do, keyed by infrena type. Each
+	// entry asserts one fact of the closed vocabulary (facts.go), and the
+	// generator refuses to produce a catalog that contradicts it. See
+	// docs/FACTS.md.
+	Observed map[string][]Observation `yaml:"observed"`
+}
+
+// Observation is one fact seen on real Google.
+type Observation struct {
+	// Path is the attribute, for an attribute fact; empty for a type fact.
+	Path  string `yaml:"path"`
+	Fact  string `yaml:"fact"`
+	Value string `yaml:"value"`
+	// Seen is "YYYY-MM-DD TestLiveName": when, and the live test that
+	// showed it, which a test checks still exists.
+	Seen string `yaml:"seen"`
 }
 
 // LoadOverlay reads and validates the overlay. mmv1Dir is the vendored

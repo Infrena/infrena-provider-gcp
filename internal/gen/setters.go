@@ -203,14 +203,19 @@ func applySetters(t *catalog.Type, mm *mmv1.Resource) {
 		carried = append(carried, s.Fields...)
 	}
 	if t.UpdateVerb == "" {
-		applyPatchAllowlist(t.Attributes, carried)
+		applyPatchAllowlist(t.Attributes, carried, SourceDiscovery)
 	}
 	for _, a := range t.Attributes {
 		if t.SetterFor(a.Canonical) == nil {
 			continue
 		}
+		if a.ForceNew {
+			overrule(a, "immutable", SourceMM)
+			addSource(a, "immutable", SourceDiscovery)
+		}
 		a.ForceNew = false
-		if !mmOutput[a.Canonical] {
+		if !mmOutput[a.Canonical] && a.Output {
+			overrule(a, "output", SourceMM)
 			a.Output = false
 		}
 	}
