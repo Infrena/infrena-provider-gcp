@@ -382,7 +382,7 @@ projects/{project}/locations/{location}/clusters/{cluster}
 | `networkConfig.subnetwork` | — | `string` | output only | — | Output only. The relative name of the Google Compute Engine \[subnetwork\](https://cloud.google.com/compute/docs/vpc) to which the cluster is connected. Example … |
 | `networkPolicy` | `network_policy` | `map` | optional | — | Configuration options for the NetworkPolicy feature. |
 | `networkPolicy.enabled` | — | `boolean` | optional | — | Whether network policy is enabled on the cluster. |
-| `networkPolicy.provider_value` | wire `provider` | `string` | optional | — | The selected network policy provider. |
+| `networkPolicy.provider` | — | `string` | optional | — | The selected network policy provider. |
 | `nodeConfig` | `node_config` | `map` | optional | — | Parameters used in creating the cluster's nodes. For requests, this field should only be used in lieu of a "node_pool" object, since this configuration (along with the "initial_node_count") will be … |
 | `nodeConfig.accelerators` | — | `list` | optional | — | A list of hardware accelerators to be attached to each node. See https://cloud.google.com/compute/docs/gpus for more information about support for GPUs. |
 | `nodeConfig.accelerators[]` | — | `map` | optional | — | — |
@@ -576,7 +576,7 @@ projects/{project}/locations/{location}/clusters/{cluster}
 | `nodeConfig.resourceManagerTags` | `resource_manager_tags` | `map` | optional | — | A map of resource manager tag keys and values to be attached to the nodes. |
 | `nodeConfig.resourceManagerTags.tags` | — | `map` | optional | opaque | TagKeyValue must be in one of the following formats (\[KEY\]=\[VALUE\]) 1. `tagKeys/{tag_key_id}=tagValues/{tag_value_id}` 2. `{org_id}/{tag_key_name}={tag_value_name}` 3 … |
 | `nodeConfig.sandboxConfig` | `sandbox_config` | `map` | optional | — | Sandbox configuration for this node. |
-| `nodeConfig.sandboxConfig.type_value` | wire `type` | `string` | optional | — | Type of the sandbox to use for the node. |
+| `nodeConfig.sandboxConfig.type` | — | `string` | optional | — | Type of the sandbox to use for the node. |
 | `nodeConfig.secondaryBootDiskUpdateStrategy` | `secondary_boot_disk_update_strategy` | `map` | optional | opaque | Secondary boot disk update strategy. |
 | `nodeConfig.secondaryBootDisks` | `secondary_boot_disks` | `list` | optional | — | List of secondary boot disks attached to the nodes. |
 | `nodeConfig.secondaryBootDisks[]` | — | `map` | optional | — | — |
@@ -818,7 +818,7 @@ projects/{project}/locations/{location}/clusters/{cluster}
 | `nodePools[].placementPolicy` | `placement_policy` | `map` | optional | — | Specifies the node placement policy. |
 | `nodePools[].placementPolicy.policyName` | `policy_name` | `string` | optional | — | If set, refers to the name of a custom resource policy supplied by the user. The resource policy must be in the same project and region as the node pool. If not found, InvalidArgument error is … |
 | `nodePools[].placementPolicy.tpuTopology` | `tpu_topology` | `string` | optional | — | Optional. TPU placement topology for pod slice node pool. https://cloud.google.com/tpu/docs/types-topologies#tpu_topologies |
-| `nodePools[].placementPolicy.type_value` | wire `type` | `string` | optional | — | The type of placement. |
+| `nodePools[].placementPolicy.type` | — | `string` | optional | — | The type of placement. |
 | `nodePools[].podIpv4CidrSize` | `pod_ipv4_cidr_size` | `integer` | output only | — | Output only. The pod CIDR block size per node in this node pool. |
 | `nodePools[].queuedProvisioning` | `queued_provisioning` | `map` | optional | — | Specifies the configuration of queued provisioning. |
 | `nodePools[].queuedProvisioning.enabled` | — | `boolean` | optional | — | Denotes that this node pool is QRM specific, meaning nodes can be only obtained through queuing via the Cluster Autoscaler ProvisioningRequest API. |

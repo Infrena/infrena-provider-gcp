@@ -103,7 +103,7 @@ projects/{{project}}/datasets/{{dataset_id}}
 | `maxTimeTravelHours` | `max_time_travel_hours` | `string` | optional | — | Optional. Defines the time travel window in hours. The value can be from 48 to 168 hours (2 to 7 days). The default value is 168 hours if this is not set. |
 | `resourceTags` | `resource_tags` | `map` | optional | opaque | Optional. The \[tags\](https://cloud.google.com/bigquery/docs/tags) attached to this dataset. Tag keys are globally unique. Tag key is expected to be in the namespaced format, for example … |
 | `restrictions` | — | `map` | output only | — | Optional. Output only. Restriction config for all tables and dataset. If set, restrict certain accesses on the dataset and all its tables based on the config. See \[Data … |
-| `restrictions.type_value` | wire `type` | `string` | output only | — | Output only. Specifies the type of dataset/table restriction. |
+| `restrictions.type` | — | `string` | output only | — | Output only. Specifies the type of dataset/table restriction. |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. A URL that can be used to access the resource again. You can use this URL in Get or Update requests to the resource. |

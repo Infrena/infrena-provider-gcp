@@ -13,7 +13,7 @@ A configuration object describing how Cloud Bigtable should treat traffic from a
 | Asset type | `bigtableadmin.googleapis.com/AppProfile` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 

@@ -91,7 +91,7 @@ projects/{project}/instances/{instance}
 | `ipAddresses[]` | — | `map` | optional | — | — |
 | `ipAddresses[].ipAddress` | `ip_address` | `string` | optional | — | The IP address assigned. |
 | `ipAddresses[].timeToRetire` | `time_to_retire` | `string` | optional | — | The due time for this IP to be retired in \[RFC 3339\](https://tools.ietf.org/html/rfc3339) format, for example `2012-11-15T16:19:00.094Z`. This field is only available when the IP is scheduled to be … |
-| `ipAddresses[].type_value` | wire `type` | `string` | optional | — | The type of this IP address. A `PRIMARY` address is a public address that can accept incoming connections. A `PRIVATE` address is a private address that can accept incoming connections. An `OUTGOING` … |
+| `ipAddresses[].type` | — | `string` | optional | — | The type of this IP address. A `PRIMARY` address is a public address that can accept incoming connections. A `PRIVATE` address is a private address that can accept incoming connections. An `OUTGOING` … |
 | `ipv6Address` | `ipv6_address` | `string` | optional | — | The IPv6 address assigned to the instance. (Deprecated) This property was applicable only to First Generation instances. |
 | `kind` | — | `string` | optional | — | This is always `sql#instance`. |
 | `maintenanceVersion` | `maintenance_version` | `string` | optional | — | The current software version on the instance. |

@@ -54,7 +54,7 @@ projects/{project}/locations/{location}/jobs/{job}
 | `conditions[].revisionReason` | `revision_reason` | `string` | output only | — | Output only. A reason for the revision condition. |
 | `conditions[].severity` | — | `string` | optional | — | How to interpret failures of this condition, one of Error, Warning, Info |
 | `conditions[].state` | — | `string` | optional | — | State of the condition. |
-| `conditions[].type_value` | wire `type` | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
+| `conditions[].type` | — | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation time. |
 | `creator` | — | `string` | output only | — | Output only. Email address of the authenticated creator. |
 | `deleteTime` | `delete_time` | `string` | output only | — | Output only. The deletion time. It is only populated as a response to a Delete request. |
@@ -224,6 +224,6 @@ projects/{project}/locations/{location}/jobs/{job}
 | `terminalCondition.revisionReason` | `revision_reason` | `string` | output only | — | Output only. A reason for the revision condition. |
 | `terminalCondition.severity` | — | `string` | optional | — | How to interpret failures of this condition, one of Error, Warning, Info |
 | `terminalCondition.state` | — | `string` | optional | — | State of the condition. |
-| `terminalCondition.type_value` | wire `type` | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
+| `terminalCondition.type` | — | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
 | `uid` | — | `string` | output only | — | Output only. Server assigned unique identifier for the Execution. The value is a UUID4 string and guaranteed to remain unchanged until the resource is deleted. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last-modified time. |
