@@ -21,7 +21,7 @@ Represents access on a subset of rows on the specified table, defined by its fil
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}/rowAccessPolicies` |
 | Read | yes | `GET projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}/rowAccessPolicies/{{policy_id}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}/rowAccessPolicies/{{policy_id}}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}/rowAccessPolicies/{{policy_id}}` |
 | Import | yes | by id, see below |
 

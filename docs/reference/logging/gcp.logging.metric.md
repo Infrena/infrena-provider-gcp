@@ -22,7 +22,7 @@ Logs-based metric can also be used to extract values from logs and create a a di
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/metrics` |
 | Read | yes | `GET projects/{{project}}/metrics/{{%name}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{{project}}/metrics/{{%name}}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{{project}}/metrics/{{%name}}` |
 | Import | yes | by id, see below |
 

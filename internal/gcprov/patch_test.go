@@ -840,3 +840,46 @@ func TestAnUpdateCarriesItsRequestOptions(t *testing.T) {
 		t.Errorf("an update that changed nothing built body %v mask %v; an option alone is no reason to patch", body, mask)
 	}
 }
+
+// TestAPutUpdateCarriesWhatDidNotChange. A PUT replaces the resource with
+// its body, so the changed leaves alone would clear every other field: a
+// log metric's filter, a SQL user's host. The update reads the resource
+// fresh and sends it whole with the change written in. The fake replaces
+// on a PUT exactly as Google does, so a dropped field shows up here.
+func TestAPutUpdateCarriesWhatDidNotChange(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetPutReplaces(func(string) bool { return true })
+	path := "/v1/projects/p/locations/r/widgets/one"
+	s.Seed(path, map[string]any{
+		"name": "one", "sizeGb": float64(10), "tier": "gold", "etag": "e1",
+	})
+	ty := widgetType()
+	ty.UpdateVerb = http.MethodPut
+	ty.UpdateMask = false
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+	current := widgetState()
+	current.Attributes["tier"] = value.String("gold", value.SourceProvider)
+	st, err := p.Update(context.Background(), current, widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(20), "tier": "gold",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	put := sentBody(t, requestOf(t, s, http.MethodPut, path))
+	if put["sizeGb"] != float64(20) {
+		t.Errorf("the PUT does not carry the change: %v", put)
+	}
+	if put["tier"] != "gold" || put["etag"] != "e1" {
+		t.Errorf("the PUT dropped what did not change, which a PUT clears: %v", put)
+	}
+	held, _ := s.Get(path)
+	if held["tier"] != "gold" {
+		t.Errorf("Google's resource lost its tier: %v", held)
+	}
+	if got, _ := st.Attributes["sizeGb"].AsInt(); got != 20 {
+		t.Errorf("state after the update has sizeGb %v", st.Attributes["sizeGb"])
+	}
+}

@@ -254,6 +254,7 @@ func roundTrip(t *testing.T, ty *catalog.Type, counts *discoStyleCounts) (msg st
 	// Each mutation answers the way its own Discovery method does, not the
 	// way the catalog says; the catalog's style is only the fallback.
 	s.SetOperationStyleFor(discoStyleResolver(t, ty, counts))
+	s.SetPutReplaces(discoPutIsUpdate(t, ty))
 	if os.Getenv("GCP_ROUNDTRIP_TRACE") == ty.Name {
 		// Every request the fake saw, to find where a create and a read
 		// disagree about where the resource lives.

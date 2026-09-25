@@ -8,6 +8,6 @@
 | --- | --- | --- | --- | --- |
 | [`gcp.alertpolicy`](gcp.alertpolicy.md) | yes | yes | yes | A description of the conditions under which some aspect of your system is considered to be "unhealthy" and the ways to notify people or … |
 | [`gcp.metricdescriptor`](gcp.metricdescriptor.md) | yes | **no** | yes | Defines a metric type and its schema. |
-| [`gcp.monitoring.group`](gcp.monitoring.group.md) | yes | **no** | yes | The description of a dynamic collection of monitored resources. |
+| [`gcp.monitoring.group`](gcp.monitoring.group.md) | yes | yes | yes | The description of a dynamic collection of monitored resources. |
 | [`gcp.monitoring.service`](gcp.monitoring.service.md) | yes | yes | yes | A Service is a discrete, autonomous, and network-accessible unit, designed to solve an individual concern. |
 | [`gcp.servicelevelobjective`](gcp.servicelevelobjective.md) | **no** | yes | yes | A Service-Level Objective (SLO) describes a level of desired good service. |

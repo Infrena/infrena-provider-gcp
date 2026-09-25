@@ -21,7 +21,7 @@ User workloads ConfigMap used by Airflow tasks that run with Kubernetes Executor
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{region}}/environments/{{environment}}/userWorkloadsConfigMaps` |
 | Read | yes | `GET projects/{{project}}/locations/{{region}}/environments/{{environment}}/userWorkloadsConfigMaps/{{name}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{{project}}/locations/{{region}}/environments/{{environment}}/userWorkloadsConfigMaps/{{name}}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{region}}/environments/{{environment}}/userWorkloadsConfigMaps/{{name}}` |
 | Import | yes | by id, see below |
 

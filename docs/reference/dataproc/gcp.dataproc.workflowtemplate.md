@@ -21,7 +21,7 @@ A Dataproc workflow template resource.
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/workflowTemplates` |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT {+name}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

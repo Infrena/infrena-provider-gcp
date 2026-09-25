@@ -21,7 +21,7 @@ An attestor that attests to container image artifacts.
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/attestors?attestorId={{name}}` |
 | Read | yes | `GET projects/{{project}}/attestors/{{name}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{{project}}/attestors/{{name}}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{{project}}/attestors/{{name}}` |
 | Import | yes | by id, see below |
 

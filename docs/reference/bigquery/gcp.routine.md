@@ -20,7 +20,7 @@ A user-defined function or a stored procedure that belongs to a Dataset
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/datasets/{{dataset_id}}/routines` |
 | Read | yes | `GET projects/{{project}}/datasets/{{dataset_id}}/routines/{{routine_id}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{{project}}/datasets/{{dataset_id}}/routines/{{routine_id}}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}/routines/{{routine_id}}` |
 | Import | yes | by id, see below |
 
