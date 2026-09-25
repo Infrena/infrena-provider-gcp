@@ -49,7 +49,7 @@ projects/{project}/global/firewalls/{firewall}
 | `description` | — | `string` | optional | — | An optional description of this resource. Provide this field when you create the resource. |
 | `destinationRanges` | `destinations`, `destination_ranges` | `list` | optional | unordered | If destination ranges are specified, the firewall rule applies only to traffic that has destination IP address in these ranges. These ranges must be expressed inCIDR format. Both IPv4 and IPv6 are … |
 | `destinationRanges[]` | — | `string` | optional | — | — |
-| `direction` | — | `string` | optional | force new | Direction of traffic to which this firewall applies, either `INGRESS` or `EGRESS`. The default is `INGRESS`. For `EGRESS` traffic, you cannot specify the sourceTags fields. |
+| `direction` | — | `string` | optional | — | Direction of traffic to which this firewall applies, either `INGRESS` or `EGRESS`. The default is `INGRESS`. For `EGRESS` traffic, you cannot specify the sourceTags fields. |
 | `disabled` | — | `boolean` | optional | — | Denotes whether the firewall rule is disabled. When set to true, the firewall rule is not enforced and the network behaves as if it did not exist. If this is unspecified, the firewall rule will be … |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of the resource. Always compute#firewall for firewall rules. |

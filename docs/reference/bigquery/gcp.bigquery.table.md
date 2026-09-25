@@ -374,7 +374,7 @@ projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}
 | `replicas[].datasetId` | `dataset_id` | `string` | optional | — | Required. The ID of the dataset containing this table. |
 | `replicas[].projectId` | `project_id` | `string` | optional | — | Required. The ID of the project containing this table. |
 | `replicas[].tableId` | `table_id` | `string` | optional | — | Required. The ID of the table. The ID can contain Unicode characters in category L (letter), M (mark), N (number), Pc (connector, including underscore), Pd (dash), and Zs (space). For more … |
-| `requirePartitionFilter` | `require_partition_filter` | `boolean` | output only | — | Optional. If set to true, queries over this table require a partition filter that can be used for partition elimination to be specified. |
+| `requirePartitionFilter` | `require_partition_filter` | `boolean` | optional | — | Optional. If set to true, queries over this table require a partition filter that can be used for partition elimination to be specified. |
 | `resourceTags` | `resource_tags` | `map` | optional | opaque | \[Optional\] The tags associated with this table. Tag keys are globally unique. See additional information on \[tags\](https://cloud.google.com/iam/docs/tags-access-control#definitions). An object … |
 | `restrictions` | — | `map` | output only | — | Optional. Output only. Restriction config for table. If set, restrict certain accesses on the table based on the config. See \[Data … |
 | `restrictions.type` | — | `string` | output only | — | Output only. Specifies the type of dataset/table restriction. |

@@ -11,7 +11,8 @@ Represents a SSL policy. SSL policies give you the ability to control the featur
 | Service | compute |
 | Scope | global |
 | Asset type | `compute.googleapis.com/SslPolicy` |
-| Tier | 1 (ruled: update_encoder (update_encoder/ssl_policy.tmpl) copies the current fingerprint into the update, which this provider already does for every type whose fingerprint says it is required (LockField), and sends customFeatures as null when the list is empty. Clearing customFeatures by writing an empty list therefore sends [] rather than null. Google requires the list empty whenever the profile is not CUSTOM, and whether it treats [] the same as null is not verified.
+| Tier | 1 (ruled: Two facts corrected on evidence (TestLiveProbeUnknowns, 2026-09-25): magic-modules marks description immutable, and Google patched it; and a create without minTlsVersion is refused, "SslPolicy minimum TLS version needs to be specified", which nothing in either source says.
+update_encoder (update_encoder/ssl_policy.tmpl) copies the current fingerprint into the update, which this provider already does for every type whose fingerprint says it is required (LockField), and sends customFeatures as null when the list is empty. Clearing customFeatures by writing an empty list therefore sends [] rather than null. Google requires the list empty whenever the profile is not CUSTOM, and whether it treats [] the same as null is not verified.
 ) |
 | Mutation timeout | 600s |
 
@@ -40,13 +41,13 @@ projects/{project}/global/sslPolicies/{sslPolicy}
 | `creationTimestamp` | `creation_timestamp` | `string` | output only | — | Output only. \[Output Only\] Creation timestamp inRFC3339 text format. |
 | `customFeatures` | `custom_features` | `list` | optional | unordered | A list of features enabled when the selected profile is CUSTOM. The method returns the set of features that can be specified in this list. This field must be empty if the profile is notCUSTOM. |
 | `customFeatures[]` | — | `string` | optional | — | — |
-| `description` | — | `string` | optional | force new | An optional description of this resource. Provide this property when you create the resource. |
+| `description` | — | `string` | optional | — | An optional description of this resource. Provide this property when you create the resource. |
 | `enabledFeatures` | `enabled_features` | `list` | output only | unordered | Output only. \[Output Only\] The list of features enabled in the SSL policy. |
 | `enabledFeatures[]` | — | `string` | optional | — | — |
 | `fingerprint` | — | `string` | output only | — | Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a SslPolicy. An up-to-date fingerprint … |
 | `id` | — | `string` | output only | — | Output only. \[Output Only\] The unique identifier for the resource. This identifier is defined by the server. |
 | `kind` | — | `string` | output only | — | Output only. \[Output only\] Type of the resource. Alwayscompute#sslPolicyfor SSL policies. |
-| `minTlsVersion` | `min_tls_version` | `string` | optional | — | The minimum version of SSL protocol that can be used by the clients to establish a connection with the load balancer. This can be one ofTLS_1_0, TLS_1_1, TLS_1_2,TLS_1_3. When set to TLS_1_3, the … |
+| `minTlsVersion` | `min_tls_version` | `string` | required | — | The minimum version of SSL protocol that can be used by the clients to establish a connection with the load balancer. This can be one ofTLS_1_0, TLS_1_1, TLS_1_2,TLS_1_3. When set to TLS_1_3, the … |
 | `name` | — | `string` | required | force new | Name of the resource. The name must be 1-63 characters long, and comply with RFC1035. Specifically, the name must be 1-63 characters long and match the regular expression … |
 | `postQuantumKeyExchange` | `post_quantum_key_exchange` | `string` | optional | — | One of DEFAULT, ENABLED, orDEFERRED. Controls whether the load balancer negotiates X25519MLKEM768 key exchange when clients advertise support for it. When set to DEFAULT, or if no SSL Policy is … |
 | `profile` | — | `string` | optional | — | Profile specifies the set of SSL features that can be used by the load balancer when negotiating SSL with clients. This can be one ofCOMPATIBLE, MODERN, RESTRICTED,FIPS_202205, or CUSTOM. If … |

@@ -470,7 +470,14 @@ rulings:
 
   compute/SslPolicy:
     hooks: [update_encoder]
+    in_place: [description]
+    required: [minTlsVersion]
     note: >
+      Two facts corrected on evidence (TestLiveProbeUnknowns, 2026-09-25):
+      magic-modules marks description immutable, and Google patched it; and a
+      create without minTlsVersion is refused, "SslPolicy minimum TLS version
+      needs to be specified", which nothing in either source says.
+
       update_encoder (update_encoder/ssl_policy.tmpl) copies the current
       fingerprint into the update, which this provider already does for every
       type whose fingerprint says it is required (LockField), and sends
@@ -955,6 +962,37 @@ rulings:
       ship read, import and delete only, like every other folder- and
       organization-rooted type.
 
+  bigquery/Table:
+    hooks: []
+    settable: [requirePartitionFilter]
+    note: >
+      No hooks; one wrong flag. Table.yaml is an exclude_resource file
+      (Terraform implements the table by hand and never runs it) and marks
+      requirePartitionFilter output, which Discovery calls "Optional. If set to
+      true, queries over this table require a partition filter". Output, users
+      could not set it. Found triaging the unknowns, 2026-09-25, and checked
+      live (TestLiveBigQueryTable). The same file's other magic-modules-only
+      outputs were checked and are right: they are server-set fields the old
+      APIs never mark.
+
+  compute/Firewall:
+    hooks: []
+    in_place: [direction]
+    note: >
+      magic-modules marks direction immutable (Terraform forces a new rule),
+      and Google patched an INGRESS rule to EGRESS in place
+      (TestLiveProbeUnknowns, 2026-09-25). Replacing a firewall rule leaves a
+      moment with no rule at all, so a direction change is an update here.
+
+  storage/Bucket:
+    hooks: []
+    in_place: [defaultObjectAcl]
+    note: >
+      magic-modules marks defaultObjectAcl immutable, and Google's buckets.patch
+      applied a new default object ACL in place (TestLiveProbeUnknowns,
+      2026-09-25). As immutable, changing it REPLACED the bucket and every
+      object in it.
+
   # HELD by the 2026-09-25 pass, each for a reason no ruling key can fix:
   #   compute/Disk, compute/RegionDisk: sourceImage is ForceNew with no rule for
   #     the resolved image url Google answers (Terraform's DiskImageDiffSuppress),
@@ -1263,6 +1301,9 @@ observed:
       fact: output
       value: "false"
       seen: 2026-09-25 TestLiveHealthChecks
+    - fact: patch_one_field
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
   gcp.regionhealthcheck:
     - path: type_value
       fact: output
@@ -1321,3 +1362,32 @@ observed:
     - fact: update_verb
       value: PATCH
       seen: 2026-09-25 TestLiveSpannerInstanceAndBackupSchedule
+  gcp.firewall:
+    - path: direction
+      fact: immutable
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
+    - fact: patch_one_field
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
+  gcp.sslpolicy:
+    - path: description
+      fact: immutable
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
+    - path: minTlsVersion
+      fact: required
+      value: "true"
+      seen: 2026-09-25 TestLiveProbeUnknowns
+    - fact: patch_one_field
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
+  gcp.storage.bucket:
+    - path: defaultObjectAcl
+      fact: immutable
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
+  gcp.router:
+    - fact: patch_one_field
+      value: "false"
+      seen: 2026-09-25 TestLiveProbeUnknowns
