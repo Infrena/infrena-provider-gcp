@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/infrena/infrena/pkg/schema"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 // TestTheRealCatalogIsOneInfrenaAccepts runs infrena's own validator over every
@@ -1031,5 +1032,59 @@ func TestNodeGroupShipsWithItsNodeCount(t *testing.T) {
 	}
 	if a := ty.Attributes["initialNodeCount"]; a == nil || !a.Required || !a.CreateOnly {
 		t.Errorf("initialNodeCount = %+v, want a required create-only attribute", a)
+	}
+}
+
+// TestEverySecretLookingFieldIsSensitive. magic-modules' `sensitive` is the
+// only source of secrets, and a search of the catalog on 2026-09-24 found 13
+// it misses (a Cloud SQL user's password, a GKE cluster's basic-auth
+// password, a router's MD5 key). They are marked in the overlay; this is the
+// check that the next type shipping one fails here, not in a plan printed to
+// someone's terminal.
+//
+// Settable string fields named as passwords, private or client keys, API
+// keys, tokens and shared secrets. A reference to a secret (a Secret Manager
+// version, a password URI) is not one. The allowed names are tokens that are
+// identifiers, not credentials.
+func TestEverySecretLookingFieldIsSensitive(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := regexp.MustCompile(`(?i)(password|passwd|privatekey|private_key|clientkey|apikey|api_key|activationtoken|sharedsecret|passphrase)`)
+	// Not a secret: a reference to one, or a field describing one (its type,
+	// its expiry).
+	reference := regexp.MustCompile(`(?i)(SecretVersion|SecretUri|PasswordUri|Uri$|Name$|Id$|Version$|Interval$|Policy$|Config$|Type$|Duration$|Time$)`)
+	notCredentials := map[string]bool{
+		// Identifiers that happen to be called tokens: a Firebase source id,
+		// a Cloud Run execution suffix, an object restore handle.
+		"sourceToken": true, "runExecutionToken": true, "startExecutionToken": true, "restoreToken": true,
+	}
+	checked := 0
+	var walk func(ty, path string, as map[string]*Attr)
+	walk = func(ty, path string, as map[string]*Attr) {
+		for name, a := range as {
+			leaf := a.Canonical
+			if leaf == "" {
+				leaf = name
+			}
+			if a.Kind == value.KindString && !a.Output && secret.MatchString(leaf) && !reference.MatchString(leaf) && !notCredentials[leaf] {
+				checked++
+				if !a.Sensitive {
+					t.Errorf("%s %s%s looks like a secret and is not sensitive; mark it in gen/overlay.yaml's sensitive list", ty, path, name)
+				}
+			}
+			walk(ty, path+name+".", a.Fields)
+			if a.Elem != nil {
+				walk(ty, path+name+"[].", a.Elem.Fields)
+			}
+		}
+	}
+	for _, ty := range c.Types {
+		walk(ty.Name, "", ty.Attributes)
+	}
+	// 14 were checked on 2026-09-24, every one sensitive.
+	if checked < 12 {
+		t.Errorf("only %d secret-looking fields were checked; the walk is not reaching them", checked)
 	}
 }

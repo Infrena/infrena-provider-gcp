@@ -53,7 +53,7 @@ projects/{project}/global/sslCertificates/{sslCertificate}
 | `selfLink` | `self_link` | `string` | output only | — | \[Output only\] Server-defined URL for the resource. |
 | `selfManaged` | `self_managed` | `map` | optional | — | Configuration and status of a self-managed SSL certificate. |
 | `selfManaged.certificate` | — | `string` | optional | — | A local certificate file. The certificate must be in PEM format. The certificate chain must be no greater than 5 certs long. The chain must include at least one intermediate cert. |
-| `selfManaged.privateKey` | `private_key` | `string` | optional | — | A write-only private key in PEM format. Only insert requests will include this field. |
+| `selfManaged.privateKey` | `private_key` | `string` | optional | sensitive | A write-only private key in PEM format. Only insert requests will include this field. |
 | `subjectAlternativeNames` | `subject_alternative_names` | `list` | output only | — | Output only. \[Output Only\] Domains associated with the certificate via Subject Alternative Name. |
 | `subjectAlternativeNames[]` | — | `string` | optional | — | — |
 | `type_value` | wire `type` | `string` | optional | — | (Optional) Specifies the type of SSL certificate, either "SELF_MANAGED" or "MANAGED". If not specified, the certificate is self-managed and the fieldscertificate and private_key are used. |
