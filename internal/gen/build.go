@@ -1157,6 +1157,16 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		}
 	}
 
+	// A PATCH the API does not publish is a 404 on every update. magic-
+	// modules declares one for Firestore's ChangeStream, whose collection
+	// has create, get, list and delete and nothing else; found by making the
+	// fake answer each request as its Discovery method does (2026-09-25).
+	// With no verb the type is replaced on change, which the API allows.
+	if t.UpdateVerb == http.MethodPatch && patchMethodOf(col) == nil {
+		t.UpdateVerb, t.UpdateURL, t.UpdateMask = "", "", false
+	}
+	t.DeleteURL = discoveredDeleteURL(t, col)
+
 	// A POST create goes to the COLLECTION. magic-modules' BigQuery Table
 	// base_url is the table's own item path (Terraform implements the table
 	// by hand and never runs that YAML), and a POST there is a 404: found
@@ -1179,7 +1189,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 	// And the update's, from the patch method it is sent to. Only a PATCH
 	// is ever sent (see discoveredUpdate), so that is the method to ask.
-	if patch := col.Methods["patch"]; t.UpdateVerb == http.MethodPatch && patch != nil && patch.HTTPMethod == http.MethodPatch {
+	if patch := patchMethodOf(col); t.UpdateVerb == http.MethodPatch && patch != nil {
 		if updateAwait, _ := AwaitOf(doc, patch); updateAwait != await {
 			t.UpdateAwait = &updateAwait
 		}
@@ -2497,6 +2507,87 @@ var bareMMPlaceholderRE = regexp.MustCompile(`^(?:v[0-9][0-9a-z]*/)?\{\{[a-z_]+\
 
 // versionPrefixOf is a path's leading version segment with its slash
 // ("v3/"), or "".
+// patchMethodOf is the collection's PATCH at the resource's own address:
+// the method named patch, or (compute's storagePools) one named update.
+func patchMethodOf(col disco.Collection) *disco.Method {
+	if m := col.Methods["patch"]; m != nil && m.HTTPMethod == http.MethodPatch {
+		return m
+	}
+	get := col.Methods["get"]
+	names := make([]string, 0, len(col.Methods))
+	for n := range col.Methods {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		if m := col.Methods[n]; m.HTTPMethod == http.MethodPatch && sameAddress(m, get) {
+			return m
+		}
+	}
+	return nil
+}
+
+// flatShape is a method's address with every placeholder the same and no
+// version prefix, from flatPath where the document gives one: every
+// proto-first delete's path is "v1/{+name}", and only flatPath says whose.
+func flatShape(m *disco.Method) string {
+	p := m.FlatPath
+	if p == "" {
+		p = m.Path
+	}
+	p = strings.TrimPrefix(p, pathPrefixOf(p))
+	return placeholderRE.ReplaceAllString(p, "{}")
+}
+
+// discoveredDeleteURL is where the API's own delete goes, for the two shapes
+// that are not the item's own path. Both deleted nothing, found by the fake
+// answering each request as its Discovery method does (2026-09-25):
+//
+//   - a literal tail after the item: BigQuery's jobs.delete is
+//     DELETE .../jobs/{jobId}/delete. DELETE .../jobs/{jobId} is a 404,
+//     which reads as already gone, so the job was forgotten, not deleted.
+//   - the collection, with the item named in the query: Cloud SQL's
+//     users.delete is DELETE .../users?name=. There is no per-user path.
+//
+// A delete_url magic-modules gives is kept.
+func discoveredDeleteURL(t *catalog.Type, col disco.Collection) string {
+	del, get := col.Methods["delete"], col.Methods["get"]
+	if t.DeleteURL != "" || del == nil || get == nil || del.HTTPMethod != http.MethodDelete || t.SelfLink == "" {
+		return t.DeleteURL
+	}
+	ds, gs := flatShape(del), flatShape(get)
+	if ds == gs {
+		return ""
+	}
+	if tail := strings.TrimPrefix(ds, gs); tail != ds && strings.HasPrefix(tail, "/") && !strings.Contains(tail, "{") {
+		self, _, _ := strings.Cut(t.SelfLink, "?")
+		return self + tail
+	}
+	i := strings.LastIndex(gs, "/")
+	if i < 0 || ds != gs[:i] {
+		return ""
+	}
+	// The item's own placeholder, and the query parameter of that name.
+	getPath := get.FlatPath
+	if getPath == "" {
+		getPath = get.Path
+	}
+	m := placeholderRE.FindAllStringSubmatch(getPath, -1)
+	if len(m) == 0 {
+		return ""
+	}
+	param := del.Parameters[m[len(m)-1][1]]
+	if param == nil || param.Location != "query" {
+		return ""
+	}
+	self, _, _ := strings.Cut(t.SelfLink, "?")
+	j := strings.LastIndex(self, "/")
+	if j < 0 {
+		return ""
+	}
+	return self[:j] + "?" + m[len(m)-1][1] + "=" + self[j+1:]
+}
+
 // withoutItemTail drops a create template's trailing id segment when the
 // API's own create path ends at the collection: a template that names the
 // new resource's id where the insert takes none. Anything else is returned

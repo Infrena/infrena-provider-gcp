@@ -22,7 +22,7 @@ Jobs are actions that BigQuery runs on your behalf to load data, export data, qu
 | Create | yes | `POST projects/{{project}}/jobs` |
 | Read | yes | `GET projects/{{project}}/jobs/{{job_id}}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
-| Delete | yes | `DELETE projects/{{project}}/jobs/{{job_id}}` |
+| Delete | yes | `DELETE projects/{{project}}/jobs/{{job_id}}/delete` |
 | Import | yes | by id, see below |
 
 ## Import id

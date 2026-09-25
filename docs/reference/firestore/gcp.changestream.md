@@ -21,7 +21,7 @@ A change stream resource for a Cloud Firestore Database. Change streams enable r
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/databases/{{database}}/changeStreams?changeStreamId={{name}}` |
 | Read | yes | `GET projects/{{project}}/databases/{{database}}/changeStreams/{{name}}` |
-| Update | yes | `PATCH projects/{{project}}/databases/{{database}}/changeStreams/{{name}}`, with an update mask naming the changed fields |
+| Update | **no** | publishes no update method; every change to it replaces the resource |
 | Delete | yes | `DELETE projects/{{project}}/databases/{{database}}/changeStreams/{{name}}` |
 | Import | yes | by id, see below |
 

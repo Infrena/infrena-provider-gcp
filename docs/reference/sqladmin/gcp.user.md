@@ -21,7 +21,7 @@ A Cloud SQL user resource.
 | Create | yes | `POST projects/{project}/instances/{instance}/users` |
 | Read | yes | `GET projects/{project}/instances/{instance}/users/{name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
-| Delete | yes | `DELETE projects/{project}/instances/{instance}/users/{name}` |
+| Delete | yes | `DELETE projects/{project}/instances/{instance}/users?name={name}` |
 | Import | yes | by id, see below |
 
 ## Import id
