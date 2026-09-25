@@ -1088,3 +1088,72 @@ func TestEverySecretLookingFieldIsSensitive(t *testing.T) {
 		t.Errorf("only %d secret-looking fields were checked; the walk is not reaching them", checked)
 	}
 }
+
+// TestTheCatalogKeepsItsRules checks, over every shipped type, the rules the
+// generator enforces one type at a time: each was found broken on at least
+// one type before it was a rule (a POST update from magic-modules, a create
+// url carrying magic-modules' PRE_CREATE_REPLACE_ME, a setter on a path the
+// id cannot fill). A rule enforced where it was written and nowhere else is
+// how those shipped.
+func TestTheCatalogKeepsItsRules(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ph := regexp.MustCompile(`\{\{?\+?%?([A-Za-z0-9_]+)\}?\}`)
+	for _, ty := range c.Types {
+		if ty.UpdateVerb != "" && ty.UpdateVerb != "PATCH" {
+			t.Errorf("%s: update verb %q; the update is PATCH or nothing", ty.Name, ty.UpdateVerb)
+		}
+		for _, tmpl := range []string{ty.CreateURL, ty.BaseURL, ty.UpdateURL, ty.DeleteURL, ty.SelfLink} {
+			if strings.Contains(tmpl, "PRE_CREATE_REPLACE_ME") {
+				t.Errorf("%s: %q carries magic-modules' pre_create token", ty.Name, tmpl)
+			}
+		}
+		if ty.EndpointTemplate != "" && (!strings.Contains(ty.EndpointTemplate, "{location}") || !strings.Contains(ty.SelfLink, "locations/")) {
+			t.Errorf("%s: endpoint template %q cannot be filled from its ids", ty.Name, ty.EndpointTemplate)
+		}
+		idNames := map[string]bool{"project": true, "region": true, "zone": true, "location": true}
+		for _, m := range ph.FindAllStringSubmatch(ty.SelfLink, -1) {
+			idNames[m[1]] = true
+		}
+		for n := range ty.CreateBindings {
+			idNames[n] = true
+		}
+		byCanonical := map[string]*Attr{}
+		for _, a := range ty.Attributes {
+			byCanonical[a.Canonical] = a
+		}
+		if ty.LockField != "" && byCanonical[ty.LockField] == nil {
+			t.Errorf("%s: lock field %q is not an attribute", ty.Name, ty.LockField)
+		}
+		for _, s := range ty.Setters {
+			for _, m := range ph.FindAllStringSubmatch(s.Path, -1) {
+				if !idNames[m[1]] {
+					t.Errorf("%s: setter %s's path names {%s}, which its id does not", ty.Name, s.Method, m[1])
+				}
+			}
+			for _, f := range s.Fields {
+				if a := byCanonical[f]; a == nil || a.Output || a.ForceNew {
+					t.Errorf("%s: setter %s carries %q, which is not a field that changes in place", ty.Name, s.Method, f)
+				}
+			}
+		}
+		var walk func(path string, as map[string]*Attr)
+		walk = func(path string, as map[string]*Attr) {
+			for name, a := range as {
+				if a.Required && a.Output {
+					t.Errorf("%s %s%s is both required and output", ty.Name, path, name)
+				}
+				if a.InputOnly && a.Output {
+					t.Errorf("%s %s%s is both input only and output", ty.Name, path, name)
+				}
+				walk(path+name+".", a.Fields)
+				if a.Elem != nil {
+					walk(path+name+"[].", a.Elem.Fields)
+				}
+			}
+		}
+		walk("", ty.Attributes)
+	}
+}
