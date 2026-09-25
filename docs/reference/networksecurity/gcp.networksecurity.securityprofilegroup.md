@@ -19,10 +19,10 @@ A security profile group defines a container for security profiles.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/securityProfileGroups/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/securityProfileGroups/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/securityProfileGroups/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/securityProfileGroups/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/securityProfileGroups/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/securityProfileGroups/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

@@ -249,7 +249,7 @@ projects/{project}/locations/{location}/clusters/{cluster}/nodePools/{nodePool}
 | `config.resourceManagerTags` | `resource_manager_tags` | `map` | optional | — | A map of resource manager tag keys and values to be attached to the nodes. |
 | `config.resourceManagerTags.tags` | — | `map` | optional | opaque | TagKeyValue must be in one of the following formats (\[KEY\]=\[VALUE\]) 1. `tagKeys/{tag_key_id}=tagValues/{tag_value_id}` 2. `{org_id}/{tag_key_name}={tag_value_name}` 3 … |
 | `config.sandboxConfig` | `sandbox_config` | `map` | optional | — | Sandbox configuration for this node. |
-| `config.sandboxConfig.type_value` | wire `type` | `string` | optional | — | Type of the sandbox to use for the node. |
+| `config.sandboxConfig.type` | — | `string` | optional | — | Type of the sandbox to use for the node. |
 | `config.secondaryBootDiskUpdateStrategy` | `secondary_boot_disk_update_strategy` | `map` | optional | opaque | Secondary boot disk update strategy. |
 | `config.secondaryBootDisks` | `secondary_boot_disks` | `list` | optional | — | List of secondary boot disks attached to the nodes. |
 | `config.secondaryBootDisks[]` | — | `map` | optional | — | — |
@@ -340,7 +340,7 @@ projects/{project}/locations/{location}/clusters/{cluster}/nodePools/{nodePool}
 | `placementPolicy` | `placement_policy` | `map` | optional | — | Specifies the node placement policy. |
 | `placementPolicy.policyName` | `policy_name` | `string` | optional | — | If set, refers to the name of a custom resource policy supplied by the user. The resource policy must be in the same project and region as the node pool. If not found, InvalidArgument error is … |
 | `placementPolicy.tpuTopology` | `tpu_topology` | `string` | optional | — | Optional. TPU placement topology for pod slice node pool. https://cloud.google.com/tpu/docs/types-topologies#tpu_topologies |
-| `placementPolicy.type_value` | wire `type` | `string` | optional | — | The type of placement. |
+| `placementPolicy.type` | — | `string` | optional | — | The type of placement. |
 | `podIpv4CidrSize` | `pod_ipv4_cidr_size` | `integer` | output only | — | Output only. The pod CIDR block size per node in this node pool. |
 | `projectId` | `project_id` | `string` | optional | force new, create only | Deprecated. The Google Developers Console \[project ID or project number\](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by … |
 | `queuedProvisioning` | `queued_provisioning` | `map` | optional | — | Specifies the configuration of queued provisioning. |

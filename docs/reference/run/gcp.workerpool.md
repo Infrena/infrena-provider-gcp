@@ -54,7 +54,7 @@ projects/{project}/locations/{location}/workerPools/{workerPool}
 | `conditions[].revisionReason` | `revision_reason` | `string` | output only | — | Output only. A reason for the revision condition. |
 | `conditions[].severity` | — | `string` | optional | — | How to interpret failures of this condition, one of Error, Warning, Info |
 | `conditions[].state` | — | `string` | optional | — | State of the condition. |
-| `conditions[].type_value` | wire `type` | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
+| `conditions[].type` | — | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation time. |
 | `creator` | — | `string` | output only | — | Output only. Email address of the authenticated creator. |
 | `customAudiences` | `custom_audiences` | `list` | optional | — | Deprecated: Not supported, and ignored by Cloud Run. |
@@ -68,12 +68,12 @@ projects/{project}/locations/{location}/workerPools/{workerPool}
 | `instanceSplitStatuses[]` | — | `map` | optional | — | — |
 | `instanceSplitStatuses[].percent` | — | `integer` | optional | — | Specifies percent of the instance split to this Revision. |
 | `instanceSplitStatuses[].revision` | — | `string` | optional | — | Revision to which this instance split is assigned. |
-| `instanceSplitStatuses[].type_value` | wire `type` | `string` | optional | — | The allocation type for this instance split. |
+| `instanceSplitStatuses[].type` | — | `string` | optional | — | The allocation type for this instance split. |
 | `instanceSplits` | `instance_splits` | `list` | optional | — | Optional. Specifies how to distribute instances over a collection of Revisions belonging to the WorkerPool. If instance split is empty or not provided, defaults to 100% instances assigned to the … |
 | `instanceSplits[]` | — | `map` | optional | — | — |
 | `instanceSplits[].percent` | — | `integer` | optional | — | Specifies percent of the instance split to this Revision. This defaults to zero if unspecified. |
 | `instanceSplits[].revision` | — | `string` | optional | — | Revision to which to assign this portion of instances, if split allocation is by revision. |
-| `instanceSplits[].type_value` | wire `type` | `string` | optional | — | The allocation type for this instance split. |
+| `instanceSplits[].type` | — | `string` | optional | — | The allocation type for this instance split. |
 | `labels` | — | `map` | optional | opaque | Optional. Unstructured key value map that can be used to organize and categorize objects. User-provided labels are shared with Google's billing system, so they can be used to filter, or break down … |
 | `lastModifier` | `last_modifier` | `string` | output only | — | Output only. Email address of the last authenticated modifier. |
 | `latestCreatedRevision` | `latest_created_revision` | `string` | output only | — | Output only. Name of the last created revision. See comments in `reconciling` for additional information on reconciliation process in Cloud Run. |
@@ -224,7 +224,7 @@ projects/{project}/locations/{location}/workerPools/{workerPool}
 | `terminalCondition.revisionReason` | `revision_reason` | `string` | output only | — | Output only. A reason for the revision condition. |
 | `terminalCondition.severity` | — | `string` | optional | — | How to interpret failures of this condition, one of Error, Warning, Info |
 | `terminalCondition.state` | — | `string` | optional | — | State of the condition. |
-| `terminalCondition.type_value` | wire `type` | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
+| `terminalCondition.type` | — | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
 | `threatDetectionEnabled` | `threat_detection_enabled` | `boolean` | output only | — | Output only. Indicates whether Cloud Run Threat Detection monitoring is enabled for the parent project of this worker pool. |
 | `uid` | — | `string` | output only | — | Output only. Server assigned unique identifier for the trigger. The value is a UUID4 string and guaranteed to remain unchanged until the resource is deleted. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last-modified time. |

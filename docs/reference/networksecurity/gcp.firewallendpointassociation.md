@@ -19,10 +19,10 @@ Firewall endpoint association links a firewall endpoint to a VPC network in the 
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/firewallEndpointAssociations?firewallEndpointAssociationId={{name}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/firewallEndpointAssociations/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/firewallEndpointAssociations/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/firewallEndpointAssociations/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/firewallEndpointAssociations?firewallEndpointAssociationId={{name}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/firewallEndpointAssociations/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/firewallEndpointAssociations/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/firewallEndpointAssociations/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

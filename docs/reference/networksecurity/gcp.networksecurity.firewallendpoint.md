@@ -19,10 +19,10 @@ A Firewall endpoint is a Cloud Firewall resource that enables layer 7 advanced p
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/firewallEndpoints/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/firewallEndpoints/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/firewallEndpoints/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/firewallEndpoints/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/firewallEndpoints/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/firewallEndpoints/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

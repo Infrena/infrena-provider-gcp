@@ -19,10 +19,10 @@ A security profile defines the behavior associated to a profile type.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/securityProfiles/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/securityProfiles/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/securityProfiles/{{name}}` |
+| Create | yes | `POST organizations/{organization}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` |
+| Read | yes | `GET organizations/{organization}/locations/{{location}}/securityProfiles/{{name}}` |
+| Update | yes | `PATCH organizations/{organization}/locations/{{location}}/securityProfiles/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE organizations/{organization}/locations/{{location}}/securityProfiles/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ A security profile defines the behavior associated to a profile type.
 
 ## Attributes
 
-32 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+33 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -46,6 +46,7 @@ A security profile defines the behavior associated to a profile type.
 | `etag` | — | `string` | output only | — | Output only. This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels as key value pairs. |
 | `name` | — | `string` | required | force new | Immutable. Identifier. Name of the SecurityProfile resource. It matches pattern `projects\|organizations/*/locations/{location}/securityProfiles/{security_profile}`. |
+| `organization` | — | `string` | required | force new | The organization this gcp.networksecurity.organization.securityprofile belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `threatPreventionProfile` | `threat_prevention_profile` | `map` | optional | — | The threat prevention configuration for the SecurityProfile. |
 | `threatPreventionProfile.antivirusOverrides` | `antivirus_overrides` | `list` | optional | unordered | Optional. Configuration for overriding antivirus actions per protocol. |
 | `threatPreventionProfile.antivirusOverrides[]` | — | `map` | optional | — | — |
@@ -59,7 +60,7 @@ A security profile defines the behavior associated to a profile type.
 | `threatPreventionProfile.threatOverrides[]` | — | `map` | optional | — | — |
 | `threatPreventionProfile.threatOverrides[].action` | — | `string` | required | — | Required. Threat action override. For some threat types, only a subset of actions applies. |
 | `threatPreventionProfile.threatOverrides[].threatId` | `threat_id` | `string` | required | — | Required. Vendor-specific ID of a threat to override. |
-| `threatPreventionProfile.threatOverrides[].type_value` | wire `type` | `string` | output only | — | Output only. Type of the threat (read only). |
+| `threatPreventionProfile.threatOverrides[].type` | — | `string` | output only | — | Output only. Type of the threat (read only). |
 | `type_value` | wire `type` | `string` | required | force new | Immutable. The single ProfileType that the SecurityProfile resource configures. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Last resource update timestamp. |
 | `urlFilteringProfile` | `url_filtering_profile` | `map` | optional | — | The URL filtering configuration for the SecurityProfile. |

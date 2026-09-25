@@ -19,10 +19,10 @@ Describes a query that has been saved by a user.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` needs `folder`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
+| Create | yes | `POST folders/{folder}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` |
+| Read | yes | `GET folders/{folder}/locations/{{location}}/savedQueries/{{name}}` |
+| Update | yes | `PATCH folders/{folder}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE folders/{folder}/locations/{{location}}/savedQueries/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,13 +33,14 @@ Describes a query that has been saved by a user.
 
 ## Attributes
 
-210 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+211 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the saved query was created. |
 | `description` | — | `string` | optional | — | Optional. A human readable description of the saved query. |
 | `displayName` | `display_name` | `string` | required | — | Required. The user specified title for the SavedQuery. |
+| `folder` | — | `string` | required | force new | The folder this gcp.logging.folder.savedquery belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `loggingQuery` | `logging_query` | `map` | optional | — | Logging query that can be executed in Logs Explorer or via Logging API. |
 | `loggingQuery.filter` | — | `string` | required | — | Required. An advanced query using the Logging Query Language (https://docs.cloud.google.com/logging/docs/view/logging-query-language). The maximum length of the filter is 20000 characters. |
 | `loggingQuery.summaryFieldEnd` | `summary_field_end` | `integer` | optional | — | Characters will be counted from the end of the string. |
@@ -66,7 +67,7 @@ Describes a query that has been saved by a user.
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction` | `sql_aggregation_function` | `map` | optional | — | The function to apply to the field. |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.parameters` | — | `list` | optional | — | Optional. Parameters to be applied to the aggregation. Aggregations that support or require parameters are listed above. |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.parameters[]` | — | `string` | optional | — | — |
-| `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.type_value` | wire `type` | `string` | optional | — | Required. Specifies the aggregation function. Use one of the following string identifiers: "average": Computes the average (AVG). Applies only to numeric values. "count": Counts the number of values … |
+| `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.type` | — | `string` | optional | — | Required. Specifies the aggregation function. Use one of the following string identifiers: "average": Computes the average (AVG). Applies only to numeric values. "count": Counts the number of values … |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.truncationGranularity` | `truncation_granularity` | `string` | optional | — | The truncation granularity when grouping by a time/date field. This will be used to truncate the field to the granularity specified. This can be either a date or a time granularity found at … |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField` | `virtual_field` | `map` | optional | — | Optional. A virtual field definition, used in place of field to define a field that is computed from other fields rather than being directly present in the data schema.For example, a virtual field … |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField.underlyingFieldSources` | `underlying_field_sources` | `list` | optional | — | The field sources that will be used to create the virtual field, based on the semantics of the virtual field type.The field sources must follow these rules, based on the virtual field type: - For … |

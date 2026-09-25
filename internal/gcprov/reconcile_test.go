@@ -1036,3 +1036,88 @@ func TestAnOutputFieldInAnUnorderedListElementIsNotDrift(t *testing.T) {
 		t.Errorf("the reconciled list %v does not equal the configured %v", got.Raw, ref.Raw)
 	}
 }
+
+// TestAConfiguredZeroGoogleLeftOutIsNotDrift. proto3 JSON omits false, 0,
+// "" and empty collections, so an answer never carries a configured
+// `enable: false`. Reported missing, it was drift on every plan against a
+// resource exactly as configured, and a replacement where the field is
+// immutable. Found reading alloydb's Instance decoder, which exists only to
+// put these back (2026-09-25).
+func TestAConfiguredZeroGoogleLeftOutIsNotDrift(t *testing.T) {
+	attrs := map[string]*catalog.Attr{
+		"enabled": {Canonical: "enabled", Kind: value.KindBool},
+		"count":   {Canonical: "count", Kind: value.KindInt},
+		"config": {Canonical: "config", Kind: value.KindMap, Fields: map[string]*catalog.Attr{
+			"flag":  {Canonical: "flag", Kind: value.KindBool},
+			"mode":  {Canonical: "mode", Kind: value.KindString},
+			"other": {Canonical: "other", Kind: value.KindBool},
+		}},
+	}
+	reference := attrsMixed(map[string]any{
+		"enabled": false, "count": int64(0),
+		"config": map[string]any{"flag": false, "mode": "A", "other": true},
+	})
+	incoming := attrsMixed(map[string]any{
+		"config": map[string]any{"mode": "A"},
+	})
+	got := ReconcileAttrs(attrs, reference, incoming)
+	if v, ok := got["enabled"]; !ok || v.Raw != false {
+		t.Errorf("enabled = %#v, want the configured false Google left out", got["enabled"])
+	}
+	if v, ok := got["count"]; !ok || v.Raw != int64(0) {
+		t.Errorf("count = %#v, want the configured 0", got["count"])
+	}
+	cfg, _ := got["config"].Raw.(map[string]value.Value)
+	if v, ok := cfg["flag"]; !ok || v.Raw != false {
+		t.Errorf("config.flag = %#v, want the configured false", cfg["flag"])
+	}
+	// A configured true Google left out is a real difference, not a default.
+	if _, ok := cfg["other"]; ok {
+		t.Errorf("config.other = %#v, but Google did not return it and true is no default", cfg["other"])
+	}
+}
+
+// TestAKMSKeyIsTheSameKeyWithItsVersion. Compute answers a CMEK key name
+// with the version appended ("may be returned for resource GET requests"),
+// and every such field on an image, instance or snapshot is immutable: read
+// as a different key, the resource was replaced on every plan.
+func TestAKMSKeyIsTheSameKeyWithItsVersion(t *testing.T) {
+	key := "projects/p/locations/global/keyRings/r/cryptoKeys/k"
+	for _, c := range []struct {
+		want, got string
+		same      bool
+	}{
+		{key, key + "/cryptoKeyVersions/1", true},
+		{key, "https://cloudkms.googleapis.com/v1/" + key + "/cryptoKeyVersions/12", true},
+		{key + "/cryptoKeyVersions/3", key + "/cryptoKeyVersions/3", true},
+		{key, "projects/p/locations/global/keyRings/r/cryptoKeys/other/cryptoKeyVersions/1", false},
+		{key + "/cryptoKeyVersions/1", key + "/cryptoKeyVersions/2", false},
+	} {
+		if got := equivalent(catalog.EquivalenceKMSKey, c.want, c.got); got != c.same {
+			t.Errorf("equivalent(kms_key, %q, %q) = %v, want %v", c.want, c.got, got, c.same)
+		}
+	}
+}
+
+// TestAnImageFamilyIsTheImageItPointsAt. gcp.image's sourceImage is
+// immutable, and an image created from a family is answered with the image
+// the family resolved to: every plan proposed replacing it (live,
+// 2026-09-25).
+func TestAnImageFamilyIsTheImageItPointsAt(t *testing.T) {
+	fam := "projects/debian-cloud/global/images/family/debian-12"
+	for _, c := range []struct {
+		want, got string
+		same      bool
+	}{
+		{fam, "https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-12-bookworm-v20260910", true},
+		{fam, "projects/debian-cloud/global/images/debian-12", true},
+		{fam, "projects/debian-cloud/global/images/debian-11-bullseye-v20260910", false},
+		{fam, "projects/other/global/images/debian-12-bookworm-v20260910", false},
+		{"projects/p/global/images/mine", "https://www.googleapis.com/compute/v1/projects/p/global/images/mine", true},
+		{"projects/p/global/images/mine", "projects/p/global/images/other", false},
+	} {
+		if got := equivalent(catalog.EquivalenceImage, c.want, c.got); got != c.same {
+			t.Errorf("equivalent(image, %q, %q) = %v, want %v", c.want, c.got, got, c.same)
+		}
+	}
+}

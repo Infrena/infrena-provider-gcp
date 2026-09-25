@@ -103,7 +103,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of resource. Always compute#router for routers. |
 | `md5AuthenticationKeys` | `md5_authentication_keys` | `list` | optional | — | Keys used for MD5 authentication. |
 | `md5AuthenticationKeys[]` | — | `map` | optional | — | — |
-| `md5AuthenticationKeys[].key` | — | `string` | required | — | \[Input only\] Value of the key. For patch and update calls, it can be skipped to copy the value from the previous configuration. This is allowed if the key with the same name existed before the … |
+| `md5AuthenticationKeys[].key` | — | `string` | required | sensitive | \[Input only\] Value of the key. For patch and update calls, it can be skipped to copy the value from the previous configuration. This is allowed if the key with the same name existed before the … |
 | `md5AuthenticationKeys[].name` | — | `string` | required | — | Name used to identify the key. Must be unique within a router. Must be referenced by exactly one bgpPeer. Must comply withRFC1035. |
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
 | `nats` | — | `list` | optional | — | A list of NAT services created in this router. |
@@ -155,7 +155,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `nats[].tcpEstablishedIdleTimeoutSec` | `tcp_established_idle_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for TCP established connections. Defaults to 1200s if not set. |
 | `nats[].tcpTimeWaitTimeoutSec` | `tcp_time_wait_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for TCP connections that are in TIME_WAIT state. Defaults to 120s if not set. |
 | `nats[].tcpTransitoryIdleTimeoutSec` | `tcp_transitory_idle_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for TCP transitory connections. Defaults to 30s if not set. |
-| `nats[].type_value` | wire `type` | `string` | optional | — | Indicates whether this NAT is used for public or private IP translation. If unspecified, it defaults to PUBLIC. |
+| `nats[].type` | — | `string` | optional | — | Indicates whether this NAT is used for public or private IP translation. If unspecified, it defaults to PUBLIC. |
 | `nats[].udpIdleTimeoutSec` | `udp_idle_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for UDP connections. Defaults to 30s if not set. |
 | `nccGateway` | `ncc_gateway` | `string` | optional | force new | URI of the ncc_gateway to which this router associated. |
 | `network` | — | `string` | optional | force new, refers to `gcp.network.selfLink` | URI of the network to which this router belongs. |

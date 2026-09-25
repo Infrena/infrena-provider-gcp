@@ -60,7 +60,7 @@ projects/{project}/global/routes/{route}
 | `nextHopNetwork` | `next_hop_network` | `string` | output only | — | The URL of the local network if it should handle matching packets. |
 | `nextHopOrigin` | `next_hop_origin` | `string` | output only | — | Output only. \[Output Only\] Indicates the origin of the route. Can be IGP (Interior Gateway Protocol), EGP (Exterior Gateway Protocol), or INCOMPLETE. |
 | `nextHopPeering` | `next_hop_peering` | `string` | output only | — | Output only. \[Output Only\] The network peering name that should handle matching packets, which should conform to RFC1035. |
-| `nextHopVpnTunnel` | `next_hop_vpn_tunnel` | `string` | optional | force new | The URL to a VpnTunnel that should handle matching packets. |
+| `nextHopVpnTunnel` | `next_hop_vpn_tunnel` | `string` | optional | force new, refers to `gcp.vpntunnel.selfLink` | The URL to a VpnTunnel that should handle matching packets. |
 | `params` | — | `map` | optional | force new | Input only. \[Input Only\] Additional params passed with the request, but not persisted as part of resource payload. |
 | `params.resourceManagerTags` | `resource_manager_tags` | `map` | optional | opaque | Tag keys/values directly bound to this resource. Tag keys and values have the same definition as resource manager tags. The field is allowed for INSERT only. The keys/values to set on the resource … |
 | `priority` | — | `integer` | optional | force new | The priority of this route. Priority is used to break ties in cases where there is more than one matching route of equal prefix length. In cases where multiple routes have equal prefix length, the … |
@@ -86,3 +86,4 @@ These attributes name another type. infrena uses them to order a plan.
 | --- | --- |
 | `network` | `gcp.network.selfLink` |
 | `nextHopInstance` | `gcp.compute.instance.selfLink` |
+| `nextHopVpnTunnel` | `gcp.vpntunnel.selfLink` |

@@ -60,6 +60,6 @@ projects/{project}/regions/{region}/nodeTemplates/{nodeTemplate}
 | `region` | — | `string` | output only | — | Output only. \[Output Only\] The name of the region where the node template resides, such as us-central1. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. \[Output Only\] Server-defined URL for the resource. |
 | `serverBinding` | `server_binding` | `map` | optional | — | Sets the binding properties for the physical server. Valid values include: - *\[Default\]* RESTART_NODE_ON_ANY_SERVER: Restarts VMs on any available physical server - RESTART_NODE_ON_MINIMAL_SERVER … |
-| `serverBinding.type_value` | wire `type` | `string` | required | — | — |
+| `serverBinding.type` | — | `string` | required | — | — |
 | `status` | — | `string` | output only | — | Output only. \[Output Only\] The status of the node template. One of the following values:CREATING, READY, and DELETING. |
 | `statusMessage` | `status_message` | `string` | output only | — | Output only. \[Output Only\] An optional, human-readable explanation of the status. |

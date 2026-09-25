@@ -19,10 +19,10 @@ AddressGroup is a resource that specifies how a collection of IP/DNS used in Fir
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/addressGroups/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/addressGroups/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/addressGroups/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/addressGroups?addressGroupId={{name}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/addressGroups/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/addressGroups/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/addressGroups/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

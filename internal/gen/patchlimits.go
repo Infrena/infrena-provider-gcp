@@ -58,7 +58,7 @@ var restrictionProse = []*regexp.Regexp{
 // it accepts only some of the resource's fields, and returns Google's own
 // sentence so the refusal can quote it rather than paraphrase it.
 func restrictedPatch(col disco.Collection) (bool, string) {
-	patch := col.Methods["patch"]
+	patch := patchMethodOf(col)
 	if patch == nil {
 		return false, ""
 	}
@@ -78,7 +78,7 @@ func restrictedPatch(col disco.Collection) (bool, string) {
 // Top level only, and deliberately: every restriction Google documents is a
 // top-level field, and a nested allowlist would need path syntax the overlay
 // has no way to spell (the same limit the alias table carries).
-func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string) {
+func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string, src string) {
 	allowed := make(map[string]bool, len(fields))
 	for _, f := range fields {
 		allowed[f] = true
@@ -88,6 +88,7 @@ func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string) {
 			continue
 		}
 		a.ForceNew = true
+		addSource(a, "immutable", src)
 	}
 }
 
@@ -116,7 +117,7 @@ func applyPatchAllowlist(attrs map[string]*catalog.Attr, fields []string) {
 // envelope is refused, because a request sent in a shape we only half recognise
 // is a request we cannot predict the effect of.
 func discoveredUpdateWrapper(d *disco.Document, col disco.Collection) (wrapper, maskField string) {
-	patch, get := col.Methods["patch"], col.Methods["get"]
+	patch, get := patchMethodOf(col), col.Methods["get"]
 	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
 		return "", ""
 	}

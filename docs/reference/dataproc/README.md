@@ -2,7 +2,7 @@
 
 # dataproc
 
-4 type(s). [Back to the index](../README.md).
+5 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
@@ -10,3 +10,4 @@
 | [`gcp.dataproc.cluster`](gcp.dataproc.cluster.md) | yes | yes | yes | Describes the identifying information, config, and status of a cluster |
 | [`gcp.dataproc.session`](gcp.dataproc.session.md) | yes | **no** | yes | A representation of a session. |
 | [`gcp.dataproc.workflowtemplate`](gcp.dataproc.workflowtemplate.md) | yes | **no** | yes | A Dataproc workflow template resource. |
+| [`gcp.sessiontemplate`](gcp.sessiontemplate.md) | yes | yes | yes | A Dataproc Serverless session template defines the configuration settings for creating one or more Dataproc Serverless interactive sessions. |

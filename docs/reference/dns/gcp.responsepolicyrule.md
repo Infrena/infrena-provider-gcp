@@ -97,6 +97,6 @@ projects/{{project}}/responsePolicies/{{response_policy}}/rules/{{rule_name}}
 | `localData.localDatas[].signatureRrdatas` | `signature_rrdatas` | `list` | optional | — | — |
 | `localData.localDatas[].signatureRrdatas[]` | — | `string` | optional | — | — |
 | `localData.localDatas[].ttl` | — | `integer` | optional | — | Number of seconds that this `ResourceRecordSet` can be cached by resolvers. |
-| `localData.localDatas[].type_value` | wire `type` | `string` | required | — | The identifier of a supported record type. See the list of Supported DNS record types. |
+| `localData.localDatas[].type` | — | `string` | required | — | The identifier of a supported record type. See the list of Supported DNS record types. |
 | `response_policy` | — | `string` | required | force new | The response_policy this gcp.responsepolicyrule belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `ruleName` | `rule_name` | `string` | required | force new | An identifier for this rule. Must be unique with the ResponsePolicy. |

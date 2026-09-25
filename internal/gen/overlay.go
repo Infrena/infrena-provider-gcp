@@ -31,6 +31,24 @@ type Ruling struct {
 	// hides by always sending "Managed by Terraform". Evidence, never
 	// assumed; the note cites it.
 	Required []string `yaml:"required"`
+	// Settable names fields magic-modules marks output because its hook
+	// derives them, which here the user writes instead: a health check's
+	// `type`, which Terraform infers from the protocol block and compute
+	// requires. Left output, the field Google insists on could not be
+	// written and every create failed.
+	Settable []string `yaml:"settable"`
+	// InPlace names dotted paths that change in place inside a block
+	// magic-modules marks immutable as a whole. ForceNew on a block
+	// replaces the resource for any change inside it; Terraform patches
+	// these leaves (an Artifact Registry repository's upstream
+	// credentials), and replacing the repository deletes its artifacts.
+	InPlace []string `yaml:"in_place"`
+	// SendWithUpdate names dotted paths of input-only request options that
+	// every update carries in its body, outside the mask. Terraform's
+	// Artifact Registry update re-sends the whole remote config, so its
+	// disableUpstreamValidation always reaches Google; a patch of only what
+	// changed drops it, and Google validates upstream credentials anyway.
+	SendWithUpdate []string `yaml:"send_with_update"`
 }
 
 // Patchable is a human decision about a type whose API patches only SOME of
@@ -82,6 +100,30 @@ type Overlay struct {
 	// agrees), so a mapping only a person can attest to belongs here beside
 	// the rulings, not guessed at in Go.
 	ProductAliases map[string][]string `yaml:"product_aliases"`
+
+	// Sensitive marks secrets no source marks: a Cloud SQL user's password,
+	// a GKE cluster's basic-auth password, a router's MD5 key. magic-modules
+	// is the only source of `sensitive` and it misses these, several on
+	// types Terraform writes by hand. Keyed by type name; each path is dotted,
+	// with [] for a list element. A path the type does not have fails the
+	// build.
+	Sensitive map[string]SensitiveFields `yaml:"sensitive"`
+	// Observed is what live tests saw Google do, keyed by infrena type. Each
+	// entry asserts one fact of the closed vocabulary (facts.go), and the
+	// generator refuses to produce a catalog that contradicts it. See
+	// docs/FACTS.md.
+	Observed map[string][]Observation `yaml:"observed"`
+}
+
+// Observation is one fact seen on real Google.
+type Observation struct {
+	// Path is the attribute, for an attribute fact; empty for a type fact.
+	Path  string `yaml:"path"`
+	Fact  string `yaml:"fact"`
+	Value string `yaml:"value"`
+	// Seen is "YYYY-MM-DD TestLiveName": when, and the live test that
+	// showed it, which a test checks still exists.
+	Seen string `yaml:"seen"`
 }
 
 // LoadOverlay reads and validates the overlay. mmv1Dir is the vendored
@@ -124,4 +166,10 @@ func LoadOverlay(path, mmv1Dir string) (*Overlay, error) {
 		}
 	}
 	return &o, nil
+}
+
+// SensitiveFields is one type's entry in the overlay's sensitive list.
+type SensitiveFields struct {
+	Fields []string `yaml:"fields"`
+	Note   string   `yaml:"note"`
 }

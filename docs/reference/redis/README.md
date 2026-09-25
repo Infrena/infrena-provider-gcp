@@ -2,8 +2,10 @@
 
 # redis
 
-1 type(s). [Back to the index](../README.md).
+3 type(s). [Back to the index](../README.md).
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
 | [`gcp.aclpolicy`](gcp.aclpolicy.md) | yes | yes | yes | The ACL policy resource. |
+| [`gcp.redis.cluster`](gcp.redis.cluster.md) | yes | yes | yes | A Google Cloud Redis Cluster instance. |
+| [`gcp.redis.instance`](gcp.redis.instance.md) | yes | yes | yes | A Google Cloud Redis instance. |

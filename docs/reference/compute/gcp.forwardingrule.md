@@ -13,7 +13,7 @@ A ForwardingRule resource. A ForwardingRule resource specifies which pool of tar
 | Asset type | `compute.googleapis.com/ForwardingRule` |
 | Tier | 1 (ruled: post_create is labels.tmpl, handled as on compute/Address. target also has a setter (setTarget), so pointing a forwarding rule at a new target is an update, not a replacement.
 pre_create (pre_create/compute_forwarding_rule.go.tmpl) removes labels from the insert when the target is a Private Service Connect service attachment, because Google refuses labels on those creates. THE BOUNDED GAP: a PSC forwarding rule configured with labels fails its create with Google's own error. Leave labels off it.
-Its patch is restricted in prose ("Currently, you can only patch the network_tier field"), so without a patchable: list every field no setter carries replaces the rule. Terraform patches allowGlobalAccess and allowPscGlobalAccess as well; which list is right is open and will be settled live.
+Its patch is restricted in prose ("Currently, you can only patch the network_tier field"), and understated: see its patchable: entry, which lists what does patch. Every other field no setter carries replaces the rule.
 ) |
 | Mutation timeout | 600s |
 

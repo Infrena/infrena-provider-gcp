@@ -19,10 +19,10 @@ Describes a query that has been saved by a user.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
+| Create | yes | `POST organizations/{organization}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` |
+| Read | yes | `GET organizations/{organization}/locations/{{location}}/savedQueries/{{name}}` |
+| Update | yes | `PATCH organizations/{organization}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE organizations/{organization}/locations/{{location}}/savedQueries/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ Describes a query that has been saved by a user.
 
 ## Attributes
 
-210 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+211 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ Describes a query that has been saved by a user.
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction` | `sql_aggregation_function` | `map` | optional | — | The function to apply to the field. |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.parameters` | — | `list` | optional | — | Optional. Parameters to be applied to the aggregation. Aggregations that support or require parameters are listed above. |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.parameters[]` | — | `string` | optional | — | — |
-| `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.type_value` | wire `type` | `string` | optional | — | Required. Specifies the aggregation function. Use one of the following string identifiers: "average": Computes the average (AVG). Applies only to numeric values. "count": Counts the number of values … |
+| `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.sqlAggregationFunction.type` | — | `string` | optional | — | Required. Specifies the aggregation function. Use one of the following string identifiers: "average": Computes the average (AVG). Applies only to numeric values. "count": Counts the number of values … |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.truncationGranularity` | `truncation_granularity` | `string` | optional | — | The truncation granularity when grouping by a time/date field. This will be used to truncate the field to the granularity specified. This can be either a date or a time granularity found at … |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField` | `virtual_field` | `map` | optional | — | Optional. A virtual field definition, used in place of field to define a field that is computed from other fields rather than being directly present in the data schema.For example, a virtual field … |
 | `opsAnalyticsQuery.queryBuilder.fieldSources[].projectedField.virtualField.underlyingFieldSources` | `underlying_field_sources` | `list` | optional | — | The field sources that will be used to create the virtual field, based on the semantics of the virtual field type.The field sources must follow these rules, based on the virtual field type: - For … |
@@ -244,6 +244,7 @@ Describes a query that has been saved by a user.
 | `opsAnalyticsQuery.queryBuilder.resourceNames[]` | — | `string` | optional | — | — |
 | `opsAnalyticsQuery.queryBuilder.searchTerm` | `search_term` | `string` | optional | — | The plain text search to use for the query. There is no support for multiple search terms. This uses the SEARCH functionality in BigQuery. For example, a search_term = 'ERROR' would result in the … |
 | `opsAnalyticsQuery.sqlQueryText` | `sql_query_text` | `string` | required | — | Optional. A Log Analytics SQL query in text format.If both sql_query_text and query_builder fields are set, then the sql_query_text will be used, if its non-empty. At least one of the two fields must … |
+| `organization` | — | `string` | required | force new | The organization this gcp.logging.organization.savedquery belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `savedQueryId` | — | `string` | optional | force new, create only | Optional. The ID to use for the saved query, which will become the final component of the saved query's resource name.If the saved_query_id is not provided, the system will generate an alphanumeric … |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The timestamp when the saved query was last updated. |
 | `visibility` | — | `string` | required | — | Required. The visibility status of this query, which determines its ownership. |

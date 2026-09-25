@@ -146,7 +146,7 @@ projects/{project}/locations/{location}/functions/{function}
 | `stateMessages[]` | — | `map` | optional | — | — |
 | `stateMessages[].message` | — | `string` | optional | — | The message. |
 | `stateMessages[].severity` | — | `string` | optional | — | Severity of the state message. |
-| `stateMessages[].type_value` | wire `type` | `string` | optional | — | One-word CamelCase type of the state message. |
+| `stateMessages[].type` | — | `string` | optional | — | One-word CamelCase type of the state message. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last update timestamp of a Cloud Function. |
 | `upgradeInfo` | `upgrade_info` | `map` | output only | — | Output only. UpgradeInfo for this Cloud Function |
 | `upgradeInfo.buildConfig` | `build_config` | `map` | optional | — | Describes the Build step of the function that builds a container to prepare for 2nd gen upgrade. |

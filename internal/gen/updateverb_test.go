@@ -668,15 +668,18 @@ func TestClearBeforeDeleteReachesTheCatalogAndIsChecked(t *testing.T) {
 
 // TestACreateURLCarryingAPreCreateTokenIsRefused. compute's NodeGroup create
 // url carries "PRE_CREATE_REPLACE_ME" for its pre_create hook to fill.
-// Shipped, every create would send the token itself.
+// Shipped as it is, every create would send the token itself.
 func TestACreateURLCarryingAPreCreateTokenIsRefused(t *testing.T) {
 	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
 		"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\ncreate_url: projects/{{project}}/patchables?count=PRE_CREATE_REPLACE_ME\nself_link: projects/{{project}}/patchables/{{name}}\n"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := res.Catalog.Type("gcp.patchable"); ok {
-		t.Error("gcp.patchable shipped with a create url that sends PRE_CREATE_REPLACE_ME")
+	// Refused, or the parameter dropped because the create does not publish
+	// it (dropUnpublishedCreateQuery, which is what happens to this
+	// fixture's "count"): either way the token is never sent.
+	if ty, ok := res.Catalog.Type("gcp.patchable"); ok && strings.Contains(ty.CreateURL, "PRE_CREATE_REPLACE_ME") {
+		t.Errorf("gcp.patchable shipped with a create url that sends the token: %q", ty.CreateURL)
 	}
 }
 
@@ -703,5 +706,69 @@ func TestARulingCanRequireAFieldGoogleInsistsOn(t *testing.T) {
 	}
 	if ty := build("nosuchfield"); ty != nil {
 		t.Error("a ruling requiring a field the type does not have still shipped the type")
+	}
+}
+
+// monitoringFixture is Cloud Monitoring's shape: a collection read at
+// "v3/{+name}", where name is the full resource name, and a magic-modules
+// resource that writes its self_link as the bare "v3/{{name}}".
+func monitoringFixture(updateVerb string) map[string]string {
+	doc := `{"name": "mon", "version": "v3", "rootUrl": "https://mon.googleapis.com/", "servicePath": "",
+  "schemas": {"Policy": {"id": "Policy", "type": "object", "properties": {
+    "name": {"type": "string", "description": "Output only. The full name."}, "displayName": {"type": "string"}}}},
+  "resources": {"projects": {"resources": {"alertPolicies": {"methods": {
+    "get": {"id": "a", "path": "v3/{+name}", "httpMethod": "GET", "response": {"$ref": "Policy"}, "parameters": {"name": {"location": "path"}}},
+    "create": {"id": "b", "path": "v3/{+name}/alertPolicies", "httpMethod": "POST", "request": {"$ref": "Policy"}, "response": {"$ref": "Policy"}, "parameters": {"name": {"location": "path"}}},
+    "patch": {"id": "c", "path": "v3/{+name}", "httpMethod": "PATCH", "request": {"$ref": "Policy"}, "response": {"$ref": "Policy"}, "parameters": {"name": {"location": "path"}}},
+    "delete": {"id": "d", "path": "v3/{+name}", "httpMethod": "DELETE", "parameters": {"name": {"location": "path"}}}}}}}}}`
+	mm := "name: AlertPolicy\nbase_url: v3/projects/{{project}}/alertPolicies\nself_link: v3/{{name}}\n"
+	if updateVerb != "" {
+		mm += "update_verb: " + updateVerb + "\nupdate_url: v3/projects/{{project}}/alertPolicies\n"
+	}
+	return map[string]string{"schemas/mon.json": doc, "mmv1/products/mon/AlertPolicy.yaml": mm}
+}
+
+// TestABareNameSelfLinkIsReadThroughDiscoverysGetPath. magic-modules writes
+// Cloud Monitoring's self_links as "v3/{{name}}", name the full resource
+// name; as an escaping placeholder it names nothing, and the collection
+// check refused five types. Discovery's "v3/{+name}" is the same address.
+func TestABareNameSelfLinkIsReadThroughDiscoverysGetPath(t *testing.T) {
+	res, err := Build(writeRefFixture(t, monitoringFixture("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.alertpolicy")
+	if !ok {
+		t.Fatalf("gcp.alertpolicy did not ship; warnings: %+v", res.Warnings)
+	}
+	if ty.SelfLink != "{+name}" {
+		t.Errorf("self_link = %q, want {+name}, the reserved expansion of the full name", ty.SelfLink)
+	}
+}
+
+// TestAnUpdateVerbOtherThanPatchIsRefusedFromMagicModulesToo. PATCH or
+// nothing held for verbs derived from Discovery, and a verb magic-modules
+// declared went straight through: pubsub's schema shipped updating by POST
+// to :commit, a request this provider does not build.
+func TestAnUpdateVerbOtherThanPatchIsRefusedFromMagicModulesToo(t *testing.T) {
+	// The fixture's collection publishes its own PATCH, so a refused POST or
+	// PUT falls back to it -- at the resource's own address, never
+	// magic-modules' collection url. metricDescriptors and schemas publish
+	// no patch, which is why they end up with no update at all.
+	for _, verb := range []string{"POST", "PUT", "PATCH"} {
+		res, err := Build(writeRefFixture(t, monitoringFixture(verb)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ty, ok := res.Catalog.Type("gcp.alertpolicy")
+		if !ok {
+			t.Fatalf("gcp.alertpolicy did not ship with update_verb %s", verb)
+		}
+		if ty.UpdateVerb != "PATCH" {
+			t.Errorf("magic-modules update_verb %s shipped as %q, want PATCH", verb, ty.UpdateVerb)
+		}
+		if verb != "PATCH" && strings.Contains(ty.UpdateURL, "alertPolicies") {
+			t.Errorf("magic-modules' %s update_url %q reached the catalog", verb, ty.UpdateURL)
+		}
 	}
 }

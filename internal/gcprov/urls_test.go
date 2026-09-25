@@ -1,6 +1,7 @@
 package gcprov
 
 import (
+	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"regexp"
 	"strings"
 	"testing"
@@ -163,6 +164,8 @@ func TestExpandURLHandlesEveryRealCatalogTemplate(t *testing.T) {
 			for _, ph := range placeholderRE.FindAllString(tmpl, -1) {
 				name := strings.Trim(ph, "{}")
 				name = strings.TrimPrefix(strings.TrimSpace(name), "+")
+				// {{%name}} is magic-modules' escaped form of name.
+				name = strings.TrimPrefix(name, "%")
 				a[name] = value.String("x", value.SourceExplicit)
 			}
 			if _, err := ExpandURL(tmpl, a); err != nil {
@@ -173,5 +176,30 @@ func TestExpandURLHandlesEveryRealCatalogTemplate(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestAnEscapedPlaceholderRoundTripsThroughAnID. magic-modules' {{%name}}
+// asks for the value escaped: a logging metric named "team/errors" is
+// .../metrics/team%2Ferrors, and parsing that id must give the name back.
+// Read as a placeholder called "%name", the self_link could not be built.
+func TestAnEscapedPlaceholderRoundTripsThroughAnID(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.logging.metric", SelfLink: "projects/{{project}}/metrics/{{%name}}"}
+	rel, err := ExpandURL(ty.SelfLink, map[string]value.Value{
+		"project": value.String("p", value.SourceExplicit),
+		"name":    value.String("team/errors", value.SourceExplicit),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rel != "projects/p/metrics/team%2Ferrors" {
+		t.Errorf("expanded %q, want the name escaped", rel)
+	}
+	got, err := ParseProviderID(ty, rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["name"].Raw != "team/errors" {
+		t.Errorf("parsed name %v, want team/errors", got["name"].Raw)
 	}
 }

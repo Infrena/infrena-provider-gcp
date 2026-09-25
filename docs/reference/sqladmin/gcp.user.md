@@ -21,7 +21,7 @@ A Cloud SQL user resource.
 | Create | yes | `POST projects/{project}/instances/{instance}/users` |
 | Read | yes | `GET projects/{project}/instances/{instance}/users/{name}` |
 | Update | **no** | publishes no update method; every change to it replaces the resource |
-| Delete | yes | `DELETE projects/{project}/instances/{instance}/users/{name}` |
+| Delete | yes | `DELETE projects/{project}/instances/{instance}/users?name={name}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -46,7 +46,7 @@ projects/{project}/instances/{instance}/users/{name}
 | `instance` | — | `string` | optional | — | The name of the Cloud SQL instance. This does not include the project ID. Can be omitted for `update` because it is already specified on the URL. |
 | `kind` | — | `string` | optional | — | This is always `sql#user`. |
 | `name` | — | `string` | optional | — | The name of the user in the Cloud SQL instance. Can be omitted for `update` because it is already specified in the URL. |
-| `password` | — | `string` | optional | — | The password for the user. |
+| `password` | — | `string` | optional | sensitive | The password for the user. |
 | `passwordPolicy` | `password_policy` | `map` | optional | — | User level password validation policy. |
 | `passwordPolicy.allowedFailedAttempts` | `allowed_failed_attempts` | `integer` | optional | — | Number of failed login attempts allowed before user get locked. |
 | `passwordPolicy.enableFailedAttemptsCheck` | `enable_failed_attempts_check` | `boolean` | optional | — | If true, failed login attempts check will be enabled. |

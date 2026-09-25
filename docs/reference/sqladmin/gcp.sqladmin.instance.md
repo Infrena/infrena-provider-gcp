@@ -91,7 +91,7 @@ projects/{project}/instances/{instance}
 | `ipAddresses[]` | — | `map` | optional | — | — |
 | `ipAddresses[].ipAddress` | `ip_address` | `string` | optional | — | The IP address assigned. |
 | `ipAddresses[].timeToRetire` | `time_to_retire` | `string` | optional | — | The due time for this IP to be retired in \[RFC 3339\](https://tools.ietf.org/html/rfc3339) format, for example `2012-11-15T16:19:00.094Z`. This field is only available when the IP is scheduled to be … |
-| `ipAddresses[].type_value` | wire `type` | `string` | optional | — | The type of this IP address. A `PRIMARY` address is a public address that can accept incoming connections. A `PRIVATE` address is a private address that can accept incoming connections. An `OUTGOING` … |
+| `ipAddresses[].type` | — | `string` | optional | — | The type of this IP address. A `PRIMARY` address is a public address that can accept incoming connections. A `PRIVATE` address is a private address that can accept incoming connections. An `OUTGOING` … |
 | `ipv6Address` | `ipv6_address` | `string` | optional | — | The IPv6 address assigned to the instance. (Deprecated) This property was applicable only to First Generation instances. |
 | `kind` | — | `string` | optional | — | This is always `sql#instance`. |
 | `maintenanceVersion` | `maintenance_version` | `string` | optional | — | The current software version on the instance. |
@@ -124,12 +124,12 @@ projects/{project}/instances/{instance}
 | `onPremisesConfiguration` | `on_premises_configuration` | `map` | optional | — | Configuration specific to on-premises instances. |
 | `onPremisesConfiguration.caCertificate` | `ca_certificate` | `string` | optional | — | PEM representation of the trusted CA's x509 certificate. |
 | `onPremisesConfiguration.clientCertificate` | `client_certificate` | `string` | optional | — | PEM representation of the replica's x509 certificate. |
-| `onPremisesConfiguration.clientKey` | `client_key` | `string` | optional | — | PEM representation of the replica's private key. The corresponding public key is encoded in the client's certificate. |
+| `onPremisesConfiguration.clientKey` | `client_key` | `string` | optional | sensitive | PEM representation of the replica's private key. The corresponding public key is encoded in the client's certificate. |
 | `onPremisesConfiguration.dmsManaged` | `dms_managed` | `boolean` | output only | — | Output only. Indicates whether the resource is managed by Database Migration Service. |
 | `onPremisesConfiguration.dumpFilePath` | `dump_file_path` | `string` | optional | — | The dump file to create the Cloud SQL replica. |
 | `onPremisesConfiguration.hostPort` | `host_port` | `string` | optional | — | The host and port of the on-premises instance in host:port format |
 | `onPremisesConfiguration.kind` | — | `string` | optional | — | This is always `sql#onPremisesConfiguration`. |
-| `onPremisesConfiguration.password` | — | `string` | optional | — | The password for connecting to on-premises instance. |
+| `onPremisesConfiguration.password` | — | `string` | optional | sensitive | The password for connecting to on-premises instance. |
 | `onPremisesConfiguration.selectedObjects` | `selected_objects` | `list` | optional | — | Optional. A list of objects that the user selects for replication from an external source instance. |
 | `onPremisesConfiguration.selectedObjects[]` | — | `map` | optional | — | — |
 | `onPremisesConfiguration.selectedObjects[].database` | — | `string` | optional | — | Required. The name of the database to migrate. |
@@ -153,12 +153,12 @@ projects/{project}/instances/{instance}
 | `replicaConfiguration.mysqlReplicaConfiguration` | `mysql_replica_configuration` | `map` | optional | — | MySQL specific configuration when replicating from a MySQL on-premises primary instance. Replication configuration information such as the username, password, certificates, and keys are not stored in … |
 | `replicaConfiguration.mysqlReplicaConfiguration.caCertificate` | `ca_certificate` | `string` | optional | — | PEM representation of the trusted CA's x509 certificate. |
 | `replicaConfiguration.mysqlReplicaConfiguration.clientCertificate` | `client_certificate` | `string` | optional | — | PEM representation of the replica's x509 certificate. |
-| `replicaConfiguration.mysqlReplicaConfiguration.clientKey` | `client_key` | `string` | optional | — | PEM representation of the replica's private key. The corresponding public key is encoded in the client's certificate. |
+| `replicaConfiguration.mysqlReplicaConfiguration.clientKey` | `client_key` | `string` | optional | sensitive | PEM representation of the replica's private key. The corresponding public key is encoded in the client's certificate. |
 | `replicaConfiguration.mysqlReplicaConfiguration.connectRetryInterval` | `connect_retry_interval` | `integer` | optional | — | Seconds to wait between connect retries. MySQL's default is 60 seconds. |
 | `replicaConfiguration.mysqlReplicaConfiguration.dumpFilePath` | `dump_file_path` | `string` | optional | — | Path to a SQL dump file in Google Cloud Storage from which the replica instance is to be created. The URI is in the form gs://bucketName/fileName. Compressed gzip files (.gz) are also supported … |
 | `replicaConfiguration.mysqlReplicaConfiguration.kind` | — | `string` | optional | — | This is always `sql#mysqlReplicaConfiguration`. |
 | `replicaConfiguration.mysqlReplicaConfiguration.masterHeartbeatPeriod` | `master_heartbeat_period` | `string` | optional | — | Interval in milliseconds between replication heartbeats. |
-| `replicaConfiguration.mysqlReplicaConfiguration.password` | — | `string` | optional | — | The password for the replication connection. |
+| `replicaConfiguration.mysqlReplicaConfiguration.password` | — | `string` | optional | sensitive | The password for the replication connection. |
 | `replicaConfiguration.mysqlReplicaConfiguration.sslCipher` | `ssl_cipher` | `string` | optional | — | A list of permissible ciphers to use for SSL encryption. |
 | `replicaConfiguration.mysqlReplicaConfiguration.username` | — | `string` | optional | — | The username for the replication connection. |
 | `replicaConfiguration.mysqlReplicaConfiguration.verifyServerCertificate` | `verify_server_certificate` | `boolean` | optional | — | Whether or not to check the primary instance's Common Name value in the certificate that it sends during the SSL handshake. |
@@ -168,7 +168,7 @@ projects/{project}/instances/{instance}
 | `replicationCluster.drReplica` | `dr_replica` | `boolean` | output only | — | Output only. Read-only field that indicates whether the replica is a DR replica. This field is not set if the instance is a primary instance. |
 | `replicationCluster.failoverDrReplicaName` | `failover_dr_replica_name` | `string` | optional | — | Optional. If the instance is a primary instance, then this field identifies the disaster recovery (DR) replica. A DR replica is an optional configuration for Enterprise Plus edition instances. If the … |
 | `replicationCluster.psaWriteEndpoint` | `psa_write_endpoint` | `string` | output only | — | Output only. If set, this field indicates this instance has a private service access (PSA) DNS endpoint that is pointing to the primary instance of the cluster. If this instance is the primary, then … |
-| `rootPassword` | `root_password` | `string` | optional | — | Initial root password. Use only on creation. You must set root passwords before you can connect to PostgreSQL instances. |
+| `rootPassword` | `root_password` | `string` | optional | sensitive | Initial root password. Use only on creation. You must set root passwords before you can connect to PostgreSQL instances. |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. This status indicates whether the instance satisfies PZI. The status is reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | optional | — | This status indicates whether the instance satisfies PZS. The status is reserved for future use. |
 | `scheduledMaintenance` | `scheduled_maintenance` | `map` | optional | — | The start time of any upcoming scheduled maintenance for this instance. |

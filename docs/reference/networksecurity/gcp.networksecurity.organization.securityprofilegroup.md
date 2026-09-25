@@ -19,10 +19,10 @@ A security profile group defines a container for security profiles.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/securityProfileGroups/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/securityProfileGroups/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/securityProfileGroups/{{name}}` |
+| Create | yes | `POST organizations/{organization}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` |
+| Read | yes | `GET organizations/{organization}/locations/{{location}}/securityProfileGroups/{{name}}` |
+| Update | yes | `PATCH organizations/{organization}/locations/{{location}}/securityProfileGroups/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE organizations/{organization}/locations/{{location}}/securityProfileGroups/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ A security profile group defines a container for security profiles.
 
 ## Attributes
 
-11 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+12 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -45,6 +45,7 @@ A security profile group defines a container for security profiles.
 | `etag` | — | `string` | output only | — | Output only. This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels as key value pairs. |
 | `name` | — | `string` | required | force new | Immutable. Identifier. Name of the SecurityProfileGroup resource. It matches pattern `projects\|organizations/*/locations/{location}/securityProfileGroups/{security_profile_group}`. |
+| `organization` | — | `string` | required | force new | The organization this gcp.networksecurity.organization.securityprofilegroup belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `threatPreventionProfile` | `threat_prevention_profile` | `string` | optional | — | Optional. Reference to a SecurityProfile with the ThreatPrevention configuration. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Last resource update timestamp. |
 | `urlFilteringProfile` | `url_filtering_profile` | `string` | optional | — | Optional. Reference to a SecurityProfile with the UrlFiltering configuration. |

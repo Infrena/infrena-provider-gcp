@@ -127,12 +127,38 @@ func equivalent(rule, want, got string) bool {
 		return want != "" && lastSegment(want) == lastSegment(got)
 	case catalog.EquivalenceCase:
 		return strings.EqualFold(want, got)
+	case catalog.EquivalenceKMSKey:
+		// Only the version Google appended is dropped: a configuration that
+		// names a version means that version.
+		if withoutKeyVersion(want) != want {
+			return equivalent(catalog.EquivalenceSelfLink, want, got)
+		}
+		return equivalent(catalog.EquivalenceSelfLink, want, withoutKeyVersion(got))
+	case catalog.EquivalenceImage:
+		if equivalent(catalog.EquivalenceSelfLink, want, got) {
+			return true
+		}
+		w, g := fromProjects(want), fromProjects(got)
+		prefix, family, ok := strings.Cut(w, "/images/family/")
+		if !ok || w == "" || !strings.HasPrefix(g, prefix+"/images/") {
+			return false
+		}
+		image := lastSegment(g)
+		return image == family || strings.HasPrefix(image, family+"-")
 	case catalog.EquivalenceDuration:
 		w, errW := time.ParseDuration(want)
 		g, errG := time.ParseDuration(got)
 		return errW == nil && errG == nil && w == g
 	}
 	return false
+}
+
+// withoutKeyVersion drops a trailing "/cryptoKeyVersions/<n>".
+func withoutKeyVersion(s string) string {
+	if i := strings.Index(s, "/cryptoKeyVersions/"); i >= 0 && !strings.Contains(s[i+len("/cryptoKeyVersions/"):], "/") {
+		return s[:i]
+	}
+	return s
 }
 
 // fromProjects is a resource path from its "projects/" segment on, which is
@@ -217,14 +243,11 @@ func (r reconciler) sameProjectSpelling(reference, incoming value.Value) value.V
 // reference may be nil -- a create's readback has no previous state -- and
 // then nothing is reordered, because there is no order to reorder to.
 //
-// AN UNDECLARED TOP-LEVEL KEY IS KEPT, which is the one place this does not
-// prune. infrena's own planner already ignores an attribute that is in state
-// but neither in configuration nor in the schema ("the provider's own
-// business" -- internal/planner/diff.go), so such a key costs no drift, while
-// an undeclared key NESTED inside a declared object does: it is part of that
-// object's value, and value.Equal compares maps by length and key before
-// anything else. Dropping the top-level ones as well would also throw away
-// what Import and Discover read a resource's own identity out of.
+// AN UNDECLARED TOP-LEVEL KEY IS KEPT HERE, and dropped where state is
+// assembled (declaredOnly): the host refuses a state carrying one and fails
+// the whole operation, which a field Google added after the pinned Discovery
+// document did to a live Spanner create (2026-09-25). Kept this far so the
+// id is still read from the full answer.
 func ReconcileAttrs(attrs map[string]*catalog.Attr, reference, incoming map[string]value.Value) map[string]value.Value {
 	return reconciler{}.attrs(attrs, reference, incoming)
 }
@@ -238,9 +261,52 @@ func (r reconciler) attrs(attrs map[string]*catalog.Attr, reference, incoming ma
 	for name, a := range attrs {
 		if carried, ok := r.carryInputOnly(a, reference[name], incoming, name); ok {
 			out[name] = carried
+		} else if carried, ok := r.carryOmittedZero(reference[name], incoming, name); ok {
+			out[name] = carried
 		}
 	}
 	return out
+}
+
+// carryOmittedZero reports a configured zero value -- false, 0, "", an empty
+// list or map -- that the answer left out, as configured. proto3 JSON never
+// writes a field at its default, so Google's answer to `enable: false` has no
+// `enable` at all, and reported missing it was drift on every plan against a
+// resource exactly as configured (a replacement where the field is
+// immutable). alloydb's Instance decoder exists only to put these back.
+//
+// Only a zero: a configured true that comes back absent is a real
+// difference. Not inside an unordered list, where the reference element may
+// be a sibling.
+func (r reconciler) carryOmittedZero(ref value.Value, in map[string]value.Value, name string) (value.Value, bool) {
+	if r.unmatched || !isZero(ref) {
+		return value.Value{}, false
+	}
+	if _, answered := in[name]; answered {
+		return value.Value{}, false
+	}
+	return ref, true
+}
+
+func isZero(v value.Value) bool {
+	if !v.Known {
+		return false
+	}
+	switch raw := v.Raw.(type) {
+	case bool:
+		return !raw
+	case int64:
+		return raw == 0
+	case float64:
+		return raw == 0
+	case string:
+		return raw == ""
+	case []value.Value:
+		return len(raw) == 0
+	case map[string]value.Value:
+		return len(raw) == 0
+	}
+	return false
 }
 
 // carryInputOnly is the whole of input-only handling: a field the API never
@@ -284,6 +350,8 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 		v, found := in[name]
 		if !found {
 			if carried, ok := r.carryInputOnly(field, ref[name], in, name); ok {
+				out[name] = carried
+			} else if carried, ok := r.carryOmittedZero(ref[name], in, name); ok && hasRef {
 				out[name] = carried
 			}
 			continue

@@ -64,6 +64,9 @@ type Parameter struct {
 	Type     string `json:"type"`
 	Location string `json:"location"`
 	Required bool   `json:"required"`
+	// Format refines Type as it does on a schema ("int32" on compute's
+	// nodeGroups.insert initialNodeCount).
+	Format string `json:"format"`
 	// Pattern is the regular expression Discovery publishes for a path
 	// parameter's value, e.g. "^projects/[^/]+$". It is the ONLY thing that
 	// tells two identically spelled placeholders apart when one collection
@@ -80,8 +83,14 @@ type Parameter struct {
 
 // Method is one API method.
 type Method struct {
-	ID          string                `json:"id"`
-	Path        string                `json:"path"`
+	ID   string `json:"id"`
+	Path string `json:"path"`
+	// FlatPath is the same address with every segment spelled out
+	// ("v1/projects/{projectsId}/locations/{locationsId}/repositories/{repositoriesId}")
+	// where Path may say only "v1/{+name}". Every delete of a proto-first API
+	// shares that Path, so only FlatPath tells them apart. Empty where the
+	// document gives none.
+	FlatPath    string                `json:"flatPath"`
 	HTTPMethod  string                `json:"httpMethod"`
 	Description string                `json:"description"`
 	Request     *Ref                  `json:"request"`
@@ -135,6 +144,10 @@ const (
 // after") that declares nothing. Measured: 5 settable properties in the
 // catalog mention immutability mid-sentence, and none of them is a
 // declaration.
+// deprecatedThenTag skips a leading "[DEPRECATED] ..." notice up to a
+// bracketed behaviour tag within its first 200 characters.
+var deprecatedThenTag = regexp.MustCompile(`(?is)^\s*\[DEPRECATED\][^\[]{0,200}`)
+
 var behaviorTag = regexp.MustCompile(`(?i)^\s*(?:\[(output only|input only)\]|(output only|input only|immutable|identifier|required|optional)\.)\s*`)
 
 // Behaviors reads the leading run of field-behaviour tags from a property's
@@ -146,6 +159,16 @@ func Behaviors(s *Schema) map[Behavior]bool {
 		return out
 	}
 	d := s.Description
+	// A deprecation notice can come before the tags: compute's
+	// CustomerEncryptionKey.sha256 reads "[DEPRECATED] CSEK is no longer
+	// supported. Use CMEK instead. [Output only] The RFC 4648 ...", and read
+	// from the start, every disk, image and snapshot key's sha256 shipped as
+	// settable. Only a bracketed tag close behind the notice counts.
+	if strings.HasPrefix(strings.TrimSpace(d), "[DEPRECATED]") {
+		if i := deprecatedThenTag.FindStringIndex(d); i != nil && behaviorTag.MatchString(d[i[1]:]) {
+			d = d[i[1]:]
+		}
+	}
 	for {
 		m := behaviorTag.FindStringSubmatch(d)
 		if m == nil {

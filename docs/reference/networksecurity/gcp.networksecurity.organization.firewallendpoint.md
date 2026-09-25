@@ -19,10 +19,10 @@ A Firewall endpoint is a Cloud Firewall resource that enables layer 7 advanced p
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/firewallEndpoints/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/firewallEndpoints/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/firewallEndpoints/{{name}}` |
+| Create | yes | `POST organizations/{organization}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` |
+| Read | yes | `GET organizations/{organization}/locations/{{location}}/firewallEndpoints/{{name}}` |
+| Update | yes | `PATCH organizations/{organization}/locations/{{location}}/firewallEndpoints/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE organizations/{organization}/locations/{{location}}/firewallEndpoints/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ A Firewall endpoint is a Cloud Firewall resource that enables layer 7 advanced p
 
 ## Attributes
 
-18 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+19 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -50,6 +50,7 @@ A Firewall endpoint is a Cloud Firewall resource that enables layer 7 advanced p
 | `endpointSettings.jumboFramesEnabled` | `jumbo_frames_enabled` | `boolean` | optional | force new | Optional. Immutable. Indicates whether Jumbo Frames are enabled. Default value is false. |
 | `labels` | — | `map` | optional | opaque | Optional. Labels as key value pairs |
 | `name` | — | `string` | required | force new | Immutable. Identifier. Name of resource. |
+| `organization` | — | `string` | required | force new | The organization this gcp.networksecurity.organization.firewallendpoint belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `reconciling` | — | `boolean` | output only | — | Output only. Whether reconciling is in progress, recommended per https://google.aip.dev/128. |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. \[Output Only\] Reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. \[Output Only\] Reserved for future use. |

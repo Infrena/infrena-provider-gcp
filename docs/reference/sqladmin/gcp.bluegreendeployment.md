@@ -53,7 +53,7 @@ projects/{project}/locations/{location}/blueGreenDeployments/{blueGreenDeploymen
 | `deploymentMappings[].source.ipMappings[]` | — | `map` | optional | — | — |
 | `deploymentMappings[].source.ipMappings[].ipAddress` | `ip_address` | `string` | optional | — | The IP address assigned. |
 | `deploymentMappings[].source.ipMappings[].timeToRetire` | `time_to_retire` | `string` | optional | — | The due time for this IP to be retired in \[RFC 3339\](https://tools.ietf.org/html/rfc3339) format, for example `2012-11-15T16:19:00.094Z`. This field is only available when the IP is scheduled to be … |
-| `deploymentMappings[].source.ipMappings[].type_value` | wire `type` | `string` | optional | — | The type of this IP address. A `PRIMARY` address is a public address that can accept incoming connections. A `PRIVATE` address is a private address that can accept incoming connections. An `OUTGOING` … |
+| `deploymentMappings[].source.ipMappings[].type` | — | `string` | optional | — | The type of this IP address. A `PRIMARY` address is a public address that can accept incoming connections. A `PRIVATE` address is a private address that can accept incoming connections. An `OUTGOING` … |
 | `deploymentMappings[].state` | — | `string` | output only | — | Output only. Specifies the current state of this specific source-target pair. |
 | `deploymentMappings[].target` | — | `map` | output only | — | Output only. Specifies details of the corresponding target instance in this pair. |
 | `deploymentMappings[].target.connection` | — | `string` | output only | — | Output only. The instance connection name. |
@@ -67,7 +67,7 @@ projects/{project}/locations/{location}/blueGreenDeployments/{blueGreenDeploymen
 | `deploymentTasks.task[].errorMessage` | `error_message` | `string` | output only | — | Output only. Optional error details if the task state is `FAILED`. |
 | `deploymentTasks.task[].startTime` | `start_time` | `string` | output only | — | Output only. Task start time. |
 | `deploymentTasks.task[].state` | — | `string` | output only | — | Output only. The current state of the task. |
-| `deploymentTasks.task[].type_value` | wire `type` | `string` | output only | — | Output only. The type of the task. |
+| `deploymentTasks.task[].type` | — | `string` | output only | — | Output only. The type of the task. |
 | `description` | — | `string` | optional | — | Optional. User-provided description for the deployment. The description can be up to 255 characters long. |
 | `errorDetail` | `error_detail` | `string` | output only | — | Output only. Provides details on why switchover is not possible. This field is empty unless a switchover attempt failed or the state is `SWITCHOVER_NOT_READY`. Example: "The target database version … |
 | `name` | — | `string` | output only | — | Output only. Identifier. The full resource name of the deployment. Format: projects/{project}/locations/{location}/blueGreenDeployments/{deployment_id} |

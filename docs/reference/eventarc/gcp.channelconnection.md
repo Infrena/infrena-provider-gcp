@@ -37,7 +37,7 @@ projects/{project}/locations/{location}/channelConnections/{channelConnection}
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
-| `activationToken` | `activation_token` | `string` | optional | — | Input only. Activation token for the channel. The token will be used during the creation of ChannelConnection to bind the channel with the provider project. This field will not be stored in the … |
+| `activationToken` | `activation_token` | `string` | optional | sensitive | Input only. Activation token for the channel. The token will be used during the creation of ChannelConnection to bind the channel with the provider project. This field will not be stored in the … |
 | `channel` | — | `string` | optional | — | Required. The name of the connected subscriber Channel. This is a weak reference to avoid cross project and cross accounts references. This must be in … |
 | `channelConnectionId` | — | `string` | required | force new, create only | Required. The user-provided ID to be assigned to the channel connection. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation time. |

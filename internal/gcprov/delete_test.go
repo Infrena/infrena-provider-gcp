@@ -169,3 +169,37 @@ func TestNothingToClearSendsNoPatch(t *testing.T) {
 		}
 	}
 }
+
+// TestAnUpdateWaitsOnlyForItsOwnAnswer. Artifact Registry's create answers
+// with an operation and its patch with the repository itself. Awaited as an
+// operation, an update polled the repository's own name for a `done` it
+// never has, until the type's twenty-minute timeout (live, 2026-09-25).
+func TestAnUpdateWaitsOnlyForItsOwnAnswer(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetOperationStyle(gcpfake.OpSync)
+	s.Seed(deletePath, map[string]any{"name": "one", "sizeGb": float64(10)})
+	ty := widgetType()
+	ty.Await = catalog.AwaitLongRunning
+	none := catalog.AwaitNone
+	ty.UpdateAwait = &none
+	ty.OperationPollPath = "v1/{+name}"
+	ty.TimeoutSeconds = 3
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+	st, err := p.Update(context.Background(), widgetState(), widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(20),
+	}))
+	if err != nil {
+		t.Fatalf("Update = %v, want the patch's own answer taken as the result", err)
+	}
+	if got, _ := st.Attributes["sizeGb"].AsInt(); got != 20 {
+		t.Errorf("state after the update has sizeGb %v, want 20", st.Attributes["sizeGb"])
+	}
+	for _, r := range s.Requests() {
+		if r.Method == "GET" && !strings.HasSuffix(r.Path, "/widgets/one") {
+			t.Errorf("the update polled %s, which is not an operation", r.Path)
+		}
+	}
+}

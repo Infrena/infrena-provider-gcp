@@ -205,4 +205,7 @@ var genericWords = map[string]bool{
 	"database": true, "table": true, "template": true, "version": true,
 	"connection": true, "endpoint": true, "gateway": true, "repository": true,
 	"resource": true, "operation": true, "channel": true, "trigger": true,
+	// Added 2026-09-25, before AlloyDB's backup and VPC Access's connector
+	// took gcp.backup and gcp.connector.
+	"backup": true, "connector": true, "snapshot": true, "index": true, "user": true,
 }
