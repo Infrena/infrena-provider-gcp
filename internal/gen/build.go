@@ -1230,8 +1230,20 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 
 	if ruling != nil {
+		for _, f := range ruling.Settable {
+			a := attrNamed(attrs, f)
+			if a == nil {
+				return nil, fmt.Errorf("settable names %q, which is not an attribute of this type", f)
+			}
+			a.Output = false
+		}
+		for _, path := range ruling.InPlace {
+			if err := markInPlace(attrs, path); err != nil {
+				return nil, err
+			}
+		}
 		for _, f := range ruling.Required {
-			a := attrs[f]
+			a := attrNamed(attrs, f)
 			if a == nil || a.Output {
 				return nil, fmt.Errorf("required names %q, which is not a settable attribute of this type", f)
 			}
@@ -2617,4 +2629,48 @@ func attrAtPath(attrs map[string]*catalog.Attr, path string) *catalog.Attr {
 		fields = a.Fields
 	}
 	return a
+}
+
+// markInPlace makes the leaf at a dotted path change in place inside blocks
+// that are ForceNew as a whole: each block on the way stops being ForceNew,
+// and every sibling off the path that was covered by it becomes ForceNew
+// itself, so only the named leaf moved.
+func markInPlace(attrs map[string]*catalog.Attr, path string) error {
+	fields := attrs
+	segs := strings.Split(path, ".")
+	for i, seg := range segs {
+		a := fields[seg]
+		if a == nil {
+			return fmt.Errorf("in_place names %q, which has no %q", path, seg)
+		}
+		if i == len(segs)-1 {
+			a.ForceNew = false
+			return nil
+		}
+		if a.ForceNew {
+			a.ForceNew = false
+			for name, sib := range a.Fields {
+				if name != segs[i+1] && !sib.Output {
+					sib.ForceNew = true
+				}
+			}
+		}
+		fields = a.Fields
+	}
+	return nil
+}
+
+// attrNamed finds a top-level attribute by its key or its wire name: a
+// ruling names fields as the API does ("type"), and a keyword-clashing one is
+// keyed differently ("type_value").
+func attrNamed(attrs map[string]*catalog.Attr, name string) *catalog.Attr {
+	if a := attrs[name]; a != nil {
+		return a
+	}
+	for _, a := range attrs {
+		if a.Canonical == name {
+			return a
+		}
+	}
+	return nil
 }

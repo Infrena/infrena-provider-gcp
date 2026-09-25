@@ -31,6 +31,18 @@ type Ruling struct {
 	// hides by always sending "Managed by Terraform". Evidence, never
 	// assumed; the note cites it.
 	Required []string `yaml:"required"`
+	// Settable names fields magic-modules marks output because its hook
+	// derives them, which here the user writes instead: a health check's
+	// `type`, which Terraform infers from the protocol block and compute
+	// requires. Left output, the field Google insists on could not be
+	// written and every create failed.
+	Settable []string `yaml:"settable"`
+	// InPlace names dotted paths that change in place inside a block
+	// magic-modules marks immutable as a whole. ForceNew on a block
+	// replaces the resource for any change inside it; Terraform patches
+	// these leaves (an Artifact Registry repository's upstream
+	// credentials), and replacing the repository deletes its artifacts.
+	InPlace []string `yaml:"in_place"`
 }
 
 // Patchable is a human decision about a type whose API patches only SOME of
