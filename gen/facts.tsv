@@ -4282,7 +4282,7 @@ gcp.logging.metric		setters	none	default
 gcp.logging.metric		timeout	60	default
 gcp.logging.metric		update_await	none	discovery
 gcp.logging.metric		update_mask	none	default
-gcp.logging.metric		update_verb	PUT	discovery
+gcp.logging.metric		update_verb	PUT	observed+discovery
 gcp.logging.metric	bucketOptions.explicitBuckets.bounds	required	true	mm
 gcp.logging.metric	bucketOptions.exponentialBuckets.growthFactor	required	true	mm
 gcp.logging.metric	bucketOptions.exponentialBuckets.numFiniteBuckets	required	true	mm
