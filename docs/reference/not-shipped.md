@@ -17,23 +17,17 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | Reason | Types |
 | --- | --- |
 | [no insert or create method](#no-insert-or-create-method) | 251 |
-| [unruled wire hooks](#unruled-wire-hooks) | 46 |
+| [unruled wire hooks](#unruled-wire-hooks) | 31 |
 | [no delete method](#no-delete-method) | 16 |
 | [legacy alias of a type that does ship](#legacy-alias-of-a-type-that-does-ship) | 9 |
 | [magic-modules marks it exclude](#magic-modules-marks-it-exclude) | 9 |
 | [min_version is beta, not ga](#min_version-is-beta-not-ga) | 8 |
 | [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
 | [no get method](#no-get-method) | 2 |
-| [create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill](#create-url-projectsprojectzoneszonenodegroupsinitialnodecountpre_create_replace_me-carries-a-token-magic-modules-pre_create-hook-replaces-which-this-provider-cannot-fill) | 1 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectalertpolicies-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectgroups-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectlocationslocationsessiontemplates-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectmetricdescriptors-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates](#self_link-name-is-not-inside-projectsprojectservices-the-collection-its-create-posts-to-so-it-would-name-a-resource-this-type-never-creates) | 1 |
-| [shipped, but cannot be created](#shipped-but-cannot-be-created) | 62 |
+| [shipped, but cannot be created](#shipped-but-cannot-be-created) | 53 |
 
-**352** types did not ship. **62** more ship without a create.
+**331** types did not ship. **53** more ship without a create.
 
 ## no insert or create method
 
@@ -303,10 +297,7 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `accesscontextmanager/AuthorizedOrgsDesc` | 2 | custom_import, encoder, post_create, pre_update |
 | `accesscontextmanager/GcpUserAccessBinding` | 2 | custom_import |
 | `accesscontextmanager/ServicePerimeter` | 2 | custom_import, encoder, pre_update |
-| `alloydb/Backup` | 2 | encoder |
 | `alloydb/Cluster` | 2 | pre_create, pre_delete, pre_update |
-| `alloydb/Instance` | 2 | custom_import, decoder, pre_create, pre_delete |
-| `alloydb/User` | 2 | custom_import, pre_update |
 | `binaryauthorization/Policy` | 2 | pre_delete |
 | `cloudkms/CryptoKey` | 2 | custom_delete, custom_import, decoder, encoder, update_encoder |
 | `cloudkms/CryptoKeyVersion` | 2 | custom_delete, custom_import, pre_update |
@@ -315,36 +306,24 @@ The upstream definition carries hooks that rewrite the request or response. Each
 | `compute/Disk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
 | `compute/FirewallPolicy` | 2 | post_create, post_delete, post_update |
 | `compute/GlobalVmExtensionPolicy` | 2 | post_delete, pre_delete, pre_update |
-| `compute/InterconnectAttachment` | 2 | post_create, pre_delete |
 | `compute/OrganizationSecurityPolicy` | 2 | post_create, post_delete, post_update |
 | `compute/RegionDisk` | 2 | custom_update, decoder, encoder, pre_delete, update_encoder |
 | `compute/Reservation` | 2 | decoder, pre_update, update_encoder |
 | `compute/ServiceAttachment` | 2 | encoder, update_encoder |
 | `compute/Snapshot` | 2 | decoder, pre_create |
-| `compute/VpnTunnel` | 2 | encoder, post_create |
-| `compute/ZoneVmExtensionPolicy` | 2 | pre_update |
 | `dataproc/Batch` | 2 | decoder |
 | `firestore/Index` | 2 | custom_create, custom_import, encoder |
 | `iam/OauthClient` | 2 | decoder, post_create, post_delete, post_update |
 | `iam/WorkforcePool` | 2 | decoder |
 | `iam/WorkloadIdentityPool` | 2 | decoder, post_create, pre_create |
-| `logging/LogScope` | 2 | encoder |
-| `logging/LogScope` | 2 | encoder |
-| `logging/LogScope` | 2 | encoder |
 | `monitoring/NotificationChannel` | 2 | custom_import, decoder, encoder |
 | `monitoring/UptimeCheckConfig` | 2 | custom_delete, custom_import, encoder |
 | `networkservices/Gateway` | 2 | post_delete, update_encoder |
-| `redis/Cluster` | 2 | decoder, encoder |
-| `redis/Instance` | 2 | decoder, encoder, pre_delete |
-| `spanner/BackupSchedule` | 2 | decoder, encoder, pre_update |
-| `spanner/Instance` | 2 | decoder, encoder, post_create, pre_delete, pre_update, update_encoder |
 | `spanner/InstanceConfig` | 2 | decoder, encoder, update_encoder |
 | `spanner/InstancePartition` | 2 | encoder, pre_update |
 | `storage/Folder` | 2 | custom_delete, custom_import, custom_update |
 | `storage/HmacKey` | 2 | decoder, post_create, pre_delete |
 | `storage/ManagedFolder` | 2 | custom_update |
-| `vpcaccess/Connector` | 2 | decoder, encoder, post_create, pre_update |
-| `workflows/Workflow` | 2 | encoder, pre_delete |
 
 ## no delete method
 
@@ -436,14 +415,6 @@ The API publishes no get. Reading one means listing its parent, which needs a ru
 | `cloudresourcemanager/tagHolds` | 2 | needs a ruling with read_via |
 | `servicenetworking/peeredDnsDomains` | 2 | needs a ruling with read_via |
 
-## create url "projects/{{project}}/zones/{{zone}}/nodeGroups?initialNodeCount=PRE_CREATE_REPLACE_ME" carries a token magic-modules' pre_create hook replaces, which this provider cannot fill
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `compute/NodeGroup` | 3 | — |
-
 ## reference to gcp.servertlspolicy.selfLink dropped
 
 Reported by the generator.
@@ -451,46 +422,6 @@ Reported by the generator.
 | Type | Tier | Detail |
 | --- | --- | --- |
 | `compute/gcp.targethttpsproxy.serverTlsPolicy` | 1 | gcp.servertlspolicy has no attribute "selfLink" |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/alertPolicies", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/AlertPolicy` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/groups", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/Group` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/locations/{{location}}/sessionTemplates", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `dataproc/SessionTemplate` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/metricDescriptors", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/MetricDescriptor` | 3 | — |
-
-## self_link "{{name}}" is not inside "projects/{{project}}/services", the collection its create posts to, so it would name a resource this type never creates
-
-Reported by the generator.
-
-| Type | Tier | Detail |
-| --- | --- | --- |
-| `monitoring/Service` | 3 | — |
 
 ## Shipped, but cannot be created
 
@@ -505,8 +436,6 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.bigtableadmin.cluster` | `{+parent}/clusters?clusterId={{clusterId}}` | instance |
 | `gcp.bigtableadmin.table` | `{+parent}/tables` | instance |
 | `gcp.cloudasset.savedquery` | `{+parent}/savedQueries?savedQueryId={{savedQueryId}}` | parent |
-| `gcp.cloudresourcemanager.folder.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | folder |
-| `gcp.cloudresourcemanager.organization.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | organization |
 | `gcp.config` | `{+parent}/configs` | api |
 | `gcp.credential` | `{+parent}/credentials` | oauthClient |
 | `gcp.feed` | `{+parent}/feeds` | parent |
@@ -520,20 +449,17 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.logging.billingaccount.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | billingAccount |
 | `gcp.logging.billingaccount.exclusion` | `{+parent}/exclusions` | billingAccount |
 | `gcp.logging.billingaccount.link` | `{+parent}/links?linkId={{linkId}}` | billingAccount, bucket |
-| `gcp.logging.billingaccount.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | billingAccount |
 | `gcp.logging.billingaccount.sink` | `{+parent}/sinks` | billingAccount |
 | `gcp.logging.billingaccount.view` | `{+parent}/views?viewId={{viewId}}` | billingAccount, bucket |
 | `gcp.logging.folder.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | folder |
 | `gcp.logging.folder.exclusion` | `{+parent}/exclusions` | folder |
 | `gcp.logging.folder.link` | `{+parent}/links?linkId={{linkId}}` | bucket, folder |
-| `gcp.logging.folder.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | folder |
 | `gcp.logging.folder.sink` | `{+parent}/sinks` | folder |
 | `gcp.logging.folder.view` | `{+parent}/views?viewId={{viewId}}` | bucket, folder |
 | `gcp.logging.link` | `{+parent}/links?linkId={{linkId}}` | bucket |
 | `gcp.logging.organization.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | organization |
 | `gcp.logging.organization.exclusion` | `{+parent}/exclusions` | organization |
 | `gcp.logging.organization.link` | `{+parent}/links?linkId={{linkId}}` | bucket, organization |
-| `gcp.logging.organization.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | organization |
 | `gcp.logging.organization.sink` | `{+parent}/sinks` | organization |
 | `gcp.logging.organization.view` | `{+parent}/views?viewId={{viewId}}` | bucket, organization |
 | `gcp.logging.view` | `{+parent}/views?viewId={{viewId}}` | bucket |
@@ -541,10 +467,6 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.managedidentity` | `{+parent}/managedIdentities` | namespace, workloadIdentityPool |
 | `gcp.materializedview` | `{+parent}/materializedViews?materializedViewId={{materializedViewId}}` | instance |
 | `gcp.namespace` | `{+parent}/namespaces` | workloadIdentityPool |
-| `gcp.networksecurity.organization.addressgroup` | `{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}` | organization |
-| `gcp.networksecurity.organization.firewallendpoint` | `{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` | organization |
-| `gcp.networksecurity.organization.securityprofile` | `{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` | organization |
-| `gcp.networksecurity.organization.securityprofilegroup` | `{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` | organization |
 | `gcp.networksecurity.rule` | `{+parent}/rules` | gatewaySecurityPolicy |
 | `gcp.osconfig.folder.policyorchestrator` | `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` | folder |
 | `gcp.osconfig.organization.policyorchestrator` | `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` | organization |

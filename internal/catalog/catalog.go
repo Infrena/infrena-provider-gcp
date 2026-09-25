@@ -51,6 +51,11 @@ type RefTarget struct {
 
 // Attr is one attribute, at any depth.
 type Attr struct {
+	// Sources says which inputs decided each of this attribute's facts
+	// (gen/facts.go, docs/FACTS.md). The generator's alone: never
+	// serialised, so neither the runtime nor the embedded catalog sees it.
+	Sources map[string][]string `json:"-"`
+
 	Canonical string     `json:"canonical"`
 	Aliases   []string   `json:"aliases,omitempty"`
 	Kind      value.Kind `json:"kind"`
@@ -90,6 +95,13 @@ type Attr struct {
 	// reporting it missing -- which the next plan would read as drift, for
 	// ever, on a resource that is exactly as configured.
 	InputOnly bool `json:"input_only,omitempty"`
+	// SendWithUpdate marks an input-only REQUEST OPTION that goes in the body
+	// of every update, changed or not, and never in the mask: an Artifact
+	// Registry repository's disableUpstreamValidation. A patch carries only
+	// what changed, so without this the option was left out of every update
+	// after the create, and Google validated credentials the user had asked
+	// it not to (live, 2026-09-25). Only a ruling sets it.
+	SendWithUpdate bool `json:"send_with_update,omitempty"`
 
 	// Unordered marks a list GCP may return in a different order than it was
 	// sent. Task 15 reorders those to match the reference; an ordered list is
@@ -99,6 +111,9 @@ type Attr struct {
 
 // Type is one resource type.
 type Type struct {
+	// Sources is Attr.Sources for the type's own facts.
+	Sources map[string][]string `json:"-"`
+
 	Name        string `json:"name"`
 	Service     string `json:"service"`
 	Description string `json:"description,omitempty"`
@@ -246,6 +261,13 @@ type Type struct {
 	// failure for a delete that worked. Nil means "the same as Await";
 	// DeleteAwaitKind is how to read it.
 	DeleteAwait *AwaitKind `json:"delete_await,omitempty"`
+	// UpdateAwait is how an update completes, when that differs from Await,
+	// for the same reason as DeleteAwait. Artifact Registry's create answers
+	// with an operation and its patch with the repository itself; awaited as
+	// an operation, the repository's own name was polled for a `done` it
+	// never has until the type's twenty-minute timeout (live, 2026-09-25).
+	// Nil means "the same as Await"; UpdateAwaitKind is how to read it.
+	UpdateAwait *AwaitKind `json:"update_await,omitempty"`
 	// OperationWaitPath is the API's own operations wait path for this type's
 	// scope, e.g. "projects/{project}/zones/{zone}/operations/{operation}/wait".
 	// EMPTY means the API publishes no wait method — container and sqladmin do
@@ -699,6 +721,14 @@ func (t *Type) SetterFor(canonical string) *Setter {
 	return nil
 }
 
+// UpdateAwaitKind is how this type's update completes.
+func (t *Type) UpdateAwaitKind() AwaitKind {
+	if t.UpdateAwait != nil {
+		return *t.UpdateAwait
+	}
+	return t.Await
+}
+
 // DeleteAwaitKind is how this type's delete completes.
 func (t *Type) DeleteAwaitKind() AwaitKind {
 	if t.DeleteAwait != nil {
@@ -724,4 +754,15 @@ const (
 	EquivalenceCase = "case"
 	// EquivalenceDuration: the same length of time ("10s" and "10.000s").
 	EquivalenceDuration = "duration"
+	// EquivalenceKMSKey: the same Cloud KMS key, with or without the key
+	// version Google appends when it answers
+	// (".../cryptoKeys/k/cryptoKeyVersions/1"), and however much of the path
+	// each carries. From Discovery's own CustomerEncryptionKey text: "The
+	// fully-qualifed key name may be returned for resource GET requests".
+	EquivalenceKMSKey = "kms_key"
+	// EquivalenceImage: an image family and an image in it. A resource
+	// created from ".../images/family/debian-12" is answered with the image
+	// the family pointed at, ".../images/debian-12-bookworm-v20260910"; the
+	// same rule Terraform's DiskImageDiffSuppress applies.
+	EquivalenceImage = "image"
 )

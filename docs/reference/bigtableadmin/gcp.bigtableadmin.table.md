@@ -13,7 +13,7 @@ A collection of user data indexed by row, column, and timestamp. Each table is s
 | Asset type | `bigtableadmin.googleapis.com/Table` |
 | Hangs off | `projects` |
 | Tier | 1 (generic-safe) |
-| Mutation timeout | 60s |
+| Mutation timeout | 1200s |
 
 ## What it can do
 
@@ -68,399 +68,399 @@ projects/{project}/instances/{instance}/tables/{table}
 | `rowKeySchema.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
 | `rowKeySchema.fields[]` | — | `map` | optional | — | — |
 | `rowKeySchema.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
-| `rowKeySchema.fields[].type_value` | wire `type` | `map` | optional | — | The type of values in this field. |
-| `rowKeySchema.fields[].type_value.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType` | `input_type` | `map` | optional | — | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType` | `input_type` | `map` | optional | — | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType.inputType` | `input_type` | `map` | optional | opaque | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType.stateType` | `state_type` | `map` | output only | opaque | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.arrayType` | `array_type` | `map` | optional | — | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.arrayType.elementType` | `element_type` | `map` | optional | opaque | The type of the elements in the array. This must not be `Array`. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | `bool_type` | `map` | optional | — | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType.encoding` | — | `map` | optional | opaque | Specifies the encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.bytesType` | `bytes_type` | `map` | optional | — | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.bytesType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | `enum_type` | `map` | optional | — | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType.enumName` | `enum_name` | `string` | optional | — | The fully qualified name of the protobuf enum message, including package. In the format of "foo.bar.EnumMessage". |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType.schemaBundleId` | `schema_bundle_id` | `string` | optional | — | The ID of the schema bundle that this enum is defined in. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int32Type` | `int32_type` | `map` | optional | — | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int32Type.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int64Type` | `int64_type` | `map` | optional | — | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int64Type.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType` | `map_type` | `map` | optional | — | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType.keyType` | `key_type` | `map` | optional | opaque | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType.valueType` | `value_type` | `map` | optional | opaque | The type of the values in a map. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | `proto_type` | `map` | optional | — | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType.messageName` | `message_name` | `string` | optional | — | The fully qualified name of the protobuf message, including package. In the format of "foo.bar.Message". |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType.schemaBundleId` | `schema_bundle_id` | `string` | optional | — | The ID of the schema bundle that this proto is defined in. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.stringType` | `string_type` | `map` | optional | — | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.stringType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType` | `struct_type` | `map` | optional | — | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType.fields[]` | — | `map` | optional | opaque | — |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.timestampType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType` | `state_type` | `map` | output only | — | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.stateType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType` | `array_type` | `map` | optional | — | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType` | `element_type` | `map` | optional | — | The type of the elements in the array. This must not be `Array`. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType.elementType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType` | `bytes_type` | `map` | optional | — | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType.encoding.raw` | — | `map` | optional | — | Use `Raw` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType.encoding.raw.escapeNulls` | `escape_nulls` | `boolean` | optional | — | If set, allows NULL values to be encoded as the empty string "". The actual empty string, or any value which only contains the null byte `0x00`, has one more null byte appended. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | `int32_type` | `map` | optional | — | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type.encoding.bigEndianBytes` | `big_endian_bytes` | `map` | optional | opaque | Use `BigEndianBytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type` | `int64_type` | `map` | optional | — | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type.encoding.bigEndianBytes` | `big_endian_bytes` | `map` | optional | — | Use `BigEndianBytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type.encoding.bigEndianBytes.bytesType` | `bytes_type` | `map` | optional | opaque | Deprecated: ignored if set. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType` | `map_type` | `map` | optional | — | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType` | `key_type` | `map` | optional | — | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.keyType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType` | `value_type` | `map` | optional | — | The type of the values in a map. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType.valueType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType` | `string_type` | `map` | optional | — | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType.encoding.utf8Bytes` | `utf8_bytes` | `map` | optional | — | Use `Utf8Bytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType.encoding.utf8Bytes.nullEscapeChar` | `null_escape_char` | `string` | optional | — | Single-character escape sequence used to support NULL values. If set, allows NULL values to be encoded as the empty string "". The actual empty string, or any value where every character equals … |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType.encoding.utf8Raw` | `utf8_raw` | `map` | optional | opaque | Deprecated: if set, converts to an empty `utf8_bytes`. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType` | `struct_type` | `map` | optional | — | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.encoding` | — | `map` | optional | same fields as `rowKeySchema.encoding` | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[]` | — | `map` | optional | — | — |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value` | wire `type` | `map` | optional | — | The type of values in this field. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.arrayType` | `array_type` | `map` | optional | opaque | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.boolType` | `bool_type` | `map` | optional | opaque | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.enumType` | `enum_type` | `map` | optional | opaque | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.mapType` | `map_type` | `map` | optional | opaque | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.protoType` | `proto_type` | `map` | optional | opaque | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.stringType` | `string_type` | `map` | optional | opaque | String |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.structType` | `struct_type` | `map` | optional | opaque | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.structType.fields[].type_value.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType.encoding.unixMicrosInt64` | `unix_micros_int64` | `map` | optional | — | Encodes the number of microseconds since the Unix epoch using the given `Int64` encoding. Values must be microsecond-aligned. Compatible with: - Java `Instant.truncatedTo()` with `ChronoUnit.MICROS` |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType.encoding.unixMicrosInt64.bigEndianBytes` | `big_endian_bytes` | `map` | optional | opaque | Use `BigEndianBytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType.encoding.unixMicrosInt64.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
-| `rowKeySchema.fields[].type_value.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType` | `state_type` | `map` | output only | — | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.aggregateType.stateType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
-| `rowKeySchema.fields[].type_value.arrayType` | `array_type` | `map` | optional | — | Array |
-| `rowKeySchema.fields[].type_value.arrayType.elementType` | `element_type` | `map` | optional | — | The type of the elements in the array. This must not be `Array`. |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.arrayType.elementType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.int64Type` | `int64_type` | `map` | optional | — | Int64 |
-| `rowKeySchema.fields[].type_value.int64Type.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.int64Type.encoding.bigEndianBytes` | `big_endian_bytes` | `map` | optional | — | Use `BigEndianBytes` encoding. |
-| `rowKeySchema.fields[].type_value.int64Type.encoding.bigEndianBytes.bytesType` | `bytes_type` | `map` | optional | — | Deprecated: ignored if set. |
-| `rowKeySchema.fields[].type_value.int64Type.encoding.bigEndianBytes.bytesType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.int64Type.encoding.bigEndianBytes.bytesType.encoding.raw` | — | `map` | optional | opaque | Use `Raw` encoding. |
-| `rowKeySchema.fields[].type_value.int64Type.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
-| `rowKeySchema.fields[].type_value.mapType` | `map_type` | `map` | optional | — | Map |
-| `rowKeySchema.fields[].type_value.mapType.keyType` | `key_type` | `map` | optional | — | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
-| `rowKeySchema.fields[].type_value.mapType.keyType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.mapType.keyType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.mapType.keyType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.mapType.keyType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.mapType.keyType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.mapType.keyType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.mapType.keyType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.mapType.keyType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.mapType.keyType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.mapType.keyType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.mapType.keyType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.mapType.keyType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.mapType.keyType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.mapType.keyType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.mapType.keyType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.mapType.keyType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.mapType.valueType` | `value_type` | `map` | optional | — | The type of the values in a map. |
-| `rowKeySchema.fields[].type_value.mapType.valueType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType` | Aggregate |
-| `rowKeySchema.fields[].type_value.mapType.valueType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.arrayType` | Array |
-| `rowKeySchema.fields[].type_value.mapType.valueType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.mapType.valueType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.bytesType` | Bytes |
-| `rowKeySchema.fields[].type_value.mapType.valueType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.mapType.valueType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.mapType.valueType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.mapType.valueType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.mapType.valueType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.mapType.valueType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.mapType.valueType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int64Type` | Int64 |
-| `rowKeySchema.fields[].type_value.mapType.valueType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.mapType` | Map |
-| `rowKeySchema.fields[].type_value.mapType.valueType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.mapType.valueType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.mapType.valueType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.structType` | Struct |
-| `rowKeySchema.fields[].type_value.mapType.valueType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.timestampType` | Timestamp |
-| `rowKeySchema.fields[].type_value.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.stringType` | String |
-| `rowKeySchema.fields[].type_value.structType` | `struct_type` | `map` | optional | — | Struct |
-| `rowKeySchema.fields[].type_value.structType.encoding` | — | `map` | optional | same fields as `rowKeySchema.encoding` | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
-| `rowKeySchema.fields[].type_value.structType.fields[]` | — | `map` | optional | — | — |
-| `rowKeySchema.fields[].type_value.structType.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value` | wire `type` | `map` | optional | — | The type of values in this field. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType` | `input_type` | `map` | optional | — | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.arrayType` | `array_type` | `map` | optional | opaque | Array |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.mapType` | `map_type` | `map` | optional | opaque | Map |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.stringType` | `string_type` | `map` | optional | opaque | String |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.structType` | `struct_type` | `map` | optional | opaque | Struct |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.inputType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType` | `state_type` | `map` | output only | — | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.arrayType` | `array_type` | `map` | optional | opaque | Array |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.mapType` | `map_type` | `map` | optional | opaque | Map |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.stringType` | `string_type` | `map` | optional | opaque | String |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.structType` | `struct_type` | `map` | optional | opaque | Struct |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.stateType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType` | `array_type` | `map` | optional | — | Array |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType` | `element_type` | `map` | optional | — | The type of the elements in the array. This must not be `Array`. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.arrayType` | `array_type` | `map` | optional | opaque | Array |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.mapType` | `map_type` | `map` | optional | opaque | Map |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.stringType` | `string_type` | `map` | optional | opaque | String |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.structType` | `struct_type` | `map` | optional | opaque | Struct |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.arrayType.elementType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.bytesType` | `bytes_type` | `map` | optional | — | Bytes |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.bytesType.encoding` | — | `map` | optional | same fields as `rowKeySchema.fields[].type_value.int64Type.encoding.bigEndianBytes.bytesType.encoding` | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type` | Int32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.int64Type` | `int64_type` | `map` | optional | — | Int64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.int64Type.encoding` | — | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.int32Type.encoding` | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType` | `map_type` | `map` | optional | — | Map |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType` | `key_type` | `map` | optional | — | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.arrayType` | `array_type` | `map` | optional | opaque | Array |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.mapType` | `map_type` | `map` | optional | opaque | Map |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.stringType` | `string_type` | `map` | optional | opaque | String |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.structType` | `struct_type` | `map` | optional | opaque | Struct |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.keyType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType` | `value_type` | `map` | optional | — | The type of the values in a map. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.arrayType` | `array_type` | `map` | optional | opaque | Array |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.dateType` | `date_type` | `map` | optional | opaque | Date |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.mapType` | `map_type` | `map` | optional | opaque | Map |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.stringType` | `string_type` | `map` | optional | opaque | String |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.structType` | `struct_type` | `map` | optional | opaque | Struct |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.mapType.valueType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type_value.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.stringType` | `string_type` | `map` | optional | — | String |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.stringType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.stringType.encoding.utf8Bytes` | `utf8_bytes` | `map` | optional | opaque | Use `Utf8Bytes` encoding. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.stringType.encoding.utf8Raw` | `utf8_raw` | `map` | optional | opaque | Deprecated: if set, converts to an empty `utf8_bytes`. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType` | `struct_type` | `map` | optional | — | Struct |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.encoding.delimitedBytes` | `delimited_bytes` | `map` | optional | opaque | Use `DelimitedBytes` encoding. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | User `OrderedCodeBytes` encoding. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.encoding.singleton` | — | `map` | optional | opaque | Use `Singleton` encoding. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.fields[]` | — | `map` | optional | — | — |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.structType.fields[].type_value` | wire `type` | `map` | optional | opaque | The type of values in this field. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.timestampType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.structType.fields[].type_value.timestampType.encoding.unixMicrosInt64` | `unix_micros_int64` | `map` | optional | opaque | Encodes the number of microseconds since the Unix epoch using the given `Int64` encoding. Values must be microsecond-aligned. Compatible with: - Java `Instant.truncatedTo()` with `ChronoUnit.MICROS` |
-| `rowKeySchema.fields[].type_value.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
-| `rowKeySchema.fields[].type_value.timestampType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.timestampType.encoding.unixMicrosInt64` | `unix_micros_int64` | `map` | optional | — | Encodes the number of microseconds since the Unix epoch using the given `Int64` encoding. Values must be microsecond-aligned. Compatible with: - Java `Instant.truncatedTo()` with `ChronoUnit.MICROS` |
-| `rowKeySchema.fields[].type_value.timestampType.encoding.unixMicrosInt64.bigEndianBytes` | `big_endian_bytes` | `map` | optional | — | Use `BigEndianBytes` encoding. |
-| `rowKeySchema.fields[].type_value.timestampType.encoding.unixMicrosInt64.bigEndianBytes.bytesType` | `bytes_type` | `map` | optional | — | Deprecated: ignored if set. |
-| `rowKeySchema.fields[].type_value.timestampType.encoding.unixMicrosInt64.bigEndianBytes.bytesType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
-| `rowKeySchema.fields[].type_value.timestampType.encoding.unixMicrosInt64.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
+| `rowKeySchema.fields[].type` | — | `map` | optional | — | The type of values in this field. |
+| `rowKeySchema.fields[].type.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType` | `input_type` | `map` | optional | — | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType` | `input_type` | `map` | optional | — | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType.inputType` | `input_type` | `map` | optional | opaque | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType.stateType` | `state_type` | `map` | output only | opaque | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.arrayType` | `array_type` | `map` | optional | — | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.arrayType.elementType` | `element_type` | `map` | optional | opaque | The type of the elements in the array. This must not be `Array`. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | `bool_type` | `map` | optional | — | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType.encoding` | — | `map` | optional | opaque | Specifies the encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.bytesType` | `bytes_type` | `map` | optional | — | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.bytesType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | `enum_type` | `map` | optional | — | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType.enumName` | `enum_name` | `string` | optional | — | The fully qualified name of the protobuf enum message, including package. In the format of "foo.bar.EnumMessage". |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType.schemaBundleId` | `schema_bundle_id` | `string` | optional | — | The ID of the schema bundle that this enum is defined in. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int32Type` | `int32_type` | `map` | optional | — | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int32Type.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int64Type` | `int64_type` | `map` | optional | — | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int64Type.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType` | `map_type` | `map` | optional | — | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType.keyType` | `key_type` | `map` | optional | opaque | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType.valueType` | `value_type` | `map` | optional | opaque | The type of the values in a map. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | `proto_type` | `map` | optional | — | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType.messageName` | `message_name` | `string` | optional | — | The fully qualified name of the protobuf message, including package. In the format of "foo.bar.Message". |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType.schemaBundleId` | `schema_bundle_id` | `string` | optional | — | The ID of the schema bundle that this proto is defined in. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.stringType` | `string_type` | `map` | optional | — | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.stringType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType` | `struct_type` | `map` | optional | — | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType.fields[]` | — | `map` | optional | opaque | — |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.timestampType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType` | `state_type` | `map` | output only | — | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.stateType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType` | `array_type` | `map` | optional | — | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType` | `element_type` | `map` | optional | — | The type of the elements in the array. This must not be `Array`. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.arrayType.elementType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.bytesType` | `bytes_type` | `map` | optional | — | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.bytesType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.bytesType.encoding.raw` | — | `map` | optional | — | Use `Raw` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.bytesType.encoding.raw.escapeNulls` | `escape_nulls` | `boolean` | optional | — | If set, allows NULL values to be encoded as the empty string "". The actual empty string, or any value which only contains the null byte `0x00`, has one more null byte appended. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | `int32_type` | `map` | optional | — | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int32Type.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int32Type.encoding.bigEndianBytes` | `big_endian_bytes` | `map` | optional | opaque | Use `BigEndianBytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int32Type.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int64Type` | `int64_type` | `map` | optional | — | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int64Type.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int64Type.encoding.bigEndianBytes` | `big_endian_bytes` | `map` | optional | — | Use `BigEndianBytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int64Type.encoding.bigEndianBytes.bytesType` | `bytes_type` | `map` | optional | opaque | Deprecated: ignored if set. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.int64Type.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType` | `map_type` | `map` | optional | — | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType` | `key_type` | `map` | optional | — | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.keyType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType` | `value_type` | `map` | optional | — | The type of the values in a map. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.mapType.valueType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.stringType` | `string_type` | `map` | optional | — | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.stringType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.stringType.encoding.utf8Bytes` | `utf8_bytes` | `map` | optional | — | Use `Utf8Bytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.stringType.encoding.utf8Bytes.nullEscapeChar` | `null_escape_char` | `string` | optional | — | Single-character escape sequence used to support NULL values. If set, allows NULL values to be encoded as the empty string "". The actual empty string, or any value where every character equals … |
+| `rowKeySchema.fields[].type.aggregateType.inputType.stringType.encoding.utf8Raw` | `utf8_raw` | `map` | optional | opaque | Deprecated: if set, converts to an empty `utf8_bytes`. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType` | `struct_type` | `map` | optional | — | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.encoding` | — | `map` | optional | same fields as `rowKeySchema.encoding` | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[]` | — | `map` | optional | — | — |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type` | — | `map` | optional | — | The type of values in this field. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.arrayType` | `array_type` | `map` | optional | opaque | Array |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.boolType` | `bool_type` | `map` | optional | opaque | Bool |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.enumType` | `enum_type` | `map` | optional | opaque | Enum |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.mapType` | `map_type` | `map` | optional | opaque | Map |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.protoType` | `proto_type` | `map` | optional | opaque | Proto |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.stringType` | `string_type` | `map` | optional | opaque | String |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.structType` | `struct_type` | `map` | optional | opaque | Struct |
+| `rowKeySchema.fields[].type.aggregateType.inputType.structType.fields[].type.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.inputType.timestampType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.timestampType.encoding.unixMicrosInt64` | `unix_micros_int64` | `map` | optional | — | Encodes the number of microseconds since the Unix epoch using the given `Int64` encoding. Values must be microsecond-aligned. Compatible with: - Java `Instant.truncatedTo()` with `ChronoUnit.MICROS` |
+| `rowKeySchema.fields[].type.aggregateType.inputType.timestampType.encoding.unixMicrosInt64.bigEndianBytes` | `big_endian_bytes` | `map` | optional | opaque | Use `BigEndianBytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.inputType.timestampType.encoding.unixMicrosInt64.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
+| `rowKeySchema.fields[].type.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
+| `rowKeySchema.fields[].type.aggregateType.stateType` | `state_type` | `map` | output only | — | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
+| `rowKeySchema.fields[].type.aggregateType.stateType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.aggregateType.stateType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.aggregateType.stateType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.aggregateType.stateType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.aggregateType.stateType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.aggregateType.stateType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.aggregateType.stateType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.aggregateType.stateType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.aggregateType.stateType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.aggregateType.stateType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.aggregateType.stateType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.aggregateType.stateType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.aggregateType.stateType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.aggregateType.stateType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.aggregateType.stateType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.aggregateType.stateType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
+| `rowKeySchema.fields[].type.arrayType` | `array_type` | `map` | optional | — | Array |
+| `rowKeySchema.fields[].type.arrayType.elementType` | `element_type` | `map` | optional | — | The type of the elements in the array. This must not be `Array`. |
+| `rowKeySchema.fields[].type.arrayType.elementType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.arrayType.elementType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.arrayType.elementType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.arrayType.elementType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.arrayType.elementType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.arrayType.elementType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.arrayType.elementType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.arrayType.elementType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.arrayType.elementType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.arrayType.elementType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.arrayType.elementType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.arrayType.elementType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.arrayType.elementType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.arrayType.elementType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.arrayType.elementType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.arrayType.elementType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.int64Type` | `int64_type` | `map` | optional | — | Int64 |
+| `rowKeySchema.fields[].type.int64Type.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.int64Type.encoding.bigEndianBytes` | `big_endian_bytes` | `map` | optional | — | Use `BigEndianBytes` encoding. |
+| `rowKeySchema.fields[].type.int64Type.encoding.bigEndianBytes.bytesType` | `bytes_type` | `map` | optional | — | Deprecated: ignored if set. |
+| `rowKeySchema.fields[].type.int64Type.encoding.bigEndianBytes.bytesType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.int64Type.encoding.bigEndianBytes.bytesType.encoding.raw` | — | `map` | optional | opaque | Use `Raw` encoding. |
+| `rowKeySchema.fields[].type.int64Type.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
+| `rowKeySchema.fields[].type.mapType` | `map_type` | `map` | optional | — | Map |
+| `rowKeySchema.fields[].type.mapType.keyType` | `key_type` | `map` | optional | — | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
+| `rowKeySchema.fields[].type.mapType.keyType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.mapType.keyType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.mapType.keyType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.mapType.keyType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.mapType.keyType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.mapType.keyType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.mapType.keyType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.mapType.keyType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.mapType.keyType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.mapType.keyType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.mapType.keyType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.mapType.keyType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.mapType.keyType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.mapType.keyType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.mapType.keyType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.mapType.keyType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.mapType.valueType` | `value_type` | `map` | optional | — | The type of the values in a map. |
+| `rowKeySchema.fields[].type.mapType.valueType.aggregateType` | `aggregate_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType` | Aggregate |
+| `rowKeySchema.fields[].type.mapType.valueType.arrayType` | `array_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.arrayType` | Array |
+| `rowKeySchema.fields[].type.mapType.valueType.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.mapType.valueType.bytesType` | `bytes_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.bytesType` | Bytes |
+| `rowKeySchema.fields[].type.mapType.valueType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.mapType.valueType.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.mapType.valueType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.mapType.valueType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.mapType.valueType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.mapType.valueType.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.mapType.valueType.int64Type` | `int64_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int64Type` | Int64 |
+| `rowKeySchema.fields[].type.mapType.valueType.mapType` | `map_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.mapType` | Map |
+| `rowKeySchema.fields[].type.mapType.valueType.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.mapType.valueType.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.mapType.valueType.structType` | `struct_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.structType` | Struct |
+| `rowKeySchema.fields[].type.mapType.valueType.timestampType` | `timestamp_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.timestampType` | Timestamp |
+| `rowKeySchema.fields[].type.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.stringType` | `string_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.stringType` | String |
+| `rowKeySchema.fields[].type.structType` | `struct_type` | `map` | optional | — | Struct |
+| `rowKeySchema.fields[].type.structType.encoding` | — | `map` | optional | same fields as `rowKeySchema.encoding` | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
+| `rowKeySchema.fields[].type.structType.fields[]` | — | `map` | optional | — | — |
+| `rowKeySchema.fields[].type.structType.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
+| `rowKeySchema.fields[].type.structType.fields[].type` | — | `map` | optional | — | The type of values in this field. |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType` | `aggregate_type` | `map` | optional | — | Aggregate |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.hllppUniqueCount` | `hllpp_unique_count` | `map` | optional | opaque | HyperLogLogPlusPlusUniqueCount aggregator. |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType` | `input_type` | `map` | optional | — | Type of the inputs that are accumulated by this `Aggregate`. Use `AddInput` mutations to accumulate new inputs. |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.arrayType` | `array_type` | `map` | optional | opaque | Array |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.mapType` | `map_type` | `map` | optional | opaque | Map |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.stringType` | `string_type` | `map` | optional | opaque | String |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.structType` | `struct_type` | `map` | optional | opaque | Struct |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.inputType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.max` | — | `map` | optional | opaque | Max aggregator. |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.min` | — | `map` | optional | opaque | Min aggregator. |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType` | `state_type` | `map` | output only | — | Output only. Type that holds the internal accumulator state for the `Aggregate`. This is a function of the `input_type` and `aggregator` chosen. |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.arrayType` | `array_type` | `map` | optional | opaque | Array |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.mapType` | `map_type` | `map` | optional | opaque | Map |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.stringType` | `string_type` | `map` | optional | opaque | String |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.structType` | `struct_type` | `map` | optional | opaque | Struct |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.stateType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
+| `rowKeySchema.fields[].type.structType.fields[].type.aggregateType.sum` | — | `map` | optional | opaque | Sum aggregator. |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType` | `array_type` | `map` | optional | — | Array |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType` | `element_type` | `map` | optional | — | The type of the elements in the array. This must not be `Array`. |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.arrayType` | `array_type` | `map` | optional | opaque | Array |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.mapType` | `map_type` | `map` | optional | opaque | Map |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.stringType` | `string_type` | `map` | optional | opaque | String |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.structType` | `struct_type` | `map` | optional | opaque | Struct |
+| `rowKeySchema.fields[].type.structType.fields[].type.arrayType.elementType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
+| `rowKeySchema.fields[].type.structType.fields[].type.boolType` | `bool_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.boolType` | Bool |
+| `rowKeySchema.fields[].type.structType.fields[].type.bytesType` | `bytes_type` | `map` | optional | — | Bytes |
+| `rowKeySchema.fields[].type.structType.fields[].type.bytesType.encoding` | — | `map` | optional | same fields as `rowKeySchema.fields[].type.int64Type.encoding.bigEndianBytes.bytesType.encoding` | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.structType.fields[].type.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.structType.fields[].type.enumType` | `enum_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.enumType` | Enum |
+| `rowKeySchema.fields[].type.structType.fields[].type.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.structType.fields[].type.int32Type` | `int32_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type` | Int32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.int64Type` | `int64_type` | `map` | optional | — | Int64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.int64Type.encoding` | — | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.int32Type.encoding` | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType` | `map_type` | `map` | optional | — | Map |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType` | `key_type` | `map` | optional | — | The type of a map key. Only `Bytes`, `String`, and `Int64` are allowed as key types. |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.arrayType` | `array_type` | `map` | optional | opaque | Array |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.mapType` | `map_type` | `map` | optional | opaque | Map |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.stringType` | `string_type` | `map` | optional | opaque | String |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.structType` | `struct_type` | `map` | optional | opaque | Struct |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.keyType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType` | `value_type` | `map` | optional | — | The type of the values in a map. |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.aggregateType` | `aggregate_type` | `map` | optional | opaque | Aggregate |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.arrayType` | `array_type` | `map` | optional | opaque | Array |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.boolType` | `bool_type` | `map` | optional | opaque | Bool |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.bytesType` | `bytes_type` | `map` | optional | opaque | Bytes |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.dateType` | `date_type` | `map` | optional | opaque | Date |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.enumType` | `enum_type` | `map` | optional | opaque | Enum |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.float32Type` | `float32_type` | `map` | optional | opaque | Float32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.float64Type` | `float64_type` | `map` | optional | opaque | Float64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.geographyType` | `geography_type` | `map` | optional | opaque | Geography |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.int32Type` | `int32_type` | `map` | optional | opaque | Int32 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.int64Type` | `int64_type` | `map` | optional | opaque | Int64 |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.mapType` | `map_type` | `map` | optional | opaque | Map |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.protoType` | `proto_type` | `map` | optional | opaque | Proto |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.stringType` | `string_type` | `map` | optional | opaque | String |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.structType` | `struct_type` | `map` | optional | opaque | Struct |
+| `rowKeySchema.fields[].type.structType.fields[].type.mapType.valueType.timestampType` | `timestamp_type` | `map` | optional | opaque | Timestamp |
+| `rowKeySchema.fields[].type.structType.fields[].type.protoType` | `proto_type` | `map` | optional | same fields as `rowKeySchema.fields[].type.aggregateType.inputType.aggregateType.inputType.protoType` | Proto |
+| `rowKeySchema.fields[].type.structType.fields[].type.stringType` | `string_type` | `map` | optional | — | String |
+| `rowKeySchema.fields[].type.structType.fields[].type.stringType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.structType.fields[].type.stringType.encoding.utf8Bytes` | `utf8_bytes` | `map` | optional | opaque | Use `Utf8Bytes` encoding. |
+| `rowKeySchema.fields[].type.structType.fields[].type.stringType.encoding.utf8Raw` | `utf8_raw` | `map` | optional | opaque | Deprecated: if set, converts to an empty `utf8_bytes`. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType` | `struct_type` | `map` | optional | — | Struct |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.encoding.delimitedBytes` | `delimited_bytes` | `map` | optional | opaque | Use `DelimitedBytes` encoding. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.encoding.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | User `OrderedCodeBytes` encoding. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.encoding.singleton` | — | `map` | optional | opaque | Use `Singleton` encoding. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.fields` | — | `list` | optional | — | The names and types of the fields in this struct. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.fields[]` | — | `map` | optional | — | — |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.fields[].fieldName` | `field_name` | `string` | optional | — | The field name (optional). Fields without a `field_name` are considered anonymous and cannot be referenced by name. |
+| `rowKeySchema.fields[].type.structType.fields[].type.structType.fields[].type` | — | `map` | optional | opaque | The type of values in this field. |
+| `rowKeySchema.fields[].type.structType.fields[].type.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
+| `rowKeySchema.fields[].type.structType.fields[].type.timestampType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.structType.fields[].type.timestampType.encoding.unixMicrosInt64` | `unix_micros_int64` | `map` | optional | opaque | Encodes the number of microseconds since the Unix epoch using the given `Int64` encoding. Values must be microsecond-aligned. Compatible with: - Java `Instant.truncatedTo()` with `ChronoUnit.MICROS` |
+| `rowKeySchema.fields[].type.timestampType` | `timestamp_type` | `map` | optional | — | Timestamp |
+| `rowKeySchema.fields[].type.timestampType.encoding` | — | `map` | optional | — | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.timestampType.encoding.unixMicrosInt64` | `unix_micros_int64` | `map` | optional | — | Encodes the number of microseconds since the Unix epoch using the given `Int64` encoding. Values must be microsecond-aligned. Compatible with: - Java `Instant.truncatedTo()` with `ChronoUnit.MICROS` |
+| `rowKeySchema.fields[].type.timestampType.encoding.unixMicrosInt64.bigEndianBytes` | `big_endian_bytes` | `map` | optional | — | Use `BigEndianBytes` encoding. |
+| `rowKeySchema.fields[].type.timestampType.encoding.unixMicrosInt64.bigEndianBytes.bytesType` | `bytes_type` | `map` | optional | — | Deprecated: ignored if set. |
+| `rowKeySchema.fields[].type.timestampType.encoding.unixMicrosInt64.bigEndianBytes.bytesType.encoding` | — | `map` | optional | opaque | The encoding to use when converting to or from lower level types. |
+| `rowKeySchema.fields[].type.timestampType.encoding.unixMicrosInt64.orderedCodeBytes` | `ordered_code_bytes` | `map` | optional | opaque | Use `OrderedCodeBytes` encoding. |
 | `stats` | — | `map` | output only | — | Output only. Only available with STATS_VIEW, this includes summary statistics about the entire table contents. For statistics about a specific column family, see ColumnFamilyStats in the mapped … |
 | `stats.averageCellsPerColumn` | `average_cells_per_column` | `float` | optional | — | How many cells are present per column (column family, column qualifier) combinations, averaged over all columns in all rows in the table. e.g. A table with 2 rows: * A row with 3 cells in … |
 | `stats.averageColumnsPerRow` | `average_columns_per_row` | `float` | optional | — | How many (column family, column qualifier) combinations are present per row in the table, averaged over all rows in the table. e.g. A table with 2 rows: * A row with cells in "family:col" and … |

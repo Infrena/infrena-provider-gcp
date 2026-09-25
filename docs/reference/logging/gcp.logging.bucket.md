@@ -50,7 +50,7 @@ projects/{project}/locations/{location}/buckets/{bucket}
 | `indexConfigs[]` | — | `map` | optional | — | — |
 | `indexConfigs[].createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the index was last modified.This is used to return the timestamp, and will be ignored if supplied during update. |
 | `indexConfigs[].fieldPath` | `field_path` | `string` | optional | — | Required. The LogEntry field path to index.Note that some paths are automatically indexed, and other paths are not eligible for indexing. See indexing documentation( … |
-| `indexConfigs[].type_value` | wire `type` | `string` | optional | — | Required. The type of data in this index. |
+| `indexConfigs[].type` | — | `string` | optional | — | Required. The type of data in this index. |
 | `lifecycleState` | `lifecycle_state` | `string` | output only | — | Output only. The bucket lifecycle state. |
 | `locked` | — | `boolean` | optional | — | Optional. Whether the bucket is locked.The retention period on a locked bucket cannot be changed. Locked buckets may only be deleted if they are empty. |
 | `name` | — | `string` | output only | — | Output only. The resource name of the bucket.For example:projects/my-project/locations/global/buckets/my-bucketFor a list of supported locations, see Supported Regions … |

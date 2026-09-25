@@ -303,6 +303,13 @@ func Build(in Inputs) (*Result, error) {
 		resolveRefs(b.t.Attributes, selfProduct, b.t.Service, b.t.Name, refByProduct, refCandidates, &warnings)
 	}
 	dropRefsToMissingAttributes(c.Types, &warnings)
+	if err := applySensitive(c.Types, overlay.Sensitive); err != nil {
+		return nil, err
+	}
+	// Last, so an observation checks the catalog as it will ship.
+	if err := applyObserved(c.Types, overlay.Observed); err != nil {
+		return nil, err
+	}
 	// Every shipped type whose create url cannot be built, recorded once,
 	// here, over the catalog as it finally stands. The capability itself is
 	// derived from the same function at load (catalog.Definitions), so this
@@ -328,7 +335,7 @@ func Build(in Inputs) (*Result, error) {
 		}
 		if restricted, says := restrictedPatch(b.p.col); restricted {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name, says})
-		} else if b.p.mm != nil && b.p.mm.Immutable && b.p.col.Methods["patch"] != nil && len(b.t.Setters) == 0 {
+		} else if b.p.mm != nil && b.p.mm.Immutable && patchMethodOf(b.p.col) != nil && len(b.t.Setters) == 0 {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name,
 				"magic-modules marks the resource immutable and names no field it patches"})
 		}
@@ -916,6 +923,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			a.ForceNew = true
 			a.CreateOnly = true
 			a.Output = false
+			addSource(a, "immutable", SourceDiscovery)
 			attrs[n] = a
 		}
 	}
@@ -937,11 +945,35 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.Description = mm.Description
 		t.BaseURL = mm.BaseURL
 		t.CreateURL = mm.CreateURL
-		t.UpdateURL = mm.UpdateURL
 		t.DeleteURL = mm.DeleteURL
 		t.SelfLink = mm.SelfLink
-		t.UpdateVerb = mm.UpdateVerb
+		// PATCH or nothing, from magic-modules too. Its update_verb is
+		// Terraform's whole-object update, and BuildMask sends only what
+		// the diff changed: POSTed to monitoring's metricDescriptors (a
+		// create that overwrites) it would wipe every field it left out,
+		// and pubsub's schemas :commit takes a CommitSchemaRequest wrapper
+		// this provider does not build. Refused, the type is replaced on
+		// change, which is the safe direction.
+		if mm.UpdateVerb == "" || strings.EqualFold(mm.UpdateVerb, http.MethodPatch) {
+			t.UpdateVerb = mm.UpdateVerb
+			t.UpdateURL = mm.UpdateURL
+			if mm.UpdateVerb != "" {
+				setTypeSource(t, "update_verb", SourceMM)
+			}
+		} else {
+			t.UpdateURL = ""
+			setTypeSource(t, "update_verb", lost+SourceMM)
+		}
 		t.UpdateMask = mm.UpdateMask
+		if mm.UpdateMask {
+			setTypeSource(t, "update_mask", SourceMM)
+		}
+		if mm.BaseURL != "" || mm.CreateURL != "" {
+			setTypeSource(t, "create_url", SourceMM)
+		}
+		if mm.DeleteURL != "" {
+			setTypeSource(t, "delete_url", SourceMM)
+		}
 		if len(mm.ImportFormat) > 0 {
 			t.ImportFormat = strings.Join(mm.ImportFormat, "\n")
 		}
@@ -965,8 +997,22 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			t.SelfLink = get.Path
 		}
 	}
+	// magic-modules writes some self_links as one bare placeholder,
+	// "v3/{{name}}", where name is the FULL resource name
+	// (projects/p/alertPolicies/123). As a {{...}} placeholder its slashes
+	// would be escaped, and the collection check refused all five such types.
+	// Discovery's get path says the same address correctly -- "v3/{+name}",
+	// reserved expansion, slashes kept -- so it is used instead.
+	if bareMMPlaceholderRE.MatchString(t.SelfLink) {
+		if get := col.Methods["get"]; get != nil && isBareCapture(strings.TrimPrefix(get.Path, versionPrefixOf(get.Path))) {
+			t.SelfLink = get.Path
+		}
+	}
 
 	t.LockField = lockFieldOf(attrs)
+	if t.LockField != "" {
+		setTypeSource(t, "lock_field", SourceDiscovery)
+	}
 
 	// UpdateVerb used to come from magic-modules and from nowhere else, which
 	// meant it usually came from nowhere: magic-modules relies on its own
@@ -994,17 +1040,23 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// the API's spelling of that address through self_link. See
 	// templateAddressesMethod for why magic-modules' spelling cannot be kept.
 	if (t.UpdateVerb == "" || t.UpdateVerb == http.MethodPatch) &&
-		(t.UpdateURL == "" || templateAddressesMethod(t.UpdateURL, col.Methods["patch"])) {
+		(t.UpdateURL == "" || templateAddressesMethod(t.UpdateURL, patchMethodOf(col))) {
 		if wrapper, maskField := discoveredUpdateWrapper(doc, col); wrapper != "" {
 			if restricted, _ := restrictedPatch(col); !restricted || overlay.Patchable[name] != nil {
 				t.UpdateVerb, t.UpdateWrapper, t.UpdateMaskField = http.MethodPatch, wrapper, maskField
 				t.UpdateURL = ""
+				setTypeSource(t, "update_verb", SourceDiscovery)
+				setTypeSource(t, "update_mask", SourceDiscovery)
 				// The mask travels inside the envelope; a query-string one
 				// as well would be a second mask the API never asked for.
 				t.UpdateMask = false
 				if allow := overlay.Patchable[name]; allow != nil {
-					applyPatchAllowlist(attrs, allow.Fields)
+					applyPatchAllowlist(attrs, allow.Fields, SourceRuling)
 					t.PatchOneField = allow.OneFieldPerPatch
+					setTypeSource(t, "update_verb", SourceDiscovery, SourceRuling)
+					if allow.OneFieldPerPatch {
+						setTypeSource(t, "patch_one_field", SourceRuling)
+					}
 				}
 			}
 		}
@@ -1016,13 +1068,20 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			switch {
 			case !restricted:
 				t.UpdateVerb, t.UpdateMask = verb, masked
+				setTypeSource(t, "update_verb", SourceDiscovery)
+				setTypeSource(t, "update_mask", SourceDiscovery)
 			case allow != nil:
 				// A human read what the API says and wrote down which fields it
 				// really patches. Everything else replaces, which is what the
 				// API does with it anyway.
 				t.UpdateVerb, t.UpdateMask = verb, masked
-				applyPatchAllowlist(attrs, allow.Fields)
+				applyPatchAllowlist(attrs, allow.Fields, SourceRuling)
 				t.PatchOneField = allow.OneFieldPerPatch
+				setTypeSource(t, "update_verb", SourceDiscovery, SourceRuling)
+				setTypeSource(t, "update_mask", SourceDiscovery)
+				if allow.OneFieldPerPatch {
+					setTypeSource(t, "patch_one_field", SourceRuling)
+				}
 			default:
 				// Left non-updatable on purpose: see patchlimits.go. Recorded
 				// as a noupdate row in gen/warnings.txt by Build.
@@ -1038,9 +1097,11 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// `patchable:` list, where one exists, has already decided and wins.
 	if mm != nil && mm.Immutable && t.UpdateVerb != "" && overlay.Patchable[name] == nil {
 		if fields := immutableResourcePatchFields(mm); len(fields) > 0 {
-			applyPatchAllowlist(attrs, fields)
+			applyPatchAllowlist(attrs, fields, SourceMM)
 		} else {
 			t.UpdateVerb, t.UpdateMask, t.UpdateURL = "", false, ""
+			setTypeSource(t, "update_verb", SourceMM)
+			setTypeSource(t, "update_mask", SourceMM)
 			t.UpdateWrapper, t.UpdateMaskField = "", ""
 		}
 	}
@@ -1106,6 +1167,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			// that disagrees with the API's own delete path is not an
 			// override worth keeping.
 			t.DeleteURL = t.SelfLink
+			setTypeSource(t, "delete_url", SourceDiscovery)
 		} else if first, _, _ := strings.Cut(t.ImportFormat, "\n"); first != "" {
 			t.SelfLink = first
 		}
@@ -1115,8 +1177,12 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		// the create method's own path, which for a REST-style insert is the
 		// collection path itself.
 		t.BaseURL = create.Path
+		if t.CreateURL == "" {
+			setTypeSource(t, "create_url", SourceDiscovery)
+		}
 	}
 	t.Scope = ScopeOf(t.BaseURL)
+	setTypeSource(t, "create_verb", SourceDiscovery)
 
 	// The verb a create is sent with, from the API itself. magic-modules says
 	// so too where it matters (Pub/Sub's Topic declares create_verb: PUT), but
@@ -1129,21 +1195,100 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.CreateVerb = create.HTTPMethod
 		if t.CreateVerb == http.MethodPut {
 			t.CreateURL = create.Path
+			setTypeSource(t, "create_url", SourceDiscovery)
+		}
+	}
+
+	// A PATCH the API does not publish is a 404 on every update. magic-
+	// modules declares one for Firestore's ChangeStream, whose collection
+	// has create, get, list and delete and nothing else; found by making the
+	// fake answer each request as its Discovery method does (2026-09-25).
+	// With no verb the type is replaced on change, which the API allows.
+	if t.UpdateVerb == http.MethodPatch && patchMethodOf(col) == nil {
+		t.UpdateVerb, t.UpdateURL, t.UpdateMask = "", "", false
+		setTypeSource(t, "update_verb", SourceDiscovery, lost+SourceMM)
+		setTypeSource(t, "update_mask", SourceDiscovery, lost+SourceMM)
+	}
+	// magic-modules' update_url spelling of the patch's own address gives way
+	// to self_link, as it already does for an update envelope (see
+	// templateAddressesMethod). VPC Access's connector: self_link is
+	// Discovery's {+name}, and update_url's projects/{{project}}/.../{{name}}
+	// could not be filled from the id at all (found by the round trip,
+	// 2026-09-25). Only where the patch is at the get's address, and only a
+	// url with no query of its own to lose.
+	if t.UpdateVerb == http.MethodPatch && t.UpdateURL != "" && !strings.Contains(t.UpdateURL, "?") {
+		if pm := patchMethodOf(col); pm != nil && templateAddressesMethod(t.UpdateURL, pm) && sameAddress(pm, col.Methods["get"]) {
+			t.UpdateURL = ""
+		}
+	}
+	// A mask the API requires is sent whoever declared the verb.
+	// magic-modules declares Certificate Manager's TrustConfig PATCH with no
+	// update_mask, and trustConfigs.patch says of updateMask "Required.":
+	// every update went without one (found 2026-09-25).
+	if t.UpdateVerb == http.MethodPatch && !t.UpdateMask && t.UpdateWrapper == "" {
+		if pm := patchMethodOf(col); pm != nil {
+			if p := pm.Parameters["updateMask"]; p != nil && p.Location == "query" &&
+				disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired] {
+				t.UpdateMask = true
+				setTypeSource(t, "update_mask", SourceDiscovery)
+			}
+		}
+	}
+	if del := discoveredDeleteURL(t, col); del != t.DeleteURL {
+		t.DeleteURL = del
+		setTypeSource(t, "delete_url", SourceDiscovery)
+	}
+
+	// A POST create goes to the COLLECTION. magic-modules' BigQuery Table
+	// base_url is the table's own item path (Terraform implements the table
+	// by hand and never runs that YAML), and a POST there is a 404: found
+	// live on 2026-09-25. Where Discovery's insert ends at the collection and
+	// the template ends at an id, the id is dropped.
+	if t.CreateVerb == "" {
+		before := t.CreateTemplate()
+		if t.CreateURL != "" {
+			t.CreateURL = withoutItemTail(t.CreateURL, create.Path)
+		} else {
+			t.BaseURL = withoutItemTail(t.BaseURL, create.Path)
+		}
+		if t.CreateTemplate() != before {
+			setTypeSource(t, "create_url", SourceDiscovery, lost+SourceMM)
 		}
 	}
 
 	await, _ := AwaitOf(doc, create)
 	t.Await = await
+	setTypeSource(t, "create_await", SourceDiscovery)
+	setTypeSource(t, "delete_await", SourceDiscovery)
+	if t.UpdateVerb != "" {
+		setTypeSource(t, "update_await", SourceDiscovery)
+	}
 	// The delete's own answer, which is not always the create's: see
 	// catalog.Type.DeleteAwait. Recorded only where it differs.
 	if deleteAwait, _ := AwaitOf(doc, col.Methods["delete"]); deleteAwait != await {
 		t.DeleteAwait = &deleteAwait
 	}
+	// And the update's, from the patch method it is sent to. Only a PATCH
+	// is ever sent (see discoveredUpdate), so that is the method to ask.
+	if patch := patchMethodOf(col); t.UpdateVerb == http.MethodPatch && patch != nil {
+		if updateAwait, _ := AwaitOf(doc, patch); updateAwait != await {
+			t.UpdateAwait = &updateAwait
+		}
+	}
 	// The paths and the timeout below serve whichever await is not none. The
 	// measured mismatches pair none with one kind, never two different
 	// kinds, so the create's kind wins only where both exist.
-	if await == catalog.AwaitNone && t.DeleteAwait != nil {
-		await = *t.DeleteAwait
+	for _, other := range []*catalog.AwaitKind{t.DeleteAwait, t.UpdateAwait} {
+		if other == nil || *other == catalog.AwaitNone {
+			continue
+		}
+		if await == catalog.AwaitNone {
+			await = *other
+		} else if *other != await {
+			// One set of poll paths per type. Never measured; refused
+			// rather than polled at the wrong place.
+			return nil, fmt.Errorf("its mutations complete as two different kinds of operation")
+		}
 	}
 	// TimeoutSeconds is a GUESS, not derived from any input source: nothing in
 	// Discovery, magic-modules or the overlay says how long a mutation may
@@ -1205,12 +1350,41 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 
 	if ruling != nil {
+		for _, f := range ruling.Settable {
+			a := attrNamed(attrs, f)
+			if a == nil {
+				return nil, fmt.Errorf("settable names %q, which is not an attribute of this type", f)
+			}
+			if a.Output {
+				overrule(a, "output", SourceRuling)
+			}
+			a.Output = false
+		}
+		for _, path := range ruling.InPlace {
+			if err := markInPlace(attrs, path); err != nil {
+				return nil, err
+			}
+		}
+		for _, path := range ruling.SendWithUpdate {
+			a := attrAtPath(attrs, path)
+			if a == nil || strings.Contains(path, "[]") {
+				return nil, fmt.Errorf("send_with_update names %q, which is not an attribute outside a list", path)
+			}
+			// An option Google returns is state, not an option, and would
+			// be patched like any other field.
+			if !a.InputOnly || a.Output {
+				return nil, fmt.Errorf("send_with_update names %q, which is not input-only", path)
+			}
+			a.SendWithUpdate = true
+			addSource(a, "send_with_update", SourceRuling)
+		}
 		for _, f := range ruling.Required {
-			a := attrs[f]
+			a := attrNamed(attrs, f)
 			if a == nil || a.Output {
 				return nil, fmt.Errorf("required names %q, which is not a settable attribute of this type", f)
 			}
 			a.Required = true
+			addSource(a, "required", SourceRuling)
 		}
 	}
 	if ruling != nil && len(ruling.ClearBeforeDelete) > 0 {
@@ -1220,6 +1394,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			}
 		}
 		t.ClearBeforeDelete = ruling.ClearBeforeDelete
+		setTypeSource(t, "clear_before_delete", SourceRuling)
 	}
 	if ruling != nil && ruling.ReadVia != "" {
 		t.ReadVia = ruling.ReadVia
@@ -1283,6 +1458,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// FINALLY stored, and a create url that still carried its version prefix
 	// would be a different string.
 	t.CreateBindings = createBindings(t, create)
+	spellOutBoundParents(t)
 	declareCreateURLParameters(t, create)
 	// Its complement, and only for the case it deliberately leaves refused: a
 	// placeholder that stays unresolved because an OUTPUT-ONLY attribute sits on
@@ -1294,6 +1470,9 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	bindCreateQueryID(t, t.Attributes, create)
 	// And when the url carries no id at all: see addCreateIDParameter.
 	addCreateIDParameter(t, t.Attributes, create)
+	// And a query value magic-modules leaves for its pre_create hook to fill.
+	fillPreCreateTokens(t, t.Attributes, create)
+	dropUnpublishedCreateQuery(t, create)
 
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err
@@ -1302,17 +1481,42 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// token (compute's NodeGroup: "?initialNodeCount=PRE_CREATE_REPLACE_ME").
 	// Shipped, every create would send the token itself. Refused until the
 	// generator can fill that parameter.
+	// The runtime deletes with DELETE and nothing else, and a 404 from the
+	// wrong verb reads as already gone: a POST :destroy or a PUT of a default
+	// policy sent as DELETE would report a resource deleted while it stays.
+	// Refused until the runtime can send the API's own verb (2026-09-25).
+	if mm != nil && !mm.ExcludeDelete && mm.DeleteVerb != "" && !strings.EqualFold(mm.DeleteVerb, http.MethodDelete) {
+		return nil, fmt.Errorf("magic-modules deletes it with %s, and this provider sends only DELETE", mm.DeleteVerb)
+	}
+	if del := col.Methods["delete"]; del != nil && del.HTTPMethod != http.MethodDelete {
+		return nil, fmt.Errorf("its delete method is a %s, and this provider sends only DELETE", del.HTTPMethod)
+	}
 	if strings.Contains(t.CreateURL, "PRE_CREATE_REPLACE_ME") {
 		return nil, fmt.Errorf("create url %q carries a token magic-modules' pre_create hook replaces, "+
 			"which this provider cannot fill", t.CreateURL)
 	}
 
 	t.EndpointTemplate = endpointTemplate(doc, mm, t)
+	t.UpdateURL = dropUnfillableQuery(t.UpdateURL, t)
+	t.DeleteURL = dropUnfillableQuery(t.DeleteURL, t)
 
 	// After self_link is final: a setter is admitted only on the address the
 	// resource is read at. See discoveredSetters.
 	t.Setters = discoveredSetters(doc, col, mm, t)
 	applySetters(t, mm)
+	if len(t.Setters) > 0 {
+		setTypeSource(t, "setters", SourceMM, SourceDiscovery)
+	}
+	// With no delete_url, a delete goes to self_link, and whoever wrote
+	// that decided it.
+	if len(t.Sources["delete_url"]) == 0 {
+		if mm != nil && mm.SelfLink != "" && mm.SelfLink == t.SelfLink {
+			setTypeSource(t, "delete_url", SourceMM)
+		} else {
+			setTypeSource(t, "delete_url", SourceDiscovery)
+		}
+	}
+	finishTypeSources(t)
 
 	return t, nil
 }
@@ -1511,6 +1715,7 @@ func forceNewAll(attrs map[string]*catalog.Attr) {
 func forceNewAttr(a *catalog.Attr) {
 	if !a.Output {
 		a.ForceNew = true
+		addSource(a, "immutable", SourceRuling)
 	}
 	for _, f := range a.Fields {
 		forceNewAttr(f)
@@ -1990,6 +2195,30 @@ func templatePlaceholders(tmpl string) []urlPlaceholder {
 	return out
 }
 
+// spellOutBoundParents writes a bound multi-segment placeholder's own
+// template into every url template of the type. magic-modules spells a
+// parent "{{parent}}", and a {{...}} placeholder is escaped, so the bound
+// value projects/p went out as one segment, projects%2Fp, and Google's front
+// end answered every create, update and delete with a 404. Eight shipped
+// types, seven since before anyone looked (found live on a log scope,
+// 2026-09-25). Spelled out, the templates read projects/{project}/... like
+// every other type's, and the id parses the ordinary way.
+func spellOutBoundParents(t *catalog.Type) {
+	for name, b := range t.CreateBindings {
+		ph := "{{" + name + "}}"
+		if b.Template == "" || !strings.Contains(t.CreateTemplate(), ph) {
+			continue
+		}
+		for _, p := range []*string{&t.BaseURL, &t.CreateURL, &t.SelfLink, &t.UpdateURL, &t.DeleteURL, &t.ImportFormat} {
+			*p = strings.ReplaceAll(*p, ph, b.Template)
+		}
+		delete(t.CreateBindings, name)
+	}
+	if len(t.CreateBindings) == 0 {
+		t.CreateBindings = nil
+	}
+}
+
 // createBindings resolves the create template's placeholders that name
 // neither an instance scope setting nor one of the type's own settable
 // top-level attributes, and returns what it could resolve.
@@ -2021,7 +2250,7 @@ func createBindings(t *catalog.Type, create *disco.Method) map[string]*catalog.C
 		if create != nil {
 			if p := create.Parameters[ph.Name]; p != nil && p.Location == "path" && p.Pattern != "" {
 				if tmpl := templateFromPattern(p.Pattern); tmpl != "" {
-					out[ph.Name] = &catalog.CreateBinding{Template: tmpl}
+					out[ph.Name] = &catalog.CreateBinding{Template: withoutRepeatedTail(tmpl, t.CreateTemplate(), ph.Name)}
 					continue
 				}
 			}
@@ -2109,6 +2338,14 @@ func declareCreateURLParameters(t *catalog.Type, create *disco.Method) {
 			ForceNew:    true,
 			Description: desc,
 		}
+		// A placeholder of the create url: Discovery's where it publishes
+		// the parameter, the template's author's otherwise.
+		src := SourceMM
+		if create != nil && create.Parameters[ph] != nil {
+			src = SourceDiscovery
+		}
+		addSource(t.Attributes[ph], "required", src)
+		addSource(t.Attributes[ph], "immutable", src)
 	}
 }
 
@@ -2203,7 +2440,7 @@ func idTemplateFromDelete(col disco.Collection) string {
 // the fields Google will not patch as ForceNew in gen/overlay.yaml, so each
 // field gets the behaviour the API actually gives it. Not done yet.
 func discoveredUpdate(col disco.Collection, updateURL string) (verb string, masked bool) {
-	patch := col.Methods["patch"]
+	patch := patchMethodOf(col)
 	get := col.Methods["get"]
 	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
 		return "", false
@@ -2406,4 +2643,337 @@ func endpointTemplate(doc *disco.Document, mm *mmv1.Resource, t *catalog.Type) s
 		}
 	}
 	return tmpl
+}
+
+// bareMMPlaceholderRE is a magic-modules self_link that is one placeholder
+// and at most a version segment: "v3/{{name}}", "{{name}}".
+var bareMMPlaceholderRE = regexp.MustCompile(`^(?:v[0-9][0-9a-z]*/)?\{\{[a-z_]+\}\}$`)
+
+// versionPrefixOf is a path's leading version segment with its slash
+// ("v3/"), or "".
+// patchMethodOf is the collection's PATCH at the resource's own address:
+// the method named patch, or (compute's storagePools) one named update.
+func patchMethodOf(col disco.Collection) *disco.Method {
+	if m := col.Methods["patch"]; m != nil && m.HTTPMethod == http.MethodPatch {
+		return m
+	}
+	get := col.Methods["get"]
+	names := make([]string, 0, len(col.Methods))
+	for n := range col.Methods {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		if m := col.Methods[n]; m.HTTPMethod == http.MethodPatch && sameAddress(m, get) {
+			return m
+		}
+	}
+	return nil
+}
+
+// flatShape is a method's address with every placeholder the same and no
+// version prefix, from flatPath where the document gives one: every
+// proto-first delete's path is "v1/{+name}", and only flatPath says whose.
+func flatShape(m *disco.Method) string {
+	p := m.FlatPath
+	if p == "" {
+		p = m.Path
+	}
+	p = strings.TrimPrefix(p, pathPrefixOf(p))
+	return placeholderRE.ReplaceAllString(p, "{}")
+}
+
+// discoveredDeleteURL is where the API's own delete goes, for the two shapes
+// that are not the item's own path. Both deleted nothing, found by the fake
+// answering each request as its Discovery method does (2026-09-25):
+//
+//   - a literal tail after the item: BigQuery's jobs.delete is
+//     DELETE .../jobs/{jobId}/delete. DELETE .../jobs/{jobId} is a 404,
+//     which reads as already gone, so the job was forgotten, not deleted.
+//   - the collection, with the item named in the query: Cloud SQL's
+//     users.delete is DELETE .../users?name=. There is no per-user path.
+//
+// A delete_url magic-modules gives is kept.
+func discoveredDeleteURL(t *catalog.Type, col disco.Collection) string {
+	del, get := col.Methods["delete"], col.Methods["get"]
+	if t.DeleteURL != "" || del == nil || get == nil || del.HTTPMethod != http.MethodDelete || t.SelfLink == "" {
+		return t.DeleteURL
+	}
+	ds, gs := flatShape(del), flatShape(get)
+	if ds == gs {
+		return ""
+	}
+	if tail := strings.TrimPrefix(ds, gs); tail != ds && strings.HasPrefix(tail, "/") && !strings.Contains(tail, "{") {
+		self, _, _ := strings.Cut(t.SelfLink, "?")
+		return self + tail
+	}
+	i := strings.LastIndex(gs, "/")
+	if i < 0 || ds != gs[:i] {
+		return ""
+	}
+	// The item's own placeholder, and the query parameter of that name.
+	getPath := get.FlatPath
+	if getPath == "" {
+		getPath = get.Path
+	}
+	m := placeholderRE.FindAllStringSubmatch(getPath, -1)
+	if len(m) == 0 {
+		return ""
+	}
+	param := del.Parameters[m[len(m)-1][1]]
+	if param == nil || param.Location != "query" {
+		return ""
+	}
+	self, _, _ := strings.Cut(t.SelfLink, "?")
+	j := strings.LastIndex(self, "/")
+	if j < 0 {
+		return ""
+	}
+	return self[:j] + "?" + m[len(m)-1][1] + "=" + self[j+1:]
+}
+
+// withoutItemTail drops a create template's trailing id segment when the
+// API's own create path ends at the collection: a template that names the
+// new resource's id where the insert takes none. Anything else is returned
+// unchanged, including a custom method (":insert") and a path that itself
+// ends in a placeholder.
+func withoutItemTail(tmpl, discoPath string) string {
+	path, query, hasQuery := strings.Cut(tmpl, "?")
+	path = strings.TrimSuffix(path, "/")
+	dp := strings.TrimSuffix(discoPath, "/")
+	last := path[strings.LastIndex(path, "/")+1:]
+	dlast := dp[strings.LastIndex(dp, "/")+1:]
+	if !strings.Contains(last, "{") || strings.ContainsAny(dlast, "{:") || !strings.Contains(path, "/") {
+		return tmpl
+	}
+	path = path[:strings.LastIndex(path, "/")]
+	if hasQuery {
+		return path + "?" + query
+	}
+	return path
+}
+
+func versionPrefixOf(path string) string {
+	if m := regexp.MustCompile(`^v[0-9][0-9a-z]*/`).FindString(path); m != "" {
+		return m
+	}
+	return ""
+}
+
+// dropUnfillableQuery removes a query parameter whose value is a placeholder
+// nothing this provider holds can fill: not an attribute, in any spelling,
+// and not a placeholder of the resource's own id. magic-modules' dataset
+// delete_url ends "?deleteContents={{delete_contents_on_destroy}}", a
+// Terraform-only field, and every delete of every dataset failed building
+// its url. Without the parameter the API's default applies.
+func dropUnfillableQuery(tmpl string, t *catalog.Type) string {
+	path, query, ok := strings.Cut(tmpl, "?")
+	if !ok {
+		return tmpl
+	}
+	known := map[string]bool{"project": true, "region": true, "zone": true, "location": true}
+	for p := range templatePlaceholderNames(t.SelfLink) {
+		known[p] = true
+	}
+	for name, a := range t.Attributes {
+		known[name], known[a.Canonical], known[snake(name)] = true, true, true
+		for _, al := range a.Aliases {
+			known[al] = true
+		}
+	}
+	var kept []string
+	for _, kv := range strings.Split(query, "&") {
+		_, v, _ := strings.Cut(kv, "=")
+		if m := placeholderShapeRE.FindString(v); m != "" && m == v {
+			if !known[strings.Trim(m, "{}+%")] {
+				continue
+			}
+		}
+		kept = append(kept, kv)
+	}
+	if len(kept) == 0 {
+		return path
+	}
+	return path + "?" + strings.Join(kept, "&")
+}
+
+// templatePlaceholderNames are a template's placeholder names, bare.
+func templatePlaceholderNames(tmpl string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range placeholderShapeRE.FindAllString(tmpl, -1) {
+		out[strings.Trim(m, "{}+%")] = true
+	}
+	return out
+}
+
+// withoutRepeatedTail removes from a binding the trailing segments the url
+// itself repeats right after the placeholder. Discovery's pattern for a
+// networksecurity address group's parent is projects/*/locations/*, and
+// magic-modules' url is "{{parent}}/locations/{{location}}/addressGroups",
+// so the bound url read projects/p/locations/r/locations/r/addressGroups:
+// every create of six types went to an address that does not exist.
+// Segments compare by shape, so {location} matches {{location}}.
+func withoutRepeatedTail(binding, url, placeholder string) string {
+	url, _, _ = strings.Cut(url, "?")
+	at := -1
+	for _, spelling := range []string{"{{" + placeholder + "}}", "{+" + placeholder + "}", "{" + placeholder + "}"} {
+		if i := strings.Index(url, spelling); i >= 0 {
+			at = i + len(spelling)
+			break
+		}
+	}
+	if at < 0 {
+		return binding
+	}
+	after := strings.Split(strings.Trim(url[at:], "/"), "/")
+	bind := strings.Split(binding, "/")
+	for k := len(bind) - 1; k > 0; k-- {
+		if k > len(after) {
+			continue
+		}
+		same := true
+		for i := 0; i < k; i++ {
+			if normalizeTemplateShape(bind[len(bind)-k+i]) != normalizeTemplateShape(after[i]) {
+				same = false
+				break
+			}
+		}
+		if same {
+			return strings.Join(bind[:len(bind)-k], "/")
+		}
+	}
+	return binding
+}
+
+// dropUnpublishedCreateQuery removes create-url query parameters the create
+// method does not publish. compute's network edge security service was
+// created at "?networkEdgeSecurityService={{name}}", a parameter compute's
+// insert does not take; the runtime keeps a url-named attribute out of the
+// body, so the insert went out with no name at all. Dropped, the name is in
+// the body where compute reads it. Compared ignoring case and underscores,
+// because magic-modules writes repository_id for Discovery's repositoryId.
+func dropUnpublishedCreateQuery(t *catalog.Type, create *disco.Method) {
+	path, query, ok := strings.Cut(t.CreateURL, "?")
+	if !ok || create == nil {
+		return
+	}
+	published := map[string]bool{}
+	for p := range create.Parameters {
+		published[strings.ToLower(strings.ReplaceAll(p, "_", ""))] = true
+	}
+	var kept []string
+	for _, kv := range strings.Split(query, "&") {
+		k, _, _ := strings.Cut(kv, "=")
+		if published[strings.ToLower(strings.ReplaceAll(k, "_", ""))] {
+			kept = append(kept, kv)
+		}
+	}
+	if len(kept) == 0 {
+		t.CreateURL = path
+		return
+	}
+	t.CreateURL = path + "?" + strings.Join(kept, "&")
+}
+
+// applySensitive marks the overlay's secrets. An entry for a type that does
+// not ship, or a path it does not have, is an error: a secret listed and
+// silently not marked is the leak this exists to stop.
+func applySensitive(types []*catalog.Type, entries map[string]SensitiveFields) error {
+	byName := make(map[string]*catalog.Type, len(types))
+	for _, t := range types {
+		byName[t.Name] = t
+	}
+	names := make([]string, 0, len(entries))
+	for n := range entries {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t := byName[n]
+		if t == nil {
+			return fmt.Errorf("overlay sensitive: %s does not ship", n)
+		}
+		if strings.TrimSpace(entries[n].Note) == "" {
+			return fmt.Errorf("overlay sensitive: %s has no note saying why", n)
+		}
+		for _, path := range entries[n].Fields {
+			a := attrAtPath(t.Attributes, path)
+			if a == nil {
+				return fmt.Errorf("overlay sensitive: %s has no attribute %q", n, path)
+			}
+			a.Sensitive = true
+			addSource(a, "sensitive", SourceRuling)
+		}
+	}
+	return nil
+}
+
+// attrAtPath walks "a.b[].c" through Fields and Elem.
+func attrAtPath(attrs map[string]*catalog.Attr, path string) *catalog.Attr {
+	var a *catalog.Attr
+	fields := attrs
+	for _, seg := range strings.Split(path, ".") {
+		elem := strings.HasSuffix(seg, "[]")
+		seg = strings.TrimSuffix(seg, "[]")
+		if a = fields[seg]; a == nil {
+			return nil
+		}
+		if elem {
+			if a.Elem == nil {
+				return nil
+			}
+			a = a.Elem
+		}
+		fields = a.Fields
+	}
+	return a
+}
+
+// markInPlace makes the leaf at a dotted path change in place inside blocks
+// that are ForceNew as a whole: each block on the way stops being ForceNew,
+// and every sibling off the path that was covered by it becomes ForceNew
+// itself, so only the named leaf moved.
+func markInPlace(attrs map[string]*catalog.Attr, path string) error {
+	fields := attrs
+	segs := strings.Split(path, ".")
+	for i, seg := range segs {
+		a := fields[seg]
+		if a == nil {
+			return fmt.Errorf("in_place names %q, which has no %q", path, seg)
+		}
+		if i == len(segs)-1 {
+			if a.ForceNew {
+				overrule(a, "immutable", SourceRuling)
+			}
+			a.ForceNew = false
+			return nil
+		}
+		if a.ForceNew {
+			overrule(a, "immutable", SourceRuling)
+			a.ForceNew = false
+			for name, sib := range a.Fields {
+				if name != segs[i+1] && !sib.Output {
+					sib.ForceNew = true
+					addSource(sib, "immutable", SourceRuling)
+				}
+			}
+		}
+		fields = a.Fields
+	}
+	return nil
+}
+
+// attrNamed finds a top-level attribute by its key or its wire name: a
+// ruling names fields as the API does ("type"), and a keyword-clashing one is
+// keyed differently ("type_value").
+func attrNamed(attrs map[string]*catalog.Attr, name string) *catalog.Attr {
+	if a := attrs[name]; a != nil {
+		return a
+	}
+	for _, a := range attrs {
+		if a.Canonical == name {
+			return a
+		}
+	}
+	return nil
 }

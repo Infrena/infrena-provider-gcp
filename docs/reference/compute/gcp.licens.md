@@ -20,7 +20,7 @@ Represents a License resource. A License represents billing and aggregate usage 
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/global/licenses` |
 | Read | yes | `GET projects/{project}/global/licenses/{license}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PATCH projects/{project}/global/licenses/{license}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{project}/global/licenses/{license}` |
 | Import | yes | by id, see below |
 

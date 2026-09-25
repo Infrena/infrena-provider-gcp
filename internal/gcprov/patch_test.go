@@ -532,11 +532,9 @@ func TestAnUpdateOfARenamedAttributeMasksNothingWhenNothingChanged(t *testing.T)
 
 // TestAMaskedListCarriesWireNamesInsideIt. A list is masked WHOLE -- GCP
 // replaces it outright, so buildNested never walks into one -- and the
-// object inside it was written with toRaw, which copies the schema spelling
-// straight onto the wire. gcp.router is one of the three updatable types
-// whose only renamed attribute lives inside a list, so this is the exact
-// case a Fields-only translation leaves broken while every top-level test
-// passes.
+// object inside it is written with toRaw. A router's nats[].type is no
+// longer renamed (only top-level keywords are), so it must reach the wire
+// exactly as configuration wrote it.
 func TestAMaskedListCarriesWireNamesInsideIt(t *testing.T) {
 	ty, ok := mustCatalog(t).Type("gcp.router")
 	if !ok {
@@ -546,13 +544,13 @@ func TestAMaskedListCarriesWireNamesInsideIt(t *testing.T) {
 	if !ok || nats.Elem == nil {
 		t.Fatalf("%s no longer declares nats as a list", ty.Name)
 	}
-	if a, ok := nats.Elem.Fields["type_value"]; !ok || a.Canonical != "type" {
-		t.Fatalf("%s.nats[].type_value is no longer a rename; this test is not exercising one", ty.Name)
+	if a, ok := nats.Elem.Fields["type"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s.nats[] no longer declares a plain `type`", ty.Name)
 	}
 
 	nat := func(t string) value.Value {
 		return value.List([]value.Value{
-			mapValue(map[string]any{"name": "nat-1", "type_value": t}),
+			mapValue(map[string]any{"name": "nat-1", "type": t}),
 		}, value.SourceExplicit)
 	}
 	body, mask := BuildMask(ty,
@@ -584,11 +582,10 @@ func TestAMaskedListCarriesWireNamesInsideIt(t *testing.T) {
 // has already descended through two levels of declared Fields.
 //
 // gcp.regionsecuritypolicy's
-// adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].type_value
+// adaptiveProtectionConfig.layer7DdosDefenseConfig.thresholdConfigs[].trafficGranularityConfigs[].type
 // is map, map, list, list, field -- four levels down, through two lists, and
-// every one of them settable. Nothing shallower exercises the case where the
-// mask path is right and the object hanging off it is written in the wrong
-// namespace.
+// every one of them settable. Nested, it keeps its name, and must reach the
+// wire as `type`.
 func TestANestedPatchBodyCarriesWireNamesInsideIt(t *testing.T) {
 	ty, ok := mustCatalog(t).Type("gcp.regionsecuritypolicy")
 	if !ok {
@@ -596,9 +593,8 @@ func TestANestedPatchBodyCarriesWireNamesInsideIt(t *testing.T) {
 	}
 	l7 := ty.Attributes["adaptiveProtectionConfig"].Fields["layer7DdosDefenseConfig"]
 	granular := l7.Fields["thresholdConfigs"].Elem.Fields["trafficGranularityConfigs"]
-	if a, ok := granular.Elem.Fields["type_value"]; !ok || a.Canonical != "type" {
-		t.Fatalf("%s no longer renames trafficGranularityConfigs[].type; this test is not "+
-			"exercising a rename", ty.Name)
+	if a, ok := granular.Elem.Fields["type"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s no longer declares trafficGranularityConfigs[].type", ty.Name)
 	}
 
 	config := func(v string) value.Value {
@@ -607,7 +603,7 @@ func TestANestedPatchBodyCarriesWireNamesInsideIt(t *testing.T) {
 				"thresholdConfigs": []any{map[string]any{
 					"name": "tc-1",
 					"trafficGranularityConfigs": []any{
-						map[string]any{"type_value": "HTTP_HEADER_HOST", "value": v},
+						map[string]any{"type": "HTTP_HEADER_HOST", "value": v},
 					},
 				}},
 			},
@@ -795,5 +791,52 @@ func TestAFingerprintAloneIsNeverAPatch(t *testing.T) {
 		if r.Method == "PATCH" {
 			t.Errorf("sent a patch with nothing configured changed: %s", r.Body)
 		}
+	}
+}
+
+// TestAnUpdateCarriesItsRequestOptions. An Artifact Registry repository's
+// disableUpstreamValidation is input-only and asks Google not to check the
+// upstream credentials. A patch of only what changed left it out of every
+// update after the create, and Google checked them anyway: "Failed to
+// validate remote upstream" on a username change (live, 2026-09-25). It
+// rides in the body of every update, never in the mask, and an update with
+// nothing else changed still sends nothing.
+func TestAnUpdateCarriesItsRequestOptions(t *testing.T) {
+	ty, ok := mustCatalog(t).Type("gcp.artifactregistry.repository")
+	if !ok {
+		t.Fatal("the catalog no longer ships gcp.artifactregistry.repository")
+	}
+	cfg := func(user string) map[string]value.Value {
+		return map[string]value.Value{"remoteRepositoryConfig": mapValue(map[string]any{
+			"disableUpstreamValidation": true,
+			"upstreamCredentials": map[string]any{"usernamePasswordCredentials": map[string]any{
+				"username": user, "passwordSecretVersion": "projects/p/secrets/s/versions/1",
+			}},
+		})}
+	}
+	body, mask := BuildMask(ty, cfg("user-a"), cfg("user-b"))
+	want := "remoteRepositoryConfig.upstreamCredentials.usernamePasswordCredentials.username"
+	if len(mask) != 1 || mask[0] != want {
+		t.Fatalf("mask = %v, want only [%s]: a request option is never masked", mask, want)
+	}
+	rrc, _ := body["remoteRepositoryConfig"].(map[string]any)
+	if rrc["disableUpstreamValidation"] != true {
+		t.Errorf("the update body does not carry disableUpstreamValidation: %v", body)
+	}
+	creds, _ := rrc["upstreamCredentials"].(map[string]any)
+	upc, _ := creds["usernamePasswordCredentials"].(map[string]any)
+	if upc["username"] != "user-b" {
+		t.Errorf("the update body lost the change itself: %v", body)
+	}
+
+	// And the patch answers with the repository, not an operation: see
+	// TestAnUpdateWaitsOnlyForItsOwnAnswer.
+	if ty.Await == catalog.AwaitNone || ty.UpdateAwaitKind() != catalog.AwaitNone {
+		t.Errorf("%s awaits its create as %v and its update as %v; the create is an operation and the patch is not",
+			ty.Name, ty.Await, ty.UpdateAwaitKind())
+	}
+
+	if body, mask := BuildMask(ty, cfg("user-a"), cfg("user-a")); len(mask) != 0 || len(body) != 0 {
+		t.Errorf("an update that changed nothing built body %v mask %v; an option alone is no reason to patch", body, mask)
 	}
 }

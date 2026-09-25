@@ -152,10 +152,14 @@ func (p *Provider) discoverViaCAI(ctx context.Context, project string, want []st
 				out = append(out, r)
 			}
 		}
-		pageToken, _ = body["nextPageToken"].(string)
-		if pageToken == "" {
+		next, _ := body["nextPageToken"].(string)
+		if next == "" {
 			return out, nil
 		}
+		if next == pageToken {
+			return nil, fmt.Errorf("cloud asset search returned the same page token twice; stopping")
+		}
+		pageToken = next
 	}
 }
 
@@ -358,16 +362,29 @@ func (p *Provider) listOneType(ctx context.Context, project string, ty *catalog.
 
 	var out []provider.DiscoveredResource
 	pageToken := ""
+	seen := map[string]bool{}
 	for {
 		reqURL := collection
 		if pageToken != "" {
-			reqURL += "?pageToken=" + url.QueryEscape(pageToken)
+			// A collection url may carry its own query (a dataset's
+			// accessPolicyVersion). Joined with a second "?", the token was
+			// never read, Google answered the first page again with the same
+			// token, and the loop never ended: a discover reply passed 16 MB
+			// and hung the host (live run, 2026-09-25).
+			sep := "?"
+			if strings.Contains(reqURL, "?") {
+				sep = "&"
+			}
+			reqURL += sep + "pageToken=" + url.QueryEscape(pageToken)
 		}
 		body, err := p.client.Do(ctx, http.MethodGet, reqURL, nil)
 		if err != nil {
 			return nil, err
 		}
 		for _, item := range listItems(body, ty.ListField) {
+			if googleDefinedMetric(ty, item) {
+				continue
+			}
 			id, err := ProviderID(ty, item, scope)
 			if err != nil {
 				// Reported, not dropped in silence: a listed resource whose
@@ -389,6 +406,11 @@ func (p *Provider) listOneType(ctx context.Context, project string, ty *catalog.
 		if pageToken == "" {
 			return out, nil
 		}
+		// The same token twice is a page that will come round for ever.
+		if seen[pageToken] {
+			return nil, fmt.Errorf("%s: the list returned the same page token twice; stopping", ty.Name)
+		}
+		seen[pageToken] = true
 	}
 }
 
@@ -411,7 +433,7 @@ func listedAttributes(ty *catalog.Type, id string, body map[string]any) map[stri
 	for k, v := range schemaAttrs(ty.Attributes, body) {
 		attrs[k] = v
 	}
-	return attrs
+	return declaredOnly(ty, attrs)
 }
 
 // idAttributes recovers what a provider id's own hierarchy encodes, keyed by
@@ -583,4 +605,31 @@ func firstPathSegment(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// userMetricPrefixes are the metric types a project defines itself. Every
+// other metric descriptor a project lists is Google's -- 8,999 of them on
+// the live project, one per built-in metric, the same in every project.
+var userMetricPrefixes = []string{
+	"custom.googleapis.com/", "external.googleapis.com/", "workload.googleapis.com/",
+	"logging.googleapis.com/user/", "prometheus.googleapis.com/",
+}
+
+// googleDefinedMetric reports a listed metric descriptor Google defines. It is
+// not a resource of the project at all, so discovery does not offer it:
+// reported, the 8,999 of them made one discover reply larger than the host
+// reads (16 MB), and the host then waited on the plugin for ever (live run,
+// 2026-09-25). Decided by the descriptor's own `type`, as SystemOwned decides
+// by the body.
+func googleDefinedMetric(ty *catalog.Type, item map[string]any) bool {
+	if ty.ListField != "metricDescriptors" {
+		return false
+	}
+	metric, _ := item["type"].(string)
+	for _, prefix := range userMetricPrefixes {
+		if strings.HasPrefix(metric, prefix) {
+			return false
+		}
+	}
+	return true
 }

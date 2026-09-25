@@ -47,7 +47,7 @@ projects/{project}/locations/{location}/instances/{instance}
 | `gceSetup.acceleratorConfigs` | `accelerator_configs` | `list` | optional | — | Optional. The hardware accelerators used on this instance. If you use accelerators, make sure that your configuration has \[enough vCPUs and memory to support the `machine_type` you have … |
 | `gceSetup.acceleratorConfigs[]` | — | `map` | optional | — | — |
 | `gceSetup.acceleratorConfigs[].coreCount` | `core_count` | `string` | optional | — | Optional. Count of cores of this accelerator. |
-| `gceSetup.acceleratorConfigs[].type_value` | wire `type` | `string` | optional | — | Optional. Type of this accelerator. |
+| `gceSetup.acceleratorConfigs[].type` | — | `string` | optional | — | Optional. Type of this accelerator. |
 | `gceSetup.bootDisk` | `boot_disk` | `map` | optional | — | Optional. The boot disk for the VM. |
 | `gceSetup.bootDisk.diskEncryption` | `disk_encryption` | `string` | optional | — | Optional. Disk encryption method used on the boot and data disks, defaults to GMEK. |
 | `gceSetup.bootDisk.diskSizeGb` | `disk_size_gb` | `string` | optional | — | Optional. The size of the boot disk in GB attached to this instance, up to a maximum of 64000 GB (64 TB). If not specified, this defaults to the recommended value of 150GB. |

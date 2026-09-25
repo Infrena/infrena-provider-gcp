@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -1765,5 +1766,268 @@ func TestAMatchWhoseBaseURLStartsWithAPlaceholderIsKept(t *testing.T) {
 	regional := &mmv1.Resource{Name: "RegionalSecret", BaseURL: "projects/{{project}}/locations/{{location}}/secrets"}
 	if got := preferExactCollection([]*mmv1.Resource{global, regional}, []string{"projects", "locations", "secrets"}, global); got != regional {
 		t.Errorf("paired with %s, want RegionalSecret, so the guard now keeps everything", got.Name)
+	}
+}
+
+// TestAQueryParameterNothingCanFillIsDropped. The dataset's delete_url ends
+// "?deleteContents={{delete_contents_on_destroy}}", a Terraform-only field,
+// and every dataset delete failed building its url. A literal value and a
+// placeholder the resource's id or attributes fill are kept.
+func TestAQueryParameterNothingCanFillIsDropped(t *testing.T) {
+	ty := &catalog.Type{SelfLink: "projects/{{project}}/datasets/{{dataset_id}}",
+		Attributes: map[string]*catalog.Attr{"force": {Canonical: "force"}}}
+	for in, want := range map[string]string{
+		"projects/{{project}}/datasets/{{dataset_id}}?deleteContents={{delete_contents_on_destroy}}": "projects/{{project}}/datasets/{{dataset_id}}",
+		"projects/{{project}}/datasets/{{dataset_id}}?accessPolicyVersion=3":                         "projects/{{project}}/datasets/{{dataset_id}}?accessPolicyVersion=3",
+		"projects/{{project}}/datasets/{{dataset_id}}?force={{force}}&x={{nope}}":                    "projects/{{project}}/datasets/{{dataset_id}}?force={{force}}",
+		"projects/{{project}}/datasets/{{dataset_id}}?id={{dataset_id}}":                             "projects/{{project}}/datasets/{{dataset_id}}?id={{dataset_id}}",
+	} {
+		if got := dropUnfillableQuery(in, ty); got != want {
+			t.Errorf("dropUnfillableQuery(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestABindingDoesNotRepeatWhatTheURLAlreadySays. Discovery's parent pattern
+// for an address group is projects/*/locations/*, and magic-modules' url
+// adds /locations/{{location}} itself: bound as it was, every create went to
+// .../locations/r/locations/r/addressGroups. A url that adds nothing keeps
+// the whole binding.
+func TestABindingDoesNotRepeatWhatTheURLAlreadySays(t *testing.T) {
+	for _, c := range []struct{ binding, url, want string }{
+		{"projects/{project}/locations/{location}", "{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}", "projects/{project}"},
+		{"projects/{project}/instances/{instance}", "{+parent}/appProfiles?appProfileId={{appProfileId}}", "projects/{project}/instances/{instance}"},
+		{"projects/{project}/locations/{location}", "{{parent}}/queues", "projects/{project}/locations/{location}"},
+	} {
+		if got := withoutRepeatedTail(c.binding, c.url, "parent"); got != c.want {
+			t.Errorf("withoutRepeatedTail(%q, %q) = %q, want %q", c.binding, c.url, got, c.want)
+		}
+	}
+}
+
+// TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest. A secret listed
+// and silently not marked is the leak the list exists to stop, so a path the
+// type lacks, a type that does not ship, or an entry with no reason is an
+// error, not a skip.
+func TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest(t *testing.T) {
+	build := func() []*catalog.Type {
+		return []*catalog.Type{{Name: "gcp.router", Attributes: map[string]*catalog.Attr{
+			"md5AuthenticationKeys": {Canonical: "md5AuthenticationKeys", Elem: &catalog.Attr{Fields: map[string]*catalog.Attr{
+				"key": {Canonical: "key"}, "name": {Canonical: "name"}}}}}}}
+	}
+	types := build()
+	if err := applySensitive(types, map[string]SensitiveFields{
+		"gcp.router": {Fields: []string{"md5AuthenticationKeys[].key"}, Note: "a BGP MD5 key"}}); err != nil {
+		t.Fatal(err)
+	}
+	f := types[0].Attributes["md5AuthenticationKeys"].Elem.Fields
+	if !f["key"].Sensitive || f["name"].Sensitive {
+		t.Errorf("key sensitive %v, name sensitive %v; want only the key", f["key"].Sensitive, f["name"].Sensitive)
+	}
+	for what, entries := range map[string]map[string]SensitiveFields{
+		"a missing path":        {"gcp.router": {Fields: []string{"md5AuthenticationKeys[].nope"}, Note: "x"}},
+		"a type that is absent": {"gcp.nope": {Fields: []string{"x"}, Note: "x"}},
+		"no note":               {"gcp.router": {Fields: []string{"md5AuthenticationKeys[].key"}}},
+	} {
+		if err := applySensitive(build(), entries); err == nil {
+			t.Errorf("%s was accepted", what)
+		}
+	}
+}
+
+// TestInPlaceFreesOnlyTheNamedLeafOfAnImmutableBlock. magic-modules marks an
+// Artifact Registry repository's remoteRepositoryConfig immutable as a whole,
+// which here replaced the repository (and deleted its artifacts) for a change
+// to the upstream credentials Terraform patches in place.
+func TestInPlaceFreesOnlyTheNamedLeafOfAnImmutableBlock(t *testing.T) {
+	attrs := map[string]*catalog.Attr{"remoteRepositoryConfig": {Canonical: "remoteRepositoryConfig", ForceNew: true,
+		Fields: map[string]*catalog.Attr{
+			"upstreamCredentials": {Canonical: "upstreamCredentials"},
+			"dockerRepository":    {Canonical: "dockerRepository"},
+			"state":               {Canonical: "state", Output: true},
+		}}}
+	if err := markInPlace(attrs, "remoteRepositoryConfig.upstreamCredentials"); err != nil {
+		t.Fatal(err)
+	}
+	r := attrs["remoteRepositoryConfig"]
+	if r.ForceNew || r.Fields["upstreamCredentials"].ForceNew {
+		t.Error("the path to the in-place leaf still replaces the resource")
+	}
+	if !r.Fields["dockerRepository"].ForceNew {
+		t.Error("a sibling the block's immutability covered now changes in place")
+	}
+	if r.Fields["state"].ForceNew {
+		t.Error("an output field became ForceNew")
+	}
+	if err := markInPlace(attrs, "remoteRepositoryConfig.nope"); err == nil {
+		t.Error("a path the type does not have was accepted")
+	}
+}
+
+// TestSettableAndRequiredFindAKeywordRenamedField. A health check's `type` is
+// keyed type_value (a keyword clash) and named type by the ruling, as the API
+// names it. Looked up by key alone, the ruling refused the type.
+func TestSettableAndRequiredFindAKeywordRenamedField(t *testing.T) {
+	attrs := map[string]*catalog.Attr{"type_value": {Canonical: "type", Output: true}}
+	if a := attrNamed(attrs, "type"); a == nil || a != attrs["type_value"] {
+		t.Fatalf("attrNamed(type) = %+v, want the type_value attribute", a)
+	}
+}
+
+// TestAPostCreateGoesToTheCollection. BigQuery's tables.insert POSTs to
+// .../tables; magic-modules' base_url is .../tables/{{table_id}}, and a POST
+// there is a 404 (live, 2026-09-25). Only a trailing id where the API's own
+// path ends at the collection is dropped.
+func TestAPostCreateGoesToTheCollection(t *testing.T) {
+	for _, c := range []struct{ tmpl, disco, want string }{
+		{"projects/{{project}}/datasets/{{dataset_id}}/tables/{{table_id}}",
+			"projects/{+projectId}/datasets/{+datasetId}/tables",
+			"projects/{{project}}/datasets/{{dataset_id}}/tables"},
+		{"projects/{{project}}/x/{{id}}?a={{b}}", "projects/{project}/x", "projects/{{project}}/x?a={{b}}"},
+		// Already the collection.
+		{"projects/{{project}}/datasets", "projects/{+projectId}/datasets", "projects/{{project}}/datasets"},
+		// The API's own path ends in a placeholder: nothing to compare.
+		{"{{parent}}/things/{{id}}", "v1/{+parent}", "{{parent}}/things/{{id}}"},
+		// A custom create method.
+		{"projects/{{project}}/x/{{id}}", "v1/{+name}:create", "projects/{{project}}/x/{{id}}"},
+	} {
+		if got := withoutItemTail(c.tmpl, c.disco); got != c.want {
+			t.Errorf("withoutItemTail(%q, %q) = %q, want %q", c.tmpl, c.disco, got, c.want)
+		}
+	}
+}
+
+// TestADeleteGoesWhereTheAPIPublishesIt. BigQuery's jobs.delete is under the
+// job (.../jobs/{jobId}/delete) and Cloud SQL's users.delete is on the
+// collection with ?name=. Sent to the item's own path, both deleted nothing.
+func TestADeleteGoesWhereTheAPIPublishesIt(t *testing.T) {
+	m := func(verb, flat string, query ...string) *disco.Method {
+		params := map[string]*disco.Parameter{}
+		for _, q := range query {
+			params[q] = &disco.Parameter{Location: "query"}
+		}
+		return &disco.Method{HTTPMethod: verb, FlatPath: flat, Path: flat, Parameters: params}
+	}
+	for _, c := range []struct {
+		what, self string
+		get, del   *disco.Method
+		want       string
+	}{
+		{"a literal tail under the item", "projects/{{project}}/jobs/{{job_id}}",
+			m("GET", "projects/{projectsId}/jobs/{jobsId}"),
+			m("DELETE", "projects/{projectsId}/jobs/{jobsId}/delete"),
+			"projects/{{project}}/jobs/{{job_id}}/delete"},
+		{"the collection, named in the query", "projects/{project}/instances/{instance}/users/{name}",
+			m("GET", "v1/projects/{project}/instances/{instance}/users/{name}"),
+			m("DELETE", "v1/projects/{project}/instances/{instance}/users", "name", "host"),
+			"projects/{project}/instances/{instance}/users?name={name}"},
+		{"the item's own path", "projects/{{project}}/topics/{{name}}",
+			m("GET", "v1/projects/{projectsId}/topics/{topicsId}"),
+			m("DELETE", "v1/projects/{projectsId}/topics/{topicsId}"),
+			""},
+		{"a collection delete with no query naming the item", "projects/{{project}}/x/{{name}}",
+			m("GET", "v1/projects/{p}/x/{name}"),
+			m("DELETE", "v1/projects/{p}/x"),
+			""},
+	} {
+		ty := &catalog.Type{SelfLink: c.self}
+		col := disco.Collection{Methods: map[string]*disco.Method{"get": c.get, "delete": c.del}}
+		if got := discoveredDeleteURL(ty, col); got != c.want {
+			t.Errorf("%s: discoveredDeleteURL = %q, want %q", c.what, got, c.want)
+		}
+	}
+	// magic-modules' own delete_url is kept.
+	ty := &catalog.Type{SelfLink: "projects/{{project}}/jobs/{{job_id}}", DeleteURL: "kept"}
+	col := disco.Collection{Methods: map[string]*disco.Method{
+		"get":    m("GET", "projects/{projectsId}/jobs/{jobsId}"),
+		"delete": m("DELETE", "projects/{projectsId}/jobs/{jobsId}/delete"),
+	}}
+	if got := discoveredDeleteURL(ty, col); got != "kept" {
+		t.Errorf("a declared delete_url became %q", got)
+	}
+}
+
+// TestThePatchMethodIsFoundByVerbAndAddress. Compute's storagePools publish
+// their PATCH as "update"; Firestore's changeStreams publish none.
+func TestThePatchMethodIsFoundByVerbAndAddress(t *testing.T) {
+	get := &disco.Method{HTTPMethod: "GET", Path: "projects/{project}/zones/{zone}/storagePools/{storagePool}"}
+	update := &disco.Method{HTTPMethod: "PATCH", Path: get.Path}
+	if got := patchMethodOf(disco.Collection{Methods: map[string]*disco.Method{"get": get, "update": update}}); got != update {
+		t.Errorf("patchMethodOf missed a PATCH named update: %v", got)
+	}
+	del := &disco.Method{HTTPMethod: "DELETE", Path: get.Path}
+	if got := patchMethodOf(disco.Collection{Methods: map[string]*disco.Method{"get": get, "delete": del}}); got != nil {
+		t.Errorf("patchMethodOf found %v in a collection with no PATCH", got)
+	}
+}
+
+// TestATypeDeletedWithAnotherVerbIsRefused. The runtime deletes with DELETE
+// and nothing else, and a 404 from the wrong verb reads as already gone: a
+// KMS key version's POST :destroy, or binary authorization's PUT of the
+// default policy, sent as DELETE would report a resource deleted while it
+// stays live.
+func TestATypeDeletedWithAnotherVerbIsRefused(t *testing.T) {
+	for _, c := range []struct {
+		what                string
+		schemaEdit, mmExtra string
+		ships               bool
+	}{
+		{"the control, deleted with DELETE", "", "", true},
+		{"a Discovery delete that is a POST", `"httpMethod": "DELETE"`, "", false},
+		{"a magic-modules delete_verb", "", "delete_verb: POST\n", false},
+	} {
+		dir := t.TempDir()
+		schemas := filepath.Join(dir, "schemas")
+		products := filepath.Join(dir, "mmv1", "products", "tiny")
+		for _, d := range []string{schemas, products} {
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		schema, err := os.ReadFile("testdata/frozen-schema.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.schemaEdit != "" {
+			if !bytes.Contains(schema, []byte(c.schemaEdit)) {
+				t.Fatalf("%s: the fixture no longer has %s", c.what, c.schemaEdit)
+			}
+			schema = bytes.Replace(schema, []byte(c.schemaEdit), []byte(`"httpMethod": "POST"`), 1)
+		}
+		if err := os.WriteFile(filepath.Join(schemas, "tiny.json"), schema, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		yaml, err := os.ReadFile("testdata/Frozen.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		yaml = append(yaml, []byte(c.mmExtra)...)
+		if err := os.WriteFile(filepath.Join(products, "Frozen.yaml"), yaml, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		overlay := filepath.Join(dir, "overlay.yaml")
+		ruling := "rulings:\n  tiny/Frozen:\n    hooks: []\n    read_via: list_by_parent\n    all_force_new: true\n" +
+			"    note: the fixture has no get.\naliases: {}\ndiscover_default: []\n"
+		if err := os.WriteFile(overlay, []byte(ruling), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Build(Inputs{SchemaDir: schemas, MMV1Dir: filepath.Join(dir, "mmv1", "products"),
+			OverlayPath: overlay, LockPath: filepath.Join(dir, "names.lock.json")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := res.Catalog.Type("gcp.frozen"); ok != c.ships {
+			t.Errorf("%s: gcp.frozen shipped = %v, want %v", c.what, ok, c.ships)
+		}
+		if c.ships {
+			continue
+		}
+		var said bool
+		for _, w := range res.Warnings {
+			said = said || strings.Contains(w.Reason, "sends only DELETE")
+		}
+		if !said {
+			t.Errorf("%s: refused without saying why", c.what)
+		}
 	}
 }

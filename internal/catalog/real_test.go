@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/infrena/infrena/pkg/schema"
+	"github.com/infrena/infrena/pkg/value"
 )
 
 // TestTheRealCatalogIsOneInfrenaAccepts runs infrena's own validator over every
@@ -380,16 +381,22 @@ func eachAttributeLevel(c *Catalog, fn func(where string, level map[string]*Attr
 // asserts the set is not empty, and it reports its size so a change of
 // strategy is visible in the failure rather than inferred from a later bug.
 //
-// Measured 2026-09-22: 306 renamed attributes across 56 of 233 types, 7 of
-// them Required, at depths up to 9; 263 of the 306 sit inside a list. The
-// floors are well below those so that ordinary drift in Google's own
-// Discovery documents does not trip them.
+// Measured 2026-09-25: 26 renamed attributes, 8 of them Required, every one
+// at the top level. Until that day every nested keyword was renamed too (306
+// on 2026-09-22, 820 by 2026-09-25), which the host never needed: it
+// reserves `type`, `provider` and `lifecycle` only among a resource's own
+// keys. A rename anywhere below the top level is now a regression.
 func TestTheCatalogStillRenamesAttributes(t *testing.T) {
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, required, inList := 0, 0, 0
+	topLevel := map[string]bool{}
+	for _, ty := range c.Types {
+		topLevel[ty.Name] = true
+	}
+	total, required := 0, 0
+	var nested []string
 	eachAttributeLevel(c, func(where string, level map[string]*Attr) {
 		for key, a := range level {
 			if a.Canonical == key {
@@ -399,26 +406,27 @@ func TestTheCatalogStillRenamesAttributes(t *testing.T) {
 			if a.Required {
 				required++
 			}
-			if strings.Contains(where, "[]") {
-				inList++
+			if !topLevel[where] {
+				nested = append(nested, where+"."+key)
 			}
 		}
 	})
-	t.Logf("renamed attributes: %d total, %d required, %d inside a list", total, required, inList)
-	if total < 200 {
-		t.Errorf("only %d attributes are renamed; 306 were measured on 2026-09-22, so the "+
+	t.Logf("renamed attributes: %d total, %d required, %d nested", total, required, len(nested))
+	if total < 15 {
+		t.Errorf("only %d attributes are renamed; 26 were measured on 2026-09-25, so the "+
 			"generator's renaming strategy has changed and internal/gcprov/names.go and its "+
 			"tests need revisiting", total)
 	}
 	if required == 0 {
-		t.Errorf("no RENAMED attribute is Required any more (7 were); a create that sends the "+
+		t.Errorf("no RENAMED attribute is Required any more (8 were); a create that sends the "+
 			"wrong name for one of these is the difference between a rejected request and a "+
 			"cosmetic diff, and %d renames remain", total)
 	}
-	if inList == 0 {
-		t.Errorf("no renamed attribute is inside a list any more (263 of 306 were); " +
-			"names.go recurses through Elem specifically for those, and that recursion is now " +
-			"untested by the corpus")
+	if len(nested) != 0 {
+		sort.Strings(nested)
+		t.Errorf("%d renamed attributes are nested, first %s; only a top-level keyword clashes "+
+			"with a resource key, and a nested rename makes users write type_value where "+
+			"every API document says type", len(nested), nested[0])
 	}
 }
 
@@ -644,8 +652,6 @@ func TestTheTypesThatCannotBeCreatedAreExactlyTheseOnes(t *testing.T) {
 		"gcp.bigtableadmin.cluster",
 		"gcp.bigtableadmin.table",
 		"gcp.cloudasset.savedquery",
-		"gcp.cloudresourcemanager.folder.capabilityconfig",
-		"gcp.cloudresourcemanager.organization.capabilityconfig",
 		"gcp.config",
 		"gcp.credential",
 		"gcp.feed",
@@ -659,20 +665,17 @@ func TestTheTypesThatCannotBeCreatedAreExactlyTheseOnes(t *testing.T) {
 		"gcp.logging.billingaccount.bucket",
 		"gcp.logging.billingaccount.exclusion",
 		"gcp.logging.billingaccount.link",
-		"gcp.logging.billingaccount.savedquery",
 		"gcp.logging.billingaccount.sink",
 		"gcp.logging.billingaccount.view",
 		"gcp.logging.folder.bucket",
 		"gcp.logging.folder.exclusion",
 		"gcp.logging.folder.link",
-		"gcp.logging.folder.savedquery",
 		"gcp.logging.folder.sink",
 		"gcp.logging.folder.view",
 		"gcp.logging.link",
 		"gcp.logging.organization.bucket",
 		"gcp.logging.organization.exclusion",
 		"gcp.logging.organization.link",
-		"gcp.logging.organization.savedquery",
 		"gcp.logging.organization.sink",
 		"gcp.logging.organization.view",
 		"gcp.logging.view",
@@ -680,10 +683,6 @@ func TestTheTypesThatCannotBeCreatedAreExactlyTheseOnes(t *testing.T) {
 		"gcp.managedidentity",
 		"gcp.materializedview",
 		"gcp.namespace",
-		"gcp.networksecurity.organization.addressgroup",
-		"gcp.networksecurity.organization.firewallendpoint",
-		"gcp.networksecurity.organization.securityprofile",
-		"gcp.networksecurity.organization.securityprofilegroup",
 		"gcp.networksecurity.rule",
 		"gcp.osconfig.folder.policyorchestrator",
 		"gcp.osconfig.organization.policyorchestrator",
@@ -1010,5 +1009,149 @@ func TestTheShippedSecretsReachTheHostAsSensitive(t *testing.T) {
 		if !a.Sensitive {
 			t.Errorf("%s is a secret and reaches the host without Sensitive, so plans and state show it", path)
 		}
+	}
+}
+
+// TestNodeGroupShipsWithItsNodeCount. magic-modules leaves NodeGroup's
+// initialNodeCount as PRE_CREATE_REPLACE_ME for Terraform's pre_create; the
+// generator binds it to Discovery's query parameter. Without that binding the
+// type is refused, and this is the check that the binding runs.
+func TestNodeGroupShipsWithItsNodeCount(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := c.Type("gcp.nodegroup")
+	if !ok {
+		t.Fatal("gcp.nodegroup does not ship")
+	}
+	if !strings.Contains(ty.CreateURL, "initialNodeCount={{initialNodeCount}}") {
+		t.Errorf("create url %q does not bind initialNodeCount", ty.CreateURL)
+	}
+	if a := ty.Attributes["initialNodeCount"]; a == nil || !a.Required || !a.CreateOnly {
+		t.Errorf("initialNodeCount = %+v, want a required create-only attribute", a)
+	}
+}
+
+// TestEverySecretLookingFieldIsSensitive. magic-modules' `sensitive` is the
+// only source of secrets, and a search of the catalog on 2026-09-24 found 13
+// it misses (a Cloud SQL user's password, a GKE cluster's basic-auth
+// password, a router's MD5 key). They are marked in the overlay; this is the
+// check that the next type shipping one fails here, not in a plan printed to
+// someone's terminal.
+//
+// Settable string fields named as passwords, private or client keys, API
+// keys, tokens and shared secrets. A reference to a secret (a Secret Manager
+// version, a password URI) is not one. The allowed names are tokens that are
+// identifiers, not credentials.
+func TestEverySecretLookingFieldIsSensitive(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := regexp.MustCompile(`(?i)(password|passwd|privatekey|private_key|clientkey|apikey|api_key|activationtoken|sharedsecret|passphrase)`)
+	// Not a secret: a reference to one, or a field describing one (its type,
+	// its expiry).
+	reference := regexp.MustCompile(`(?i)(SecretVersion|SecretUri|PasswordUri|Uri$|Name$|Id$|Version$|Interval$|Policy$|Config$|Type$|Duration$|Time$)`)
+	notCredentials := map[string]bool{
+		// Identifiers that happen to be called tokens: a Firebase source id,
+		// a Cloud Run execution suffix, an object restore handle.
+		"sourceToken": true, "runExecutionToken": true, "startExecutionToken": true, "restoreToken": true,
+	}
+	checked := 0
+	var walk func(ty, path string, as map[string]*Attr)
+	walk = func(ty, path string, as map[string]*Attr) {
+		for name, a := range as {
+			leaf := a.Canonical
+			if leaf == "" {
+				leaf = name
+			}
+			if a.Kind == value.KindString && !a.Output && secret.MatchString(leaf) && !reference.MatchString(leaf) && !notCredentials[leaf] {
+				checked++
+				if !a.Sensitive {
+					t.Errorf("%s %s%s looks like a secret and is not sensitive; mark it in gen/overlay.yaml's sensitive list", ty, path, name)
+				}
+			}
+			walk(ty, path+name+".", a.Fields)
+			if a.Elem != nil {
+				walk(ty, path+name+"[].", a.Elem.Fields)
+			}
+		}
+	}
+	for _, ty := range c.Types {
+		walk(ty.Name, "", ty.Attributes)
+	}
+	// 14 were checked on 2026-09-24, every one sensitive.
+	if checked < 12 {
+		t.Errorf("only %d secret-looking fields were checked; the walk is not reaching them", checked)
+	}
+}
+
+// TestTheCatalogKeepsItsRules checks, over every shipped type, the rules the
+// generator enforces one type at a time: each was found broken on at least
+// one type before it was a rule (a POST update from magic-modules, a create
+// url carrying magic-modules' PRE_CREATE_REPLACE_ME, a setter on a path the
+// id cannot fill). A rule enforced where it was written and nowhere else is
+// how those shipped.
+func TestTheCatalogKeepsItsRules(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ph := regexp.MustCompile(`\{\{?\+?%?([A-Za-z0-9_]+)\}?\}`)
+	for _, ty := range c.Types {
+		if ty.UpdateVerb != "" && ty.UpdateVerb != "PATCH" {
+			t.Errorf("%s: update verb %q; the update is PATCH or nothing", ty.Name, ty.UpdateVerb)
+		}
+		for _, tmpl := range []string{ty.CreateURL, ty.BaseURL, ty.UpdateURL, ty.DeleteURL, ty.SelfLink} {
+			if strings.Contains(tmpl, "PRE_CREATE_REPLACE_ME") {
+				t.Errorf("%s: %q carries magic-modules' pre_create token", ty.Name, tmpl)
+			}
+		}
+		if ty.EndpointTemplate != "" && (!strings.Contains(ty.EndpointTemplate, "{location}") || !strings.Contains(ty.SelfLink, "locations/")) {
+			t.Errorf("%s: endpoint template %q cannot be filled from its ids", ty.Name, ty.EndpointTemplate)
+		}
+		idNames := map[string]bool{"project": true, "region": true, "zone": true, "location": true}
+		for _, m := range ph.FindAllStringSubmatch(ty.SelfLink, -1) {
+			idNames[m[1]] = true
+		}
+		for n := range ty.CreateBindings {
+			idNames[n] = true
+		}
+		byCanonical := map[string]*Attr{}
+		for _, a := range ty.Attributes {
+			byCanonical[a.Canonical] = a
+		}
+		if ty.LockField != "" && byCanonical[ty.LockField] == nil {
+			t.Errorf("%s: lock field %q is not an attribute", ty.Name, ty.LockField)
+		}
+		for _, s := range ty.Setters {
+			for _, m := range ph.FindAllStringSubmatch(s.Path, -1) {
+				if !idNames[m[1]] {
+					t.Errorf("%s: setter %s's path names {%s}, which its id does not", ty.Name, s.Method, m[1])
+				}
+			}
+			for _, f := range s.Fields {
+				if a := byCanonical[f]; a == nil || a.Output || a.ForceNew {
+					t.Errorf("%s: setter %s carries %q, which is not a field that changes in place", ty.Name, s.Method, f)
+				}
+			}
+		}
+		var walk func(path string, as map[string]*Attr)
+		walk = func(path string, as map[string]*Attr) {
+			for name, a := range as {
+				if a.Required && a.Output {
+					t.Errorf("%s %s%s is both required and output", ty.Name, path, name)
+				}
+				if a.InputOnly && a.Output {
+					t.Errorf("%s %s%s is both input only and output", ty.Name, path, name)
+				}
+				walk(path+name+".", a.Fields)
+				if a.Elem != nil {
+					walk(path+name+"[].", a.Elem.Fields)
+				}
+			}
+		}
+		walk("", ty.Attributes)
 	}
 }

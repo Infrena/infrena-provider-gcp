@@ -251,11 +251,15 @@ func TestImportReadsAnExistingResource(t *testing.T) {
 	}
 }
 
-// TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder. 16 types have a
+// TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder. 16 types had a
 // self_link beginning with {{parent}}, leaving reduceSelfLink no literal text
 // to search for. Two of them also return a selfLink in their bodies, so before
 // PathPrefix existed ProviderID failed on every create -- and per the orphan
 // rule, an error after a successful create orphans the resource.
+//
+// Since 2026-09-25 a bound {{parent}} is spelled out (projects/{project}/...),
+// because escaped it sent projects%2Fp and every request 404'd. The body's
+// selfLink must still reduce to the id, so this stays on the same type.
 //
 // Against the REAL catalog entry, not a hand-built type, so this fails if the
 // generator ever stops emitting the prefix.
@@ -264,8 +268,8 @@ func TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder(t *testing.T) {
 	if !ok {
 		t.Fatal("the catalog no longer ships gcp.networksecurity.addressgroup")
 	}
-	if !strings.HasPrefix(ty.SelfLink, "{{") {
-		t.Fatalf("this test exists for a self_link that starts with a placeholder; got %q", ty.SelfLink)
+	if !strings.HasPrefix(ty.SelfLink, "projects/{project}/") {
+		t.Fatalf("%s's bound parent is no longer spelled out: %q", ty.Name, ty.SelfLink)
 	}
 	if ty.PathPrefix == "" {
 		t.Fatalf("%s has no path_prefix, so its urls carry no api version", ty.Name)
@@ -795,13 +799,11 @@ func TestAReadKeysStateBySchemaName(t *testing.T) {
 	}
 }
 
-// TestAReadKeysAListElementBySchemaNameToo is the same claim one level in,
-// on the shape two thirds of the corpus's renames actually have. gcp.router
-// is one of the three updatable types (with gcp.grpcroute and
-// gcp.responsepolicyrule) whose ONLY renamed attribute lives inside a list,
-// so a translation that recursed into Fields but not Elem would leave this
-// exactly as broken as it was while passing every top-level test above.
-func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
+// TestAReadKeepsANestedTypeAsType. Only a top-level attribute shares a map
+// with the resource's own keys, so only a top-level `type` is renamed. Until
+// 2026-09-25 every nested one was too (794 of them), and a router's
+// nats[].type had to be written type_value. It now reads back as `type`.
+func TestAReadKeepsANestedTypeAsType(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
 	defer s.Close()
@@ -810,8 +812,9 @@ func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
 	if !ok || nats.Elem == nil {
 		t.Fatalf("%s no longer declares nats as a list", ty.Name)
 	}
-	requireRenamedAt(t, &catalog.Type{Name: ty.Name + ".nats[]", Attributes: nats.Elem.Fields},
-		"type_value", "type")
+	if a, ok := nats.Elem.Fields["type"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s.nats[] no longer declares a plain `type`: %v", ty.Name, nats.Elem.Fields["type"])
+	}
 
 	// "router", not "name": gcp.router's self_link captures its own id under
 	// the API's own placeholder name ("projects/{project}/regions/{region}/routers/{router}").
@@ -840,24 +843,18 @@ func TestAReadKeysAListElementBySchemaNameToo(t *testing.T) {
 	if !ok {
 		t.Fatalf("state[nats][0] = %#v, want an object", list[0])
 	}
-	if _, leaked := fields["type"]; leaked {
-		t.Errorf("a list element in state is keyed by the WIRE name: %#v", fields)
+	if _, renamed := fields["type_value"]; renamed {
+		t.Errorf("a list element in state is keyed by a rename it no longer has: %#v", fields)
 	}
-	if got, ok := fields["type_value"].AsString(); !ok || got != "PUBLIC" {
-		t.Errorf("state[nats][0] = %#v, want %q carrying the value", fields, "type_value")
+	if got, ok := fields["type"].AsString(); !ok || got != "PUBLIC" {
+		t.Errorf("state[nats][0] = %#v, want %q carrying the value", fields, "type")
 	}
 }
 
-// TestACreateSendsWireNamesBelowTheTopLevelToo. requestBody translating only
-// its own top-level keys passes every other create test in this file and
-// still sends "type_value" inside every nested object and list element it
-// writes -- which for 263 of the corpus's 306 renamed attributes is the only
-// place they ever appear.
-//
-// gcp.regionsecuritypolicy carries both halves at once: a renamed attribute
-// at the top level, and another two levels down inside a list
-// (rules[].redirectOptions.type_value), so one create exercises the whole
-// descent.
+// TestACreateSendsWireNamesBelowTheTopLevelToo. gcp.regionsecuritypolicy
+// has a `type` at the top level, renamed type_value, and another two levels
+// down inside a list (rules[].redirectOptions.type), which keeps its name.
+// One create must send both as `type`.
 func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
 	gcptest.Isolate(t)
 	s := gcpfake.New(t)
@@ -865,9 +862,8 @@ func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
 	ty, c := syncCatalogFor(t, "gcp.regionsecuritypolicy")
 	requireRenamedAt(t, ty, "type_value", "type")
 	redirect := ty.Attributes["rules"].Elem.Fields["redirectOptions"]
-	if a, ok := redirect.Fields["type_value"]; !ok || a.Canonical != "type" {
-		t.Fatalf("%s no longer renames rules[].redirectOptions.type; this test is not "+
-			"exercising a nested rename", ty.Name)
+	if a, ok := redirect.Fields["type"]; !ok || a.Canonical != "type" {
+		t.Fatalf("%s no longer declares rules[].redirectOptions.type", ty.Name)
 	}
 	p := testProviderWithCatalog(t, s, c)
 
@@ -880,7 +876,7 @@ func TestACreateSendsWireNamesBelowTheTopLevelToo(t *testing.T) {
 			"type_value": "CLOUD_ARMOR",
 			"rules": []any{map[string]any{
 				"priority":        int64(1000),
-				"redirectOptions": map[string]any{"type_value": "GOOGLE_RECAPTCHA"},
+				"redirectOptions": map[string]any{"type": "GOOGLE_RECAPTCHA"},
 			}},
 		}),
 	})
@@ -1254,7 +1250,7 @@ func TestOnlyThisResourcesOwnNameIsShortened(t *testing.T) {
 		"projects/p/locations/r/gadgets/one":         "projects/p/locations/r/gadgets/one",
 	} {
 		attrs := map[string]value.Value{"name": value.String(full, value.SourceProvider)}
-		shortNameFromOwnID(ty, "projects/p/locations/r/widgets/one", attrs)
+		shortNameFromOwnID(ty, "projects/p/locations/r/widgets/one", attrs, value.Value{})
 		if got, _ := attrs["name"].Raw.(string); got != want {
 			t.Errorf("%s: got %q, want %q", full, got, want)
 		}
@@ -1269,7 +1265,7 @@ func TestAFullPathNameIsLeftAlone(t *testing.T) {
 	job := &catalog.Type{SelfLink: "projects/{{project}}/jobs/{{name}}", Attributes: map[string]*catalog.Attr{"name": {Kind: value.KindString, Output: true}}}
 	for _, ty := range []*catalog.Type{topic, job} {
 		attrs := map[string]value.Value{"name": value.String("projects/p/x/one", value.SourceProvider)}
-		shortNameFromOwnID(ty, "projects/p/x/one", attrs)
+		shortNameFromOwnID(ty, "projects/p/x/one", attrs, value.Value{})
 		if got, _ := attrs["name"].Raw.(string); got != "projects/p/x/one" {
 			t.Errorf("self_link %q: name shortened to %q", ty.SelfLink, got)
 		}
@@ -1321,5 +1317,108 @@ func TestACreateAnsweredWithoutASelfLinkStillHasAnID(t *testing.T) {
 	}
 	if st.ProviderID != "projects/p/locations/r/widgets/two" {
 		t.Errorf("provider id = %q, want projects/p/locations/r/widgets/two", st.ProviderID)
+	}
+}
+
+// TestTheNameFillsOnlyAPlaceholderThatStandsForIt. A record set's id ends
+// {name}/{type}; with type unset the id is unknown, and filling {type} with
+// the name read the record set at .../rrsets/www/www.
+func TestTheNameFillsOnlyAPlaceholderThatStandsForIt(t *testing.T) {
+	merged := map[string]value.Value{"name": value.String("www", value.SourceExplicit)}
+	fillLastFromName("projects/{project}/managedZones/{managedZone}/rrsets/{name}/{type}", merged)
+	if _, filled := merged["type"]; filled {
+		t.Errorf("{type} was filled with the name: %v", merged["type"].Raw)
+	}
+	fillLastFromName("projects/{project}/policies/{policy}", merged)
+	if merged["policy"].Raw != "www" {
+		t.Errorf("{policy} = %v, want the name", merged["policy"].Raw)
+	}
+}
+
+// TestABareCaptureIDIsBuiltFromAShortName. A logging sink's id template is
+// "{+sinkName}", its full name, and it is configured and answered as the
+// short "my-sink": read at "my-sink" it was never found. A full name is used
+// as it is.
+func TestABareCaptureIDIsBuiltFromAShortName(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.logging.sink", SelfLink: "{+sinkName}", CreateURL: "projects/{{project}}/sinks",
+		Attributes: map[string]*catalog.Attr{"name": {Canonical: "name", Kind: value.KindString}}}
+	s := func(v string) value.Value { return value.String(v, value.SourceExplicit) }
+	id, err := ProviderID(ty, map[string]any{"name": "my-sink"}, map[string]value.Value{"project": s("p"), "name": s("my-sink")})
+	if err != nil || id != "projects/p/sinks/my-sink" {
+		t.Errorf("id = %q, %v; want projects/p/sinks/my-sink", id, err)
+	}
+	id, err = ProviderID(ty, map[string]any{"name": "projects/p/sinks/other"}, map[string]value.Value{"project": s("p")})
+	if err != nil || id != "projects/p/sinks/other" {
+		t.Errorf("a full name as the id: %q, %v", id, err)
+	}
+}
+
+// TestABareCaptureNameIsShortenedOnlyWhenConfiguredShort. A certificate
+// issuance config is configured short and answered in full; a Cloud Tasks
+// queue must be configured in full. Shortening the queue's name would be the
+// drift the rule exists to prevent.
+func TestABareCaptureNameIsShortenedOnlyWhenConfiguredShort(t *testing.T) {
+	ty := &catalog.Type{SelfLink: "{+name}", Attributes: map[string]*catalog.Attr{"name": {Canonical: "name", Kind: value.KindString}}}
+	s := func(v string) value.Value { return value.String(v, value.SourceExplicit) }
+	full := "projects/p/locations/l/configs/c"
+	for _, c := range []struct {
+		ref  value.Value
+		want string
+	}{
+		{s("c"), "c"},
+		{s(full), full},
+		{value.Value{}, full},
+	} {
+		attrs := map[string]value.Value{"name": s(full)}
+		shortNameFromOwnID(ty, full, attrs, c.ref)
+		if attrs["name"].Raw != c.want {
+			t.Errorf("configured %v: name reported %v, want %q", c.ref.Raw, attrs["name"].Raw, c.want)
+		}
+	}
+}
+
+// TestAnIDWhoseTemplateStartsWithABoundParentParses. An address group's id
+// template starts {{parent}}, bound at create to projects/{project}, and its
+// ids are projects/p/locations/r/addressGroups/g: parent is two segments,
+// a placeholder captures one, and no such id ever parsed, so the type could
+// be created and never read, updated or deleted.
+func TestAnIDWhoseTemplateStartsWithABoundParentParses(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.networksecurity.addressgroup",
+		SelfLink:       "{{parent}}/locations/{{location}}/addressGroups/{{name}}",
+		CreateBindings: map[string]*catalog.CreateBinding{"parent": {Template: "projects/{project}"}}}
+	got, err := ParseProviderID(ty, "projects/p/locations/r/addressGroups/g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range map[string]string{"parent": "projects/p", "location": "r", "name": "g", "project": "p"} {
+		if got[k].Raw != want {
+			t.Errorf("%s = %v, want %q", k, got[k].Raw, want)
+		}
+	}
+}
+
+// TestAFieldGoogleAddedIsLeftOutOfState. The host refuses a state carrying
+// an attribute the schema does not declare and fails the operation, so a
+// field Google added after the pinned Discovery document failed every
+// create -- after the resource existed. Spanner answered an instance with
+// resourceLocation on 2026-09-25. Seeded, because the fake would otherwise
+// echo only what it was sent.
+func TestAFieldGoogleAddedIsLeftOutOfState(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.Seed("/v1/projects/p/locations/r/widgets/one", map[string]any{
+		"name": "one", "sizeGb": float64(10), "resourceLocation": "us-central1",
+	})
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{widgetType()}})
+	st, err := p.Read(context.Background(), widgetState())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, leaked := st.Attributes["resourceLocation"]; leaked {
+		t.Errorf("state carries an attribute the schema does not declare, which the host refuses: %v", st.Attributes)
+	}
+	if got, _ := st.Attributes["sizeGb"].AsInt(); got != 10 {
+		t.Errorf("a declared attribute was lost too: %v", st.Attributes)
 	}
 }

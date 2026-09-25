@@ -80,7 +80,7 @@ func TestARestrictionIsReadInEveryShapeGoogleWritesIt(t *testing.T) {
 		"Patches the specified TargetHttpsProxy resource with the data included in the request. This method supports PATCH semantics and usesJSON merge patch format and processing rules.":                                                false,
 		"Patches the specified SSL policy with the data included in the request.":                                                                                                                                                          false,
 	} {
-		col := disco.Collection{Methods: map[string]*disco.Method{"patch": {Description: desc}}}
+		col := disco.Collection{Methods: map[string]*disco.Method{"patch": {HTTPMethod: "PATCH", Description: desc}}}
 		if got, _ := restrictedPatch(col); got != want {
 			t.Errorf("restrictedPatch = %v, want %v, for %q", got, want, desc)
 		}

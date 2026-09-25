@@ -19,10 +19,10 @@ A security profile defines the behavior associated to a profile type.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/securityProfiles/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/securityProfiles/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/securityProfiles/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/securityProfiles/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/securityProfiles/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/securityProfiles/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -59,7 +59,7 @@ A security profile defines the behavior associated to a profile type.
 | `threatPreventionProfile.threatOverrides[]` | — | `map` | optional | — | — |
 | `threatPreventionProfile.threatOverrides[].action` | — | `string` | required | — | Required. Threat action override. For some threat types, only a subset of actions applies. |
 | `threatPreventionProfile.threatOverrides[].threatId` | `threat_id` | `string` | required | — | Required. Vendor-specific ID of a threat to override. |
-| `threatPreventionProfile.threatOverrides[].type_value` | wire `type` | `string` | output only | — | Output only. Type of the threat (read only). |
+| `threatPreventionProfile.threatOverrides[].type` | — | `string` | output only | — | Output only. Type of the threat (read only). |
 | `type_value` | wire `type` | `string` | required | force new | Immutable. The single ProfileType that the SecurityProfile resource configures. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. Last resource update timestamp. |
 | `urlFilteringProfile` | `url_filtering_profile` | `map` | optional | — | The URL filtering configuration for the SecurityProfile. |

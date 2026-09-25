@@ -11,7 +11,8 @@ Datasets allow you to organize and control access to your tables.
 | Service | bigquery |
 | Scope | global |
 | Asset type | `bigquery.googleapis.com/Dataset` |
-| Tier | 1 (ruled: One hook, and the generic path already does what it does.
+| Tier | 1 (ruled: THE BOUNDED GAP, found 2026-09-24: magic-modules' delete_url adds ?deleteContents={{delete_contents_on_destroy}}, a Terraform-only field, and every dataset delete failed building its url until the generator dropped query parameters nothing can fill. Without it, Google refuses to delete a dataset that still has tables, loudly; empty it first.
+One hook, and the generic path already does what it does.
 update_encoder (update_encoder/bigquery_dataset.go.tmpl) drops `access` from the update body unless the ACL itself changed, because BigQuery replaces the whole list with whatever it is sent and re-sending an unchanged copy clobbers entries BigQuery maintains itself. BuildMask omits every attribute whose value did not change, so `access` is only ever sent when it did.
 Held back until the update verb could be derived: Dataset.yaml declares an update_url and no update_verb, and magic-modules' own default for that is PUT, which with a partial body would clear every field left out. The url is now checked against datasets.patch (same path, and its accessPolicyVersion query parameter is one patch declares) and the type PATCHes. Unblocks gcp.bigquery.table and gcp.routine, which ship already.
 THE BOUNDED GAP: deleting a dataset that still holds tables fails with Google's own error, since deleteContents is never sent. That is loud, and it is the API's rule; the fix is to remove the tables first.
@@ -25,7 +26,7 @@ THE BOUNDED GAP: deleting a dataset that still holds tables fails with Google's 
 | Create | yes | `POST projects/{{project}}/datasets?accessPolicyVersion=3` |
 | Read | yes | `GET projects/{{project}}/datasets/{{dataset_id}}` |
 | Update | yes | `PATCH projects/{{project}}/datasets/{{dataset_id}}?accessPolicyVersion=3` |
-| Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}?deleteContents={{delete_contents_on_destroy}}` |
+| Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -102,7 +103,7 @@ projects/{{project}}/datasets/{{dataset_id}}
 | `maxTimeTravelHours` | `max_time_travel_hours` | `string` | optional | — | Optional. Defines the time travel window in hours. The value can be from 48 to 168 hours (2 to 7 days). The default value is 168 hours if this is not set. |
 | `resourceTags` | `resource_tags` | `map` | optional | opaque | Optional. The \[tags\](https://cloud.google.com/bigquery/docs/tags) attached to this dataset. Tag keys are globally unique. Tag key is expected to be in the namespaced format, for example … |
 | `restrictions` | — | `map` | output only | — | Optional. Output only. Restriction config for all tables and dataset. If set, restrict certain accesses on the dataset and all its tables based on the config. See \[Data … |
-| `restrictions.type_value` | wire `type` | `string` | output only | — | Output only. Specifies the type of dataset/table restriction. |
+| `restrictions.type` | — | `string` | output only | — | Output only. Specifies the type of dataset/table restriction. |
 | `satisfiesPzi` | `satisfies_pzi` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `satisfiesPzs` | `satisfies_pzs` | `boolean` | output only | — | Output only. Reserved for future use. |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. A URL that can be used to access the resource again. You can use this URL in Get or Update requests to the resource. |

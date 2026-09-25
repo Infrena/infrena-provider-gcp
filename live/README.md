@@ -50,8 +50,17 @@ values do not.
 | Label | `infrena-live-tests=true` — **this is what the guard checks**, and it is the one value you must match exactly |
 | Billing account | `012345-567890-ABCDEF` — needed only if the project is not already billed |
 | Service account | `infrena-live@example-project-1234.iam.gserviceaccount.com` |
-| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin`, `dns.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
-| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager, dns |
+| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin`, `dns.admin`, `artifactregistry.admin`, `bigquery.dataEditor`, `bigtable.admin`, `certificatemanager.owner`, `cloudkms.admin`, `redis.admin`, `spanner.admin`, `workflows.admin`, `logging.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
+| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager, dns, artifactregistry, bigquery, bigtableadmin, certificatemanager, cloudkms, redis, spanner, workflows, logging |
+
+**One thing here is permanent on purpose.** `TestLiveCMEKImagePlansClean` creates a KMS key ring
+`infrena-live` and a key `infrena-live-cmek` in `global` once, and every later run reuses them: a key
+ring can never be deleted, and a key version costs about $0.06 a month until destroyed, so a new one
+per run would pile up. It grants compute's service agent use of that key.
+
+`TestLiveArtifactRegistryCredentialsChangeInPlace` grants Artifact Registry's own service agent
+`secretAccessor` on the one secret it creates, because a remote repository reads its upstream password
+as that agent and refuses the create without it. The grant goes away with the secret.
 
 If `gcloud projects create` returns `QuotaFailure: you have exceeded your
 allotted project quota`, reusing a dormant project works — but verify it is

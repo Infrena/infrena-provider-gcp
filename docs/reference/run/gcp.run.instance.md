@@ -54,7 +54,7 @@ projects/{project}/locations/{location}/instances/{instance}
 | `conditions[].revisionReason` | `revision_reason` | `string` | output only | — | Output only. A reason for the revision condition. |
 | `conditions[].severity` | — | `string` | optional | — | How to interpret failures of this condition, one of Error, Warning, Info |
 | `conditions[].state` | — | `string` | optional | — | State of the condition. |
-| `conditions[].type_value` | wire `type` | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
+| `conditions[].type` | — | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
 | `containerStatuses` | `container_statuses` | `list` | output only | — | Output only. Status information for each of the specified containers. The status includes the resolved digest for specified images. |
 | `containerStatuses[]` | — | `map` | optional | — | — |
 | `containerStatuses[].imageDigest` | `image_digest` | `string` | optional | — | ImageDigest holds the resolved digest for the image specified and resolved during the creation of Revision. This field holds the digest value regardless of whether a tag or digest was originally … |
@@ -177,7 +177,7 @@ projects/{project}/locations/{location}/instances/{instance}
 | `terminalCondition.revisionReason` | `revision_reason` | `string` | output only | — | Output only. A reason for the revision condition. |
 | `terminalCondition.severity` | — | `string` | optional | — | How to interpret failures of this condition, one of Error, Warning, Info |
 | `terminalCondition.state` | — | `string` | optional | — | State of the condition. |
-| `terminalCondition.type_value` | wire `type` | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
+| `terminalCondition.type` | — | `string` | optional | — | type is used to communicate the status of the reconciliation process. See also: https://github.com/knative/serving/blob/main/docs/spec/errors.md#error-conditions-and-reporting Types common to all … |
 | `uid` | — | `string` | output only | — | Output only. Server assigned unique identifier for the trigger. The value is a UUID4 string and guaranteed to remain unchanged until the resource is deleted. |
 | `updateTime` | `update_time` | `string` | output only | — | Output only. The last-modified time. |
 | `urls` | — | `list` | output only | — | Output only. All URLs serving traffic for this Instance. |

@@ -19,10 +19,10 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/capabilityConfigs/{{capability_config_id}}` |
-| Update | yes | `PATCH {{parent}}/capabilityConfigs/{{capability_config_id}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/capabilityConfigs/{{capability_config_id}}` |
+| Create | yes | `POST organizations/{organization}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` |
+| Read | yes | `GET organizations/{organization}/capabilityConfigs/{{capability_config_id}}` |
+| Update | yes | `PATCH organizations/{organization}/capabilityConfigs/{{capability_config_id}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE organizations/{organization}/capabilityConfigs/{{capability_config_id}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 
 ## Attributes
 
-12 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+13 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -45,6 +45,7 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 | `etag` | — | `string` | output only | — | This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
 | `managementProject` | `management_project` | `string` | optional | force new | Optional. Immutable. The Management Project associated with this CapabilityConfig. If not provided during creation, a management project will be automatically created. Cannot be modified after … |
 | `name` | — | `string` | output only | — | Identifier. The unique resource name of the CapabilityConfig. Format: `organizations/{organization}/capabilityConfigs/{capabilityConfig}` or, `folders/{folder}/capabilityConfigs/{capabilityConfig}` … |
+| `organization` | — | `string` | required | force new | The organization this gcp.cloudresourcemanager.organization.capabilityconfig belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `state` | — | `string` | output only | — | Output only. The lifecycle state of the CapabilityConfig. |
 | `types` | — | `list` | required | unordered | Required. The CapabilityConfig types. |
 | `types[]` | — | `string` | optional | — | — |

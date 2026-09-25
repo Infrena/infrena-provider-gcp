@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	pathpkg "path"
 	"reflect"
 	"regexp"
 	"sort"
@@ -50,8 +51,14 @@ type apiErrorSpec struct {
 type Request struct {
 	Method string
 	Path   string
-	Query  url.Values
-	Body   []byte
+	// SentPath is the path as the client sent it, escapes intact. Path is
+	// Go's decoded form, in which "projects%2Fp" (one escaped segment, a
+	// 404 from Google) and "projects/p" look the same: a log scope create
+	// whose bound parent was escaped passed here and failed live
+	// (2026-09-25).
+	SentPath string
+	Query    url.Values
+	Body     []byte
 }
 
 // Server is the fake. Zero value is not usable; construct with New.
@@ -87,6 +94,7 @@ type Server struct {
 	notFoundRemaining map[string]int
 
 	opStyle   OperationStyle
+	styleFor  func(method, path string) (OperationStyle, bool)
 	opCounter int
 
 	lroOps         map[string]*lroOp
@@ -222,6 +230,19 @@ func (s *Server) SetOperationStyle(style OperationStyle) {
 	s.opStyle = style
 }
 
+// SetOperationStyleFor makes each mutation answer in the style fn gives for
+// its own method and path, falling back to SetOperationStyle's where fn
+// reports none. A test that takes fn from the API's Discovery document
+// makes the fake disagree with a catalog that is wrong about how one method
+// answers: with one style per type, the fake answered every method the way
+// the catalog said the create did, which is how an update that answers
+// with the resource hung against Google and passed here.
+func (s *Server) SetOperationStyleFor(fn func(method, path string) (OperationStyle, bool)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.styleFor = fn
+}
+
 // SetListField overrides the array-valued field name a GET on
 // collectionPath's list response carries its results under. Defaults to
 // "items" (compute's own convention) when never set for that path.
@@ -299,7 +320,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	s.requests = append(s.requests, Request{
-		Method: r.Method, Path: r.URL.Path, Query: r.URL.Query(), Body: bodyBytes,
+		Method: r.Method, Path: r.URL.Path, SentPath: r.URL.EscapedPath(), Query: r.URL.Query(), Body: bodyBytes,
 	})
 	failed := s.failNext
 	s.failNext = nil
@@ -445,11 +466,22 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	}
 	id, fromQuery := resourceID(r, body)
 	if id == "" {
-		writeError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "no id in the request's query parameters or body")
-		return
+		// Google assigns the id itself for some APIs (Cloud Monitoring's
+		// alert policies and groups, Resource Manager's tag keys), and
+		// answers with the full resource name. So does the fake.
+		s.mu.Lock()
+		s.opCounter++
+		id = fmt.Sprintf("assigned-%d", s.opCounter)
+		s.mu.Unlock()
+		fromQuery = true
 	}
 	collection := strings.TrimSuffix(r.URL.Path, "/")
 	path := collection + "/" + id
+	if !queryNamesTheResource(r) {
+		if _, inner, ok := unwrapCreate(body); ok {
+			body = inner
+		}
+	}
 	stored := cloneMap(body)
 	s.mu.Lock()
 	for f := range s.dropOnCreate {
@@ -476,7 +508,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	s.declaredCollections[collection] = true
 	s.mu.Unlock()
 
-	s.respondMutation(w, path, stored, false)
+	s.respondMutation(w, r, path, stored, false)
 }
 
 // resourceID takes the id GCP's insert methods take it from: a query
@@ -486,10 +518,22 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 func resourceID(r *http.Request, body map[string]any) (string, bool) {
 	reserved := map[string]bool{"updateMask": true, "pageToken": true, "pageSize": true, "parent": true, "requestId": true}
 	for k, v := range r.URL.Query() {
-		if reserved[k] || len(v) == 0 || v[0] == "" {
+		// Only an id parameter names the resource: a bucket's ?project= and
+		// a node group's ?initialNodeCount= are not ids, and the fake once
+		// stored both under them.
+		// Either spelling: Google's transcoding takes repository_id as well
+		// as repositoryId, and magic-modules writes the snake form.
+		if reserved[k] || len(v) == 0 || v[0] == "" || !(strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "_id") || k == "id") {
 			continue
 		}
 		return v[0], true
+	}
+	// AIP's wrapped create, {roleId: "x", role: {...}}: the id is the one
+	// "...Id" field beside the object. Only when no query parameter named the
+	// resource: a wasm plugin's body has mainVersionId beside its versions
+	// map, and is not a wrapper. See unwrapCreate for the body.
+	if id, _, ok := unwrapCreate(body); ok {
+		return id, true
 	}
 	if name, ok := body["name"].(string); ok && name != "" {
 		if i := strings.LastIndex(name, "/"); i >= 0 {
@@ -501,7 +545,7 @@ func resourceID(r *http.Request, body map[string]any) (string, bool) {
 }
 
 func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
-	path := r.URL.Path
+	path := s.itemAddressed(r)
 	s.mu.Lock()
 	existing, ok := s.resources[path]
 	s.mu.Unlock()
@@ -592,11 +636,16 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 	s.resources[path] = merged
 	s.mu.Unlock()
 
-	s.respondMutation(w, path, merged, false)
+	s.respondMutation(w, r, path, merged, false)
 }
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
+	path := s.itemAddressed(r)
+	// A delete published under the item, not at it: BigQuery's jobs.delete
+	// is DELETE .../jobs/{jobId}/delete.
+	if dir, last := pathpkg.Split(path); !s.has(path) && last == "delete" && s.has(strings.TrimSuffix(dir, "/")) {
+		path = strings.TrimSuffix(dir, "/")
+	}
 	s.mu.Lock()
 	_, existed := s.resources[path]
 	failing := s.deleteThenFail[path]
@@ -612,15 +661,20 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		writeNotFound(w, path)
 		return
 	}
-	s.respondMutation(w, path, nil, true)
+	s.respondMutation(w, r, path, nil, true)
 }
 
 // respondMutation writes a create/patch/delete's response in whatever shape
 // the configured OperationStyle calls for.
-func (s *Server) respondMutation(w http.ResponseWriter, path string, result map[string]any, isDelete bool) {
+func (s *Server) respondMutation(w http.ResponseWriter, r *http.Request, path string, result map[string]any, isDelete bool) {
 	s.mu.Lock()
-	style := s.opStyle
+	style, styleFor := s.opStyle, s.styleFor
 	s.mu.Unlock()
+	if styleFor != nil {
+		if own, ok := styleFor(r.Method, r.URL.EscapedPath()); ok {
+			style = own
+		}
+	}
 
 	switch style {
 	case OpLongRunning:
@@ -829,7 +883,7 @@ func (s *Server) handleCreateAt(w http.ResponseWriter, r *http.Request, bodyByte
 		writeError(w, http.StatusConflict, "ALREADY_EXISTS", "Resource already exists in the project (resource="+path+").")
 		return
 	}
-	s.respondMutation(w, path, body, false)
+	s.respondMutation(w, r, path, body, false)
 }
 
 // unwrapUpdateEnvelope recognises AIP-134's update request: exactly one
@@ -944,7 +998,7 @@ func (s *Server) handleSetter(w http.ResponseWriter, r *http.Request, bodyBytes 
 	}
 	s.resources[path] = merged
 	s.mu.Unlock()
-	s.respondMutation(w, path, merged, false)
+	s.respondMutation(w, r, path, merged, false)
 }
 
 // DeleteThenFailOperation makes the next delete of path accepted and then
@@ -971,4 +1025,90 @@ func (s *Server) OneFieldPerPatch(path string) {
 		s.oneFieldPatch = map[string]bool{}
 	}
 	s.oneFieldPatch[path] = true
+}
+
+// unwrapCreate recognises AIP's wrapped create body, as IAM roles, service
+// accounts and Bigtable instances take it: exactly one string field named
+// "...Id" and exactly one object field, the resource. Anything else is a
+// plain create body.
+func unwrapCreate(body map[string]any) (id string, inner map[string]any, ok bool) {
+	// {roleId, role}, {instanceId, instance, clusters}: the id field is the
+	// object's own name plus "Id".
+	for k, v := range body {
+		obj, isObj := v.(map[string]any)
+		if !isObj {
+			continue
+		}
+		if s, _ := body[k+"Id"].(string); s != "" {
+			return s, obj, true
+		}
+	}
+	// {cluster: {name}, projectId, zone} (GKE): no id field, and the one
+	// object among plain request strings names itself.
+	var objs []map[string]any
+	for _, v := range body {
+		switch x := v.(type) {
+		case map[string]any:
+			objs = append(objs, x)
+		case string:
+		default:
+			return "", nil, false
+		}
+	}
+	if len(objs) == 1 && len(body) > 1 {
+		if n, _ := objs[0]["name"].(string); n != "" {
+			if i := strings.LastIndex(n, "/"); i >= 0 {
+				n = n[i+1:]
+			}
+			return n, objs[0], true
+		}
+	}
+	return "", nil, false
+}
+
+func (s *Server) has(path string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.resources[path]
+	return ok
+}
+
+// itemAddressed is the stored resource a patch or delete addresses. Usually
+// its own path; but some APIs publish the method on the COLLECTION and name
+// the item in the query (compute's autoscalers.patch takes ?autoscaler=,
+// Cloud SQL's users.delete takes ?name=), and a fake that only looked at the
+// path answered those with a 404 Google would never send.
+func (s *Server) itemAddressed(r *http.Request) string {
+	path := r.URL.Path
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.resources[path]; ok {
+		return path
+	}
+	keys := make([]string, 0, len(r.URL.Query()))
+	for k := range r.URL.Query() {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := r.URL.Query().Get(k)
+		if v == "" || strings.Contains(v, "/") {
+			continue
+		}
+		if _, ok := s.resources[path+"/"+v]; ok {
+			return path + "/" + v
+		}
+	}
+	return path
+}
+
+// queryNamesTheResource reports whether a create's query string carries its
+// id, by resourceID's rule.
+func queryNamesTheResource(r *http.Request) bool {
+	for k, v := range r.URL.Query() {
+		if len(v) > 0 && v[0] != "" && (strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "_id") || k == "id") && k != "requestId" {
+			return true
+		}
+	}
+	return false
 }

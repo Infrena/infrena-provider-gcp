@@ -104,7 +104,41 @@ func BuildMask(ty *catalog.Type, current, desired map[string]value.Value) (map[s
 		body[a.Canonical] = wireValue(a, want)
 		mask = append(mask, a.Canonical)
 	}
+	if len(mask) > 0 {
+		addRequestOptions(ty.Attributes, desired, body)
+	}
 	return body, mask
+}
+
+// addRequestOptions puts every configured SendWithUpdate option into the
+// body, at its path, without masking it: Google reads a request option from
+// the body and would refuse a mask naming a field it never returns. Only
+// Fields are walked. A ruling cannot name a path through a list (the
+// generator refuses one), and a list is sent whole anyway.
+func addRequestOptions(attrs map[string]*catalog.Attr, desired map[string]value.Value, body map[string]any) {
+	for _, name := range sortedAttrNames(attrs) {
+		a := attrs[name]
+		want, ok := desired[name]
+		if !ok || !want.Known {
+			continue
+		}
+		if a.SendWithUpdate {
+			body[a.Canonical] = wireValue(a, want)
+			continue
+		}
+		fields, isMap := want.Raw.(map[string]value.Value)
+		if len(a.Fields) == 0 || !isMap {
+			continue
+		}
+		sub, _ := body[a.Canonical].(map[string]any)
+		if sub == nil {
+			sub = map[string]any{}
+		}
+		addRequestOptions(a.Fields, fields, sub)
+		if len(sub) > 0 {
+			body[a.Canonical] = sub
+		}
+	}
 }
 
 // buildNested recurses one level of Fields at a time, producing dotted mask
@@ -315,7 +349,7 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 
 	// From here on the patch is real, and errors are REPORTED, not returned,
 	// for as long as there is a truthful state to return instead.
-	_, awaitErr := p.await(ctx, ty, resp)
+	_, awaitErr := p.awaitAs(ctx, ty, ty.UpdateAwaitKind(), resp)
 	if awaitErr != nil {
 		fmt.Fprintf(os.Stderr, "gcp: %s: update reported a failure, reading back what exists: %v\n",
 			ty.Name, awaitErr)
@@ -411,7 +445,7 @@ func (p *Provider) patchOneFieldAtATime(ctx context.Context, ty *catalog.Type, c
 			return nil, err
 		}
 		if err == nil {
-			_, err = p.await(ctx, ty, resp)
+			_, err = p.awaitAs(ctx, ty, ty.UpdateAwaitKind(), resp)
 		}
 		if err != nil {
 			failure = err
