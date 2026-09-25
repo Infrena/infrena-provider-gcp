@@ -50,8 +50,8 @@ source spoke: `output`, `required`, `immutable`, `input_only`, `sensitive`, `equ
   - `unverified`: type facts Discovery backs that no observation or ruling has checked. Discovery
     says what is legal; the prose says what happens, and they differ (subnetwork patch limits).
 
-Both are generated and committed, like `gen/warnings.txt`, and `go run ./cmd/gen-gcp -check` fails
-CI when any committed output is stale. Neither goes into the embedded catalog: `Sources` is never
+Both are generated and committed, like `gen/warnings.txt`. `go run ./cmd/gen-gcp -check` fails when
+any committed output is stale; it needs the fetched `schemas/`, so it runs locally, not in CI. Neither goes into the embedded catalog: `Sources` is never
 serialised, so the runtime and the plugin binary do not change.
 
 ## Observations are assertions

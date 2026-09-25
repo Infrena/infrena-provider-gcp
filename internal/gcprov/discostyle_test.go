@@ -1,6 +1,7 @@
 package gcprov
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -9,9 +10,7 @@ import (
 	"testing"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
-	"github.com/infrena/infrena-provider-gcp/internal/disco"
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
-	"github.com/infrena/infrena-provider-gcp/internal/gen"
 )
 
 // discoMethod is one Discovery method as the fake needs it: the verb, the
@@ -40,60 +39,54 @@ var (
 // {+name} for a run of them.
 var discoPlaceholderRE = regexp.MustCompile(`\{\+?[^}]+\}`)
 
-// loadDiscoMethods reads every vendored Discovery document once. Each
-// method's answer style comes from its OWN response schema, which is the
-// point: the catalog records one await per type (and two exceptions), and
-// a fake taking its style from the catalog agreed with the catalog when it
-// was wrong.
+// loadDiscoMethods reads gen/methods.tsv once: every Discovery method, with
+// its answer style taken from its OWN response schema, which is the point:
+// the catalog records one await per type (and two exceptions), and a fake
+// taking its style from the catalog agreed with the catalog when it was
+// wrong. The committed digest, not schemas/, which is gitignored: a test
+// reading schemas/ passed on one laptop and failed in CI (2026-09-25).
 func loadDiscoMethods() (map[string][]discoMethod, error) {
 	discoOnce.Do(func() {
-		dir := filepath.Join("..", "..", "schemas")
-		entries, err := os.ReadDir(dir)
+		data, err := os.ReadFile(filepath.Join("..", "..", "gen", "methods.tsv"))
 		if err != nil {
 			discoErr = err
 			return
 		}
+		styles := map[string]gcpfake.OperationStyle{
+			"none": gcpfake.OpSync, "longrunning": gcpfake.OpLongRunning, "compute_operation": gcpfake.OpCompute,
+		}
 		discoMethods = map[string][]discoMethod{}
-		for _, e := range entries {
-			if !strings.HasSuffix(e.Name(), ".json") || strings.HasPrefix(e.Name(), "_") {
+		for _, line := range strings.Split(string(data), "\n") {
+			if line == "" || strings.HasPrefix(line, "#") {
 				continue
 			}
-			data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-			if err != nil {
-				discoErr = err
+			f := strings.Split(line, "\t")
+			if len(f) != 6 {
+				discoErr = fmt.Errorf("gen/methods.tsv: %q has %d fields, want 6", line, len(f))
 				return
 			}
-			d, err := disco.Parse(data)
-			if err != nil {
-				discoErr = err
+			style, ok := styles[f[3]]
+			if !ok {
+				discoErr = fmt.Errorf("gen/methods.tsv: unknown answer style %q", f[3])
 				return
 			}
-			for _, col := range d.Collections() {
-				for _, m := range col.Methods {
-					path := m.FlatPath
-					if path == "" {
-						path = m.Path
-					}
-					kind, _ := gen.AwaitOf(d, m)
-					var required []string
-					for name, p := range m.Parameters {
-						if p.Location == "query" && (p.Required ||
-							disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired]) {
-							required = append(required, name)
-						}
-					}
-					discoMethods[d.Name] = append(discoMethods[d.Name], discoMethod{
-						id:            m.ID,
-						verb:          m.HTTPMethod,
-						pattern:       discoPathPattern(path),
-						style:         styleFor(kind),
-						literals:      len(discoPlaceholderRE.ReplaceAllString(path, "")),
-						requiredQuery: required,
-					})
-				}
+			var required []string
+			if f[4] != "" {
+				required = strings.Split(f[4], ",")
 			}
+			discoMethods[f[0]] = append(discoMethods[f[0]], discoMethod{
+				id:            f[5],
+				verb:          f[1],
+				pattern:       discoPathPattern(f[2]),
+				style:         style,
+				literals:      len(discoPlaceholderRE.ReplaceAllString(f[2], "")),
+				requiredQuery: required,
+			})
 		}
 	})
+	if discoErr == nil && len(discoMethods) < 20 {
+		return nil, fmt.Errorf("gen/methods.tsv covers only %d services", len(discoMethods))
+	}
 	return discoMethods, discoErr
 }
 
