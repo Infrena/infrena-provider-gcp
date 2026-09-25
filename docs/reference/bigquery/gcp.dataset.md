@@ -11,7 +11,8 @@ Datasets allow you to organize and control access to your tables.
 | Service | bigquery |
 | Scope | global |
 | Asset type | `bigquery.googleapis.com/Dataset` |
-| Tier | 1 (ruled: One hook, and the generic path already does what it does.
+| Tier | 1 (ruled: THE BOUNDED GAP, found 2026-09-24: magic-modules' delete_url adds ?deleteContents={{delete_contents_on_destroy}}, a Terraform-only field, and every dataset delete failed building its url until the generator dropped query parameters nothing can fill. Without it, Google refuses to delete a dataset that still has tables, loudly; empty it first.
+One hook, and the generic path already does what it does.
 update_encoder (update_encoder/bigquery_dataset.go.tmpl) drops `access` from the update body unless the ACL itself changed, because BigQuery replaces the whole list with whatever it is sent and re-sending an unchanged copy clobbers entries BigQuery maintains itself. BuildMask omits every attribute whose value did not change, so `access` is only ever sent when it did.
 Held back until the update verb could be derived: Dataset.yaml declares an update_url and no update_verb, and magic-modules' own default for that is PUT, which with a partial body would clear every field left out. The url is now checked against datasets.patch (same path, and its accessPolicyVersion query parameter is one patch declares) and the type PATCHes. Unblocks gcp.bigquery.table and gcp.routine, which ship already.
 THE BOUNDED GAP: deleting a dataset that still holds tables fails with Google's own error, since deleteContents is never sent. That is loud, and it is the API's rule; the fix is to remove the tables first.
@@ -25,7 +26,7 @@ THE BOUNDED GAP: deleting a dataset that still holds tables fails with Google's 
 | Create | yes | `POST projects/{{project}}/datasets?accessPolicyVersion=3` |
 | Read | yes | `GET projects/{{project}}/datasets/{{dataset_id}}` |
 | Update | yes | `PATCH projects/{{project}}/datasets/{{dataset_id}}?accessPolicyVersion=3` |
-| Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}?deleteContents={{delete_contents_on_destroy}}` |
+| Delete | yes | `DELETE projects/{{project}}/datasets/{{dataset_id}}` |
 | Import | yes | by id, see below |
 
 ## Import id
