@@ -1458,6 +1458,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// FINALLY stored, and a create url that still carried its version prefix
 	// would be a different string.
 	t.CreateBindings = createBindings(t, create)
+	spellOutBoundParents(t)
 	declareCreateURLParameters(t, create)
 	// Its complement, and only for the case it deliberately leaves refused: a
 	// placeholder that stays unresolved because an OUTPUT-ONLY attribute sits on
@@ -2192,6 +2193,30 @@ func templatePlaceholders(tmpl string) []urlPlaceholder {
 		i += openLen + rel + len(closeSeq)
 	}
 	return out
+}
+
+// spellOutBoundParents writes a bound multi-segment placeholder's own
+// template into every url template of the type. magic-modules spells a
+// parent "{{parent}}", and a {{...}} placeholder is escaped, so the bound
+// value projects/p went out as one segment, projects%2Fp, and Google's front
+// end answered every create, update and delete with a 404. Eight shipped
+// types, seven since before anyone looked (found live on a log scope,
+// 2026-09-25). Spelled out, the templates read projects/{project}/... like
+// every other type's, and the id parses the ordinary way.
+func spellOutBoundParents(t *catalog.Type) {
+	for name, b := range t.CreateBindings {
+		ph := "{{" + name + "}}"
+		if b.Template == "" || !strings.Contains(t.CreateTemplate(), ph) {
+			continue
+		}
+		for _, p := range []*string{&t.BaseURL, &t.CreateURL, &t.SelfLink, &t.UpdateURL, &t.DeleteURL, &t.ImportFormat} {
+			*p = strings.ReplaceAll(*p, ph, b.Template)
+		}
+		delete(t.CreateBindings, name)
+	}
+	if len(t.CreateBindings) == 0 {
+		t.CreateBindings = nil
+	}
 }
 
 // createBindings resolves the create template's placeholders that name

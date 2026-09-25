@@ -134,6 +134,17 @@ func equivalent(rule, want, got string) bool {
 			return equivalent(catalog.EquivalenceSelfLink, want, got)
 		}
 		return equivalent(catalog.EquivalenceSelfLink, want, withoutKeyVersion(got))
+	case catalog.EquivalenceImage:
+		if equivalent(catalog.EquivalenceSelfLink, want, got) {
+			return true
+		}
+		w, g := fromProjects(want), fromProjects(got)
+		prefix, family, ok := strings.Cut(w, "/images/family/")
+		if !ok || w == "" || !strings.HasPrefix(g, prefix+"/images/") {
+			return false
+		}
+		image := lastSegment(g)
+		return image == family || strings.HasPrefix(image, family+"-")
 	case catalog.EquivalenceDuration:
 		w, errW := time.ParseDuration(want)
 		g, errG := time.ParseDuration(got)
@@ -232,14 +243,11 @@ func (r reconciler) sameProjectSpelling(reference, incoming value.Value) value.V
 // reference may be nil -- a create's readback has no previous state -- and
 // then nothing is reordered, because there is no order to reorder to.
 //
-// AN UNDECLARED TOP-LEVEL KEY IS KEPT, which is the one place this does not
-// prune. infrena's own planner already ignores an attribute that is in state
-// but neither in configuration nor in the schema ("the provider's own
-// business" -- internal/planner/diff.go), so such a key costs no drift, while
-// an undeclared key NESTED inside a declared object does: it is part of that
-// object's value, and value.Equal compares maps by length and key before
-// anything else. Dropping the top-level ones as well would also throw away
-// what Import and Discover read a resource's own identity out of.
+// AN UNDECLARED TOP-LEVEL KEY IS KEPT HERE, and dropped where state is
+// assembled (declaredOnly): the host refuses a state carrying one and fails
+// the whole operation, which a field Google added after the pinned Discovery
+// document did to a live Spanner create (2026-09-25). Kept this far so the
+// id is still read from the full answer.
 func ReconcileAttrs(attrs map[string]*catalog.Attr, reference, incoming map[string]value.Value) map[string]value.Value {
 	return reconciler{}.attrs(attrs, reference, incoming)
 }

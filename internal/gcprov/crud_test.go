@@ -251,11 +251,15 @@ func TestImportReadsAnExistingResource(t *testing.T) {
 	}
 }
 
-// TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder. 16 types have a
+// TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder. 16 types had a
 // self_link beginning with {{parent}}, leaving reduceSelfLink no literal text
 // to search for. Two of them also return a selfLink in their bodies, so before
 // PathPrefix existed ProviderID failed on every create -- and per the orphan
 // rule, an error after a successful create orphans the resource.
+//
+// Since 2026-09-25 a bound {{parent}} is spelled out (projects/{project}/...),
+// because escaped it sent projects%2Fp and every request 404'd. The body's
+// selfLink must still reduce to the id, so this stays on the same type.
 //
 // Against the REAL catalog entry, not a hand-built type, so this fails if the
 // generator ever stops emitting the prefix.
@@ -264,8 +268,8 @@ func TestAProviderIDForATypeWhoseSelfLinkStartsWithAPlaceholder(t *testing.T) {
 	if !ok {
 		t.Fatal("the catalog no longer ships gcp.networksecurity.addressgroup")
 	}
-	if !strings.HasPrefix(ty.SelfLink, "{{") {
-		t.Fatalf("this test exists for a self_link that starts with a placeholder; got %q", ty.SelfLink)
+	if !strings.HasPrefix(ty.SelfLink, "projects/{project}/") {
+		t.Fatalf("%s's bound parent is no longer spelled out: %q", ty.Name, ty.SelfLink)
 	}
 	if ty.PathPrefix == "" {
 		t.Fatalf("%s has no path_prefix, so its urls carry no api version", ty.Name)
@@ -1390,5 +1394,31 @@ func TestAnIDWhoseTemplateStartsWithABoundParentParses(t *testing.T) {
 		if got[k].Raw != want {
 			t.Errorf("%s = %v, want %q", k, got[k].Raw, want)
 		}
+	}
+}
+
+// TestAFieldGoogleAddedIsLeftOutOfState. The host refuses a state carrying
+// an attribute the schema does not declare and fails the operation, so a
+// field Google added after the pinned Discovery document failed every
+// create -- after the resource existed. Spanner answered an instance with
+// resourceLocation on 2026-09-25. Seeded, because the fake would otherwise
+// echo only what it was sent.
+func TestAFieldGoogleAddedIsLeftOutOfState(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.Seed("/v1/projects/p/locations/r/widgets/one", map[string]any{
+		"name": "one", "sizeGb": float64(10), "resourceLocation": "us-central1",
+	})
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{widgetType()}})
+	st, err := p.Read(context.Background(), widgetState())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, leaked := st.Attributes["resourceLocation"]; leaked {
+		t.Errorf("state carries an attribute the schema does not declare, which the host refuses: %v", st.Attributes)
+	}
+	if got, _ := st.Attributes["sizeGb"].AsInt(); got != 10 {
+		t.Errorf("a declared attribute was lost too: %v", st.Attributes)
 	}
 }
