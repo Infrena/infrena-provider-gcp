@@ -1318,6 +1318,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	addCreateIDParameter(t, t.Attributes, create)
 	// And a query value magic-modules leaves for its pre_create hook to fill.
 	fillPreCreateTokens(t, t.Attributes, create)
+	dropUnpublishedCreateQuery(t, create)
 
 	if err := checkSelfLinkIsInsideTheCreateCollection(t); err != nil {
 		return nil, err
@@ -1332,6 +1333,8 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 
 	t.EndpointTemplate = endpointTemplate(doc, mm, t)
+	t.UpdateURL = dropUnfillableQuery(t.UpdateURL, t)
+	t.DeleteURL = dropUnfillableQuery(t.DeleteURL, t)
 
 	// After self_link is final: a setter is admitted only on the address the
 	// resource is read at. See discoveredSetters.
@@ -2045,7 +2048,7 @@ func createBindings(t *catalog.Type, create *disco.Method) map[string]*catalog.C
 		if create != nil {
 			if p := create.Parameters[ph.Name]; p != nil && p.Location == "path" && p.Pattern != "" {
 				if tmpl := templateFromPattern(p.Pattern); tmpl != "" {
-					out[ph.Name] = &catalog.CreateBinding{Template: tmpl}
+					out[ph.Name] = &catalog.CreateBinding{Template: withoutRepeatedTail(tmpl, t.CreateTemplate(), ph.Name)}
 					continue
 				}
 			}
@@ -2443,4 +2446,119 @@ func versionPrefixOf(path string) string {
 		return m
 	}
 	return ""
+}
+
+// dropUnfillableQuery removes a query parameter whose value is a placeholder
+// nothing this provider holds can fill: not an attribute, in any spelling,
+// and not a placeholder of the resource's own id. magic-modules' dataset
+// delete_url ends "?deleteContents={{delete_contents_on_destroy}}", a
+// Terraform-only field, and every delete of every dataset failed building
+// its url. Without the parameter the API's default applies.
+func dropUnfillableQuery(tmpl string, t *catalog.Type) string {
+	path, query, ok := strings.Cut(tmpl, "?")
+	if !ok {
+		return tmpl
+	}
+	known := map[string]bool{"project": true, "region": true, "zone": true, "location": true}
+	for p := range templatePlaceholderNames(t.SelfLink) {
+		known[p] = true
+	}
+	for name, a := range t.Attributes {
+		known[name], known[a.Canonical], known[snake(name)] = true, true, true
+		for _, al := range a.Aliases {
+			known[al] = true
+		}
+	}
+	var kept []string
+	for _, kv := range strings.Split(query, "&") {
+		_, v, _ := strings.Cut(kv, "=")
+		if m := placeholderShapeRE.FindString(v); m != "" && m == v {
+			if !known[strings.Trim(m, "{}+%")] {
+				continue
+			}
+		}
+		kept = append(kept, kv)
+	}
+	if len(kept) == 0 {
+		return path
+	}
+	return path + "?" + strings.Join(kept, "&")
+}
+
+// templatePlaceholderNames are a template's placeholder names, bare.
+func templatePlaceholderNames(tmpl string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range placeholderShapeRE.FindAllString(tmpl, -1) {
+		out[strings.Trim(m, "{}+%")] = true
+	}
+	return out
+}
+
+// withoutRepeatedTail removes from a binding the trailing segments the url
+// itself repeats right after the placeholder. Discovery's pattern for a
+// networksecurity address group's parent is projects/*/locations/*, and
+// magic-modules' url is "{{parent}}/locations/{{location}}/addressGroups",
+// so the bound url read projects/p/locations/r/locations/r/addressGroups:
+// every create of six types went to an address that does not exist.
+// Segments compare by shape, so {location} matches {{location}}.
+func withoutRepeatedTail(binding, url, placeholder string) string {
+	url, _, _ = strings.Cut(url, "?")
+	at := -1
+	for _, spelling := range []string{"{{" + placeholder + "}}", "{+" + placeholder + "}", "{" + placeholder + "}"} {
+		if i := strings.Index(url, spelling); i >= 0 {
+			at = i + len(spelling)
+			break
+		}
+	}
+	if at < 0 {
+		return binding
+	}
+	after := strings.Split(strings.Trim(url[at:], "/"), "/")
+	bind := strings.Split(binding, "/")
+	for k := len(bind) - 1; k > 0; k-- {
+		if k > len(after) {
+			continue
+		}
+		same := true
+		for i := 0; i < k; i++ {
+			if normalizeTemplateShape(bind[len(bind)-k+i]) != normalizeTemplateShape(after[i]) {
+				same = false
+				break
+			}
+		}
+		if same {
+			return strings.Join(bind[:len(bind)-k], "/")
+		}
+	}
+	return binding
+}
+
+// dropUnpublishedCreateQuery removes create-url query parameters the create
+// method does not publish. compute's network edge security service was
+// created at "?networkEdgeSecurityService={{name}}", a parameter compute's
+// insert does not take; the runtime keeps a url-named attribute out of the
+// body, so the insert went out with no name at all. Dropped, the name is in
+// the body where compute reads it. Compared ignoring case and underscores,
+// because magic-modules writes repository_id for Discovery's repositoryId.
+func dropUnpublishedCreateQuery(t *catalog.Type, create *disco.Method) {
+	path, query, ok := strings.Cut(t.CreateURL, "?")
+	if !ok || create == nil {
+		return
+	}
+	published := map[string]bool{}
+	for p := range create.Parameters {
+		published[strings.ToLower(strings.ReplaceAll(p, "_", ""))] = true
+	}
+	var kept []string
+	for _, kv := range strings.Split(query, "&") {
+		k, _, _ := strings.Cut(kv, "=")
+		if published[strings.ToLower(strings.ReplaceAll(k, "_", ""))] {
+			kept = append(kept, kv)
+		}
+	}
+	if len(kept) == 0 {
+		t.CreateURL = path
+		return
+	}
+	t.CreateURL = path + "?" + strings.Join(kept, "&")
 }

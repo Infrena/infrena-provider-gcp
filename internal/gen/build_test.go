@@ -1767,3 +1767,39 @@ func TestAMatchWhoseBaseURLStartsWithAPlaceholderIsKept(t *testing.T) {
 		t.Errorf("paired with %s, want RegionalSecret, so the guard now keeps everything", got.Name)
 	}
 }
+
+// TestAQueryParameterNothingCanFillIsDropped. The dataset's delete_url ends
+// "?deleteContents={{delete_contents_on_destroy}}", a Terraform-only field,
+// and every dataset delete failed building its url. A literal value and a
+// placeholder the resource's id or attributes fill are kept.
+func TestAQueryParameterNothingCanFillIsDropped(t *testing.T) {
+	ty := &catalog.Type{SelfLink: "projects/{{project}}/datasets/{{dataset_id}}",
+		Attributes: map[string]*catalog.Attr{"force": {Canonical: "force"}}}
+	for in, want := range map[string]string{
+		"projects/{{project}}/datasets/{{dataset_id}}?deleteContents={{delete_contents_on_destroy}}": "projects/{{project}}/datasets/{{dataset_id}}",
+		"projects/{{project}}/datasets/{{dataset_id}}?accessPolicyVersion=3":                         "projects/{{project}}/datasets/{{dataset_id}}?accessPolicyVersion=3",
+		"projects/{{project}}/datasets/{{dataset_id}}?force={{force}}&x={{nope}}":                    "projects/{{project}}/datasets/{{dataset_id}}?force={{force}}",
+		"projects/{{project}}/datasets/{{dataset_id}}?id={{dataset_id}}":                             "projects/{{project}}/datasets/{{dataset_id}}?id={{dataset_id}}",
+	} {
+		if got := dropUnfillableQuery(in, ty); got != want {
+			t.Errorf("dropUnfillableQuery(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestABindingDoesNotRepeatWhatTheURLAlreadySays. Discovery's parent pattern
+// for an address group is projects/*/locations/*, and magic-modules' url
+// adds /locations/{{location}} itself: bound as it was, every create went to
+// .../locations/r/locations/r/addressGroups. A url that adds nothing keeps
+// the whole binding.
+func TestABindingDoesNotRepeatWhatTheURLAlreadySays(t *testing.T) {
+	for _, c := range []struct{ binding, url, want string }{
+		{"projects/{project}/locations/{location}", "{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}", "projects/{project}"},
+		{"projects/{project}/instances/{instance}", "{+parent}/appProfiles?appProfileId={{appProfileId}}", "projects/{project}/instances/{instance}"},
+		{"projects/{project}/locations/{location}", "{{parent}}/queues", "projects/{project}/locations/{location}"},
+	} {
+		if got := withoutRepeatedTail(c.binding, c.url, "parent"); got != c.want {
+			t.Errorf("withoutRepeatedTail(%q, %q) = %q, want %q", c.binding, c.url, got, c.want)
+		}
+	}
+}

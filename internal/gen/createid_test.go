@@ -425,3 +425,22 @@ func TestAPreCreateTokenIsBoundToTheQueryParameterItStandsFor(t *testing.T) {
 		t.Errorf("initialNodeCount = %+v, want a required create-only integer", a)
 	}
 }
+
+// TestACreateQueryParameterTheAPIDoesNotTakeIsDropped. compute's network edge
+// security service was created at "?networkEdgeSecurityService={{name}}", a
+// parameter the insert does not publish, and the runtime then kept name out
+// of the body. An id parameter in magic-modules' snake spelling is kept.
+func TestACreateQueryParameterTheAPIDoesNotTakeIsDropped(t *testing.T) {
+	create := &disco.Method{Parameters: map[string]*disco.Parameter{
+		"project": {Location: "path"}, "repositoryId": {Location: "query"}}}
+	for in, want := range map[string]string{
+		"projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices?networkEdgeSecurityService={{name}}": "projects/{{project}}/regions/{{region}}/networkEdgeSecurityServices",
+		"projects/{{project}}/locations/{{location}}/repositories?repository_id={{repository_id}}":                "projects/{{project}}/locations/{{location}}/repositories?repository_id={{repository_id}}",
+	} {
+		ty := &catalog.Type{CreateURL: in}
+		dropUnpublishedCreateQuery(ty, create)
+		if ty.CreateURL != want {
+			t.Errorf("create url %q became %q, want %q", in, ty.CreateURL, want)
+		}
+	}
+}
