@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	pathpkg "path"
 	"reflect"
 	"regexp"
 	"sort"
@@ -87,6 +88,7 @@ type Server struct {
 	notFoundRemaining map[string]int
 
 	opStyle   OperationStyle
+	styleFor  func(method, path string) (OperationStyle, bool)
 	opCounter int
 
 	lroOps         map[string]*lroOp
@@ -220,6 +222,19 @@ func (s *Server) SetOperationStyle(style OperationStyle) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.opStyle = style
+}
+
+// SetOperationStyleFor makes each mutation answer in the style fn gives for
+// its own method and path, falling back to SetOperationStyle's where fn
+// reports none. A test that takes fn from the API's Discovery document
+// makes the fake disagree with a catalog that is wrong about how one method
+// answers: with one style per type, the fake answered every method the way
+// the catalog said the create did, which is how an update that answers
+// with the resource hung against Google and passed here.
+func (s *Server) SetOperationStyleFor(fn func(method, path string) (OperationStyle, bool)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.styleFor = fn
 }
 
 // SetListField overrides the array-valued field name a GET on
@@ -487,7 +502,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, bodyBytes 
 	s.declaredCollections[collection] = true
 	s.mu.Unlock()
 
-	s.respondMutation(w, path, stored, false)
+	s.respondMutation(w, r, path, stored, false)
 }
 
 // resourceID takes the id GCP's insert methods take it from: a query
@@ -524,7 +539,7 @@ func resourceID(r *http.Request, body map[string]any) (string, bool) {
 }
 
 func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
-	path := r.URL.Path
+	path := s.itemAddressed(r)
 	s.mu.Lock()
 	existing, ok := s.resources[path]
 	s.mu.Unlock()
@@ -615,11 +630,16 @@ func (s *Server) handlePatch(w http.ResponseWriter, r *http.Request, bodyBytes [
 	s.resources[path] = merged
 	s.mu.Unlock()
 
-	s.respondMutation(w, path, merged, false)
+	s.respondMutation(w, r, path, merged, false)
 }
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
+	path := s.itemAddressed(r)
+	// A delete published under the item, not at it: BigQuery's jobs.delete
+	// is DELETE .../jobs/{jobId}/delete.
+	if dir, last := pathpkg.Split(path); !s.has(path) && last == "delete" && s.has(strings.TrimSuffix(dir, "/")) {
+		path = strings.TrimSuffix(dir, "/")
+	}
 	s.mu.Lock()
 	_, existed := s.resources[path]
 	failing := s.deleteThenFail[path]
@@ -635,15 +655,20 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		writeNotFound(w, path)
 		return
 	}
-	s.respondMutation(w, path, nil, true)
+	s.respondMutation(w, r, path, nil, true)
 }
 
 // respondMutation writes a create/patch/delete's response in whatever shape
 // the configured OperationStyle calls for.
-func (s *Server) respondMutation(w http.ResponseWriter, path string, result map[string]any, isDelete bool) {
+func (s *Server) respondMutation(w http.ResponseWriter, r *http.Request, path string, result map[string]any, isDelete bool) {
 	s.mu.Lock()
-	style := s.opStyle
+	style, styleFor := s.opStyle, s.styleFor
 	s.mu.Unlock()
+	if styleFor != nil {
+		if own, ok := styleFor(r.Method, r.URL.Path); ok {
+			style = own
+		}
+	}
 
 	switch style {
 	case OpLongRunning:
@@ -852,7 +877,7 @@ func (s *Server) handleCreateAt(w http.ResponseWriter, r *http.Request, bodyByte
 		writeError(w, http.StatusConflict, "ALREADY_EXISTS", "Resource already exists in the project (resource="+path+").")
 		return
 	}
-	s.respondMutation(w, path, body, false)
+	s.respondMutation(w, r, path, body, false)
 }
 
 // unwrapUpdateEnvelope recognises AIP-134's update request: exactly one
@@ -967,7 +992,7 @@ func (s *Server) handleSetter(w http.ResponseWriter, r *http.Request, bodyBytes 
 	}
 	s.resources[path] = merged
 	s.mu.Unlock()
-	s.respondMutation(w, path, merged, false)
+	s.respondMutation(w, r, path, merged, false)
 }
 
 // DeleteThenFailOperation makes the next delete of path accepted and then
@@ -1033,6 +1058,42 @@ func unwrapCreate(body map[string]any) (id string, inner map[string]any, ok bool
 		}
 	}
 	return "", nil, false
+}
+
+func (s *Server) has(path string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.resources[path]
+	return ok
+}
+
+// itemAddressed is the stored resource a patch or delete addresses. Usually
+// its own path; but some APIs publish the method on the COLLECTION and name
+// the item in the query (compute's autoscalers.patch takes ?autoscaler=,
+// Cloud SQL's users.delete takes ?name=), and a fake that only looked at the
+// path answered those with a 404 Google would never send.
+func (s *Server) itemAddressed(r *http.Request) string {
+	path := r.URL.Path
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.resources[path]; ok {
+		return path
+	}
+	keys := make([]string, 0, len(r.URL.Query()))
+	for k := range r.URL.Query() {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := r.URL.Query().Get(k)
+		if v == "" || strings.Contains(v, "/") {
+			continue
+		}
+		if _, ok := s.resources[path+"/"+v]; ok {
+			return path + "/" + v
+		}
+	}
+	return path
 }
 
 // queryNamesTheResource reports whether a create's query string carries its

@@ -1895,3 +1895,67 @@ func TestAPostCreateGoesToTheCollection(t *testing.T) {
 		}
 	}
 }
+
+// TestADeleteGoesWhereTheAPIPublishesIt. BigQuery's jobs.delete is under the
+// job (.../jobs/{jobId}/delete) and Cloud SQL's users.delete is on the
+// collection with ?name=. Sent to the item's own path, both deleted nothing.
+func TestADeleteGoesWhereTheAPIPublishesIt(t *testing.T) {
+	m := func(verb, flat string, query ...string) *disco.Method {
+		params := map[string]*disco.Parameter{}
+		for _, q := range query {
+			params[q] = &disco.Parameter{Location: "query"}
+		}
+		return &disco.Method{HTTPMethod: verb, FlatPath: flat, Path: flat, Parameters: params}
+	}
+	for _, c := range []struct {
+		what, self string
+		get, del   *disco.Method
+		want       string
+	}{
+		{"a literal tail under the item", "projects/{{project}}/jobs/{{job_id}}",
+			m("GET", "projects/{projectsId}/jobs/{jobsId}"),
+			m("DELETE", "projects/{projectsId}/jobs/{jobsId}/delete"),
+			"projects/{{project}}/jobs/{{job_id}}/delete"},
+		{"the collection, named in the query", "projects/{project}/instances/{instance}/users/{name}",
+			m("GET", "v1/projects/{project}/instances/{instance}/users/{name}"),
+			m("DELETE", "v1/projects/{project}/instances/{instance}/users", "name", "host"),
+			"projects/{project}/instances/{instance}/users?name={name}"},
+		{"the item's own path", "projects/{{project}}/topics/{{name}}",
+			m("GET", "v1/projects/{projectsId}/topics/{topicsId}"),
+			m("DELETE", "v1/projects/{projectsId}/topics/{topicsId}"),
+			""},
+		{"a collection delete with no query naming the item", "projects/{{project}}/x/{{name}}",
+			m("GET", "v1/projects/{p}/x/{name}"),
+			m("DELETE", "v1/projects/{p}/x"),
+			""},
+	} {
+		ty := &catalog.Type{SelfLink: c.self}
+		col := disco.Collection{Methods: map[string]*disco.Method{"get": c.get, "delete": c.del}}
+		if got := discoveredDeleteURL(ty, col); got != c.want {
+			t.Errorf("%s: discoveredDeleteURL = %q, want %q", c.what, got, c.want)
+		}
+	}
+	// magic-modules' own delete_url is kept.
+	ty := &catalog.Type{SelfLink: "projects/{{project}}/jobs/{{job_id}}", DeleteURL: "kept"}
+	col := disco.Collection{Methods: map[string]*disco.Method{
+		"get":    m("GET", "projects/{projectsId}/jobs/{jobsId}"),
+		"delete": m("DELETE", "projects/{projectsId}/jobs/{jobsId}/delete"),
+	}}
+	if got := discoveredDeleteURL(ty, col); got != "kept" {
+		t.Errorf("a declared delete_url became %q", got)
+	}
+}
+
+// TestThePatchMethodIsFoundByVerbAndAddress. Compute's storagePools publish
+// their PATCH as "update"; Firestore's changeStreams publish none.
+func TestThePatchMethodIsFoundByVerbAndAddress(t *testing.T) {
+	get := &disco.Method{HTTPMethod: "GET", Path: "projects/{project}/zones/{zone}/storagePools/{storagePool}"}
+	update := &disco.Method{HTTPMethod: "PATCH", Path: get.Path}
+	if got := patchMethodOf(disco.Collection{Methods: map[string]*disco.Method{"get": get, "update": update}}); got != update {
+		t.Errorf("patchMethodOf missed a PATCH named update: %v", got)
+	}
+	del := &disco.Method{HTTPMethod: "DELETE", Path: get.Path}
+	if got := patchMethodOf(disco.Collection{Methods: map[string]*disco.Method{"get": get, "delete": del}}); got != nil {
+		t.Errorf("patchMethodOf found %v in a collection with no PATCH", got)
+	}
+}

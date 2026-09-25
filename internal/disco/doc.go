@@ -83,8 +83,14 @@ type Parameter struct {
 
 // Method is one API method.
 type Method struct {
-	ID          string                `json:"id"`
-	Path        string                `json:"path"`
+	ID   string `json:"id"`
+	Path string `json:"path"`
+	// FlatPath is the same address with every segment spelled out
+	// ("v1/projects/{projectsId}/locations/{locationsId}/repositories/{repositoriesId}")
+	// where Path may say only "v1/{+name}". Every delete of a proto-first API
+	// shares that Path, so only FlatPath tells them apart. Empty where the
+	// document gives none.
+	FlatPath    string                `json:"flatPath"`
 	HTTPMethod  string                `json:"httpMethod"`
 	Description string                `json:"description"`
 	Request     *Ref                  `json:"request"`
