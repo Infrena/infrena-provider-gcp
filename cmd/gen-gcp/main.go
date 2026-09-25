@@ -1,9 +1,10 @@
 // Command gen-gcp regenerates internal/catalog/catalog.json.gz,
-// gen/warnings.txt, gen/facts.tsv and gen/unknowns.txt.
+// gen/warnings.txt, gen/facts.tsv, gen/unknowns.txt and gen/methods.tsv.
 //
 // Run it by hand and commit the diff. Nothing runs it at build time. With
-// -check it writes nothing and fails if any committed output is stale, which
-// is what CI runs.
+// -check it writes nothing and fails if any committed output is stale. It
+// needs the fetched schemas/, which are gitignored, so it is a local check:
+// CI cannot regenerate against the documents the catalog was built from.
 package main
 
 import (
@@ -27,11 +28,12 @@ func main() {
 	warn := flag.String("warnings", "gen/warnings.txt", "where to write the warnings")
 	facts := flag.String("facts", "gen/facts.tsv", "where to write every fact and its sources")
 	unknowns := flag.String("unknowns", "gen/unknowns.txt", "where to write the facts nothing has checked")
+	methods := flag.String("methods", "gen/methods.tsv", "where to write the Discovery method digest the round trip reads")
 	check := flag.Bool("check", false, "write nothing; fail if a committed output is stale")
 	flag.Parse()
 
 	if !*check {
-		if err := generate(in, *out, *warn, *facts, *unknowns); err != nil {
+		if err := generate(in, *out, *warn, *facts, *unknowns, *methods); err != nil {
 			fmt.Fprintf(os.Stderr, "gen-gcp: %v\n", err)
 			os.Exit(1)
 		}
@@ -62,9 +64,10 @@ func main() {
 		{*warn, filepath.Join(tmp, "warnings.txt")},
 		{*facts, filepath.Join(tmp, "facts.tsv")},
 		{*unknowns, filepath.Join(tmp, "unknowns.txt")},
+		{*methods, filepath.Join(tmp, "methods.tsv")},
 		{committedLock, in.LockPath},
 	}
-	if err := generate(in, pairs[0][1], pairs[1][1], pairs[2][1], pairs[3][1]); err != nil {
+	if err := generate(in, pairs[0][1], pairs[1][1], pairs[2][1], pairs[3][1], pairs[4][1]); err != nil {
 		fmt.Fprintf(os.Stderr, "gen-gcp: %v\n", err)
 		os.Exit(1)
 	}
@@ -83,7 +86,7 @@ func main() {
 	fmt.Fprintln(os.Stderr, "gen-gcp: every committed output is up to date")
 }
 
-func generate(in gen.Inputs, out, warn, facts, unknowns string) error {
+func generate(in gen.Inputs, out, warn, facts, unknowns, methods string) error {
 	res, err := gen.Build(in)
 	if err != nil {
 		return err
@@ -99,6 +102,9 @@ func generate(in gen.Inputs, out, warn, facts, unknowns string) error {
 		return err
 	}
 	if err := gen.WriteFacts(facts, unknowns, res.Catalog); err != nil {
+		return err
+	}
+	if err := gen.WriteMethods(in.SchemaDir, methods); err != nil {
 		return err
 	}
 	var tier2 int
