@@ -303,6 +303,9 @@ func Build(in Inputs) (*Result, error) {
 		resolveRefs(b.t.Attributes, selfProduct, b.t.Service, b.t.Name, refByProduct, refCandidates, &warnings)
 	}
 	dropRefsToMissingAttributes(c.Types, &warnings)
+	if err := applySensitive(c.Types, overlay.Sensitive); err != nil {
+		return nil, err
+	}
 	// Every shipped type whose create url cannot be built, recorded once,
 	// here, over the catalog as it finally stands. The capability itself is
 	// derived from the same function at load (catalog.Definitions), so this
@@ -2561,4 +2564,57 @@ func dropUnpublishedCreateQuery(t *catalog.Type, create *disco.Method) {
 		return
 	}
 	t.CreateURL = path + "?" + strings.Join(kept, "&")
+}
+
+// applySensitive marks the overlay's secrets. An entry for a type that does
+// not ship, or a path it does not have, is an error: a secret listed and
+// silently not marked is the leak this exists to stop.
+func applySensitive(types []*catalog.Type, entries map[string]SensitiveFields) error {
+	byName := make(map[string]*catalog.Type, len(types))
+	for _, t := range types {
+		byName[t.Name] = t
+	}
+	names := make([]string, 0, len(entries))
+	for n := range entries {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t := byName[n]
+		if t == nil {
+			return fmt.Errorf("overlay sensitive: %s does not ship", n)
+		}
+		if strings.TrimSpace(entries[n].Note) == "" {
+			return fmt.Errorf("overlay sensitive: %s has no note saying why", n)
+		}
+		for _, path := range entries[n].Fields {
+			a := attrAtPath(t.Attributes, path)
+			if a == nil {
+				return fmt.Errorf("overlay sensitive: %s has no attribute %q", n, path)
+			}
+			a.Sensitive = true
+		}
+	}
+	return nil
+}
+
+// attrAtPath walks "a.b[].c" through Fields and Elem.
+func attrAtPath(attrs map[string]*catalog.Attr, path string) *catalog.Attr {
+	var a *catalog.Attr
+	fields := attrs
+	for _, seg := range strings.Split(path, ".") {
+		elem := strings.HasSuffix(seg, "[]")
+		seg = strings.TrimSuffix(seg, "[]")
+		if a = fields[seg]; a == nil {
+			return nil
+		}
+		if elem {
+			if a.Elem == nil {
+				return nil
+			}
+			a = a.Elem
+		}
+		fields = a.Fields
+	}
+	return a
 }

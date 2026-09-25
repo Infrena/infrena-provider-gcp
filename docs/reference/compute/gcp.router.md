@@ -103,7 +103,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `kind` | — | `string` | output only | — | Output only. \[Output Only\] Type of resource. Always compute#router for routers. |
 | `md5AuthenticationKeys` | `md5_authentication_keys` | `list` | optional | — | Keys used for MD5 authentication. |
 | `md5AuthenticationKeys[]` | — | `map` | optional | — | — |
-| `md5AuthenticationKeys[].key` | — | `string` | required | — | \[Input only\] Value of the key. For patch and update calls, it can be skipped to copy the value from the previous configuration. This is allowed if the key with the same name existed before the … |
+| `md5AuthenticationKeys[].key` | — | `string` | required | sensitive | \[Input only\] Value of the key. For patch and update calls, it can be skipped to copy the value from the previous configuration. This is allowed if the key with the same name existed before the … |
 | `md5AuthenticationKeys[].name` | — | `string` | required | — | Name used to identify the key. Must be unique within a router. Must be referenced by exactly one bgpPeer. Must comply withRFC1035. |
 | `name` | — | `string` | required | force new | Name of the resource. Provided by the client when the resource is created. The name must be 1-63 characters long, and comply withRFC1035. Specifically, the name must be 1-63 characters long and match … |
 | `nats` | — | `list` | optional | — | A list of NAT services created in this router. |

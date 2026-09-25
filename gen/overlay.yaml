@@ -880,6 +880,37 @@ aliases:
   gcp.container.cluster:
     initialNodeCount: node_count
 
+# sensitive: secrets no source marks, found 2026-09-24 by a catalog-wide
+# search for settable fields named or described as passwords, keys and tokens.
+# magic-modules' `sensitive` is the only source Discovery offers, and it misses
+# these -- several on types Terraform writes by hand (Cloud SQL instances, GKE
+# clusters), whose YAML Terraform never runs.
+sensitive:
+  gcp.user:
+    fields: [password]
+    note: A Cloud SQL user's password.
+  gcp.sqladmin.instance:
+    fields: [rootPassword, onPremisesConfiguration.password, onPremisesConfiguration.clientKey, replicaConfiguration.mysqlReplicaConfiguration.password, replicaConfiguration.mysqlReplicaConfiguration.clientKey]
+    note: The initial root password, and the passwords and PEM private keys of replication connections.
+  gcp.container.cluster:
+    fields: [masterAuth.password]
+    note: The password for basic authentication to the cluster's master endpoint.
+  gcp.connection:
+    fields: [githubEnterpriseConfig.apiKey]
+    note: The API key GitHub Enterprise webhook events are authenticated with.
+  gcp.channelconnection:
+    fields: [activationToken]
+    note: The token that activates the channel connection, input only.
+  gcp.sslcertificate:
+    fields: [selfManaged.privateKey]
+    note: The write-only PEM private key of a self-managed certificate; the top-level privateKey was already marked.
+  gcp.regionsslcertificate:
+    fields: [selfManaged.privateKey]
+    note: As on gcp.sslcertificate.
+  gcp.router:
+    fields: ["md5AuthenticationKeys[].key"]
+    note: The value of a BGP session's MD5 authentication key, input only.
+
 # product_aliases: Discovery API name -> every vendored magic-modules product
 # directory that also carries resources for it. mmv1's directory names
 # routinely diverge from Google's Discovery API names (TagBinding lives under

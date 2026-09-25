@@ -72,7 +72,7 @@ projects/{{project}}/locations/{{location}}/connections/{{name}}
 | `githubConfig.authorizerCredential.oauthTokenSecretVersion` | `oauth_token_secret_version` | `string` | optional | — | Optional. A SecretManager resource containing the OAuth token that authorizes the Cloud Build connection. Format: `projects/*/secrets/*/versions/*`. |
 | `githubConfig.authorizerCredential.username` | — | `string` | output only | — | Output only. The username associated to this token. |
 | `githubEnterpriseConfig` | `github_enterprise_config` | `map` | optional | — | Configuration for connections to an instance of GitHub Enterprise. |
-| `githubEnterpriseConfig.apiKey` | `api_key` | `string` | optional | — | Required. API Key used for authentication of webhook events. |
+| `githubEnterpriseConfig.apiKey` | `api_key` | `string` | optional | sensitive | Required. API Key used for authentication of webhook events. |
 | `githubEnterpriseConfig.appId` | `app_id` | `string` | optional | — | Optional. Id of the GitHub App created from the manifest. |
 | `githubEnterpriseConfig.appInstallationId` | `app_installation_id` | `string` | optional | — | Optional. ID of the installation of the GitHub App. |
 | `githubEnterpriseConfig.appSlug` | `app_slug` | `string` | optional | — | Optional. The URL-friendly name of the GitHub App. |

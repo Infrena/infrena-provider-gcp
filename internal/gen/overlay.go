@@ -82,6 +82,14 @@ type Overlay struct {
 	// agrees), so a mapping only a person can attest to belongs here beside
 	// the rulings, not guessed at in Go.
 	ProductAliases map[string][]string `yaml:"product_aliases"`
+
+	// Sensitive marks secrets no source marks: a Cloud SQL user's password,
+	// a GKE cluster's basic-auth password, a router's MD5 key. magic-modules
+	// is the only source of `sensitive` and it misses these, several on
+	// types Terraform writes by hand. Keyed by type name; each path is dotted,
+	// with [] for a list element. A path the type does not have fails the
+	// build.
+	Sensitive map[string]SensitiveFields `yaml:"sensitive"`
 }
 
 // LoadOverlay reads and validates the overlay. mmv1Dir is the vendored
@@ -124,4 +132,10 @@ func LoadOverlay(path, mmv1Dir string) (*Overlay, error) {
 		}
 	}
 	return &o, nil
+}
+
+// SensitiveFields is one type's entry in the overlay's sensitive list.
+type SensitiveFields struct {
+	Fields []string `yaml:"fields"`
+	Note   string   `yaml:"note"`
 }

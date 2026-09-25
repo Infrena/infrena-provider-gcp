@@ -1803,3 +1803,33 @@ func TestABindingDoesNotRepeatWhatTheURLAlreadySays(t *testing.T) {
 		}
 	}
 }
+
+// TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest. A secret listed
+// and silently not marked is the leak the list exists to stop, so a path the
+// type lacks, a type that does not ship, or an entry with no reason is an
+// error, not a skip.
+func TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest(t *testing.T) {
+	build := func() []*catalog.Type {
+		return []*catalog.Type{{Name: "gcp.router", Attributes: map[string]*catalog.Attr{
+			"md5AuthenticationKeys": {Canonical: "md5AuthenticationKeys", Elem: &catalog.Attr{Fields: map[string]*catalog.Attr{
+				"key": {Canonical: "key"}, "name": {Canonical: "name"}}}}}}}
+	}
+	types := build()
+	if err := applySensitive(types, map[string]SensitiveFields{
+		"gcp.router": {Fields: []string{"md5AuthenticationKeys[].key"}, Note: "a BGP MD5 key"}}); err != nil {
+		t.Fatal(err)
+	}
+	f := types[0].Attributes["md5AuthenticationKeys"].Elem.Fields
+	if !f["key"].Sensitive || f["name"].Sensitive {
+		t.Errorf("key sensitive %v, name sensitive %v; want only the key", f["key"].Sensitive, f["name"].Sensitive)
+	}
+	for what, entries := range map[string]map[string]SensitiveFields{
+		"a missing path":        {"gcp.router": {Fields: []string{"md5AuthenticationKeys[].nope"}, Note: "x"}},
+		"a type that is absent": {"gcp.nope": {Fields: []string{"x"}, Note: "x"}},
+		"no note":               {"gcp.router": {Fields: []string{"md5AuthenticationKeys[].key"}}},
+	} {
+		if err := applySensitive(build(), entries); err == nil {
+			t.Errorf("%s was accepted", what)
+		}
+	}
+}
