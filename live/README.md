@@ -50,8 +50,12 @@ values do not.
 | Label | `infrena-live-tests=true` — **this is what the guard checks**, and it is the one value you must match exactly |
 | Billing account | `012345-567890-ABCDEF` — needed only if the project is not already billed |
 | Service account | `infrena-live@example-project-1234.iam.gserviceaccount.com` |
-| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin`, `dns.admin` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
-| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager, dns |
+| Roles | `compute.admin`, `storage.admin`, `cloudasset.viewer`, `resourcemanager.tagAdmin`, `resourcemanager.tagUser`, `iam.serviceAccountAdmin`, `pubsub.editor`, `run.developer`, `clouddeploy.admin`, `secretmanager.admin`, `dns.admin`, `artifactregistry.admin`, `bigquery.dataEditor` — and `iam.serviceAccountUser` granted on the service account **itself**, so a Cloud Run job can run as it |
+| APIs | compute, storage, cloudresourcemanager, cloudasset, iam, iamcredentials, serviceusage, pubsub, run, clouddeploy, secretmanager, dns, artifactregistry, bigquery |
+
+`TestLiveArtifactRegistryCredentialsChangeInPlace` grants Artifact Registry's own service agent
+`secretAccessor` on the one secret it creates, because a remote repository reads its upstream password
+as that agent and refuses the create without it. The grant goes away with the secret.
 
 If `gcloud projects create` returns `QuotaFailure: you have exceeded your
 allotted project quota`, reusing a dormant project works — but verify it is
