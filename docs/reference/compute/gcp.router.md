@@ -155,7 +155,7 @@ projects/{project}/regions/{region}/routers/{router}
 | `nats[].tcpEstablishedIdleTimeoutSec` | `tcp_established_idle_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for TCP established connections. Defaults to 1200s if not set. |
 | `nats[].tcpTimeWaitTimeoutSec` | `tcp_time_wait_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for TCP connections that are in TIME_WAIT state. Defaults to 120s if not set. |
 | `nats[].tcpTransitoryIdleTimeoutSec` | `tcp_transitory_idle_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for TCP transitory connections. Defaults to 30s if not set. |
-| `nats[].type_value` | wire `type` | `string` | optional | — | Indicates whether this NAT is used for public or private IP translation. If unspecified, it defaults to PUBLIC. |
+| `nats[].type` | — | `string` | optional | — | Indicates whether this NAT is used for public or private IP translation. If unspecified, it defaults to PUBLIC. |
 | `nats[].udpIdleTimeoutSec` | `udp_idle_timeout_sec` | `integer` | optional | — | Timeout (in seconds) for UDP connections. Defaults to 30s if not set. |
 | `nccGateway` | `ncc_gateway` | `string` | optional | force new | URI of the ncc_gateway to which this router associated. |
 | `network` | — | `string` | optional | force new, refers to `gcp.network.selfLink` | URI of the network to which this router belongs. |

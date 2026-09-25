@@ -92,4 +92,4 @@ projects/{project}/regions/{region}/resourcePolicies/{resourcePolicy}
 | `workloadPolicy.acceleratorTopology` | `accelerator_topology` | `string` | optional | force new | Specifies the topology required to create a partition for VMs that have interconnected GPUs. |
 | `workloadPolicy.acceleratorTopologyMode` | `accelerator_topology_mode` | `string` | optional | force new | Specifies the connection mode for the accelerator topology. If not specified, the default is AUTO_CONNECT. |
 | `workloadPolicy.maxTopologyDistance` | `max_topology_distance` | `string` | optional | force new | Specifies the maximum distance between instances. |
-| `workloadPolicy.type_value` | wire `type` | `string` | required | force new | Specifies the intent of the instance placement in the MIG. |
+| `workloadPolicy.type` | — | `string` | required | force new | Specifies the intent of the instance placement in the MIG. |

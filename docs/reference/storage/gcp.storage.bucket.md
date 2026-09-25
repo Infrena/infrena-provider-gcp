@@ -132,7 +132,7 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | `lifecycle_value.rule[]` | — | `map` | optional | — | — |
 | `lifecycle_value.rule[].action` | — | `map` | optional | — | The action to take. |
 | `lifecycle_value.rule[].action.storageClass` | `storage_class` | `string` | optional | — | Target storage class. Required iff the type of the action is SetStorageClass. |
-| `lifecycle_value.rule[].action.type_value` | wire `type` | `string` | optional | — | Type of the action. Currently, only Delete, SetStorageClass, and AbortIncompleteMultipartUpload are supported. |
+| `lifecycle_value.rule[].action.type` | — | `string` | optional | — | Type of the action. Currently, only Delete, SetStorageClass, and AbortIncompleteMultipartUpload are supported. |
 | `lifecycle_value.rule[].condition` | — | `map` | optional | — | The condition(s) under which the action will be taken. |
 | `lifecycle_value.rule[].condition.age` | — | `integer` | optional | — | Age of an object (in days). This condition is satisfied when an object reaches the specified age. |
 | `lifecycle_value.rule[].condition.createdBefore` | `created_before` | `string` | optional | — | A date in RFC 3339 format with only the date part (for instance, "2013-01-15"). This condition is satisfied when an object is created before midnight of the specified date in UTC. |

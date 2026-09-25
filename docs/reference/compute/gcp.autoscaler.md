@@ -74,6 +74,6 @@ projects/{project}/zones/{zone}/autoscalers/{autoscaler}
 | `statusDetails` | `status_details` | `list` | output only | — | \[Output Only\] Human-readable details about the current state of the autoscaler. Read the documentation forCommonly returned status messages for examples of status messages you might encounter. |
 | `statusDetails[]` | — | `map` | optional | — | — |
 | `statusDetails[].message` | — | `string` | optional | — | The status message. |
-| `statusDetails[].type_value` | wire `type` | `string` | optional | — | The type of error, warning, or notice returned. Current set of possible values: - ALL_INSTANCES_UNHEALTHY (WARNING): All instances in the instance group are unhealthy (not in RUNNING state). - … |
+| `statusDetails[].type` | — | `string` | optional | — | The type of error, warning, or notice returned. Current set of possible values: - ALL_INSTANCES_UNHEALTHY (WARNING): All instances in the instance group are unhealthy (not in RUNNING state). - … |
 | `target` | — | `string` | required | — | URL of the managed instance group that this autoscaler will scale. This field is required when creating an autoscaler. |
 | `zone` | — | `string` | output only | force new | Output only. \[Output Only\] URL of thezone where the instance group resides (for autoscalers living in zonal scope). |

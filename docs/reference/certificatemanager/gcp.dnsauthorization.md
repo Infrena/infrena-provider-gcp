@@ -42,7 +42,7 @@ projects/{{project}}/locations/{{location}}/dnsAuthorizations/{{name}}
 | `dnsResourceRecord` | `dns_resource_record` | `map` | output only | — | Output only. DNS Resource Record that needs to be added to DNS configuration. |
 | `dnsResourceRecord.data` | — | `string` | output only | — | Output only. Data of the DNS Resource Record. |
 | `dnsResourceRecord.name` | — | `string` | output only | — | Output only. Fully qualified name of the DNS Resource Record. e.g. `_acme-challenge.example.com` |
-| `dnsResourceRecord.type_value` | wire `type` | `string` | output only | — | Output only. Type of the DNS Resource Record. Currently always set to "CNAME". |
+| `dnsResourceRecord.type` | — | `string` | output only | — | Output only. Type of the DNS Resource Record. Currently always set to "CNAME". |
 | `domain` | — | `string` | required | force new | Required. Immutable. A domain that is being authorized. A DnsAuthorization resource covers a single domain and its wildcard, e.g. authorization for `example.com` can be used to issue certificates for … |
 | `labels` | — | `map` | optional | opaque | Optional. Set of labels associated with a DnsAuthorization. |
 | `name` | — | `string` | required | force new | Identifier. A user-defined name of the dns authorization. DnsAuthorization names must be unique globally and match pattern `projects/*/locations/*/dnsAuthorizations/*`. |
