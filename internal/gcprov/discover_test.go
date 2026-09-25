@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
 	"github.com/infrena/infrena-provider-gcp/internal/gcptest"
@@ -596,5 +597,68 @@ func TestTheFallbackScansTheCatalogsDefaultList(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Type != "gcp.widget" {
 		t.Fatalf("the fallback scanned %+v; discover_default was not consulted", got)
+	}
+}
+
+// TestDiscoveryLeavesOutGoogleDefinedMetrics. Monitoring lists every metric
+// Google defines alongside a project's own: 8,999 on the live project, which
+// made one discover reply larger than the host reads and hung it. Only the
+// project's own metrics are resources of the project.
+func TestDiscoveryLeavesOutGoogleDefinedMetrics(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.FailCAI(403, "PERMISSION_DENIED", "no")
+	c := widgetCatalog()
+	c.Types[0].ListField = "metricDescriptors"
+	s.SetListField("/v1/projects/p/locations/r/widgets", "metricDescriptors")
+	s.Seed("/v1/projects/p/locations/r/widgets/mine", map[string]any{"name": "mine", "type": "custom.googleapis.com/orders"})
+	s.Seed("/v1/projects/p/locations/r/widgets/cpu", map[string]any{"name": "cpu", "type": "compute.googleapis.com/instance/cpu/utilization"})
+	p := testProviderWithCatalog(t, s, c)
+	p.settings.DiscoverTypes = []string{"gcp.widget"}
+
+	got, err := p.Discover(context.Background(), provider.DiscoverRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !strings.HasSuffix(got[0].ProviderID, "/mine") {
+		t.Fatalf("discovered %+v, want only the project's own metric", got)
+	}
+}
+
+// TestAListWhoseUrlHasAQueryStillPages. A dataset's collection url carries
+// ?accessPolicyVersion=3. The page token was joined with a second "?", so
+// Google never saw it, answered the first page again, and the loop never
+// ended.
+func TestAListWhoseUrlHasAQueryStillPages(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.FailCAI(403, "PERMISSION_DENIED", "no")
+	c := widgetCatalog()
+	c.Types[0].BaseURL += "?view=FULL"
+	for _, n := range []string{"a", "b", "c"} {
+		s.Seed("/v1/projects/p/locations/r/widgets/"+n, map[string]any{"name": n})
+	}
+	p := testProviderWithCatalog(t, s, c)
+	p.settings.DiscoverTypes = []string{"gcp.widget"}
+
+	done := make(chan struct{})
+	var got []provider.DiscoveredResource
+	var err error
+	go func() {
+		got, err = p.Discover(context.Background(), provider.DiscoverRequest{})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("discover never finished: the page token is not reaching the list")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("discovered %d, want all 3 across two pages", len(got))
 	}
 }
