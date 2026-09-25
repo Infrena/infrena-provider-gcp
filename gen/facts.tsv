@@ -1012,7 +1012,7 @@ gcp.bigquery.table	numTimeTravelPhysicalBytes	output	true	discovery
 gcp.bigquery.table	numTotalLogicalBytes	output	true	discovery
 gcp.bigquery.table	numTotalPhysicalBytes	output	true	discovery
 gcp.bigquery.table	replicas	output	true	discovery
-gcp.bigquery.table	requirePartitionFilter	output	true	mm
+gcp.bigquery.table	requirePartitionFilter	output	false	!mm+ruling+observed
 gcp.bigquery.table	restrictions	output	true	discovery
 gcp.bigquery.table	restrictions.type	output	true	discovery
 gcp.bigquery.table	selfLink	output	true	discovery
@@ -2655,7 +2655,7 @@ gcp.firewall		create_verb	POST	discovery
 gcp.firewall		delete_await	compute_operation	discovery
 gcp.firewall		delete_url	projects/{project}/global/firewalls/{firewall}	discovery
 gcp.firewall		lock_field	none	default
-gcp.firewall		patch_one_field	false	default
+gcp.firewall		patch_one_field	false	observed+default
 gcp.firewall		setters	none	default
 gcp.firewall		timeout	600	default
 gcp.firewall		update_await	compute_operation	discovery
@@ -2669,7 +2669,7 @@ gcp.firewall	denied	unordered	true	mm
 gcp.firewall	denied[].IPProtocol	equivalence	case	mm
 gcp.firewall	denied[].IPProtocol	required	true	mm
 gcp.firewall	destinationRanges	unordered	true	mm
-gcp.firewall	direction	immutable	true	mm
+gcp.firewall	direction	immutable	false	!mm+ruling+observed
 gcp.firewall	id	output	true	discovery
 gcp.firewall	kind	output	true	discovery
 gcp.firewall	logConfig.metadata	required	true	mm
@@ -3025,7 +3025,7 @@ gcp.healthcheck		create_verb	POST	discovery
 gcp.healthcheck		delete_await	compute_operation	discovery
 gcp.healthcheck		delete_url	projects/{project}/global/healthChecks/{healthCheck}	discovery
 gcp.healthcheck		lock_field	none	default
-gcp.healthcheck		patch_one_field	false	default
+gcp.healthcheck		patch_one_field	false	observed+default
 gcp.healthcheck		setters	none	default
 gcp.healthcheck		timeout	600	default
 gcp.healthcheck		update_await	compute_operation	discovery
@@ -6535,7 +6535,7 @@ gcp.regionsecuritypolicy		delete_await	compute_operation	discovery
 gcp.regionsecuritypolicy		delete_url	projects/{{project}}/regions/{{region}}/securityPolicies/{{name}}	mm
 gcp.regionsecuritypolicy		lock_field	fingerprint	discovery
 gcp.regionsecuritypolicy		patch_one_field	false	default
-gcp.regionsecuritypolicy		setters	none	default
+gcp.regionsecuritypolicy		setters	labels=setLabels	mm+discovery
 gcp.regionsecuritypolicy		timeout	600	default
 gcp.regionsecuritypolicy		update_await	compute_operation	discovery
 gcp.regionsecuritypolicy		update_mask	query	mm
@@ -6577,37 +6577,51 @@ gcp.regionsnapshot		delete_await	compute_operation	discovery
 gcp.regionsnapshot		delete_url	projects/{project}/regions/{region}/snapshots/{snapshot}	discovery
 gcp.regionsnapshot		lock_field	none	default
 gcp.regionsnapshot		patch_one_field	false	default
-gcp.regionsnapshot		setters	none	default
+gcp.regionsnapshot		setters	labels=setLabels	mm+discovery
 gcp.regionsnapshot		timeout	600	default
 gcp.regionsnapshot		update_await	none	default
 gcp.regionsnapshot		update_mask	none	default
 gcp.regionsnapshot		update_verb	none	default
 gcp.regionsnapshot	architecture	output	true	discovery
 gcp.regionsnapshot	autoCreated	output	true	discovery
+gcp.regionsnapshot	chainName	immutable	true	discovery
 gcp.regionsnapshot	creationSizeBytes	output	true	discovery
 gcp.regionsnapshot	creationTimestamp	output	true	discovery
+gcp.regionsnapshot	description	immutable	true	discovery
 gcp.regionsnapshot	diskSizeGb	output	true	discovery
 gcp.regionsnapshot	downloadBytes	output	true	discovery
 gcp.regionsnapshot	enableConfidentialCompute	output	true	discovery
+gcp.regionsnapshot	guestFlush	immutable	true	discovery
 gcp.regionsnapshot	guestFlush	input_only	true	discovery
 gcp.regionsnapshot	guestOsFeatures	output	true	discovery
 gcp.regionsnapshot	id	output	true	discovery
 gcp.regionsnapshot	kind	output	true	discovery
+gcp.regionsnapshot	labelFingerprint	immutable	true	discovery
 gcp.regionsnapshot	licenseCodes	output	true	discovery
 gcp.regionsnapshot	licenses	output	true	discovery
+gcp.regionsnapshot	locationHint	immutable	true	discovery
+gcp.regionsnapshot	name	immutable	true	discovery
+gcp.regionsnapshot	params	immutable	true	discovery
 gcp.regionsnapshot	params	input_only	true	discovery
 gcp.regionsnapshot	params.resourceManagerTags	input_only	true	discovery
 gcp.regionsnapshot	region	output	true	discovery
 gcp.regionsnapshot	satisfiesPzi	output	true	discovery
 gcp.regionsnapshot	satisfiesPzs	output	true	discovery
 gcp.regionsnapshot	selfLink	output	true	discovery
+gcp.regionsnapshot	snapshotEncryptionKey	immutable	true	discovery
 gcp.regionsnapshot	snapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regionsnapshot	snapshotEncryptionKey.sha256	output	true	discovery
 gcp.regionsnapshot	snapshotGroupId	output	true	discovery
 gcp.regionsnapshot	snapshotGroupName	output	true	discovery
+gcp.regionsnapshot	snapshotType	immutable	true	discovery
+gcp.regionsnapshot	sourceDisk	immutable	true	discovery
+gcp.regionsnapshot	sourceDiskEncryptionKey	immutable	true	discovery
 gcp.regionsnapshot	sourceDiskEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regionsnapshot	sourceDiskEncryptionKey.sha256	output	true	discovery
+gcp.regionsnapshot	sourceDiskForRecoveryCheckpoint	immutable	true	discovery
 gcp.regionsnapshot	sourceDiskId	output	true	discovery
+gcp.regionsnapshot	sourceInstantSnapshot	immutable	true	discovery
+gcp.regionsnapshot	sourceInstantSnapshotEncryptionKey	immutable	true	discovery
 gcp.regionsnapshot	sourceInstantSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regionsnapshot	sourceInstantSnapshotEncryptionKey.sha256	output	true	discovery
 gcp.regionsnapshot	sourceInstantSnapshotId	output	true	discovery
@@ -6616,6 +6630,7 @@ gcp.regionsnapshot	sourceSnapshotSchedulePolicyId	output	true	discovery
 gcp.regionsnapshot	status	output	true	discovery
 gcp.regionsnapshot	storageBytes	output	true	discovery
 gcp.regionsnapshot	storageBytesStatus	output	true	discovery
+gcp.regionsnapshot	storageLocations	immutable	true	discovery
 gcp.regionsslcertificate		clear_before_delete	none	default
 gcp.regionsslcertificate		create_await	compute_operation	discovery
 gcp.regionsslcertificate		create_url	projects/{{project}}/regions/{{region}}/sslCertificates	mm
@@ -7110,7 +7125,7 @@ gcp.router		create_verb	POST	discovery
 gcp.router		delete_await	compute_operation	discovery
 gcp.router		delete_url	projects/{project}/regions/{region}/routers/{router}	discovery
 gcp.router		lock_field	none	default
-gcp.router		patch_one_field	false	default
+gcp.router		patch_one_field	false	observed+default
 gcp.router		setters	none	default
 gcp.router		timeout	600	default
 gcp.router		update_await	compute_operation	discovery
@@ -7327,7 +7342,7 @@ gcp.securitypolicy		delete_await	compute_operation	discovery
 gcp.securitypolicy		delete_url	projects/{project}/global/securityPolicies/{securityPolicy}	discovery
 gcp.securitypolicy		lock_field	fingerprint	discovery
 gcp.securitypolicy		patch_one_field	false	default
-gcp.securitypolicy		setters	none	default
+gcp.securitypolicy		setters	labels=setLabels	mm+discovery
 gcp.securitypolicy		timeout	600	default
 gcp.securitypolicy		update_await	compute_operation	discovery
 gcp.securitypolicy		update_mask	query	discovery
@@ -7754,7 +7769,7 @@ gcp.sslpolicy		create_verb	POST	discovery
 gcp.sslpolicy		delete_await	compute_operation	discovery
 gcp.sslpolicy		delete_url	projects/{project}/global/sslPolicies/{sslPolicy}	discovery
 gcp.sslpolicy		lock_field	fingerprint	discovery
-gcp.sslpolicy		patch_one_field	false	default
+gcp.sslpolicy		patch_one_field	false	observed+default
 gcp.sslpolicy		setters	none	default
 gcp.sslpolicy		timeout	600	default
 gcp.sslpolicy		update_await	compute_operation	discovery
@@ -7762,12 +7777,13 @@ gcp.sslpolicy		update_mask	none	default
 gcp.sslpolicy		update_verb	PATCH	mm
 gcp.sslpolicy	creationTimestamp	output	true	discovery+mm
 gcp.sslpolicy	customFeatures	unordered	true	mm
-gcp.sslpolicy	description	immutable	true	mm
+gcp.sslpolicy	description	immutable	false	!mm+ruling+observed
 gcp.sslpolicy	enabledFeatures	output	true	discovery+mm
 gcp.sslpolicy	enabledFeatures	unordered	true	mm
 gcp.sslpolicy	fingerprint	output	true	mm
 gcp.sslpolicy	id	output	true	discovery
 gcp.sslpolicy	kind	output	true	discovery
+gcp.sslpolicy	minTlsVersion	required	true	ruling+observed
 gcp.sslpolicy	name	immutable	true	mm
 gcp.sslpolicy	name	required	true	mm
 gcp.sslpolicy	region	output	true	discovery
@@ -7798,7 +7814,7 @@ gcp.storage.bucket	acl[].email	output	true	mm
 gcp.storage.bucket	acl[].entity	required	false	mm
 gcp.storage.bucket	acl[].id	output	true	mm
 gcp.storage.bucket	acl[].kind	output	true	discovery
-gcp.storage.bucket	defaultObjectAcl	immutable	true	mm
+gcp.storage.bucket	defaultObjectAcl	immutable	false	!mm+ruling+observed
 gcp.storage.bucket	defaultObjectAcl[].bucket	equivalence	self_link	mm
 gcp.storage.bucket	defaultObjectAcl[].bucket	required	false	mm
 gcp.storage.bucket	defaultObjectAcl[].domain	output	true	mm
@@ -8269,15 +8285,20 @@ gcp.targetvpngateway		delete_await	compute_operation	discovery
 gcp.targetvpngateway		delete_url	projects/{project}/regions/{region}/targetVpnGateways/{targetVpnGateway}	discovery
 gcp.targetvpngateway		lock_field	none	default
 gcp.targetvpngateway		patch_one_field	false	default
-gcp.targetvpngateway		setters	none	default
+gcp.targetvpngateway		setters	labels=setLabels	mm+discovery
 gcp.targetvpngateway		timeout	600	default
 gcp.targetvpngateway		update_await	none	default
 gcp.targetvpngateway		update_mask	none	default
 gcp.targetvpngateway		update_verb	none	default
 gcp.targetvpngateway	creationTimestamp	output	true	discovery
+gcp.targetvpngateway	description	immutable	true	discovery
 gcp.targetvpngateway	forwardingRules	output	true	discovery
 gcp.targetvpngateway	id	output	true	discovery
 gcp.targetvpngateway	kind	output	true	discovery
+gcp.targetvpngateway	labelFingerprint	immutable	true	discovery
+gcp.targetvpngateway	name	immutable	true	discovery
+gcp.targetvpngateway	network	immutable	true	discovery
+gcp.targetvpngateway	params	immutable	true	discovery
 gcp.targetvpngateway	params	input_only	true	discovery
 gcp.targetvpngateway	region	output	true	discovery
 gcp.targetvpngateway	selfLink	output	true	discovery

@@ -71,7 +71,7 @@ The Buckets resource represents a bucket in Google Cloud Storage. There is a sin
 | `customPlacementConfig.dataLocations` | `data_locations` | `list` | optional | — | The list of regional locations in which data is placed. |
 | `customPlacementConfig.dataLocations[]` | — | `string` | optional | — | — |
 | `defaultEventBasedHold` | `default_event_based_hold` | `boolean` | optional | — | The default value for event-based hold on newly created objects in this bucket. Event-based hold is a way to retain objects indefinitely until an event occurs, signified by the hold's release. After … |
-| `defaultObjectAcl` | `default_object_acl` | `list` | optional | force new | Default access controls to apply to new objects when no ACL is provided. |
+| `defaultObjectAcl` | `default_object_acl` | `list` | optional | — | Default access controls to apply to new objects when no ACL is provided. |
 | `defaultObjectAcl[]` | — | `map` | optional | — | — |
 | `defaultObjectAcl[].bucket` | — | `string` | optional | — | The name of the bucket. |
 | `defaultObjectAcl[].domain` | — | `string` | output only | — | The domain associated with the entity, if any. |
