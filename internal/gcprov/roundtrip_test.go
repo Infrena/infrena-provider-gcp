@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
 	"github.com/infrena/infrena-provider-gcp/internal/gcpfake"
@@ -141,7 +142,9 @@ func TestEveryCreatableTypeRoundTripsAgainstTheFake(t *testing.T) {
 		mu       sync.Mutex
 		failures []string
 		checked  int
+		changed  int
 	)
+	counts := &discoStyleCounts{unmatchedByType: map[string][]string{}}
 	// One subtest per type, in parallel: each has its own fake, and a type
 	// whose read-back 404s spends seconds in the eventual-consistency retry.
 	t.Run("types", func(t *testing.T) {
@@ -152,11 +155,15 @@ func TestEveryCreatableTypeRoundTripsAgainstTheFake(t *testing.T) {
 			checked++
 			t.Run(ty.Name, func(t *testing.T) {
 				t.Parallel()
-				if msg := roundTrip(t, ty); msg != "" {
-					mu.Lock()
+				msg, didChange := roundTrip(t, ty, counts)
+				mu.Lock()
+				if msg != "" {
 					failures = append(failures, ty.Name+": "+msg)
-					mu.Unlock()
 				}
+				if didChange {
+					changed++
+				}
+				mu.Unlock()
 			})
 		}
 	})
@@ -197,6 +204,36 @@ func TestEveryCreatableTypeRoundTripsAgainstTheFake(t *testing.T) {
 	if checked < 150 {
 		t.Errorf("only %d types were round-tripped; the catalog has far more creatable types", checked)
 	}
+	// A resolver that stopped matching would quietly hand every answer back
+	// to the catalog, which is the thing under test.
+	t.Logf("answers from Discovery: %d matched, %d fell back to the catalog; %d types changed a field",
+		counts.matched, counts.unmatched, changed)
+	// A mutation no Discovery method answers is a request Google does not
+	// publish: this is how BigQuery's job delete, Cloud SQL's user delete
+	// and Firestore's change-stream update were found (2026-09-25). The
+	// exceptions are the harness's, not the provider's: its minimal name
+	// is a bare word where these APIs take a full resource name.
+	harness := map[string]bool{
+		"gcp.topic":              true, // name is projects/{p}/topics/{t}
+		"gcp.subscription":       true, // name is projects/{p}/subscriptions/{s}
+		"gcp.container.nodepool": true, // parent is projects/{p}/locations/{l}/clusters/{c}
+	}
+	for name, reqs := range counts.unmatchedByType {
+		if harness[name] {
+			delete(harness, name)
+			continue
+		}
+		t.Errorf("%s: sent a mutation no Discovery method answers: %v", name, reqs)
+	}
+	for name := range harness {
+		t.Errorf("%s: listed as sending unpublished requests only because of the harness, but every one matched; remove it", name)
+	}
+	if counts.matched < 10*counts.unmatched {
+		t.Errorf("only %d of %d mutations were answered from Discovery", counts.matched, counts.matched+counts.unmatched)
+	}
+	if changed < 60 {
+		t.Errorf("only %d types changed a field; an update that changes nothing tests no mask", changed)
+	}
 	for _, f := range failures {
 		t.Error(f)
 	}
@@ -204,7 +241,7 @@ func TestEveryCreatableTypeRoundTripsAgainstTheFake(t *testing.T) {
 
 // roundTrip runs one type's life against a fresh fake and returns what went
 // wrong first, or "".
-func roundTrip(t *testing.T, ty *catalog.Type) (msg string) {
+func roundTrip(t *testing.T, ty *catalog.Type, counts *discoStyleCounts) (msg string, changed bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			msg = fmt.Sprintf("panic: %v", r)
@@ -212,6 +249,9 @@ func roundTrip(t *testing.T, ty *catalog.Type) (msg string) {
 	}()
 	s := gcpfake.New(t)
 	defer s.Close()
+	// Each mutation answers the way its own Discovery method does, not the
+	// way the catalog says; the catalog's style is only the fallback.
+	s.SetOperationStyleFor(discoStyleResolver(t, ty, counts))
 	if os.Getenv("GCP_ROUNDTRIP_TRACE") == ty.Name {
 		// Every request the fake saw, to find where a create and a read
 		// disagree about where the resource lives.
@@ -234,13 +274,13 @@ func roundTrip(t *testing.T, ty *catalog.Type) (msg string) {
 	desired := &resource.DesiredResource{Type: ty.Name, Attrs: minimalDesired(ty)}
 	st, err := p.Create(ctx, desired)
 	if err != nil {
-		return "create: " + err.Error()
+		return "create: " + err.Error(), changed
 	}
 	if st == nil || st.ProviderID == "" {
-		return "create returned no provider id"
+		return "create returned no provider id", changed
 	}
 	if _, err := ParseProviderID(ty, st.ProviderID); err != nil {
-		return "the provider id it returned does not parse: " + err.Error()
+		return "the provider id it returned does not parse: " + err.Error(), changed
 	}
 	for name, want := range desired.Attrs {
 		if got := st.Attributes[name]; !got.Equal(want) {
@@ -250,45 +290,111 @@ func roundTrip(t *testing.T, ty *catalog.Type) (msg string) {
 					t.Logf("fake holds %v", held)
 				}
 			}
-			return fmt.Sprintf("after create, %s is %v, configured %v", name, got.Raw, want.Raw)
+			return fmt.Sprintf("after create, %s is %v, configured %v", name, got.Raw, want.Raw), changed
 		}
 	}
 
 	read, err := p.Read(ctx, st)
 	if err != nil {
-		return "read: " + err.Error()
+		return "read: " + err.Error(), changed
 	}
 	if read == nil {
-		return "read after create finds nothing at " + st.ProviderID
+		return "read after create finds nothing at " + st.ProviderID, changed
 	}
 	for name, want := range desired.Attrs {
 		if got := read.Attributes[name]; !got.Equal(want) {
-			return fmt.Sprintf("after a read, %s is %v, configured %v", name, got.Raw, want.Raw)
+			return fmt.Sprintf("after a read, %s is %v, configured %v", name, got.Raw, want.Raw), changed
 		}
 	}
 
 	if ty.UpdateVerb != "" || len(ty.Setters) > 0 {
 		before := len(s.Requests())
 		if _, err := p.Update(ctx, read, desired); err != nil {
-			return "an update with nothing changed: " + err.Error()
+			return "an update with nothing changed: " + err.Error(), changed
 		}
 		for _, r := range s.Requests()[before:] {
 			if r.Method != "GET" {
-				return fmt.Sprintf("an update with nothing changed sent %s %s %s", r.Method, r.Path, r.Body)
+				return fmt.Sprintf("an update with nothing changed sent %s %s %s", r.Method, r.Path, r.Body), changed
 			}
+		}
+
+		// Then a real change, of one field an update may change. The fake
+		// applies only what the mask names, answers the way the method's
+		// own Discovery entry does, and a read afterwards must see it.
+		if name := oneFieldToChange(ty); name != "" {
+			next := &resource.DesiredResource{Type: ty.Name, Attrs: map[string]value.Value{}}
+			for k, v := range desired.Attrs {
+				next.Attrs[k] = v
+			}
+			want := value.String("rt-changed", value.SourceExplicit)
+			next.Attrs[name] = want
+			began := time.Now()
+			updated, err := p.Update(ctx, read, next)
+			if err != nil {
+				return fmt.Sprintf("an update changing %s: %v", name, err), false
+			}
+			// An update that waits for an operation that never comes times
+			// out, then reads back and reports success: against Google that
+			// was twenty minutes per update. The fake answers at once, so
+			// waiting out the timeout is always the bug.
+			if time.Since(began) >= time.Duration(ty.TimeoutSeconds)*time.Second {
+				return fmt.Sprintf("an update changing %s waited out its whole %ds timeout", name, ty.TimeoutSeconds), false
+			}
+			if updated == nil || !updated.Attributes[name].Equal(want) {
+				return fmt.Sprintf("after an update changing %s, state holds %v", name, updated.Attributes[name].Raw), false
+			}
+			again, err := p.Read(ctx, updated)
+			if err != nil || again == nil {
+				return fmt.Sprintf("read after changing %s: %v", name, err), false
+			}
+			if got := again.Attributes[name]; !got.Equal(want) {
+				return fmt.Sprintf("after changing %s, a read finds %v: the change never reached the resource", name, got.Raw), false
+			}
+			read, changed = again, true
 		}
 	}
 
 	s.SetOperationStyle(styleFor(ty.DeleteAwaitKind()))
+	began := time.Now()
 	if err := p.Delete(ctx, read); err != nil {
-		return "delete: " + err.Error()
+		return "delete: " + err.Error(), changed
+	}
+	if time.Since(began) >= time.Duration(ty.TimeoutSeconds)*time.Second {
+		return fmt.Sprintf("the delete waited out its whole %ds timeout", ty.TimeoutSeconds), changed
 	}
 	gone, err := p.Read(ctx, read)
 	if err != nil {
-		return "read after delete: " + err.Error()
+		return "read after delete: " + err.Error(), changed
 	}
 	if gone != nil {
-		return "still readable after delete at " + read.ProviderID
+		return "still readable after delete at " + read.ProviderID, changed
+	}
+	return "", changed
+}
+
+// oneFieldToChange picks a top-level string an update may change and the
+// fake can hold any value of: settable, not ForceNew, not in the url, not a
+// reference, a lock, a secret, input-only or compared by a rule.
+// description first, because nearly every API has one and none validates
+// it.
+func oneFieldToChange(ty *catalog.Type) string {
+	inURL := urlIdentifying(ty)
+	ok := func(name string) bool {
+		a := ty.Attributes[name]
+		if a == nil || a.Kind != value.KindString || a.Output || a.ForceNew || a.CreateOnly ||
+			a.InputOnly || a.Sensitive || a.Ref != nil || a.Equivalence != "" ||
+			inURL[name] || inURL[a.Canonical] || a.Canonical == ty.LockField {
+			return false
+		}
+		return ty.UpdateVerb != "" || ty.SetterFor(a.Canonical) != nil
+	}
+	if ok("description") {
+		return "description"
+	}
+	for _, name := range sortedAttrNames(ty.Attributes) {
+		if ok(name) {
+			return name
+		}
 	}
 	return ""
 }
