@@ -306,6 +306,10 @@ func Build(in Inputs) (*Result, error) {
 	if err := applySensitive(c.Types, overlay.Sensitive); err != nil {
 		return nil, err
 	}
+	// Last, so an observation checks the catalog as it will ship.
+	if err := applyObserved(c.Types, overlay.Observed); err != nil {
+		return nil, err
+	}
 	// Every shipped type whose create url cannot be built, recorded once,
 	// here, over the catalog as it finally stands. The capability itself is
 	// derived from the same function at load (catalog.Definitions), so this
@@ -919,6 +923,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			a.ForceNew = true
 			a.CreateOnly = true
 			a.Output = false
+			addSource(a, "immutable", SourceDiscovery)
 			attrs[n] = a
 		}
 	}
@@ -952,10 +957,23 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		if mm.UpdateVerb == "" || strings.EqualFold(mm.UpdateVerb, http.MethodPatch) {
 			t.UpdateVerb = mm.UpdateVerb
 			t.UpdateURL = mm.UpdateURL
+			if mm.UpdateVerb != "" {
+				setTypeSource(t, "update_verb", SourceMM)
+			}
 		} else {
 			t.UpdateURL = ""
+			setTypeSource(t, "update_verb", lost+SourceMM)
 		}
 		t.UpdateMask = mm.UpdateMask
+		if mm.UpdateMask {
+			setTypeSource(t, "update_mask", SourceMM)
+		}
+		if mm.BaseURL != "" || mm.CreateURL != "" {
+			setTypeSource(t, "create_url", SourceMM)
+		}
+		if mm.DeleteURL != "" {
+			setTypeSource(t, "delete_url", SourceMM)
+		}
 		if len(mm.ImportFormat) > 0 {
 			t.ImportFormat = strings.Join(mm.ImportFormat, "\n")
 		}
@@ -992,6 +1010,9 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 
 	t.LockField = lockFieldOf(attrs)
+	if t.LockField != "" {
+		setTypeSource(t, "lock_field", SourceDiscovery)
+	}
 
 	// UpdateVerb used to come from magic-modules and from nowhere else, which
 	// meant it usually came from nowhere: magic-modules relies on its own
@@ -1024,12 +1045,18 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			if restricted, _ := restrictedPatch(col); !restricted || overlay.Patchable[name] != nil {
 				t.UpdateVerb, t.UpdateWrapper, t.UpdateMaskField = http.MethodPatch, wrapper, maskField
 				t.UpdateURL = ""
+				setTypeSource(t, "update_verb", SourceDiscovery)
+				setTypeSource(t, "update_mask", SourceDiscovery)
 				// The mask travels inside the envelope; a query-string one
 				// as well would be a second mask the API never asked for.
 				t.UpdateMask = false
 				if allow := overlay.Patchable[name]; allow != nil {
-					applyPatchAllowlist(attrs, allow.Fields)
+					applyPatchAllowlist(attrs, allow.Fields, SourceRuling)
 					t.PatchOneField = allow.OneFieldPerPatch
+					setTypeSource(t, "update_verb", SourceDiscovery, SourceRuling)
+					if allow.OneFieldPerPatch {
+						setTypeSource(t, "patch_one_field", SourceRuling)
+					}
 				}
 			}
 		}
@@ -1041,13 +1068,20 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			switch {
 			case !restricted:
 				t.UpdateVerb, t.UpdateMask = verb, masked
+				setTypeSource(t, "update_verb", SourceDiscovery)
+				setTypeSource(t, "update_mask", SourceDiscovery)
 			case allow != nil:
 				// A human read what the API says and wrote down which fields it
 				// really patches. Everything else replaces, which is what the
 				// API does with it anyway.
 				t.UpdateVerb, t.UpdateMask = verb, masked
-				applyPatchAllowlist(attrs, allow.Fields)
+				applyPatchAllowlist(attrs, allow.Fields, SourceRuling)
 				t.PatchOneField = allow.OneFieldPerPatch
+				setTypeSource(t, "update_verb", SourceDiscovery, SourceRuling)
+				setTypeSource(t, "update_mask", SourceDiscovery)
+				if allow.OneFieldPerPatch {
+					setTypeSource(t, "patch_one_field", SourceRuling)
+				}
 			default:
 				// Left non-updatable on purpose: see patchlimits.go. Recorded
 				// as a noupdate row in gen/warnings.txt by Build.
@@ -1063,9 +1097,11 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// `patchable:` list, where one exists, has already decided and wins.
 	if mm != nil && mm.Immutable && t.UpdateVerb != "" && overlay.Patchable[name] == nil {
 		if fields := immutableResourcePatchFields(mm); len(fields) > 0 {
-			applyPatchAllowlist(attrs, fields)
+			applyPatchAllowlist(attrs, fields, SourceMM)
 		} else {
 			t.UpdateVerb, t.UpdateMask, t.UpdateURL = "", false, ""
+			setTypeSource(t, "update_verb", SourceMM)
+			setTypeSource(t, "update_mask", SourceMM)
 			t.UpdateWrapper, t.UpdateMaskField = "", ""
 		}
 	}
@@ -1131,6 +1167,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			// that disagrees with the API's own delete path is not an
 			// override worth keeping.
 			t.DeleteURL = t.SelfLink
+			setTypeSource(t, "delete_url", SourceDiscovery)
 		} else if first, _, _ := strings.Cut(t.ImportFormat, "\n"); first != "" {
 			t.SelfLink = first
 		}
@@ -1140,8 +1177,12 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		// the create method's own path, which for a REST-style insert is the
 		// collection path itself.
 		t.BaseURL = create.Path
+		if t.CreateURL == "" {
+			setTypeSource(t, "create_url", SourceDiscovery)
+		}
 	}
 	t.Scope = ScopeOf(t.BaseURL)
+	setTypeSource(t, "create_verb", SourceDiscovery)
 
 	// The verb a create is sent with, from the API itself. magic-modules says
 	// so too where it matters (Pub/Sub's Topic declares create_verb: PUT), but
@@ -1154,6 +1195,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.CreateVerb = create.HTTPMethod
 		if t.CreateVerb == http.MethodPut {
 			t.CreateURL = create.Path
+			setTypeSource(t, "create_url", SourceDiscovery)
 		}
 	}
 
@@ -1164,8 +1206,13 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// With no verb the type is replaced on change, which the API allows.
 	if t.UpdateVerb == http.MethodPatch && patchMethodOf(col) == nil {
 		t.UpdateVerb, t.UpdateURL, t.UpdateMask = "", "", false
+		setTypeSource(t, "update_verb", SourceDiscovery, lost+SourceMM)
+		setTypeSource(t, "update_mask", SourceDiscovery, lost+SourceMM)
 	}
-	t.DeleteURL = discoveredDeleteURL(t, col)
+	if del := discoveredDeleteURL(t, col); del != t.DeleteURL {
+		t.DeleteURL = del
+		setTypeSource(t, "delete_url", SourceDiscovery)
+	}
 
 	// A POST create goes to the COLLECTION. magic-modules' BigQuery Table
 	// base_url is the table's own item path (Terraform implements the table
@@ -1173,15 +1220,24 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// live on 2026-09-25. Where Discovery's insert ends at the collection and
 	// the template ends at an id, the id is dropped.
 	if t.CreateVerb == "" {
+		before := t.CreateTemplate()
 		if t.CreateURL != "" {
 			t.CreateURL = withoutItemTail(t.CreateURL, create.Path)
 		} else {
 			t.BaseURL = withoutItemTail(t.BaseURL, create.Path)
 		}
+		if t.CreateTemplate() != before {
+			setTypeSource(t, "create_url", SourceDiscovery, lost+SourceMM)
+		}
 	}
 
 	await, _ := AwaitOf(doc, create)
 	t.Await = await
+	setTypeSource(t, "create_await", SourceDiscovery)
+	setTypeSource(t, "delete_await", SourceDiscovery)
+	if t.UpdateVerb != "" {
+		setTypeSource(t, "update_await", SourceDiscovery)
+	}
 	// The delete's own answer, which is not always the create's: see
 	// catalog.Type.DeleteAwait. Recorded only where it differs.
 	if deleteAwait, _ := AwaitOf(doc, col.Methods["delete"]); deleteAwait != await {
@@ -1274,6 +1330,9 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			if a == nil {
 				return nil, fmt.Errorf("settable names %q, which is not an attribute of this type", f)
 			}
+			if a.Output {
+				overrule(a, "output", SourceRuling)
+			}
 			a.Output = false
 		}
 		for _, path := range ruling.InPlace {
@@ -1292,6 +1351,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 				return nil, fmt.Errorf("send_with_update names %q, which is not input-only", path)
 			}
 			a.SendWithUpdate = true
+			addSource(a, "send_with_update", SourceRuling)
 		}
 		for _, f := range ruling.Required {
 			a := attrNamed(attrs, f)
@@ -1299,6 +1359,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 				return nil, fmt.Errorf("required names %q, which is not a settable attribute of this type", f)
 			}
 			a.Required = true
+			addSource(a, "required", SourceRuling)
 		}
 	}
 	if ruling != nil && len(ruling.ClearBeforeDelete) > 0 {
@@ -1308,6 +1369,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			}
 		}
 		t.ClearBeforeDelete = ruling.ClearBeforeDelete
+		setTypeSource(t, "clear_before_delete", SourceRuling)
 	}
 	if ruling != nil && ruling.ReadVia != "" {
 		t.ReadVia = ruling.ReadVia
@@ -1406,6 +1468,19 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// resource is read at. See discoveredSetters.
 	t.Setters = discoveredSetters(doc, col, mm, t)
 	applySetters(t, mm)
+	if len(t.Setters) > 0 {
+		setTypeSource(t, "setters", SourceMM, SourceDiscovery)
+	}
+	// With no delete_url, a delete goes to self_link, and whoever wrote
+	// that decided it.
+	if len(t.Sources["delete_url"]) == 0 {
+		if mm != nil && mm.SelfLink != "" && mm.SelfLink == t.SelfLink {
+			setTypeSource(t, "delete_url", SourceMM)
+		} else {
+			setTypeSource(t, "delete_url", SourceDiscovery)
+		}
+	}
+	finishTypeSources(t)
 
 	return t, nil
 }
@@ -1604,6 +1679,7 @@ func forceNewAll(attrs map[string]*catalog.Attr) {
 func forceNewAttr(a *catalog.Attr) {
 	if !a.Output {
 		a.ForceNew = true
+		addSource(a, "immutable", SourceRuling)
 	}
 	for _, f := range a.Fields {
 		forceNewAttr(f)
@@ -2202,6 +2278,14 @@ func declareCreateURLParameters(t *catalog.Type, create *disco.Method) {
 			ForceNew:    true,
 			Description: desc,
 		}
+		// A placeholder of the create url: Discovery's where it publishes
+		// the parameter, the template's author's otherwise.
+		src := SourceMM
+		if create != nil && create.Parameters[ph] != nil {
+			src = SourceDiscovery
+		}
+		addSource(t.Attributes[ph], "required", src)
+		addSource(t.Attributes[ph], "immutable", src)
 	}
 }
 
@@ -2758,6 +2842,7 @@ func applySensitive(types []*catalog.Type, entries map[string]SensitiveFields) e
 				return fmt.Errorf("overlay sensitive: %s has no attribute %q", n, path)
 			}
 			a.Sensitive = true
+			addSource(a, "sensitive", SourceRuling)
 		}
 	}
 	return nil
@@ -2797,14 +2882,19 @@ func markInPlace(attrs map[string]*catalog.Attr, path string) error {
 			return fmt.Errorf("in_place names %q, which has no %q", path, seg)
 		}
 		if i == len(segs)-1 {
+			if a.ForceNew {
+				overrule(a, "immutable", SourceRuling)
+			}
 			a.ForceNew = false
 			return nil
 		}
 		if a.ForceNew {
+			overrule(a, "immutable", SourceRuling)
 			a.ForceNew = false
 			for name, sib := range a.Fields {
 				if name != segs[i+1] && !sib.Output {
 					sib.ForceNew = true
+					addSource(sib, "immutable", SourceRuling)
 				}
 			}
 		}

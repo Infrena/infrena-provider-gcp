@@ -51,6 +51,11 @@ type RefTarget struct {
 
 // Attr is one attribute, at any depth.
 type Attr struct {
+	// Sources says which inputs decided each of this attribute's facts
+	// (gen/facts.go, docs/FACTS.md). The generator's alone: never
+	// serialised, so neither the runtime nor the embedded catalog sees it.
+	Sources map[string][]string `json:"-"`
+
 	Canonical string     `json:"canonical"`
 	Aliases   []string   `json:"aliases,omitempty"`
 	Kind      value.Kind `json:"kind"`
@@ -106,6 +111,9 @@ type Attr struct {
 
 // Type is one resource type.
 type Type struct {
+	// Sources is Attr.Sources for the type's own facts.
+	Sources map[string][]string `json:"-"`
+
 	Name        string `json:"name"`
 	Service     string `json:"service"`
 	Description string `json:"description,omitempty"`

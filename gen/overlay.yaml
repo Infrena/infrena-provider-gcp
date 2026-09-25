@@ -971,3 +971,79 @@ discover_default:
   - gcp.storage.bucket
   - gcp.serviceaccount
   - gcp.container.cluster
+
+# What live tests saw Google do. Each entry asserts one fact of the closed
+# vocabulary in internal/gen/facts.go, and the generator refuses a catalog that
+# contradicts it: a fact seen on Google cannot be regenerated away. `seen` is
+# the date and the live test that showed it; a test checks the test still
+# exists. Only what a test actually exercised belongs here. See docs/FACTS.md.
+observed:
+  gcp.subnetwork:
+    - fact: patch_one_field
+      value: "true"
+      seen: 2026-09-24 TestLiveNetworkAndSubnetwork
+    - path: logConfig
+      fact: immutable
+      value: "false"
+      seen: 2026-09-24 TestLiveProbes
+  gcp.address:
+    - fact: setters
+      value: labels=setLabels
+      seen: 2026-09-24 TestLiveAddressLabels
+  gcp.targethttpproxy:
+    - fact: setters
+      value: urlMap=setUrlMap
+      seen: 2026-09-24 TestLiveLoadBalancerSetters
+  gcp.globalforwardingrule:
+    - fact: setters
+      value: labels=setLabels
+      seen: 2026-09-24 TestLiveLoadBalancerSetters
+    - path: portRange
+      fact: equivalence
+      value: port_range
+      seen: 2026-09-24 TestLiveLoadBalancerSetters
+  gcp.sslcertificate:
+    - path: privateKey
+      fact: input_only
+      value: "true"
+      seen: 2026-09-24 TestLiveSslCertificateKeepsItsPrivateKey
+  gcp.managedzone:
+    - path: description
+      fact: required
+      value: "true"
+      seen: 2026-09-24 TestLiveProbeDNSDescriptionRequired
+  gcp.responsepolicy:
+    - path: description
+      fact: required
+      value: "true"
+      seen: 2026-09-24 TestLiveProbeDNSDescriptionRequired
+  gcp.dns.policy:
+    - fact: clear_before_delete
+      value: networks
+      seen: 2026-09-24 TestLiveDNSPolicyIsDestroyedWithItsNetworksAttached
+  gcp.healthcheck:
+    - path: type_value
+      fact: output
+      value: "false"
+      seen: 2026-09-25 TestLiveHealthChecks
+  gcp.regionhealthcheck:
+    - path: type_value
+      fact: output
+      value: "false"
+      seen: 2026-09-25 TestLiveHealthChecks
+  gcp.artifactregistry.repository:
+    - fact: update_await
+      value: none
+      seen: 2026-09-25 TestLiveArtifactRegistryCredentialsChangeInPlace
+    - path: remoteRepositoryConfig.upstreamCredentials
+      fact: immutable
+      value: "false"
+      seen: 2026-09-25 TestLiveArtifactRegistryCredentialsChangeInPlace
+    - path: remoteRepositoryConfig.disableUpstreamValidation
+      fact: send_with_update
+      value: "true"
+      seen: 2026-09-25 TestLiveArtifactRegistryCredentialsChangeInPlace
+  gcp.bigquery.table:
+    - fact: create_url
+      value: projects/{{project}}/datasets/{{dataset_id}}/tables
+      seen: 2026-09-25 TestLiveBigQueryTable

@@ -74,6 +74,12 @@ jobs:
       - name: the committed reference matches the catalog
         working-directory: infrena-provider-gcp
         run: go run ./cmd/gen-docs -check
+      # The catalog, warnings, fact sources and unknowns are generated too. A
+      # stale one hides a change, and an observation the catalog now
+      # contradicts fails the generator here.
+      - name: the committed catalog and facts match the generator
+        working-directory: infrena-provider-gcp
+        run: go run ./cmd/gen-gcp -check
       # Every example must still compile. The test skips when ../infrena is
       # absent, and a skip prints nothing without -v, so this greps for the
       # marker the same way the e2e step does -- a skip reading as a pass is

@@ -417,9 +417,33 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		// Never on an output-only field: a field GCP sets is returned by
 		// definition, and there is nothing of the user's to carry.
 		a.InputOnly = behaviors[disco.BehaviorInputOnly] && !a.Output
+		if a.Output {
+			addSource(a, "output", SourceDiscovery)
+		}
+		if a.ForceNew {
+			addSource(a, "immutable", SourceDiscovery)
+		}
+		if a.InputOnly {
+			addSource(a, "input_only", SourceDiscovery)
+		}
 		if f := idx[name]; f != nil {
 			a.Required = f.Required
 			a.ForceNew = a.ForceNew || f.Immutable
+			if f.Required {
+				addSource(a, "required", SourceMM)
+			}
+			if f.Immutable {
+				addSource(a, "immutable", SourceMM)
+			}
+			if f.Output {
+				addSource(a, "output", SourceMM)
+			}
+			if f.Sensitive || f.WriteOnly {
+				addSource(a, "sensitive", SourceMM)
+			}
+			if f.IsSet {
+				addSource(a, "unordered", SourceMM)
+			}
 			// Secrets. Discovery has no way to say a field is one, so
 			// magic-modules is the only source: `sensitive` on passwords,
 			// keys and tokens, `write_only` on values Terraform never keeps.
@@ -434,6 +458,9 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			if a.Equivalence == "" && isResourceRef(f) {
 				a.Equivalence = catalog.EquivalenceSelfLink
 			}
+			if a.Equivalence != "" {
+				addSource(a, "equivalence", SourceMM)
+			}
 			if f.Output {
 				a.Output = true
 			}
@@ -445,6 +472,9 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// is safe even where magic-modules is wrong, because a value
 			// Google does return is believed (gcprov.carryInputOnly).
 			a.InputOnly = (a.InputOnly || f.IgnoreRead) && !a.Output
+			if f.IgnoreRead && a.InputOnly {
+				addSource(a, "input_only", SourceMM)
+			}
 			// A set-typed list may come back reordered. Without this the
 			// reconciler treats every list as ordered, so a pure reordering
 			// reads as drift and the plan never converges — the exact failure
@@ -465,6 +495,10 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// an opaque future failure into an attributable one.
 			if a.Output && a.Required {
 				a.Required = false
+				// Whoever said output is who overruled it.
+				for _, src := range a.Sources["output"] {
+					overrule(a, "required", src)
+				}
 				// The generator's own stderr, not the plugin's: gen-gcp is a
 				// build-time tool, so this ends up as a line a human reads in the
 				// regeneration output, next to the warnings file. Collected here
@@ -513,6 +547,9 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 			// equivalence is its elements' (a backend service's healthChecks,
 			// a list of references).
 			elem := &catalog.Attr{Canonical: name, Kind: KindOf(prop.Items), Equivalence: a.Equivalence}
+			for _, src := range a.Sources["equivalence"] {
+				addSource(elem, "equivalence", src)
+			}
 			if prop.Items.Type == "object" && len(prop.Items.Properties) > 0 {
 				// Same nil-aliases reasoning as the object branch above: no path
 				// notation exists to curate an alias for an array element's field.
