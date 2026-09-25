@@ -177,7 +177,7 @@ func missingRequiredQuery(t *testing.T, ty *catalog.Type, reqs []gcpfake.Request
 		var best *discoMethod
 		for i := range all[ty.Service] {
 			m := &all[ty.Service][i]
-			if m.verb == r.Method && m.pattern.MatchString(r.Path) && (best == nil || m.literals > best.literals) {
+			if m.verb == r.Method && m.pattern.MatchString(r.SentPath) && (best == nil || m.literals > best.literals) {
 				best = m
 			}
 		}

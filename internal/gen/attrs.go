@@ -467,6 +467,18 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 		// diff_suppress covers every such field, and an image, instance or
 		// snapshot whose immutable key name drifted planned its own
 		// replacement for ever.
+		// An image written as a family is answered with the image the family
+		// pointed at, and gcp.image's sourceImage is immutable: every plan
+		// after the create proposed replacing the image (live, 2026-09-25).
+		// The generator's own rule, from that observation.
+		if name == "sourceImage" {
+			if a.Equivalence != "" {
+				overrule(a, "equivalence", SourceDefault)
+			} else {
+				addSource(a, "equivalence", SourceDefault)
+			}
+			a.Equivalence = catalog.EquivalenceImage
+		}
 		if name == "kmsKeyName" && strings.Contains(prop.Description, "cryptoKeyVersions") {
 			if a.Equivalence != "" && a.Equivalence != catalog.EquivalenceKMSKey {
 				overrule(a, "equivalence", SourceDiscovery)

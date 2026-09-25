@@ -760,4 +760,9 @@ const (
 	// each carries. From Discovery's own CustomerEncryptionKey text: "The
 	// fully-qualifed key name may be returned for resource GET requests".
 	EquivalenceKMSKey = "kms_key"
+	// EquivalenceImage: an image family and an image in it. A resource
+	// created from ".../images/family/debian-12" is answered with the image
+	// the family pointed at, ".../images/debian-12-bookworm-v20260910"; the
+	// same rule Terraform's DiskImageDiffSuppress applies.
+	EquivalenceImage = "image"
 )

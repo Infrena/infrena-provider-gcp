@@ -1098,3 +1098,26 @@ func TestAKMSKeyIsTheSameKeyWithItsVersion(t *testing.T) {
 		}
 	}
 }
+
+// TestAnImageFamilyIsTheImageItPointsAt. gcp.image's sourceImage is
+// immutable, and an image created from a family is answered with the image
+// the family resolved to: every plan proposed replacing it (live,
+// 2026-09-25).
+func TestAnImageFamilyIsTheImageItPointsAt(t *testing.T) {
+	fam := "projects/debian-cloud/global/images/family/debian-12"
+	for _, c := range []struct {
+		want, got string
+		same      bool
+	}{
+		{fam, "https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-12-bookworm-v20260910", true},
+		{fam, "projects/debian-cloud/global/images/debian-12", true},
+		{fam, "projects/debian-cloud/global/images/debian-11-bullseye-v20260910", false},
+		{fam, "projects/other/global/images/debian-12-bookworm-v20260910", false},
+		{"projects/p/global/images/mine", "https://www.googleapis.com/compute/v1/projects/p/global/images/mine", true},
+		{"projects/p/global/images/mine", "projects/p/global/images/other", false},
+	} {
+		if got := equivalent(catalog.EquivalenceImage, c.want, c.got); got != c.same {
+			t.Errorf("equivalent(image, %q, %q) = %v, want %v", c.want, c.got, got, c.same)
+		}
+	}
+}

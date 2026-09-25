@@ -51,8 +51,14 @@ type apiErrorSpec struct {
 type Request struct {
 	Method string
 	Path   string
-	Query  url.Values
-	Body   []byte
+	// SentPath is the path as the client sent it, escapes intact. Path is
+	// Go's decoded form, in which "projects%2Fp" (one escaped segment, a
+	// 404 from Google) and "projects/p" look the same: a log scope create
+	// whose bound parent was escaped passed here and failed live
+	// (2026-09-25).
+	SentPath string
+	Query    url.Values
+	Body     []byte
 }
 
 // Server is the fake. Zero value is not usable; construct with New.
@@ -314,7 +320,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	s.requests = append(s.requests, Request{
-		Method: r.Method, Path: r.URL.Path, Query: r.URL.Query(), Body: bodyBytes,
+		Method: r.Method, Path: r.URL.Path, SentPath: r.URL.EscapedPath(), Query: r.URL.Query(), Body: bodyBytes,
 	})
 	failed := s.failNext
 	s.failNext = nil
@@ -665,7 +671,7 @@ func (s *Server) respondMutation(w http.ResponseWriter, r *http.Request, path st
 	style, styleFor := s.opStyle, s.styleFor
 	s.mu.Unlock()
 	if styleFor != nil {
-		if own, ok := styleFor(r.Method, r.URL.Path); ok {
+		if own, ok := styleFor(r.Method, r.URL.EscapedPath()); ok {
 			style = own
 		}
 	}

@@ -433,7 +433,7 @@ func listedAttributes(ty *catalog.Type, id string, body map[string]any) map[stri
 	for k, v := range schemaAttrs(ty.Attributes, body) {
 		attrs[k] = v
 	}
-	return attrs
+	return declaredOnly(ty, attrs)
 }
 
 // idAttributes recovers what a provider id's own hierarchy encodes, keyed by

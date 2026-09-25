@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -153,7 +154,7 @@ func (p *Provider) bestEffortState(ctx context.Context, ty *catalog.Type, desire
 	return &resource.ResourceState{
 		Type:       ty.Name,
 		ProviderID: id,
-		Attributes: attrs,
+		Attributes: declaredOnly(ty, attrs),
 	}, nil
 }
 
@@ -480,8 +481,33 @@ func (p *Provider) stateFrom(ctx context.Context, ty *catalog.Type, current *res
 	return &resource.ResourceState{
 		Type:       current.Type,
 		ProviderID: id,
-		Attributes: attrs,
+		Attributes: declaredOnly(ty, attrs),
 	}, nil
+}
+
+// undeclaredSeen keeps declaredOnly's warning to one line per type and field.
+var undeclaredSeen sync.Map
+
+// declaredOnly drops every top-level attribute the type's schema does not
+// declare. The host REFUSES a state carrying one and fails the operation, so
+// a field Google added after the pinned Discovery document failed every
+// create of the type -- after Google had created the resource, which is the
+// orphan Create must never produce. Spanner started answering an instance
+// with resourceLocation, and a live create failed on it (2026-09-25). Nothing
+// is lost that the schema could hold; the field is named on stderr once, so
+// the next Discovery refresh is a known need rather than a surprise.
+func declaredOnly(ty *catalog.Type, attrs map[string]value.Value) map[string]value.Value {
+	for name := range attrs {
+		if _, ok := ty.Attributes[name]; ok {
+			continue
+		}
+		if _, dup := undeclaredSeen.LoadOrStore(ty.Name+"."+name, true); !dup {
+			fmt.Fprintf(os.Stderr, "gcp: %s: Google answered with %q, which this catalog does not declare; "+
+				"leaving it out of state\n", ty.Name, name)
+		}
+		delete(attrs, name)
+	}
+	return attrs
 }
 
 // Delete removes the resource. A 404 -- before or after the delete call --
