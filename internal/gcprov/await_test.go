@@ -555,10 +555,14 @@ func TestEveryOperationURLTheRuntimeBuildsAddressesAnOperation(t *testing.T) {
 // own API answers one.
 func pollPathTheRuntimeWouldRequest(p *Provider, ty *catalog.Type) (string, error) {
 	// The kind that polls: a type whose create answers synchronously can
-	// still poll for its delete (gcp.sslcert, gcp.keyring).
+	// still poll for its delete (gcp.sslcert, gcp.keyring) or its update
+	// (gcp.appprofile, gcp.bigtableadmin.table).
 	kind := ty.Await
 	if kind == catalog.AwaitNone {
 		kind = ty.DeleteAwaitKind()
+	}
+	if kind == catalog.AwaitNone {
+		kind = ty.UpdateAwaitKind()
 	}
 	switch kind {
 	case catalog.AwaitComputeOperation:

@@ -950,7 +950,7 @@ func (p *Provider) clearBeforeDelete(ctx context.Context, ty *catalog.Type, curr
 		if err != nil {
 			return fmt.Errorf("gcp: %s: clearing %s before the delete: %w", ty.Name, f, err)
 		}
-		if _, err := p.await(ctx, ty, resp); err != nil {
+		if _, err := p.awaitAs(ctx, ty, ty.UpdateAwaitKind(), resp); err != nil {
 			return fmt.Errorf("gcp: %s: clearing %s before the delete: %w", ty.Name, f, err)
 		}
 	}

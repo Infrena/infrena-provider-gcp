@@ -161,28 +161,34 @@ func TestEveryCreatableTypeRoundTripsAgainstTheFake(t *testing.T) {
 		}
 	})
 	sort.Strings(failures)
-	// The two types the fake cannot stand in for, each for a reason that is
-	// about the fake or an open question, not a defect found here.
+	// The types the fake cannot stand in for, each for a reason that is
+	// about the fake or the harness, not a defect found here.
 	known := map[string]string{
 		// A binding's parent must be a real resource's full name, which the
 		// round trip cannot invent; the live suite covers tag bindings.
 		"gcp.tagbinding": "read after create finds nothing",
-		// Creates by POST to the table's own path (magic-modules' base_url is
-		// an item path, from a YAML Terraform never runs). The fake stores it
-		// under the item; whether Google accepts it is a live question.
-		"gcp.bigquery.table": "has more segments than",
 		// Its id ends {name}/{type}, and Google refuses a record set with no
 		// type before creating anything, so the missing id is the harness's
 		// minimal configuration, not an orphan.
 		"gcp.resourcerecordset": `needs "type"`,
 	}
 	var unexpected []string
+	seen := map[string]bool{}
 	for _, f := range failures {
 		name, _, _ := strings.Cut(f, ": ")
 		if want, ok := known[name]; ok && strings.Contains(f, want) {
+			seen[name] = true
 			continue
 		}
 		unexpected = append(unexpected, f)
+	}
+	// An exception that no longer fails is stale, and a stale one would
+	// hide the next real failure of that type. BigQuery's table sat here
+	// after the fix that made it pass.
+	for name := range known {
+		if !seen[name] {
+			unexpected = append(unexpected, name+": listed as a known exception but round-tripped cleanly; remove it")
+		}
 	}
 	failures = unexpected
 	if path := os.Getenv("GCP_ROUNDTRIP_REPORT"); path != "" {
