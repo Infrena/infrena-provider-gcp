@@ -127,12 +127,27 @@ func equivalent(rule, want, got string) bool {
 		return want != "" && lastSegment(want) == lastSegment(got)
 	case catalog.EquivalenceCase:
 		return strings.EqualFold(want, got)
+	case catalog.EquivalenceKMSKey:
+		// Only the version Google appended is dropped: a configuration that
+		// names a version means that version.
+		if withoutKeyVersion(want) != want {
+			return equivalent(catalog.EquivalenceSelfLink, want, got)
+		}
+		return equivalent(catalog.EquivalenceSelfLink, want, withoutKeyVersion(got))
 	case catalog.EquivalenceDuration:
 		w, errW := time.ParseDuration(want)
 		g, errG := time.ParseDuration(got)
 		return errW == nil && errG == nil && w == g
 	}
 	return false
+}
+
+// withoutKeyVersion drops a trailing "/cryptoKeyVersions/<n>".
+func withoutKeyVersion(s string) string {
+	if i := strings.Index(s, "/cryptoKeyVersions/"); i >= 0 && !strings.Contains(s[i+len("/cryptoKeyVersions/"):], "/") {
+		return s[:i]
+	}
+	return s
 }
 
 // fromProjects is a resource path from its "projects/" segment on, which is
@@ -238,9 +253,52 @@ func (r reconciler) attrs(attrs map[string]*catalog.Attr, reference, incoming ma
 	for name, a := range attrs {
 		if carried, ok := r.carryInputOnly(a, reference[name], incoming, name); ok {
 			out[name] = carried
+		} else if carried, ok := r.carryOmittedZero(reference[name], incoming, name); ok {
+			out[name] = carried
 		}
 	}
 	return out
+}
+
+// carryOmittedZero reports a configured zero value -- false, 0, "", an empty
+// list or map -- that the answer left out, as configured. proto3 JSON never
+// writes a field at its default, so Google's answer to `enable: false` has no
+// `enable` at all, and reported missing it was drift on every plan against a
+// resource exactly as configured (a replacement where the field is
+// immutable). alloydb's Instance decoder exists only to put these back.
+//
+// Only a zero: a configured true that comes back absent is a real
+// difference. Not inside an unordered list, where the reference element may
+// be a sibling.
+func (r reconciler) carryOmittedZero(ref value.Value, in map[string]value.Value, name string) (value.Value, bool) {
+	if r.unmatched || !isZero(ref) {
+		return value.Value{}, false
+	}
+	if _, answered := in[name]; answered {
+		return value.Value{}, false
+	}
+	return ref, true
+}
+
+func isZero(v value.Value) bool {
+	if !v.Known {
+		return false
+	}
+	switch raw := v.Raw.(type) {
+	case bool:
+		return !raw
+	case int64:
+		return raw == 0
+	case float64:
+		return raw == 0
+	case string:
+		return raw == ""
+	case []value.Value:
+		return len(raw) == 0
+	case map[string]value.Value:
+		return len(raw) == 0
+	}
+	return false
 }
 
 // carryInputOnly is the whole of input-only handling: a field the API never
@@ -284,6 +342,8 @@ func (r reconciler) object(attr *catalog.Attr, reference, incoming value.Value) 
 		v, found := in[name]
 		if !found {
 			if carried, ok := r.carryInputOnly(field, ref[name], in, name); ok {
+				out[name] = carried
+			} else if carried, ok := r.carryOmittedZero(ref[name], in, name); ok && hasRef {
 				out[name] = carried
 			}
 			continue

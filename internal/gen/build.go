@@ -335,7 +335,7 @@ func Build(in Inputs) (*Result, error) {
 		}
 		if restricted, says := restrictedPatch(b.p.col); restricted {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name, says})
-		} else if b.p.mm != nil && b.p.mm.Immutable && b.p.col.Methods["patch"] != nil && len(b.t.Setters) == 0 {
+		} else if b.p.mm != nil && b.p.mm.Immutable && patchMethodOf(b.p.col) != nil && len(b.t.Setters) == 0 {
 			unpatchable = append(unpatchable, Unpatchable{b.t.Name,
 				"magic-modules marks the resource immutable and names no field it patches"})
 		}
@@ -1040,7 +1040,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// the API's spelling of that address through self_link. See
 	// templateAddressesMethod for why magic-modules' spelling cannot be kept.
 	if (t.UpdateVerb == "" || t.UpdateVerb == http.MethodPatch) &&
-		(t.UpdateURL == "" || templateAddressesMethod(t.UpdateURL, col.Methods["patch"])) {
+		(t.UpdateURL == "" || templateAddressesMethod(t.UpdateURL, patchMethodOf(col))) {
 		if wrapper, maskField := discoveredUpdateWrapper(doc, col); wrapper != "" {
 			if restricted, _ := restrictedPatch(col); !restricted || overlay.Patchable[name] != nil {
 				t.UpdateVerb, t.UpdateWrapper, t.UpdateMaskField = http.MethodPatch, wrapper, maskField
@@ -1208,6 +1208,19 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		t.UpdateVerb, t.UpdateURL, t.UpdateMask = "", "", false
 		setTypeSource(t, "update_verb", SourceDiscovery, lost+SourceMM)
 		setTypeSource(t, "update_mask", SourceDiscovery, lost+SourceMM)
+	}
+	// A mask the API requires is sent whoever declared the verb.
+	// magic-modules declares Certificate Manager's TrustConfig PATCH with no
+	// update_mask, and trustConfigs.patch says of updateMask "Required.":
+	// every update went without one (found 2026-09-25).
+	if t.UpdateVerb == http.MethodPatch && !t.UpdateMask && t.UpdateWrapper == "" {
+		if pm := patchMethodOf(col); pm != nil {
+			if p := pm.Parameters["updateMask"]; p != nil && p.Location == "query" &&
+				disco.Behaviors(&disco.Schema{Description: p.Description})[disco.BehaviorRequired] {
+				t.UpdateMask = true
+				setTypeSource(t, "update_mask", SourceDiscovery)
+			}
+		}
 	}
 	if del := discoveredDeleteURL(t, col); del != t.DeleteURL {
 		t.DeleteURL = del
@@ -1455,6 +1468,16 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// token (compute's NodeGroup: "?initialNodeCount=PRE_CREATE_REPLACE_ME").
 	// Shipped, every create would send the token itself. Refused until the
 	// generator can fill that parameter.
+	// The runtime deletes with DELETE and nothing else, and a 404 from the
+	// wrong verb reads as already gone: a POST :destroy or a PUT of a default
+	// policy sent as DELETE would report a resource deleted while it stays.
+	// Refused until the runtime can send the API's own verb (2026-09-25).
+	if mm != nil && !mm.ExcludeDelete && mm.DeleteVerb != "" && !strings.EqualFold(mm.DeleteVerb, http.MethodDelete) {
+		return nil, fmt.Errorf("magic-modules deletes it with %s, and this provider sends only DELETE", mm.DeleteVerb)
+	}
+	if del := col.Methods["delete"]; del != nil && del.HTTPMethod != http.MethodDelete {
+		return nil, fmt.Errorf("its delete method is a %s, and this provider sends only DELETE", del.HTTPMethod)
+	}
 	if strings.Contains(t.CreateURL, "PRE_CREATE_REPLACE_ME") {
 		return nil, fmt.Errorf("create url %q carries a token magic-modules' pre_create hook replaces, "+
 			"which this provider cannot fill", t.CreateURL)
@@ -2380,7 +2403,7 @@ func idTemplateFromDelete(col disco.Collection) string {
 // the fields Google will not patch as ForceNew in gen/overlay.yaml, so each
 // field gets the behaviour the API actually gives it. Not done yet.
 func discoveredUpdate(col disco.Collection, updateURL string) (verb string, masked bool) {
-	patch := col.Methods["patch"]
+	patch := patchMethodOf(col)
 	get := col.Methods["get"]
 	if patch == nil || get == nil || patch.HTTPMethod != "PATCH" {
 		return "", false

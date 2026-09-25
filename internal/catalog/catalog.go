@@ -754,4 +754,10 @@ const (
 	EquivalenceCase = "case"
 	// EquivalenceDuration: the same length of time ("10s" and "10.000s").
 	EquivalenceDuration = "duration"
+	// EquivalenceKMSKey: the same Cloud KMS key, with or without the key
+	// version Google appends when it answers
+	// (".../cryptoKeys/k/cryptoKeyVersions/1"), and however much of the path
+	// each carries. From Discovery's own CustomerEncryptionKey text: "The
+	// fully-qualifed key name may be returned for resource GET requests".
+	EquivalenceKMSKey = "kms_key"
 )

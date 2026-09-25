@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -1957,5 +1958,76 @@ func TestThePatchMethodIsFoundByVerbAndAddress(t *testing.T) {
 	del := &disco.Method{HTTPMethod: "DELETE", Path: get.Path}
 	if got := patchMethodOf(disco.Collection{Methods: map[string]*disco.Method{"get": get, "delete": del}}); got != nil {
 		t.Errorf("patchMethodOf found %v in a collection with no PATCH", got)
+	}
+}
+
+// TestATypeDeletedWithAnotherVerbIsRefused. The runtime deletes with DELETE
+// and nothing else, and a 404 from the wrong verb reads as already gone: a
+// KMS key version's POST :destroy, or binary authorization's PUT of the
+// default policy, sent as DELETE would report a resource deleted while it
+// stays live.
+func TestATypeDeletedWithAnotherVerbIsRefused(t *testing.T) {
+	for _, c := range []struct {
+		what                string
+		schemaEdit, mmExtra string
+		ships               bool
+	}{
+		{"the control, deleted with DELETE", "", "", true},
+		{"a Discovery delete that is a POST", `"httpMethod": "DELETE"`, "", false},
+		{"a magic-modules delete_verb", "", "delete_verb: POST\n", false},
+	} {
+		dir := t.TempDir()
+		schemas := filepath.Join(dir, "schemas")
+		products := filepath.Join(dir, "mmv1", "products", "tiny")
+		for _, d := range []string{schemas, products} {
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		schema, err := os.ReadFile("testdata/frozen-schema.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.schemaEdit != "" {
+			if !bytes.Contains(schema, []byte(c.schemaEdit)) {
+				t.Fatalf("%s: the fixture no longer has %s", c.what, c.schemaEdit)
+			}
+			schema = bytes.Replace(schema, []byte(c.schemaEdit), []byte(`"httpMethod": "POST"`), 1)
+		}
+		if err := os.WriteFile(filepath.Join(schemas, "tiny.json"), schema, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		yaml, err := os.ReadFile("testdata/Frozen.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		yaml = append(yaml, []byte(c.mmExtra)...)
+		if err := os.WriteFile(filepath.Join(products, "Frozen.yaml"), yaml, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		overlay := filepath.Join(dir, "overlay.yaml")
+		ruling := "rulings:\n  tiny/Frozen:\n    hooks: []\n    read_via: list_by_parent\n    all_force_new: true\n" +
+			"    note: the fixture has no get.\naliases: {}\ndiscover_default: []\n"
+		if err := os.WriteFile(overlay, []byte(ruling), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Build(Inputs{SchemaDir: schemas, MMV1Dir: filepath.Join(dir, "mmv1", "products"),
+			OverlayPath: overlay, LockPath: filepath.Join(dir, "names.lock.json")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := res.Catalog.Type("gcp.frozen"); ok != c.ships {
+			t.Errorf("%s: gcp.frozen shipped = %v, want %v", c.what, ok, c.ships)
+		}
+		if c.ships {
+			continue
+		}
+		var said bool
+		for _, w := range res.Warnings {
+			said = said || strings.Contains(w.Reason, "sends only DELETE")
+		}
+		if !said {
+			t.Errorf("%s: refused without saying why", c.what)
+		}
 	}
 }

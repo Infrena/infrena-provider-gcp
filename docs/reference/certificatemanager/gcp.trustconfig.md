@@ -21,7 +21,7 @@ TrustConfig represents a resource that represents your Public Key Infrastructure
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/trustConfigs?trustConfigId={{name}}` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}` |
-| Update | yes | `PATCH projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}` |
+| Update | yes | `PATCH projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}`, with an update mask naming the changed fields |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/trustConfigs/{{name}}` |
 | Import | yes | by id, see below |
 

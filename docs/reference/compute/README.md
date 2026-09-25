@@ -30,7 +30,7 @@
 | [`gcp.interconnect`](gcp.interconnect.md) | yes | yes | yes | Represents an Interconnect resource. |
 | [`gcp.interconnectattachmentgroup`](gcp.interconnectattachmentgroup.md) | yes | yes | yes | An interconnect attachment group resource allows customers to create, analyze, and expand highly available deployments. |
 | [`gcp.interconnectgroup`](gcp.interconnectgroup.md) | yes | yes | yes | An interconnect group resource allows customers to create, analyze, and expand their redundant connections. |
-| [`gcp.licens`](gcp.licens.md) | yes | **no** | yes | Represents a License resource. |
+| [`gcp.licens`](gcp.licens.md) | yes | yes | yes | Represents a License resource. |
 | [`gcp.network`](gcp.network.md) | yes | yes | yes | Manages a VPC network or legacy network resource on GCP. |
 | [`gcp.networkattachment`](gcp.networkattachment.md) | yes | yes | yes | A network attachment is a resource that lets a producer Virtual Private Cloud (VPC) network initiate connections to a consumer VPC network … |
 | [`gcp.networkedgesecurityservice`](gcp.networkedgesecurityservice.md) | yes | yes | yes | Google Cloud Armor network edge security service resource. |
