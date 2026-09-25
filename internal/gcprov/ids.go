@@ -2,6 +2,7 @@ package gcprov
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -55,6 +56,12 @@ func ProviderID(ty *catalog.Type, body map[string]any, attrs map[string]value.Va
 	// After wireAliases, so a placeholder an attribute fills under its wire
 	// spelling (rrsets' {type}, the schema's type_value) counts as filled.
 	aliased := wireAliases(ty.Attributes, merged)
+	if id, ok := bareCaptureID(ty, aliased); ok {
+		return id, nil
+	}
+	if id, ok := nameInOwnCollection(ty, body, aliased); ok {
+		return id, nil
+	}
 	fillLastFromName(ty.SelfLink, aliased)
 	rel, err := ExpandURL(ty.SelfLink, aliased)
 	if err != nil {
@@ -75,6 +82,12 @@ var lastPlaceholderRE = regexp.MustCompile(`\{\{?\+?([A-Za-z0-9_]+)\}?\}$`)
 func fillLastFromName(tmpl string, merged map[string]value.Value) {
 	m := lastPlaceholderRE.FindStringSubmatch(tmpl)
 	if m == nil || m[1] == "name" {
+		return
+	}
+	// Only when the template does not name `name` itself: then the last
+	// placeholder is something else of the resource's (a record set's
+	// {type}, after its {name}), and filling it with the name invents an id.
+	if strings.Contains(tmpl, "{name}") || strings.Contains(tmpl, "{{name}}") || strings.Contains(tmpl, "{+name}") {
 		return
 	}
 	if v, ok := merged[m[1]]; ok && v.Known {
@@ -133,7 +146,45 @@ func nameIsAlreadyTheID(ty *catalog.Type, body map[string]any) (string, bool) {
 	if _, err := parseAgainstTemplate(ty, ty.SelfLink, name); err != nil {
 		return "", false
 	}
+	// A bare "{+name}" id matches any string, and a one-segment name is not a
+	// full name: a logging sink answers with the short identifier it was
+	// given. See bareCaptureID.
+	if isBareCapture(ty.SelfLink) && !strings.Contains(name, "/") {
+		return "", false
+	}
 	return name, true
+}
+
+// bareCaptureID is the id of a type whose id template is a bare "{+x}" when
+// the value it has for x is only the short name: the create collection it was
+// made in, and the name. A logging sink is configured and answered as
+// "my-sink" and read at projects/p/sinks/my-sink; read at "my-sink" it was
+// never found (fake round trip, 2026-09-24).
+func bareCaptureID(ty *catalog.Type, attrs map[string]value.Value) (string, bool) {
+	if !isBareCapture(ty.SelfLink) {
+		return "", false
+	}
+	ph := strings.TrimSuffix(strings.TrimPrefix(ty.SelfLink, "{+"), "}")
+	v, ok := attrs[ph]
+	if !ok {
+		v, ok = attrs["name"]
+	}
+	name, isString := v.Raw.(string)
+	if !ok || !v.Known || !isString || name == "" || strings.Contains(name, "/") {
+		return "", false
+	}
+	coll, _, _ := strings.Cut(ty.CreateTemplate(), "?")
+	// A PUT create is sent to the resource's own address (Pub/Sub's
+	// "{+name}"), so there is no collection to put the name in: the value
+	// IS the id, however short.
+	if isBareCapture(coll) || normalizeTemplateShape(coll) == normalizeTemplateShape(ty.SelfLink) {
+		return "", false
+	}
+	rel, err := ExpandURL(strings.TrimSuffix(coll, "/"), attrs)
+	if err != nil || strings.Contains(rel, "{") {
+		return "", false
+	}
+	return rel + "/" + name, true
 }
 
 // reduceSelfLink turns an ABSOLUTE selfLink GCP answered with (scheme, host
@@ -244,8 +295,51 @@ func ParseProviderID(ty *catalog.Type, id string) (map[string]value.Value, error
 		if firstErr == nil {
 			firstErr = err
 		}
+		if attrs, ok := parseThroughBindings(ty, tmpl, id); ok {
+			return attrs, nil
+		}
 	}
 	return nil, firstErr
+}
+
+// parseThroughBindings parses an id against a template whose placeholders
+// have create bindings, with each binding's own template put in its place,
+// and then fills the bound placeholder back in. An address group's id
+// template is "{{parent}}/locations/{{location}}/addressGroups/{{name}}" and
+// its id "projects/p/locations/r/addressGroups/g": parent is two segments,
+// and a placeholder captures one, so no id of six types ever parsed. Read,
+// update, delete and import all start there.
+func parseThroughBindings(ty *catalog.Type, tmpl, id string) (map[string]value.Value, bool) {
+	expanded, used := tmpl, false
+	for name, b := range ty.CreateBindings {
+		if b.Template == "" {
+			continue
+		}
+		for _, spelling := range []string{"{{" + name + "}}", "{" + name + "}", "{{%" + name + "}}"} {
+			if strings.Contains(expanded, spelling) {
+				expanded, used = strings.ReplaceAll(expanded, spelling, b.Template), true
+			}
+		}
+	}
+	if !used {
+		return nil, false
+	}
+	attrs, err := parseAgainstTemplate(ty, expanded, id)
+	if err != nil {
+		return nil, false
+	}
+	for name, b := range ty.CreateBindings {
+		if b.Template == "" {
+			continue
+		}
+		if rel, err := ExpandURL(b.Template, attrs); err == nil {
+			if u, err := url.PathUnescape(rel); err == nil {
+				rel = u
+			}
+			attrs[name] = value.String(rel, value.SourceProvider)
+		}
+	}
+	return attrs, true
 }
 
 // importTemplates lists every id shape ParseProviderID accepts for ty:
@@ -304,7 +398,13 @@ func parseAgainstTemplate(ty *catalog.Type, tmpl, id string) (map[string]value.V
 		if j >= len(idSegs) {
 			return nil, fmt.Errorf("gcprov: %q is too short for %s", id, ty.Name)
 		}
-		out[name] = value.String(idSegs[j], value.SourceProvider)
+		// One segment of an id is one escaped value: ExpandURL wrote a
+		// metric named "a/b" as "a%2Fb", and the name is "a/b".
+		v := idSegs[j]
+		if u, err := url.PathUnescape(v); err == nil {
+			v = u
+		}
+		out[name] = value.String(v, value.SourceProvider)
 		i, j = i+1, j+1
 	}
 	if j != len(idSegs) {
@@ -320,7 +420,8 @@ func parseAgainstTemplate(ty *catalog.Type, tmpl, id string) (map[string]value.V
 // "{+x}" form, which captures the rest of the path rather than one segment.
 func parsePlaceholderSegment(seg string) (name string, reserved, ok bool) {
 	if strings.HasPrefix(seg, "{{") && strings.HasSuffix(seg, "}}") && len(seg) > 4 {
-		return seg[2 : len(seg)-2], false, true
+		// {{%name}} is the url-escaped form; see ExpandURL.
+		return strings.TrimPrefix(seg[2:len(seg)-2], "%"), false, true
 	}
 	if strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}") && len(seg) > 2 {
 		inner := seg[1 : len(seg)-1]
@@ -398,4 +499,32 @@ func fromRaw(raw any) value.Value {
 	default:
 		return value.String(fmt.Sprint(v), value.SourceProvider)
 	}
+}
+
+// nameInOwnCollection returns the answered name as the id when it is a full
+// name directly inside the collection this type creates in. An address
+// group's id template is "{{parent}}/locations/{{location}}/addressGroups/
+// {{name}}", which cannot parse "projects/p/locations/r/addressGroups/g"
+// ({{parent}} is one segment there), so the full name was escaped into the
+// {{name}} slot and the group was read at an address that does not exist.
+func nameInOwnCollection(ty *catalog.Type, body map[string]any, attrs map[string]value.Value) (string, bool) {
+	name, _ := body["name"].(string)
+	if !strings.Contains(name, "/") {
+		return "", false
+	}
+	coll, _, _ := strings.Cut(ty.CreateTemplate(), "?")
+	rel, err := ExpandURL(strings.TrimSuffix(coll, "/"), attrs)
+	if err != nil {
+		return "", false
+	}
+	// Compared unescaped: a {{parent}} placeholder expands escaped
+	// ("projects%2Fp"), and Google's name spells it plainly.
+	if u, err := url.PathUnescape(rel); err == nil {
+		rel = u
+	}
+	rest, ok := strings.CutPrefix(name, rel+"/")
+	if !ok || rest == "" || strings.Contains(rest, "/") {
+		return "", false
+	}
+	return name, true
 }

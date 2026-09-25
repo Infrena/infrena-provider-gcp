@@ -1254,7 +1254,7 @@ func TestOnlyThisResourcesOwnNameIsShortened(t *testing.T) {
 		"projects/p/locations/r/gadgets/one":         "projects/p/locations/r/gadgets/one",
 	} {
 		attrs := map[string]value.Value{"name": value.String(full, value.SourceProvider)}
-		shortNameFromOwnID(ty, "projects/p/locations/r/widgets/one", attrs)
+		shortNameFromOwnID(ty, "projects/p/locations/r/widgets/one", attrs, value.Value{})
 		if got, _ := attrs["name"].Raw.(string); got != want {
 			t.Errorf("%s: got %q, want %q", full, got, want)
 		}
@@ -1269,7 +1269,7 @@ func TestAFullPathNameIsLeftAlone(t *testing.T) {
 	job := &catalog.Type{SelfLink: "projects/{{project}}/jobs/{{name}}", Attributes: map[string]*catalog.Attr{"name": {Kind: value.KindString, Output: true}}}
 	for _, ty := range []*catalog.Type{topic, job} {
 		attrs := map[string]value.Value{"name": value.String("projects/p/x/one", value.SourceProvider)}
-		shortNameFromOwnID(ty, "projects/p/x/one", attrs)
+		shortNameFromOwnID(ty, "projects/p/x/one", attrs, value.Value{})
 		if got, _ := attrs["name"].Raw.(string); got != "projects/p/x/one" {
 			t.Errorf("self_link %q: name shortened to %q", ty.SelfLink, got)
 		}
@@ -1321,5 +1321,82 @@ func TestACreateAnsweredWithoutASelfLinkStillHasAnID(t *testing.T) {
 	}
 	if st.ProviderID != "projects/p/locations/r/widgets/two" {
 		t.Errorf("provider id = %q, want projects/p/locations/r/widgets/two", st.ProviderID)
+	}
+}
+
+// TestTheNameFillsOnlyAPlaceholderThatStandsForIt. A record set's id ends
+// {name}/{type}; with type unset the id is unknown, and filling {type} with
+// the name read the record set at .../rrsets/www/www.
+func TestTheNameFillsOnlyAPlaceholderThatStandsForIt(t *testing.T) {
+	merged := map[string]value.Value{"name": value.String("www", value.SourceExplicit)}
+	fillLastFromName("projects/{project}/managedZones/{managedZone}/rrsets/{name}/{type}", merged)
+	if _, filled := merged["type"]; filled {
+		t.Errorf("{type} was filled with the name: %v", merged["type"].Raw)
+	}
+	fillLastFromName("projects/{project}/policies/{policy}", merged)
+	if merged["policy"].Raw != "www" {
+		t.Errorf("{policy} = %v, want the name", merged["policy"].Raw)
+	}
+}
+
+// TestABareCaptureIDIsBuiltFromAShortName. A logging sink's id template is
+// "{+sinkName}", its full name, and it is configured and answered as the
+// short "my-sink": read at "my-sink" it was never found. A full name is used
+// as it is.
+func TestABareCaptureIDIsBuiltFromAShortName(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.logging.sink", SelfLink: "{+sinkName}", CreateURL: "projects/{{project}}/sinks",
+		Attributes: map[string]*catalog.Attr{"name": {Canonical: "name", Kind: value.KindString}}}
+	s := func(v string) value.Value { return value.String(v, value.SourceExplicit) }
+	id, err := ProviderID(ty, map[string]any{"name": "my-sink"}, map[string]value.Value{"project": s("p"), "name": s("my-sink")})
+	if err != nil || id != "projects/p/sinks/my-sink" {
+		t.Errorf("id = %q, %v; want projects/p/sinks/my-sink", id, err)
+	}
+	id, err = ProviderID(ty, map[string]any{"name": "projects/p/sinks/other"}, map[string]value.Value{"project": s("p")})
+	if err != nil || id != "projects/p/sinks/other" {
+		t.Errorf("a full name as the id: %q, %v", id, err)
+	}
+}
+
+// TestABareCaptureNameIsShortenedOnlyWhenConfiguredShort. A certificate
+// issuance config is configured short and answered in full; a Cloud Tasks
+// queue must be configured in full. Shortening the queue's name would be the
+// drift the rule exists to prevent.
+func TestABareCaptureNameIsShortenedOnlyWhenConfiguredShort(t *testing.T) {
+	ty := &catalog.Type{SelfLink: "{+name}", Attributes: map[string]*catalog.Attr{"name": {Canonical: "name", Kind: value.KindString}}}
+	s := func(v string) value.Value { return value.String(v, value.SourceExplicit) }
+	full := "projects/p/locations/l/configs/c"
+	for _, c := range []struct {
+		ref  value.Value
+		want string
+	}{
+		{s("c"), "c"},
+		{s(full), full},
+		{value.Value{}, full},
+	} {
+		attrs := map[string]value.Value{"name": s(full)}
+		shortNameFromOwnID(ty, full, attrs, c.ref)
+		if attrs["name"].Raw != c.want {
+			t.Errorf("configured %v: name reported %v, want %q", c.ref.Raw, attrs["name"].Raw, c.want)
+		}
+	}
+}
+
+// TestAnIDWhoseTemplateStartsWithABoundParentParses. An address group's id
+// template starts {{parent}}, bound at create to projects/{project}, and its
+// ids are projects/p/locations/r/addressGroups/g: parent is two segments,
+// a placeholder captures one, and no such id ever parsed, so the type could
+// be created and never read, updated or deleted.
+func TestAnIDWhoseTemplateStartsWithABoundParentParses(t *testing.T) {
+	ty := &catalog.Type{Name: "gcp.networksecurity.addressgroup",
+		SelfLink:       "{{parent}}/locations/{{location}}/addressGroups/{{name}}",
+		CreateBindings: map[string]*catalog.CreateBinding{"parent": {Template: "projects/{project}"}}}
+	got, err := ParseProviderID(ty, "projects/p/locations/r/addressGroups/g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range map[string]string{"parent": "projects/p", "location": "r", "name": "g", "project": "p"} {
+		if got[k].Raw != want {
+			t.Errorf("%s = %v, want %q", k, got[k].Raw, want)
+		}
 	}
 }
