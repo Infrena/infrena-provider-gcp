@@ -29,7 +29,7 @@ import (
 // the config itself, not a wrapper naming the field).
 func discoveredSetters(d *disco.Document, col disco.Collection, mm *mmv1.Resource, t *catalog.Type) []catalog.Setter {
 	if mm == nil {
-		return nil
+		return labelsSetter(d, col, t, nil)
 	}
 	selfLink, attrs := t.SelfLink, t.Attributes
 	byCanonical := map[string]*catalog.Attr{}
@@ -103,8 +103,43 @@ func discoveredSetters(d *disco.Document, col disco.Collection, mm *mmv1.Resourc
 		sort.Strings(s.Fields)
 		out = append(out, s)
 	}
+	out = labelsSetter(d, col, t, out)
 	sort.Slice(out, func(i, j int) bool { return out[i].Method < out[j].Method })
 	return out
+}
+
+// labelsSetter adds compute's setLabels from Discovery alone, when nothing
+// else covers labels. magic-modules names a labels update_url where it has a
+// resource, and two shipped types have none: a target VPN gateway and a
+// regional snapshot both publish setLabels and had no labels setter, so a
+// label change REPLACED them -- for the snapshot, its data (found triaging
+// the unknowns, 2026-09-25). Admitted only where the method's request is
+// exactly labels plus labelFingerprint, the same test as any other setter.
+func labelsSetter(d *disco.Document, col disco.Collection, t *catalog.Type, out []catalog.Setter) []catalog.Setter {
+	for _, s := range out {
+		for _, f := range s.Fields {
+			if f == "labels" {
+				return out
+			}
+		}
+	}
+	if a := t.Attributes["labels"]; a == nil || a.Output {
+		return out
+	}
+	m := setterMethod(col, "setLabels", http.MethodPost)
+	if m == nil || m.Request == nil {
+		return out
+	}
+	path := setterPath(strings.TrimPrefix(m.Path, t.PathPrefix), "setLabels", t.SelfLink)
+	if path == "" {
+		return out
+	}
+	req, err := d.Resolve(d.Schemas[m.Request.Ref])
+	if err != nil || req == nil || !requestIsExactly(req, []string{"labels"}, "labelFingerprint") {
+		return out
+	}
+	return append(out, catalog.Setter{Method: "setLabels", Path: path, Verb: http.MethodPost,
+		Fields: []string{"labels"}, Lock: "labelFingerprint"})
 }
 
 // setterMethod finds the collection's method called method, with the given
@@ -191,7 +226,11 @@ func applySetters(t *catalog.Type, mm *mmv1.Resource) {
 		return
 	}
 	mmOutput := map[string]bool{}
-	for _, f := range mm.Properties {
+	var props []*mmv1.Field
+	if mm != nil {
+		props = mm.Properties
+	}
+	for _, f := range props {
 		name := f.Name
 		if f.ApiName != "" {
 			name = f.ApiName

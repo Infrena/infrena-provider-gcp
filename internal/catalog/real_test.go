@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -1153,5 +1154,45 @@ func TestTheCatalogKeepsItsRules(t *testing.T) {
 			}
 		}
 		walk("", ty.Attributes)
+	}
+}
+
+// TestALabelChangeNeverReplacesWhereGooglePublishesSetLabels. A target VPN
+// gateway and a regional snapshot publish setLabels but had no magic-modules
+// resource to name it, so a label change REPLACED them -- the snapshot with
+// its data (found 2026-09-25). Against the committed Discovery digest: a type
+// with settable labels whose own address has a setLabels method must change
+// labels in place.
+func TestALabelChangeNeverReplacesWhereGooglePublishesSetLabels(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", "gen", "methods.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	shape := regexp.MustCompile(`\{\{?[^}]+\}?\}`)
+	norm := func(p string) string { return shape.ReplaceAllString(p, "*") }
+	published := map[string]bool{} // service + normalized item address
+	for _, line := range strings.Split(string(data), "\n") {
+		f := strings.Split(line, "\t")
+		if len(f) == 6 && f[1] == "POST" && strings.HasSuffix(f[2], "/setLabels") {
+			published[f[0]+" "+norm(strings.TrimSuffix(f[2], "/setLabels"))] = true
+		}
+	}
+	checked := 0
+	for _, ty := range c.Types {
+		a := ty.Attributes["labels"]
+		if a == nil || a.Output || !published[ty.Service+" "+norm(ty.SelfLink)] {
+			continue
+		}
+		checked++
+		if ty.SetterFor("labels") == nil && ty.UpdateVerb == "" {
+			t.Errorf("%s publishes setLabels but a label change replaces it", ty.Name)
+		}
+	}
+	if checked < 15 {
+		t.Errorf("only %d types matched a setLabels method; the digest or the matching broke", checked)
 	}
 }
