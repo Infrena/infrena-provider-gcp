@@ -87,3 +87,17 @@ func TestOutputOnlyReadsPastTheFirstTag(t *testing.T) {
 		t.Error("prose mentioning output-only was read as a declaration")
 	}
 }
+
+// TestATagAfterADeprecationNoticeIsRead. compute's CustomerEncryptionKey
+// sha256 puts "[Output only]" after a deprecation notice, and read only from
+// the start it was settable on every disk, image and snapshot key. A
+// deprecation notice with no tag behind it gives nothing.
+func TestATagAfterADeprecationNoticeIsRead(t *testing.T) {
+	out := Behaviors(&Schema{Description: "[DEPRECATED] CSEK is no longer supported. Use CMEK instead. [Output only] The RFC 4648 base64 encoded SHA-256 hash."})
+	if !out[BehaviorOutputOnly] {
+		t.Errorf("behaviours %v, want output only", out)
+	}
+	if got := Behaviors(&Schema{Description: "[DEPRECATED] Use foo instead. The size."}); len(got) != 0 {
+		t.Errorf("a deprecation notice alone gave %v", got)
+	}
+}
