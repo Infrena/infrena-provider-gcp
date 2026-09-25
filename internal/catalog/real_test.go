@@ -381,16 +381,22 @@ func eachAttributeLevel(c *Catalog, fn func(where string, level map[string]*Attr
 // asserts the set is not empty, and it reports its size so a change of
 // strategy is visible in the failure rather than inferred from a later bug.
 //
-// Measured 2026-09-22: 306 renamed attributes across 56 of 233 types, 7 of
-// them Required, at depths up to 9; 263 of the 306 sit inside a list. The
-// floors are well below those so that ordinary drift in Google's own
-// Discovery documents does not trip them.
+// Measured 2026-09-25: 26 renamed attributes, 8 of them Required, every one
+// at the top level. Until that day every nested keyword was renamed too (306
+// on 2026-09-22, 820 by 2026-09-25), which the host never needed: it
+// reserves `type`, `provider` and `lifecycle` only among a resource's own
+// keys. A rename anywhere below the top level is now a regression.
 func TestTheCatalogStillRenamesAttributes(t *testing.T) {
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, required, inList := 0, 0, 0
+	topLevel := map[string]bool{}
+	for _, ty := range c.Types {
+		topLevel[ty.Name] = true
+	}
+	total, required := 0, 0
+	var nested []string
 	eachAttributeLevel(c, func(where string, level map[string]*Attr) {
 		for key, a := range level {
 			if a.Canonical == key {
@@ -400,26 +406,27 @@ func TestTheCatalogStillRenamesAttributes(t *testing.T) {
 			if a.Required {
 				required++
 			}
-			if strings.Contains(where, "[]") {
-				inList++
+			if !topLevel[where] {
+				nested = append(nested, where+"."+key)
 			}
 		}
 	})
-	t.Logf("renamed attributes: %d total, %d required, %d inside a list", total, required, inList)
-	if total < 200 {
-		t.Errorf("only %d attributes are renamed; 306 were measured on 2026-09-22, so the "+
+	t.Logf("renamed attributes: %d total, %d required, %d nested", total, required, len(nested))
+	if total < 15 {
+		t.Errorf("only %d attributes are renamed; 26 were measured on 2026-09-25, so the "+
 			"generator's renaming strategy has changed and internal/gcprov/names.go and its "+
 			"tests need revisiting", total)
 	}
 	if required == 0 {
-		t.Errorf("no RENAMED attribute is Required any more (7 were); a create that sends the "+
+		t.Errorf("no RENAMED attribute is Required any more (8 were); a create that sends the "+
 			"wrong name for one of these is the difference between a rejected request and a "+
 			"cosmetic diff, and %d renames remain", total)
 	}
-	if inList == 0 {
-		t.Errorf("no renamed attribute is inside a list any more (263 of 306 were); " +
-			"names.go recurses through Elem specifically for those, and that recursion is now " +
-			"untested by the corpus")
+	if len(nested) != 0 {
+		sort.Strings(nested)
+		t.Errorf("%d renamed attributes are nested, first %s; only a top-level keyword clashes "+
+			"with a resource key, and a nested rename makes users write type_value where "+
+			"every API document says type", len(nested), nested[0])
 	}
 }
 

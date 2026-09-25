@@ -14,8 +14,9 @@ import (
 	"github.com/infrena/infrena/pkg/value"
 )
 
-// keywords are infrena resource keys an attribute may not shadow. A property
-// with one of these names is exposed with "_value" appended.
+// keywords are infrena resource keys a top-level attribute may not shadow. A
+// top-level property with one of these names is exposed with "_value"
+// appended; a nested one keeps its name.
 var keywords = map[string]string{
 	"type":      "type_value",
 	"provider":  "provider_value",
@@ -380,7 +381,10 @@ func buildLevel(d *disco.Document, s *disco.Schema, idx map[string]*mmv1.Field, 
 	out := map[string]*catalog.Attr{}
 	for name, prop := range s.Properties {
 		key := name
-		if renamed, clash := keywords[name]; clash {
+		// Only a top-level attribute shares a map with the resource's own
+		// keys. Below that, `type` is just a field: renaming it there sent
+		// every BigQuery schema field's type to `type_value`.
+		if renamed, clash := keywords[name]; clash && topLevel {
 			key = renamed
 		}
 		a := &catalog.Attr{
