@@ -1086,7 +1086,7 @@ gcp.bigtableadmin.instance		setters	none	default
 gcp.bigtableadmin.instance		timeout	1200	default
 gcp.bigtableadmin.instance		update_await	longrunning	discovery
 gcp.bigtableadmin.instance		update_mask	query	discovery
-gcp.bigtableadmin.instance		update_verb	PATCH	discovery
+gcp.bigtableadmin.instance		update_verb	PATCH	observed+discovery
 gcp.bigtableadmin.instance	clusters	immutable	true	discovery
 gcp.bigtableadmin.instance	createTime	output	true	discovery
 gcp.bigtableadmin.instance	instanceId	immutable	true	discovery
@@ -1462,10 +1462,10 @@ gcp.cloudasset.savedquery	savedQueryId	immutable	true	discovery
 gcp.cloudasset.savedquery	savedQueryId	required	true	discovery
 gcp.cloudresourcemanager.capabilityconfig		clear_before_delete	none	default
 gcp.cloudresourcemanager.capabilityconfig		create_await	longrunning	discovery
-gcp.cloudresourcemanager.capabilityconfig		create_url	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	mm
+gcp.cloudresourcemanager.capabilityconfig		create_url	projects/{project}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	mm
 gcp.cloudresourcemanager.capabilityconfig		create_verb	POST	discovery
 gcp.cloudresourcemanager.capabilityconfig		delete_await	longrunning	discovery
-gcp.cloudresourcemanager.capabilityconfig		delete_url	{{parent}}/capabilityConfigs/{{capability_config_id}}	mm
+gcp.cloudresourcemanager.capabilityconfig		delete_url	projects/{project}/capabilityConfigs/{{capability_config_id}}	mm
 gcp.cloudresourcemanager.capabilityconfig		lock_field	none	default
 gcp.cloudresourcemanager.capabilityconfig		patch_one_field	false	default
 gcp.cloudresourcemanager.capabilityconfig		setters	none	default
@@ -1485,10 +1485,10 @@ gcp.cloudresourcemanager.capabilityconfig	types	unordered	true	mm
 gcp.cloudresourcemanager.capabilityconfig	updateTime	output	true	discovery+mm
 gcp.cloudresourcemanager.folder.capabilityconfig		clear_before_delete	none	default
 gcp.cloudresourcemanager.folder.capabilityconfig		create_await	longrunning	discovery
-gcp.cloudresourcemanager.folder.capabilityconfig		create_url	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	mm
+gcp.cloudresourcemanager.folder.capabilityconfig		create_url	folders/{folder}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	mm
 gcp.cloudresourcemanager.folder.capabilityconfig		create_verb	POST	discovery
 gcp.cloudresourcemanager.folder.capabilityconfig		delete_await	longrunning	discovery
-gcp.cloudresourcemanager.folder.capabilityconfig		delete_url	{{parent}}/capabilityConfigs/{{capability_config_id}}	mm
+gcp.cloudresourcemanager.folder.capabilityconfig		delete_url	folders/{folder}/capabilityConfigs/{{capability_config_id}}	mm
 gcp.cloudresourcemanager.folder.capabilityconfig		lock_field	none	default
 gcp.cloudresourcemanager.folder.capabilityconfig		patch_one_field	false	default
 gcp.cloudresourcemanager.folder.capabilityconfig		setters	none	default
@@ -1500,6 +1500,8 @@ gcp.cloudresourcemanager.folder.capabilityconfig	capability_config_id	immutable	
 gcp.cloudresourcemanager.folder.capabilityconfig	capability_config_id	required	true	mm
 gcp.cloudresourcemanager.folder.capabilityconfig	createTime	output	true	discovery+mm
 gcp.cloudresourcemanager.folder.capabilityconfig	etag	output	true	mm
+gcp.cloudresourcemanager.folder.capabilityconfig	folder	immutable	true	mm
+gcp.cloudresourcemanager.folder.capabilityconfig	folder	required	true	mm
 gcp.cloudresourcemanager.folder.capabilityconfig	managementProject	immutable	true	discovery+mm
 gcp.cloudresourcemanager.folder.capabilityconfig	name	output	true	mm
 gcp.cloudresourcemanager.folder.capabilityconfig	state	output	true	discovery+mm
@@ -1530,10 +1532,10 @@ gcp.cloudresourcemanager.folder.folder	tags	input_only	true	discovery
 gcp.cloudresourcemanager.folder.folder	updateTime	output	true	discovery
 gcp.cloudresourcemanager.organization.capabilityconfig		clear_before_delete	none	default
 gcp.cloudresourcemanager.organization.capabilityconfig		create_await	longrunning	discovery
-gcp.cloudresourcemanager.organization.capabilityconfig		create_url	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	mm
+gcp.cloudresourcemanager.organization.capabilityconfig		create_url	organizations/{organization}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	mm
 gcp.cloudresourcemanager.organization.capabilityconfig		create_verb	POST	discovery
 gcp.cloudresourcemanager.organization.capabilityconfig		delete_await	longrunning	discovery
-gcp.cloudresourcemanager.organization.capabilityconfig		delete_url	{{parent}}/capabilityConfigs/{{capability_config_id}}	mm
+gcp.cloudresourcemanager.organization.capabilityconfig		delete_url	organizations/{organization}/capabilityConfigs/{{capability_config_id}}	mm
 gcp.cloudresourcemanager.organization.capabilityconfig		lock_field	none	default
 gcp.cloudresourcemanager.organization.capabilityconfig		patch_one_field	false	default
 gcp.cloudresourcemanager.organization.capabilityconfig		setters	none	default
@@ -1547,6 +1549,8 @@ gcp.cloudresourcemanager.organization.capabilityconfig	createTime	output	true	di
 gcp.cloudresourcemanager.organization.capabilityconfig	etag	output	true	mm
 gcp.cloudresourcemanager.organization.capabilityconfig	managementProject	immutable	true	discovery+mm
 gcp.cloudresourcemanager.organization.capabilityconfig	name	output	true	mm
+gcp.cloudresourcemanager.organization.capabilityconfig	organization	immutable	true	mm
+gcp.cloudresourcemanager.organization.capabilityconfig	organization	required	true	mm
 gcp.cloudresourcemanager.organization.capabilityconfig	state	output	true	discovery+mm
 gcp.cloudresourcemanager.organization.capabilityconfig	types	required	true	mm
 gcp.cloudresourcemanager.organization.capabilityconfig	types	unordered	true	mm
@@ -1613,6 +1617,7 @@ gcp.compute.instance	disks[].initializeParams.diskType	equivalence	self_link	mm
 gcp.compute.instance	disks[].initializeParams.replicaZones	equivalence	self_link	mm
 gcp.compute.instance	disks[].initializeParams.replicaZones[]	equivalence	self_link	mm
 gcp.compute.instance	disks[].initializeParams.resourceManagerTags	input_only	true	discovery
+gcp.compute.instance	disks[].initializeParams.sourceImage	equivalence	image	default
 gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey	immutable	true	mm
 gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.compute.instance	disks[].initializeParams.sourceImageEncryptionKey.rawKey	sensitive	true	mm
@@ -2683,10 +2688,10 @@ gcp.firewall	targetServiceAccounts	unordered	true	mm
 gcp.firewall	targetTags	unordered	true	mm
 gcp.firewallendpointassociation		clear_before_delete	none	default
 gcp.firewallendpointassociation		create_await	longrunning	discovery
-gcp.firewallendpointassociation		create_url	{{parent}}/locations/{{location}}/firewallEndpointAssociations?firewallEndpointAssociationId={{name}}	mm
+gcp.firewallendpointassociation		create_url	projects/{project}/locations/{{location}}/firewallEndpointAssociations?firewallEndpointAssociationId={{name}}	mm
 gcp.firewallendpointassociation		create_verb	POST	discovery
 gcp.firewallendpointassociation		delete_await	longrunning	discovery
-gcp.firewallendpointassociation		delete_url	{{parent}}/locations/{{location}}/firewallEndpointAssociations/{{name}}	mm
+gcp.firewallendpointassociation		delete_url	projects/{project}/locations/{{location}}/firewallEndpointAssociations/{{name}}	discovery
 gcp.firewallendpointassociation		lock_field	none	default
 gcp.firewallendpointassociation		patch_one_field	false	default
 gcp.firewallendpointassociation		setters	none	default
@@ -3236,7 +3241,7 @@ gcp.image	guestOsFeatures	unordered	true	mm
 gcp.image	guestOsFeatures[].type	required	true	mm
 gcp.image	id	output	true	discovery
 gcp.image	imageEncryptionKey	immutable	true	mm+ruling
-gcp.image	imageEncryptionKey.kmsKeyName	equivalence	kms_key	!mm+discovery
+gcp.image	imageEncryptionKey.kmsKeyName	equivalence	kms_key	!mm+discovery+observed
 gcp.image	imageEncryptionKey.rawKey	input_only	true	mm
 gcp.image	imageEncryptionKey.rawKey	sensitive	true	mm
 gcp.image	imageEncryptionKey.rsaEncryptedKey	input_only	true	mm
@@ -3275,7 +3280,7 @@ gcp.image	sourceDiskEncryptionKey.rawKey	sensitive	true	mm
 gcp.image	sourceDiskEncryptionKey.rsaEncryptedKey	sensitive	true	mm
 gcp.image	sourceDiskEncryptionKey.sha256	output	true	discovery
 gcp.image	sourceDiskId	output	true	discovery
-gcp.image	sourceImage	equivalence	self_link	mm
+gcp.image	sourceImage	equivalence	image	!mm+default+observed
 gcp.image	sourceImage	immutable	true	ruling
 gcp.image	sourceImageEncryptionKey	immutable	true	mm+ruling
 gcp.image	sourceImageEncryptionKey	input_only	true	mm
@@ -3358,6 +3363,7 @@ gcp.instancetemplate	properties.disks[].forceAttach	input_only	true	discovery
 gcp.instancetemplate	properties.disks[].index	output	true	discovery
 gcp.instancetemplate	properties.disks[].initializeParams	input_only	true	discovery
 gcp.instancetemplate	properties.disks[].initializeParams.resourceManagerTags	input_only	true	discovery
+gcp.instancetemplate	properties.disks[].initializeParams.sourceImage	equivalence	image	default
 gcp.instancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.instancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.sha256	output	true	discovery
 gcp.instancetemplate	properties.disks[].initializeParams.sourceSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
@@ -4003,10 +4009,10 @@ gcp.logging.billingaccount.link	linkId	required	true	discovery
 gcp.logging.billingaccount.link	name	output	true	discovery
 gcp.logging.billingaccount.savedquery		clear_before_delete	none	default
 gcp.logging.billingaccount.savedquery		create_await	none	discovery
-gcp.logging.billingaccount.savedquery		create_url	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
+gcp.logging.billingaccount.savedquery		create_url	billingAccounts/{billingAccount}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
 gcp.logging.billingaccount.savedquery		create_verb	POST	discovery
 gcp.logging.billingaccount.savedquery		delete_await	none	discovery
-gcp.logging.billingaccount.savedquery		delete_url	{{parent}}/locations/{{location}}/savedQueries/{{name}}	mm
+gcp.logging.billingaccount.savedquery		delete_url	billingAccounts/{billingAccount}/locations/{{location}}/savedQueries/{{name}}	discovery
 gcp.logging.billingaccount.savedquery		lock_field	none	default
 gcp.logging.billingaccount.savedquery		patch_one_field	false	default
 gcp.logging.billingaccount.savedquery		setters	none	default
@@ -4014,6 +4020,8 @@ gcp.logging.billingaccount.savedquery		timeout	60	default
 gcp.logging.billingaccount.savedquery		update_await	none	discovery
 gcp.logging.billingaccount.savedquery		update_mask	query	mm
 gcp.logging.billingaccount.savedquery		update_verb	PATCH	mm
+gcp.logging.billingaccount.savedquery	billingAccount	immutable	true	mm
+gcp.logging.billingaccount.savedquery	billingAccount	required	true	mm
 gcp.logging.billingaccount.savedquery	createTime	output	true	discovery+mm
 gcp.logging.billingaccount.savedquery	displayName	required	true	mm
 gcp.logging.billingaccount.savedquery	loggingQuery.filter	required	true	mm
@@ -4159,10 +4167,10 @@ gcp.logging.folder.link	linkId	required	true	discovery
 gcp.logging.folder.link	name	output	true	discovery
 gcp.logging.folder.logscope		clear_before_delete	none	default
 gcp.logging.folder.logscope		create_await	none	discovery
-gcp.logging.folder.logscope		create_url	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
+gcp.logging.folder.logscope		create_url	folders/{folder}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
 gcp.logging.folder.logscope		create_verb	POST	discovery
 gcp.logging.folder.logscope		delete_await	none	discovery
-gcp.logging.folder.logscope		delete_url	{{parent}}/locations/{{location}}/logScopes/{{name}}	mm
+gcp.logging.folder.logscope		delete_url	folders/{folder}/locations/{{location}}/logScopes/{{name}}	discovery
 gcp.logging.folder.logscope		lock_field	none	default
 gcp.logging.folder.logscope		patch_one_field	false	default
 gcp.logging.folder.logscope		setters	none	default
@@ -4171,6 +4179,8 @@ gcp.logging.folder.logscope		update_await	none	discovery
 gcp.logging.folder.logscope		update_mask	query	mm
 gcp.logging.folder.logscope		update_verb	PATCH	mm
 gcp.logging.folder.logscope	createTime	output	true	discovery+mm
+gcp.logging.folder.logscope	folder	immutable	true	mm
+gcp.logging.folder.logscope	folder	required	true	mm
 gcp.logging.folder.logscope	logScopeId	immutable	true	discovery
 gcp.logging.folder.logscope	name	equivalence	resource_name	mm
 gcp.logging.folder.logscope	name	immutable	true	mm
@@ -4180,10 +4190,10 @@ gcp.logging.folder.logscope	resourceNames	required	true	mm
 gcp.logging.folder.logscope	updateTime	output	true	discovery+mm
 gcp.logging.folder.savedquery		clear_before_delete	none	default
 gcp.logging.folder.savedquery		create_await	none	discovery
-gcp.logging.folder.savedquery		create_url	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
+gcp.logging.folder.savedquery		create_url	folders/{folder}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
 gcp.logging.folder.savedquery		create_verb	POST	discovery
 gcp.logging.folder.savedquery		delete_await	none	discovery
-gcp.logging.folder.savedquery		delete_url	{{parent}}/locations/{{location}}/savedQueries/{{name}}	mm
+gcp.logging.folder.savedquery		delete_url	folders/{folder}/locations/{{location}}/savedQueries/{{name}}	discovery
 gcp.logging.folder.savedquery		lock_field	none	default
 gcp.logging.folder.savedquery		patch_one_field	false	default
 gcp.logging.folder.savedquery		setters	none	default
@@ -4193,6 +4203,8 @@ gcp.logging.folder.savedquery		update_mask	query	mm
 gcp.logging.folder.savedquery		update_verb	PATCH	mm
 gcp.logging.folder.savedquery	createTime	output	true	discovery+mm
 gcp.logging.folder.savedquery	displayName	required	true	mm
+gcp.logging.folder.savedquery	folder	immutable	true	mm
+gcp.logging.folder.savedquery	folder	required	true	mm
 gcp.logging.folder.savedquery	loggingQuery.filter	required	true	mm
 gcp.logging.folder.savedquery	name	immutable	true	mm
 gcp.logging.folder.savedquery	name	output	true	discovery
@@ -4348,10 +4360,10 @@ gcp.logging.organization.link	linkId	required	true	discovery
 gcp.logging.organization.link	name	output	true	discovery
 gcp.logging.organization.logscope		clear_before_delete	none	default
 gcp.logging.organization.logscope		create_await	none	discovery
-gcp.logging.organization.logscope		create_url	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
+gcp.logging.organization.logscope		create_url	organizations/{organization}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
 gcp.logging.organization.logscope		create_verb	POST	discovery
 gcp.logging.organization.logscope		delete_await	none	discovery
-gcp.logging.organization.logscope		delete_url	{{parent}}/locations/{{location}}/logScopes/{{name}}	mm
+gcp.logging.organization.logscope		delete_url	organizations/{organization}/locations/{{location}}/logScopes/{{name}}	discovery
 gcp.logging.organization.logscope		lock_field	none	default
 gcp.logging.organization.logscope		patch_one_field	false	default
 gcp.logging.organization.logscope		setters	none	default
@@ -4365,14 +4377,16 @@ gcp.logging.organization.logscope	name	equivalence	resource_name	mm
 gcp.logging.organization.logscope	name	immutable	true	mm
 gcp.logging.organization.logscope	name	output	true	discovery
 gcp.logging.organization.logscope	name	required	false	!mm+discovery
+gcp.logging.organization.logscope	organization	immutable	true	mm
+gcp.logging.organization.logscope	organization	required	true	mm
 gcp.logging.organization.logscope	resourceNames	required	true	mm
 gcp.logging.organization.logscope	updateTime	output	true	discovery+mm
 gcp.logging.organization.savedquery		clear_before_delete	none	default
 gcp.logging.organization.savedquery		create_await	none	discovery
-gcp.logging.organization.savedquery		create_url	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
+gcp.logging.organization.savedquery		create_url	organizations/{organization}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
 gcp.logging.organization.savedquery		create_verb	POST	discovery
 gcp.logging.organization.savedquery		delete_await	none	discovery
-gcp.logging.organization.savedquery		delete_url	{{parent}}/locations/{{location}}/savedQueries/{{name}}	mm
+gcp.logging.organization.savedquery		delete_url	organizations/{organization}/locations/{{location}}/savedQueries/{{name}}	discovery
 gcp.logging.organization.savedquery		lock_field	none	default
 gcp.logging.organization.savedquery		patch_one_field	false	default
 gcp.logging.organization.savedquery		setters	none	default
@@ -4387,6 +4401,8 @@ gcp.logging.organization.savedquery	name	immutable	true	mm
 gcp.logging.organization.savedquery	name	output	true	discovery
 gcp.logging.organization.savedquery	name	required	false	!mm+discovery
 gcp.logging.organization.savedquery	opsAnalyticsQuery.sqlQueryText	required	true	mm
+gcp.logging.organization.savedquery	organization	immutable	true	mm
+gcp.logging.organization.savedquery	organization	required	true	mm
 gcp.logging.organization.savedquery	savedQueryId	immutable	true	discovery
 gcp.logging.organization.savedquery	updateTime	output	true	discovery+mm
 gcp.logging.organization.savedquery	visibility	required	true	mm
@@ -4430,10 +4446,10 @@ gcp.logging.organization.view	viewId	immutable	true	discovery
 gcp.logging.organization.view	viewId	required	true	discovery
 gcp.logging.savedquery		clear_before_delete	none	default
 gcp.logging.savedquery		create_await	none	discovery
-gcp.logging.savedquery		create_url	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
+gcp.logging.savedquery		create_url	projects/{project}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	mm
 gcp.logging.savedquery		create_verb	POST	discovery
 gcp.logging.savedquery		delete_await	none	discovery
-gcp.logging.savedquery		delete_url	{{parent}}/locations/{{location}}/savedQueries/{{name}}	mm
+gcp.logging.savedquery		delete_url	projects/{project}/locations/{{location}}/savedQueries/{{name}}	discovery
 gcp.logging.savedquery		lock_field	none	default
 gcp.logging.savedquery		patch_one_field	false	default
 gcp.logging.savedquery		setters	none	default
@@ -4507,17 +4523,17 @@ gcp.logicalview	logicalViewId	required	true	discovery
 gcp.logicalview	name	output	true	discovery
 gcp.logscope		clear_before_delete	none	default
 gcp.logscope		create_await	none	discovery
-gcp.logscope		create_url	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
+gcp.logscope		create_url	projects/{project}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	mm
 gcp.logscope		create_verb	POST	discovery
 gcp.logscope		delete_await	none	discovery
-gcp.logscope		delete_url	{{parent}}/locations/{{location}}/logScopes/{{name}}	mm
+gcp.logscope		delete_url	projects/{project}/locations/{{location}}/logScopes/{{name}}	discovery
 gcp.logscope		lock_field	none	default
 gcp.logscope		patch_one_field	false	default
 gcp.logscope		setters	none	default
 gcp.logscope		timeout	60	default
 gcp.logscope		update_await	none	discovery
 gcp.logscope		update_mask	query	mm
-gcp.logscope		update_verb	PATCH	mm
+gcp.logscope		update_verb	PATCH	observed+mm
 gcp.logscope	createTime	output	true	discovery+mm
 gcp.logscope	logScopeId	immutable	true	discovery
 gcp.logscope	name	equivalence	resource_name	mm
@@ -5130,10 +5146,10 @@ gcp.networkfirewallpolicy	selfLink	output	true	discovery+mm
 gcp.networkfirewallpolicy	selfLinkWithId	output	true	discovery+mm
 gcp.networksecurity.addressgroup		clear_before_delete	none	default
 gcp.networksecurity.addressgroup		create_await	longrunning	discovery
-gcp.networksecurity.addressgroup		create_url	{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}	mm
+gcp.networksecurity.addressgroup		create_url	projects/{project}/locations/{{location}}/addressGroups?addressGroupId={{name}}	mm
 gcp.networksecurity.addressgroup		create_verb	POST	discovery
 gcp.networksecurity.addressgroup		delete_await	longrunning	discovery
-gcp.networksecurity.addressgroup		delete_url	{{parent}}/locations/{{location}}/addressGroups/{{name}}	mm
+gcp.networksecurity.addressgroup		delete_url	projects/{project}/locations/{{location}}/addressGroups/{{name}}	discovery
 gcp.networksecurity.addressgroup		lock_field	none	default
 gcp.networksecurity.addressgroup		patch_one_field	false	default
 gcp.networksecurity.addressgroup		setters	none	default
@@ -5150,10 +5166,10 @@ gcp.networksecurity.addressgroup	type_value	required	true	mm
 gcp.networksecurity.addressgroup	updateTime	output	true	discovery+mm
 gcp.networksecurity.firewallendpoint		clear_before_delete	none	default
 gcp.networksecurity.firewallendpoint		create_await	longrunning	discovery
-gcp.networksecurity.firewallendpoint		create_url	{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	mm
+gcp.networksecurity.firewallendpoint		create_url	projects/{project}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	mm
 gcp.networksecurity.firewallendpoint		create_verb	POST	discovery
 gcp.networksecurity.firewallendpoint		delete_await	longrunning	discovery
-gcp.networksecurity.firewallendpoint		delete_url	{{parent}}/locations/{{location}}/firewallEndpoints/{{name}}	mm
+gcp.networksecurity.firewallendpoint		delete_url	projects/{project}/locations/{{location}}/firewallEndpoints/{{name}}	discovery
 gcp.networksecurity.firewallendpoint		lock_field	none	default
 gcp.networksecurity.firewallendpoint		patch_one_field	false	default
 gcp.networksecurity.firewallendpoint		setters	none	default
@@ -5176,10 +5192,10 @@ gcp.networksecurity.firewallendpoint	state	output	true	discovery+mm
 gcp.networksecurity.firewallendpoint	updateTime	output	true	discovery+mm
 gcp.networksecurity.organization.addressgroup		clear_before_delete	none	default
 gcp.networksecurity.organization.addressgroup		create_await	longrunning	discovery
-gcp.networksecurity.organization.addressgroup		create_url	{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}	mm
+gcp.networksecurity.organization.addressgroup		create_url	organizations/{organization}/locations/{{location}}/addressGroups?addressGroupId={{name}}	mm
 gcp.networksecurity.organization.addressgroup		create_verb	POST	discovery
 gcp.networksecurity.organization.addressgroup		delete_await	longrunning	discovery
-gcp.networksecurity.organization.addressgroup		delete_url	{{parent}}/locations/{{location}}/addressGroups/{{name}}	mm
+gcp.networksecurity.organization.addressgroup		delete_url	organizations/{organization}/locations/{{location}}/addressGroups/{{name}}	discovery
 gcp.networksecurity.organization.addressgroup		lock_field	none	default
 gcp.networksecurity.organization.addressgroup		patch_one_field	false	default
 gcp.networksecurity.organization.addressgroup		setters	none	default
@@ -5191,15 +5207,17 @@ gcp.networksecurity.organization.addressgroup	capacity	immutable	true	mm
 gcp.networksecurity.organization.addressgroup	capacity	required	true	mm
 gcp.networksecurity.organization.addressgroup	createTime	output	true	discovery+mm
 gcp.networksecurity.organization.addressgroup	name	required	true	mm
+gcp.networksecurity.organization.addressgroup	organization	immutable	true	mm
+gcp.networksecurity.organization.addressgroup	organization	required	true	mm
 gcp.networksecurity.organization.addressgroup	selfLink	output	true	discovery
 gcp.networksecurity.organization.addressgroup	type_value	required	true	mm
 gcp.networksecurity.organization.addressgroup	updateTime	output	true	discovery+mm
 gcp.networksecurity.organization.firewallendpoint		clear_before_delete	none	default
 gcp.networksecurity.organization.firewallendpoint		create_await	longrunning	discovery
-gcp.networksecurity.organization.firewallendpoint		create_url	{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	mm
+gcp.networksecurity.organization.firewallendpoint		create_url	organizations/{organization}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	mm
 gcp.networksecurity.organization.firewallendpoint		create_verb	POST	discovery
 gcp.networksecurity.organization.firewallendpoint		delete_await	longrunning	discovery
-gcp.networksecurity.organization.firewallendpoint		delete_url	{{parent}}/locations/{{location}}/firewallEndpoints/{{name}}	mm
+gcp.networksecurity.organization.firewallendpoint		delete_url	organizations/{organization}/locations/{{location}}/firewallEndpoints/{{name}}	discovery
 gcp.networksecurity.organization.firewallendpoint		lock_field	none	default
 gcp.networksecurity.organization.firewallendpoint		patch_one_field	false	default
 gcp.networksecurity.organization.firewallendpoint		setters	none	default
@@ -5215,6 +5233,8 @@ gcp.networksecurity.organization.firewallendpoint	createTime	output	true	discove
 gcp.networksecurity.organization.firewallendpoint	endpointSettings.jumboFramesEnabled	immutable	true	discovery+mm
 gcp.networksecurity.organization.firewallendpoint	name	immutable	true	discovery+mm
 gcp.networksecurity.organization.firewallendpoint	name	required	true	mm
+gcp.networksecurity.organization.firewallendpoint	organization	immutable	true	mm
+gcp.networksecurity.organization.firewallendpoint	organization	required	true	mm
 gcp.networksecurity.organization.firewallendpoint	reconciling	output	true	discovery+mm
 gcp.networksecurity.organization.firewallendpoint	satisfiesPzi	output	true	discovery
 gcp.networksecurity.organization.firewallendpoint	satisfiesPzs	output	true	discovery
@@ -5222,10 +5242,10 @@ gcp.networksecurity.organization.firewallendpoint	state	output	true	discovery+mm
 gcp.networksecurity.organization.firewallendpoint	updateTime	output	true	discovery+mm
 gcp.networksecurity.organization.securityprofile		clear_before_delete	none	default
 gcp.networksecurity.organization.securityprofile		create_await	longrunning	discovery
-gcp.networksecurity.organization.securityprofile		create_url	{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	mm
+gcp.networksecurity.organization.securityprofile		create_url	organizations/{organization}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	mm
 gcp.networksecurity.organization.securityprofile		create_verb	POST	discovery
 gcp.networksecurity.organization.securityprofile		delete_await	longrunning	discovery
-gcp.networksecurity.organization.securityprofile		delete_url	{{parent}}/locations/{{location}}/securityProfiles/{{name}}	mm
+gcp.networksecurity.organization.securityprofile		delete_url	organizations/{organization}/locations/{{location}}/securityProfiles/{{name}}	discovery
 gcp.networksecurity.organization.securityprofile		lock_field	none	default
 gcp.networksecurity.organization.securityprofile		patch_one_field	false	default
 gcp.networksecurity.organization.securityprofile		setters	none	default
@@ -5240,6 +5260,8 @@ gcp.networksecurity.organization.securityprofile	customMirroringProfile.mirrorin
 gcp.networksecurity.organization.securityprofile	etag	output	true	discovery+mm
 gcp.networksecurity.organization.securityprofile	name	immutable	true	discovery+mm
 gcp.networksecurity.organization.securityprofile	name	required	true	mm
+gcp.networksecurity.organization.securityprofile	organization	immutable	true	mm
+gcp.networksecurity.organization.securityprofile	organization	required	true	mm
 gcp.networksecurity.organization.securityprofile	threatPreventionProfile.antivirusOverrides	unordered	true	mm
 gcp.networksecurity.organization.securityprofile	threatPreventionProfile.antivirusOverrides[].action	required	true	mm
 gcp.networksecurity.organization.securityprofile	threatPreventionProfile.antivirusOverrides[].protocol	required	true	mm
@@ -5258,10 +5280,10 @@ gcp.networksecurity.organization.securityprofile	urlFilteringProfile.urlFilters[
 gcp.networksecurity.organization.securityprofile	urlFilteringProfile.urlFilters[].priority	required	true	mm
 gcp.networksecurity.organization.securityprofilegroup		clear_before_delete	none	default
 gcp.networksecurity.organization.securityprofilegroup		create_await	longrunning	discovery
-gcp.networksecurity.organization.securityprofilegroup		create_url	{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	mm
+gcp.networksecurity.organization.securityprofilegroup		create_url	organizations/{organization}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	mm
 gcp.networksecurity.organization.securityprofilegroup		create_verb	POST	discovery
 gcp.networksecurity.organization.securityprofilegroup		delete_await	longrunning	discovery
-gcp.networksecurity.organization.securityprofilegroup		delete_url	{{parent}}/locations/{{location}}/securityProfileGroups/{{name}}	mm
+gcp.networksecurity.organization.securityprofilegroup		delete_url	organizations/{organization}/locations/{{location}}/securityProfileGroups/{{name}}	discovery
 gcp.networksecurity.organization.securityprofilegroup		lock_field	none	default
 gcp.networksecurity.organization.securityprofilegroup		patch_one_field	false	default
 gcp.networksecurity.organization.securityprofilegroup		setters	none	default
@@ -5274,6 +5296,8 @@ gcp.networksecurity.organization.securityprofilegroup	dataPathId	output	true	dis
 gcp.networksecurity.organization.securityprofilegroup	etag	output	true	discovery+mm
 gcp.networksecurity.organization.securityprofilegroup	name	immutable	true	discovery+mm
 gcp.networksecurity.organization.securityprofilegroup	name	required	true	mm
+gcp.networksecurity.organization.securityprofilegroup	organization	immutable	true	mm
+gcp.networksecurity.organization.securityprofilegroup	organization	required	true	mm
 gcp.networksecurity.organization.securityprofilegroup	updateTime	output	true	discovery+mm
 gcp.networksecurity.rule		clear_before_delete	none	default
 gcp.networksecurity.rule		create_await	longrunning	discovery
@@ -5293,10 +5317,10 @@ gcp.networksecurity.rule	name	immutable	true	discovery
 gcp.networksecurity.rule	updateTime	output	true	discovery
 gcp.networksecurity.securityprofile		clear_before_delete	none	default
 gcp.networksecurity.securityprofile		create_await	longrunning	discovery
-gcp.networksecurity.securityprofile		create_url	{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	mm
+gcp.networksecurity.securityprofile		create_url	projects/{project}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	mm
 gcp.networksecurity.securityprofile		create_verb	POST	discovery
 gcp.networksecurity.securityprofile		delete_await	longrunning	discovery
-gcp.networksecurity.securityprofile		delete_url	{{parent}}/locations/{{location}}/securityProfiles/{{name}}	mm
+gcp.networksecurity.securityprofile		delete_url	projects/{project}/locations/{{location}}/securityProfiles/{{name}}	discovery
 gcp.networksecurity.securityprofile		lock_field	none	default
 gcp.networksecurity.securityprofile		patch_one_field	false	default
 gcp.networksecurity.securityprofile		setters	none	default
@@ -5329,10 +5353,10 @@ gcp.networksecurity.securityprofile	urlFilteringProfile.urlFilters[].filteringAc
 gcp.networksecurity.securityprofile	urlFilteringProfile.urlFilters[].priority	required	true	mm
 gcp.networksecurity.securityprofilegroup		clear_before_delete	none	default
 gcp.networksecurity.securityprofilegroup		create_await	longrunning	discovery
-gcp.networksecurity.securityprofilegroup		create_url	{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	mm
+gcp.networksecurity.securityprofilegroup		create_url	projects/{project}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	mm
 gcp.networksecurity.securityprofilegroup		create_verb	POST	discovery
 gcp.networksecurity.securityprofilegroup		delete_await	longrunning	discovery
-gcp.networksecurity.securityprofilegroup		delete_url	{{parent}}/locations/{{location}}/securityProfileGroups/{{name}}	mm
+gcp.networksecurity.securityprofilegroup		delete_url	projects/{project}/locations/{{location}}/securityProfileGroups/{{name}}	discovery
 gcp.networksecurity.securityprofilegroup		lock_field	none	default
 gcp.networksecurity.securityprofilegroup		patch_one_field	false	default
 gcp.networksecurity.securityprofilegroup		setters	none	default
@@ -5978,7 +6002,7 @@ gcp.redis.instance		setters	none	default
 gcp.redis.instance		timeout	1200	default
 gcp.redis.instance		update_await	longrunning	discovery
 gcp.redis.instance		update_mask	query	mm
-gcp.redis.instance		update_verb	PATCH	mm
+gcp.redis.instance		update_verb	PATCH	observed+mm
 gcp.redis.instance	alternativeLocationId	immutable	true	mm
 gcp.redis.instance	authorizedNetwork	equivalence	self_link	mm
 gcp.redis.instance	authorizedNetwork	immutable	true	mm
@@ -6334,6 +6358,7 @@ gcp.regioninstancetemplate	properties.disks[].forceAttach	input_only	true	discov
 gcp.regioninstancetemplate	properties.disks[].index	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams	input_only	true	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams.resourceManagerTags	input_only	true	discovery
+gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceImage	equivalence	image	default
 gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceImageEncryptionKey.sha256	output	true	discovery
 gcp.regioninstancetemplate	properties.disks[].initializeParams.sourceSnapshotEncryptionKey.kmsKeyName	equivalence	kms_key	discovery
@@ -7529,7 +7554,7 @@ gcp.spanner.backupschedule		setters	none	default
 gcp.spanner.backupschedule		timeout	60	default
 gcp.spanner.backupschedule		update_await	none	discovery
 gcp.spanner.backupschedule		update_mask	query	mm
-gcp.spanner.backupschedule		update_verb	PATCH	mm
+gcp.spanner.backupschedule		update_verb	PATCH	observed+mm
 gcp.spanner.backupschedule	database	immutable	true	mm
 gcp.spanner.backupschedule	database	required	true	mm
 gcp.spanner.backupschedule	encryptionConfig.encryptionType	required	true	mm
@@ -7554,7 +7579,7 @@ gcp.spanner.instance		patch_one_field	false	default
 gcp.spanner.instance		setters	none	default
 gcp.spanner.instance		timeout	1200	default
 gcp.spanner.instance		update_await	longrunning	discovery
-gcp.spanner.instance		update_mask	body:fieldMask	discovery
+gcp.spanner.instance		update_mask	body:fieldMask	observed+discovery
 gcp.spanner.instance		update_verb	PATCH	discovery
 gcp.spanner.instance	autoscalingConfig.asymmetricAutoscalingOptions[].overrides	required	true	mm
 gcp.spanner.instance	autoscalingConfig.asymmetricAutoscalingOptions[].replicaSelection	required	true	mm
@@ -8465,7 +8490,7 @@ gcp.trustconfig		patch_one_field	false	default
 gcp.trustconfig		setters	none	default
 gcp.trustconfig		timeout	1200	default
 gcp.trustconfig		update_await	longrunning	discovery
-gcp.trustconfig		update_mask	query	discovery
+gcp.trustconfig		update_mask	query	observed+discovery
 gcp.trustconfig		update_verb	PATCH	mm
 gcp.trustconfig	allowlistedCertificates[].pemCertificate	required	true	mm
 gcp.trustconfig	createTime	output	true	discovery+mm
@@ -8959,7 +8984,7 @@ gcp.workflow		setters	none	default
 gcp.workflow		timeout	1200	default
 gcp.workflow		update_await	longrunning	discovery
 gcp.workflow		update_mask	query	mm
-gcp.workflow		update_verb	PATCH	mm
+gcp.workflow		update_verb	PATCH	observed+mm
 gcp.workflow	allKmsKeys	output	true	discovery
 gcp.workflow	allKmsKeysVersions	output	true	discovery
 gcp.workflow	createTime	output	true	discovery+mm

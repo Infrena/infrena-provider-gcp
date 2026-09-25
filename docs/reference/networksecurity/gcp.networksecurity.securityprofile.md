@@ -19,10 +19,10 @@ A security profile defines the behavior associated to a profile type.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/securityProfiles/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/securityProfiles/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/securityProfiles/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/securityProfiles/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/securityProfiles/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/securityProfiles/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

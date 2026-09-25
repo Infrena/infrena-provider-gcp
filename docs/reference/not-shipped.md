@@ -25,9 +25,9 @@ So a type listed under "unruled wire hooks" below is not impossible. It is unwri
 | [magic-modules marks the resource immutable and names no field it patches](#magic-modules-marks-the-resource-immutable-and-names-no-field-it-patches) | 4 |
 | [no get method](#no-get-method) | 2 |
 | [reference to gcp.servertlspolicy.selfLink dropped](#reference-to-gcpservertlspolicyselflink-dropped) | 1 |
-| [shipped, but cannot be created](#shipped-but-cannot-be-created) | 64 |
+| [shipped, but cannot be created](#shipped-but-cannot-be-created) | 53 |
 
-**331** types did not ship. **64** more ship without a create.
+**331** types did not ship. **53** more ship without a create.
 
 ## no insert or create method
 
@@ -436,8 +436,6 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.bigtableadmin.cluster` | `{+parent}/clusters?clusterId={{clusterId}}` | instance |
 | `gcp.bigtableadmin.table` | `{+parent}/tables` | instance |
 | `gcp.cloudasset.savedquery` | `{+parent}/savedQueries?savedQueryId={{savedQueryId}}` | parent |
-| `gcp.cloudresourcemanager.folder.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | folder |
-| `gcp.cloudresourcemanager.organization.capabilityconfig` | `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` | organization |
 | `gcp.config` | `{+parent}/configs` | api |
 | `gcp.credential` | `{+parent}/credentials` | oauthClient |
 | `gcp.feed` | `{+parent}/feeds` | parent |
@@ -451,22 +449,17 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.logging.billingaccount.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | billingAccount |
 | `gcp.logging.billingaccount.exclusion` | `{+parent}/exclusions` | billingAccount |
 | `gcp.logging.billingaccount.link` | `{+parent}/links?linkId={{linkId}}` | billingAccount, bucket |
-| `gcp.logging.billingaccount.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | billingAccount |
 | `gcp.logging.billingaccount.sink` | `{+parent}/sinks` | billingAccount |
 | `gcp.logging.billingaccount.view` | `{+parent}/views?viewId={{viewId}}` | billingAccount, bucket |
 | `gcp.logging.folder.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | folder |
 | `gcp.logging.folder.exclusion` | `{+parent}/exclusions` | folder |
 | `gcp.logging.folder.link` | `{+parent}/links?linkId={{linkId}}` | bucket, folder |
-| `gcp.logging.folder.logscope` | `{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}` | folder |
-| `gcp.logging.folder.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | folder |
 | `gcp.logging.folder.sink` | `{+parent}/sinks` | folder |
 | `gcp.logging.folder.view` | `{+parent}/views?viewId={{viewId}}` | bucket, folder |
 | `gcp.logging.link` | `{+parent}/links?linkId={{linkId}}` | bucket |
 | `gcp.logging.organization.bucket` | `{+parent}/buckets?bucketId={{bucketId}}` | organization |
 | `gcp.logging.organization.exclusion` | `{+parent}/exclusions` | organization |
 | `gcp.logging.organization.link` | `{+parent}/links?linkId={{linkId}}` | bucket, organization |
-| `gcp.logging.organization.logscope` | `{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}` | organization |
-| `gcp.logging.organization.savedquery` | `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` | organization |
 | `gcp.logging.organization.sink` | `{+parent}/sinks` | organization |
 | `gcp.logging.organization.view` | `{+parent}/views?viewId={{viewId}}` | bucket, organization |
 | `gcp.logging.view` | `{+parent}/views?viewId={{viewId}}` | bucket |
@@ -474,10 +467,6 @@ These types **are** in the reference. They read, import, discover and delete. Wh
 | `gcp.managedidentity` | `{+parent}/managedIdentities` | namespace, workloadIdentityPool |
 | `gcp.materializedview` | `{+parent}/materializedViews?materializedViewId={{materializedViewId}}` | instance |
 | `gcp.namespace` | `{+parent}/namespaces` | workloadIdentityPool |
-| `gcp.networksecurity.organization.addressgroup` | `{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}` | organization |
-| `gcp.networksecurity.organization.firewallendpoint` | `{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}` | organization |
-| `gcp.networksecurity.organization.securityprofile` | `{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}` | organization |
-| `gcp.networksecurity.organization.securityprofilegroup` | `{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}` | organization |
 | `gcp.networksecurity.rule` | `{+parent}/rules` | gatewaySecurityPolicy |
 | `gcp.osconfig.folder.policyorchestrator` | `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` | folder |
 | `gcp.osconfig.organization.policyorchestrator` | `{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}` | organization |
