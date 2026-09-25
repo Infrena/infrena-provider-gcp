@@ -26,6 +26,17 @@ func TestARulingThatRulesOnNothingIsRefused(t *testing.T) {
 // directory name here would silently reproduce the exact bug ProductAliases
 // exists to fix: matchResource would just never find anything through it,
 // with nothing telling anyone that happened.
+// TestARulingThatOnlyCorrectsAFactIsAccepted. BigQuery's Table has no hooks
+// and one wrong flag (requirePartitionFilter marked output); a ruling that
+// only says settable rules on something.
+func TestARulingThatOnlyCorrectsAFactIsAccepted(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "overlay.yaml")
+	os.WriteFile(path, []byte("rulings:\n  bigquery/Table:\n    hooks: []\n    settable: [requirePartitionFilter]\n    note: a flag magic-modules has wrong\n"), 0o644)
+	if _, err := LoadOverlay(path, t.TempDir()); err != nil {
+		t.Fatalf("a ruling that corrects a fact was refused: %v", err)
+	}
+}
+
 func TestAProductAliasNamingAMissingDirectoryIsRefused(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "overlay.yaml")

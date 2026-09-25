@@ -144,8 +144,12 @@ func LoadOverlay(path, mmv1Dir string) (*Overlay, error) {
 		if r.Note == "" {
 			return nil, fmt.Errorf("%s: ruling %q has no note; a ruling with no reasoning is a rubber stamp", path, key)
 		}
-		if len(r.Hooks) == 0 && r.ReadVia == "" {
-			return nil, fmt.Errorf("%s: ruling %q names no hooks and no read_via, so it rules on nothing", path, key)
+		// A ruling may also only correct a fact (a field magic-modules marks
+		// output that Discovery calls settable), with no hooks to name.
+		corrects := r.AllForceNew || len(r.ClearBeforeDelete) > 0 || len(r.Required) > 0 ||
+			len(r.Settable) > 0 || len(r.InPlace) > 0 || len(r.SendWithUpdate) > 0
+		if len(r.Hooks) == 0 && r.ReadVia == "" && !corrects {
+			return nil, fmt.Errorf("%s: ruling %q names no hooks, no read_via and no fact to correct, so it rules on nothing", path, key)
 		}
 	}
 	for name, p := range o.Patchable {
