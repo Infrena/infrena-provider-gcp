@@ -131,14 +131,17 @@ func TestAPatchWithNoUpdateMaskParameterIsStillUpdatable(t *testing.T) {
 	}
 }
 
-// TestAPutOnlyCollectionStaysNonUpdatable is the guard that makes the whole
-// change safe, and it is not a detail. BuildMask emits a PARTIAL body -- only
-// the attributes that changed. PUT replaces the resource with the body it is
-// given, so sending a partial body to a PUT endpoint clears every field the
-// diff left out. compute's instances collection publishes `update` (PUT) and no
-// patch at all, so a derivation that accepted PUT would quietly start wiping
-// virtual machines.
-func TestAPutOnlyCollectionStaysNonUpdatable(t *testing.T) {
+// TestAPutOnlyCollectionUpdatesWithPut. BuildMask emits a PARTIAL body, and
+// a PUT replaces the resource with the body it is given, so this used to be
+// refused: sent as it stood, a PUT would clear every field the diff left out.
+// Refused, eleven types -- Cloud SQL users, log metrics, monitoring groups --
+// were REPLACED on every change instead. Since 2026-09-25 (James's decision)
+// the runtime reads the resource fresh and sends it whole with the change
+// written in, and TestAPutUpdateCarriesWhatDidNotChange (gcprov) is the guard
+// against the wipe this test used to prevent. compute's instances collection
+// also publishes a PUT update; magic-modules marks Instance immutable, which
+// still clears it.
+func TestAPutOnlyCollectionUpdatesWithPut(t *testing.T) {
 	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
 	if err != nil {
 		t.Fatal(err)
@@ -147,8 +150,8 @@ func TestAPutOnlyCollectionStaysNonUpdatable(t *testing.T) {
 	if !ok {
 		t.Fatalf("gcp.putonly missing; catalog has %d types", len(res.Catalog.Types))
 	}
-	if ty.UpdateVerb != "" {
-		t.Errorf("UpdateVerb = %q, want empty: a PUT takes a whole resource and BuildMask sends a diff", ty.UpdateVerb)
+	if ty.UpdateVerb != "PUT" || ty.UpdateMask {
+		t.Errorf("UpdateVerb = %q, UpdateMask = %v; want PUT and no mask: the whole resource is sent", ty.UpdateVerb, ty.UpdateMask)
 	}
 }
 

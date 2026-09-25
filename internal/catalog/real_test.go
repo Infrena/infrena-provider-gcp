@@ -1101,8 +1101,16 @@ func TestTheCatalogKeepsItsRules(t *testing.T) {
 	}
 	ph := regexp.MustCompile(`\{\{?\+?%?([A-Za-z0-9_]+)\}?\}`)
 	for _, ty := range c.Types {
-		if ty.UpdateVerb != "" && ty.UpdateVerb != "PATCH" {
-			t.Errorf("%s: update verb %q; the update is PATCH or nothing", ty.Name, ty.UpdateVerb)
+		switch ty.UpdateVerb {
+		case "", "PATCH":
+		case "PUT":
+			// A PUT sends the whole resource, read fresh (gcprov.Update):
+			// there is no mask to send and no envelope to build.
+			if ty.UpdateMask || ty.UpdateWrapper != "" || ty.UpdateMaskField != "" {
+				t.Errorf("%s: a PUT update with a mask or an envelope", ty.Name)
+			}
+		default:
+			t.Errorf("%s: update verb %q; the update is PATCH, PUT from a fresh read, or nothing", ty.Name, ty.UpdateVerb)
 		}
 		for _, tmpl := range []string{ty.CreateURL, ty.BaseURL, ty.UpdateURL, ty.DeleteURL, ty.SelfLink} {
 			if strings.Contains(tmpl, "PRE_CREATE_REPLACE_ME") {

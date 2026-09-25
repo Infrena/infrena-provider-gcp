@@ -21,7 +21,7 @@ User workloads Secret used by Airflow tasks that run with Kubernetes executor or
 | --- | --- | --- |
 | Create | **no** | the create url `{+parent}/userWorkloadsSecrets` needs `environment`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
 | Read | yes | `GET {+name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT {+name}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE {+name}` |
 | Import | yes | by id, see below |
 

@@ -21,7 +21,7 @@ Describes an autoscaling policy for Dataproc cluster autoscaler.
 | --- | --- | --- |
 | Create | yes | `POST projects/{{project}}/locations/{{location}}/autoscalingPolicies` |
 | Read | yes | `GET projects/{{project}}/locations/{{location}}/autoscalingPolicies/{{policy_id}}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{{project}}/locations/{{location}}/autoscalingPolicies/{{policy_id}}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{{project}}/locations/{{location}}/autoscalingPolicies/{{policy_id}}` |
 | Import | yes | by id, see below |
 

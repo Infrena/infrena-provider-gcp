@@ -1395,3 +1395,7 @@ observed:
     - fact: patch_one_field
       value: "false"
       seen: 2026-09-25 TestLiveProbeUnknowns
+  gcp.logging.metric:
+    - fact: update_verb
+      value: PUT
+      seen: 2026-09-25 TestLiveLogMetricUpdatesByPut

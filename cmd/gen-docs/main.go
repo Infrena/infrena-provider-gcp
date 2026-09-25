@@ -262,6 +262,9 @@ func renderType(t *catalog.Type) string {
 	updateHow := ""
 	if t.UpdateVerb != "" {
 		updateHow = "`" + t.UpdateVerb + " " + code(orElse(t.UpdateURL, orElse(t.SelfLink, t.BaseURL))) + "`"
+		if t.UpdateVerb == "PUT" {
+			updateHow += ", the whole resource: read first, with the change written in"
+		}
 		if t.UpdateMask {
 			updateHow += ", with an update mask naming the changed fields"
 		}

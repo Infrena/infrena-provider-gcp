@@ -225,3 +225,25 @@ func snakeCase(s string) string {
 	}
 	return b.String()
 }
+
+// discoPutIsUpdate says whether a PUT to path is, per Discovery, an update
+// (which replaces the resource) rather than a create: Pub/Sub creates with a
+// PUT to the new resource's own path.
+func discoPutIsUpdate(t *testing.T, ty *catalog.Type) func(path string) bool {
+	t.Helper()
+	all, err := loadDiscoMethods()
+	if err != nil {
+		t.Fatalf("loading the Discovery methods: %v", err)
+	}
+	methods := all[ty.Service]
+	return func(path string) bool {
+		var best *discoMethod
+		for i := range methods {
+			m := &methods[i]
+			if m.verb == "PUT" && m.pattern.MatchString(path) && (best == nil || m.literals > best.literals) {
+				best = m
+			}
+		}
+		return best != nil && !strings.HasSuffix(best.id, ".create") && !strings.HasSuffix(best.id, ".insert")
+	}
+}

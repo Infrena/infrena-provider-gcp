@@ -22,7 +22,7 @@
 | [`gcp.logging.folder.sink`](gcp.logging.folder.sink.md) | **no** | yes | yes | Describes a sink used to export log entries to one of the following destinations: a Cloud Logging log bucket, a Cloud Storage bucket, a … |
 | [`gcp.logging.folder.view`](gcp.logging.folder.view.md) | **no** | yes | yes | Describes a view over log entries in a bucket. |
 | [`gcp.logging.link`](gcp.logging.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |
-| [`gcp.logging.metric`](gcp.logging.metric.md) | yes | **no** | yes | Logs-based metric can also be used to extract values from logs and create a a distribution of the values. |
+| [`gcp.logging.metric`](gcp.logging.metric.md) | yes | yes | yes | Logs-based metric can also be used to extract values from logs and create a a distribution of the values. |
 | [`gcp.logging.organization.bucket`](gcp.logging.organization.bucket.md) | **no** | yes | yes | Describes a repository in which log entries are stored. |
 | [`gcp.logging.organization.exclusion`](gcp.logging.organization.exclusion.md) | **no** | yes | yes | Specifies a set of log entries that are filtered out by a sink. |
 | [`gcp.logging.organization.link`](gcp.logging.organization.link.md) | **no** | **no** | yes | Describes a link connected to an analytics enabled bucket. |

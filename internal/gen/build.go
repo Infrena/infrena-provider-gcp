@@ -1088,6 +1088,23 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 			}
 		}
 	}
+	// No PATCH, but a PUT: the whole resource is sent, built at runtime from
+	// a fresh read with the changes written in (gcprov.Update). Until
+	// 2026-09-25 the rule was PATCH or nothing, and eleven types -- Cloud SQL
+	// users, log metrics, monitoring groups among them -- were REPLACED on
+	// every change. James decided a PUT from a fresh read is the better
+	// answer. Only a PUT at the resource's own address whose body IS the
+	// resource; never the create method (Pub/Sub creates with a PUT).
+	if t.UpdateVerb == "" {
+		if put := discoveredPut(col, create); put != nil {
+			restricted, _ := restrictedPatch(col)
+			if !restricted {
+				t.UpdateVerb, t.UpdateMask, t.UpdateURL = http.MethodPut, false, ""
+				setTypeSource(t, "update_verb", SourceDiscovery)
+			}
+		}
+	}
+
 	// magic-modules' resource-level `immutable:` says the same thing a
 	// restricted patch says, as data rather than prose: nothing changes in
 	// place except the fields that name their own update. Discovery still
@@ -1270,8 +1287,12 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	}
 	// And the update's, from the patch method it is sent to. Only a PATCH
 	// is ever sent (see discoveredUpdate), so that is the method to ask.
-	if patch := patchMethodOf(col); t.UpdateVerb == http.MethodPatch && patch != nil {
-		if updateAwait, _ := AwaitOf(doc, patch); updateAwait != await {
+	update := patchMethodOf(col)
+	if t.UpdateVerb == http.MethodPut {
+		update = discoveredPut(col, create)
+	}
+	if t.UpdateVerb != "" && update != nil {
+		if updateAwait, _ := AwaitOf(doc, update); updateAwait != await {
 			t.UpdateAwait = &updateAwait
 		}
 	}
@@ -2472,6 +2493,30 @@ func discoveredUpdate(col disco.Collection, updateURL string) (verb string, mask
 		masked = true
 	}
 	return "PATCH", masked
+}
+
+// discoveredPut is the collection's PUT update: at the get's own address,
+// taking the resource itself as its body, and not the create method.
+func discoveredPut(col disco.Collection, create *disco.Method) *disco.Method {
+	get := col.Methods["get"]
+	if get == nil || get.Response == nil || get.Response.Ref == "" {
+		return nil
+	}
+	names := make([]string, 0, len(col.Methods))
+	for n := range col.Methods {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		m := col.Methods[n]
+		if m == create || m.HTTPMethod != http.MethodPut || m.Request == nil {
+			continue
+		}
+		if m.Request.Ref == get.Response.Ref && sameAddress(m, get) {
+			return m
+		}
+	}
+	return nil
 }
 
 // isBareCapture reports whether a url template names no literal segment at all

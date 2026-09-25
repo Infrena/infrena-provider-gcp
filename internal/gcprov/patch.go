@@ -38,7 +38,9 @@ import (
 // state persisted to disk. There is deliberately no extra read here --
 // infrena >= 0.7.1 passes the observation from immediately before planning,
 // and the AWS provider carried a re-read workaround until that was fixed. Do
-// not add one.
+// not add one. The single exception is a PUT update, which must send the
+// whole resource and reads it first (Update, readForPut): not to find what
+// changed, which is still decided here, but to carry what did not.
 func BuildMask(ty *catalog.Type, current, desired map[string]value.Value) (map[string]any, []string) {
 	body := map[string]any{}
 	var mask []string
@@ -331,7 +333,19 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 			return p.patchOneFieldAtATime(ctx, ty, current, desired, attrs, reqURL, body, mask, fields, setters)
 		}
 	}
-	if ty.LockField != "" {
+	if ty.UpdateVerb == http.MethodPut {
+		// A PUT REPLACES the resource with its body, so the changed leaves
+		// alone would clear everything else. The one extra read this path
+		// allows: the resource as Google holds it now, with the changes
+		// written into it, is the body. Whatever configuration does not
+		// mention keeps Google's value, and an etag or fingerprint in the
+		// answer is as current as it can be.
+		fresh, err := p.readForPut(ctx, ty, current.ProviderID, attrs)
+		if err != nil {
+			return nil, err
+		}
+		body = mergeChanged(fresh, body)
+	} else if ty.LockField != "" {
 		if a, v := lockValue(ty, current.Attributes); v.Known {
 			body[ty.LockField] = wireValue(a, v)
 		}
@@ -571,4 +585,38 @@ func lockValue(ty *catalog.Type, state map[string]value.Value) (*catalog.Attr, v
 		}
 	}
 	return nil, value.Value{}
+}
+
+// readForPut is the resource as Google holds it now, for a PUT update to
+// write its changes into. Its own error: nothing has been sent yet.
+func (p *Provider) readForPut(ctx context.Context, ty *catalog.Type, id string, attrs map[string]value.Value) (map[string]any, error) {
+	readURL, err := p.itemURL(ty, "", id, attrs)
+	if err != nil {
+		return nil, err
+	}
+	fresh, err := p.client.Do(ctx, http.MethodGet, readURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gcp: %s: reading the resource to update it whole: %w", ty.Name, err)
+	}
+	return fresh, nil
+}
+
+// mergeChanged writes changed into base, descending through objects both
+// hold. A list, or anything that is not an object on both sides, is
+// replaced whole: BuildMask masks a list whole, so the list in changed is
+// the one configuration wants.
+func mergeChanged(base, changed map[string]any) map[string]any {
+	if base == nil {
+		base = map[string]any{}
+	}
+	for k, v := range changed {
+		sub, isMap := v.(map[string]any)
+		have, hadMap := base[k].(map[string]any)
+		if isMap && hadMap {
+			base[k] = mergeChanged(have, sub)
+			continue
+		}
+		base[k] = v
+	}
+	return base
 }

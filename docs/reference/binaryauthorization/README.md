@@ -6,4 +6,4 @@
 
 | Type | Create | Update | Import | What it is |
 | --- | --- | --- | --- | --- |
-| [`gcp.attestor`](gcp.attestor.md) | yes | **no** | yes | An attestor that attests to container image artifacts. |
+| [`gcp.attestor`](gcp.attestor.md) | yes | yes | yes | An attestor that attests to container image artifacts. |

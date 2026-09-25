@@ -93,9 +93,13 @@ type Server struct {
 	// what is stored there, for NotFoundTimes.
 	notFoundRemaining map[string]int
 
-	opStyle   OperationStyle
-	styleFor  func(method, path string) (OperationStyle, bool)
-	opCounter int
+	opStyle  OperationStyle
+	styleFor func(method, path string) (OperationStyle, bool)
+	// putReplaces says whether a PUT to a path is an UPDATE, which replaces
+	// the stored resource whole, rather than a create (Pub/Sub's), which
+	// conflicts with one that exists. Nil means every PUT is a create.
+	putReplaces func(path string) bool
+	opCounter   int
 
 	lroOps         map[string]*lroOp
 	computeOps     map[string]*computeOp
@@ -241,6 +245,16 @@ func (s *Server) SetOperationStyleFor(fn func(method, path string) (OperationSty
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.styleFor = fn
+}
+
+// SetPutReplaces makes a PUT to an existing resource an update where fn says
+// so: the body sent becomes the resource, exactly, the way Google's PUT
+// replaces it. A client that PUT only the fields it changed would find the
+// rest gone, which is the failure a PUT update has to be tested against.
+func (s *Server) SetPutReplaces(fn func(path string) bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.putReplaces = fn
 }
 
 // SetListField overrides the array-valued field name a GET on
@@ -873,12 +887,25 @@ func (s *Server) handleCreateAt(w http.ResponseWriter, r *http.Request, bodyByte
 		}
 	}
 	s.mu.Lock()
-	_, exists := s.resources[path]
+	existing, exists := s.resources[path]
+	replaces := exists && s.putReplaces != nil && s.putReplaces(r.URL.EscapedPath())
 	if !exists {
 		body["name"] = strings.TrimPrefix(trimVersionPrefix(path), "/")
 		s.resources[path] = body
 	}
+	if replaces {
+		if name, ok := existing["name"]; ok {
+			if _, sent := body["name"]; !sent {
+				body["name"] = name
+			}
+		}
+		s.resources[path] = body
+	}
 	s.mu.Unlock()
+	if replaces {
+		s.respondMutation(w, r, path, body, false)
+		return
+	}
 	if exists {
 		writeError(w, http.StatusConflict, "ALREADY_EXISTS", "Resource already exists in the project (resource="+path+").")
 		return

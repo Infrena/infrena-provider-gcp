@@ -446,9 +446,9 @@ gcp.attestor		lock_field	none	default
 gcp.attestor		patch_one_field	false	default
 gcp.attestor		setters	none	default
 gcp.attestor		timeout	60	default
-gcp.attestor		update_await	none	default
+gcp.attestor		update_await	none	discovery
 gcp.attestor		update_mask	none	default
-gcp.attestor		update_verb	none	default
+gcp.attestor		update_verb	PUT	discovery
 gcp.attestor	name	immutable	true	mm
 gcp.attestor	name	required	true	mm
 gcp.attestor	updateTime	output	true	discovery
@@ -1593,8 +1593,8 @@ gcp.compute.instance		patch_one_field	false	default
 gcp.compute.instance		setters	labels=setLabels,machineType=setMachineType	mm+discovery
 gcp.compute.instance		timeout	600	default
 gcp.compute.instance		update_await	none	default
-gcp.compute.instance		update_mask	none	default
-gcp.compute.instance		update_verb	none	default
+gcp.compute.instance		update_mask	none	mm
+gcp.compute.instance		update_verb	none	mm
 gcp.compute.instance	advancedMachineFeatures	immutable	true	discovery
 gcp.compute.instance	canIpForward	immutable	true	discovery
 gcp.compute.instance	confidentialInstanceConfig	immutable	true	discovery
@@ -2017,9 +2017,9 @@ gcp.dataproc.autoscalingpolicy		lock_field	none	default
 gcp.dataproc.autoscalingpolicy		patch_one_field	false	default
 gcp.dataproc.autoscalingpolicy		setters	none	default
 gcp.dataproc.autoscalingpolicy		timeout	60	default
-gcp.dataproc.autoscalingpolicy		update_await	none	default
+gcp.dataproc.autoscalingpolicy		update_await	none	discovery
 gcp.dataproc.autoscalingpolicy		update_mask	none	default
-gcp.dataproc.autoscalingpolicy		update_verb	none	default
+gcp.dataproc.autoscalingpolicy		update_verb	PUT	discovery
 gcp.dataproc.autoscalingpolicy	basicAlgorithm.yarnConfig	required	true	mm
 gcp.dataproc.autoscalingpolicy	basicAlgorithm.yarnConfig.gracefulDecommissionTimeout	required	true	mm
 gcp.dataproc.autoscalingpolicy	basicAlgorithm.yarnConfig.scaleDownFactor	required	true	mm
@@ -2145,9 +2145,9 @@ gcp.dataproc.workflowtemplate		lock_field	none	default
 gcp.dataproc.workflowtemplate		patch_one_field	false	default
 gcp.dataproc.workflowtemplate		setters	none	default
 gcp.dataproc.workflowtemplate		timeout	60	default
-gcp.dataproc.workflowtemplate		update_await	none	default
+gcp.dataproc.workflowtemplate		update_await	none	discovery
 gcp.dataproc.workflowtemplate		update_mask	none	default
-gcp.dataproc.workflowtemplate		update_verb	none	default
+gcp.dataproc.workflowtemplate		update_verb	PUT	discovery
 gcp.dataproc.workflowtemplate	createTime	output	true	discovery
 gcp.dataproc.workflowtemplate	name	output	true	discovery
 gcp.dataproc.workflowtemplate	placement.managedCluster.config.auxiliaryNodeGroups[].nodeGroup.nodeGroupConfig.instanceFlexibilityPolicy.instanceMachineTypes	output	true	discovery
@@ -4280,9 +4280,9 @@ gcp.logging.metric		lock_field	none	default
 gcp.logging.metric		patch_one_field	false	default
 gcp.logging.metric		setters	none	default
 gcp.logging.metric		timeout	60	default
-gcp.logging.metric		update_await	none	default
+gcp.logging.metric		update_await	none	discovery
 gcp.logging.metric		update_mask	none	default
-gcp.logging.metric		update_verb	none	default
+gcp.logging.metric		update_verb	PUT	observed+discovery
 gcp.logging.metric	bucketOptions.explicitBuckets.bounds	required	true	mm
 gcp.logging.metric	bucketOptions.exponentialBuckets.growthFactor	required	true	mm
 gcp.logging.metric	bucketOptions.exponentialBuckets.numFiniteBuckets	required	true	mm
@@ -4882,9 +4882,9 @@ gcp.monitoring.group		lock_field	none	default
 gcp.monitoring.group		patch_one_field	false	default
 gcp.monitoring.group		setters	none	default
 gcp.monitoring.group		timeout	60	default
-gcp.monitoring.group		update_await	none	default
+gcp.monitoring.group		update_await	none	discovery
 gcp.monitoring.group		update_mask	none	default
-gcp.monitoring.group		update_verb	none	default
+gcp.monitoring.group		update_verb	PUT	discovery
 gcp.monitoring.group	displayName	required	true	mm
 gcp.monitoring.group	filter	required	true	mm
 gcp.monitoring.group	name	output	true	discovery+mm
@@ -7169,9 +7169,9 @@ gcp.routine		lock_field	none	default
 gcp.routine		patch_one_field	false	default
 gcp.routine		setters	none	default
 gcp.routine		timeout	60	default
-gcp.routine		update_await	none	default
+gcp.routine		update_await	none	discovery
 gcp.routine		update_mask	none	default
-gcp.routine		update_verb	none	default
+gcp.routine		update_verb	PUT	discovery
 gcp.routine	buildStatus	output	true	discovery
 gcp.routine	buildStatus.buildDuration	output	true	discovery
 gcp.routine	buildStatus.buildState	output	true	discovery
@@ -7200,9 +7200,9 @@ gcp.rowaccesspolicy		lock_field	none	default
 gcp.rowaccesspolicy		patch_one_field	false	default
 gcp.rowaccesspolicy		setters	none	default
 gcp.rowaccesspolicy		timeout	60	default
-gcp.rowaccesspolicy		update_await	none	default
+gcp.rowaccesspolicy		update_await	none	discovery
 gcp.rowaccesspolicy		update_mask	none	default
-gcp.rowaccesspolicy		update_verb	none	default
+gcp.rowaccesspolicy		update_verb	PUT	discovery
 gcp.rowaccesspolicy	creationTime	output	true	discovery+mm
 gcp.rowaccesspolicy	etag	output	true	discovery
 gcp.rowaccesspolicy	filterPredicate	required	true	mm
@@ -8738,9 +8738,9 @@ gcp.userworkloadsconfigmap		lock_field	none	default
 gcp.userworkloadsconfigmap		patch_one_field	false	default
 gcp.userworkloadsconfigmap		setters	none	default
 gcp.userworkloadsconfigmap		timeout	60	default
-gcp.userworkloadsconfigmap		update_await	none	default
+gcp.userworkloadsconfigmap		update_await	none	discovery
 gcp.userworkloadsconfigmap		update_mask	none	default
-gcp.userworkloadsconfigmap		update_verb	none	default
+gcp.userworkloadsconfigmap		update_verb	PUT	discovery
 gcp.userworkloadsconfigmap	environment	immutable	true	mm
 gcp.userworkloadsconfigmap	environment	required	true	mm
 gcp.userworkloadsconfigmap	name	immutable	true	mm
@@ -8755,9 +8755,9 @@ gcp.userworkloadssecret		lock_field	none	default
 gcp.userworkloadssecret		patch_one_field	false	default
 gcp.userworkloadssecret		setters	none	default
 gcp.userworkloadssecret		timeout	60	default
-gcp.userworkloadssecret		update_await	none	default
+gcp.userworkloadssecret		update_await	none	discovery
 gcp.userworkloadssecret		update_mask	none	default
-gcp.userworkloadssecret		update_verb	none	default
+gcp.userworkloadssecret		update_verb	PUT	discovery
 gcp.version		clear_before_delete	none	default
 gcp.version		create_await	longrunning	discovery
 gcp.version		create_url	{+parent}/versions	discovery
