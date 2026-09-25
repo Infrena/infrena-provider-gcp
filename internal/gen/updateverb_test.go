@@ -668,15 +668,18 @@ func TestClearBeforeDeleteReachesTheCatalogAndIsChecked(t *testing.T) {
 
 // TestACreateURLCarryingAPreCreateTokenIsRefused. compute's NodeGroup create
 // url carries "PRE_CREATE_REPLACE_ME" for its pre_create hook to fill.
-// Shipped, every create would send the token itself.
+// Shipped as it is, every create would send the token itself.
 func TestACreateURLCarryingAPreCreateTokenIsRefused(t *testing.T) {
 	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(),
 		"mmv1/products/acme/Patchable.yaml": "name: Patchable\nbase_url: projects/{{project}}/patchables\ncreate_url: projects/{{project}}/patchables?count=PRE_CREATE_REPLACE_ME\nself_link: projects/{{project}}/patchables/{{name}}\n"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := res.Catalog.Type("gcp.patchable"); ok {
-		t.Error("gcp.patchable shipped with a create url that sends PRE_CREATE_REPLACE_ME")
+	// Refused, or the parameter dropped because the create does not publish
+	// it (dropUnpublishedCreateQuery, which is what happens to this
+	// fixture's "count"): either way the token is never sent.
+	if ty, ok := res.Catalog.Type("gcp.patchable"); ok && strings.Contains(ty.CreateURL, "PRE_CREATE_REPLACE_ME") {
+		t.Errorf("gcp.patchable shipped with a create url that sends the token: %q", ty.CreateURL)
 	}
 }
 
