@@ -1012,7 +1012,7 @@ gcp.bigquery.table	numTimeTravelPhysicalBytes	output	true	discovery
 gcp.bigquery.table	numTotalLogicalBytes	output	true	discovery
 gcp.bigquery.table	numTotalPhysicalBytes	output	true	discovery
 gcp.bigquery.table	replicas	output	true	discovery
-gcp.bigquery.table	requirePartitionFilter	output	false	!mm+ruling
+gcp.bigquery.table	requirePartitionFilter	output	false	!mm+ruling+observed
 gcp.bigquery.table	restrictions	output	true	discovery
 gcp.bigquery.table	restrictions.type	output	true	discovery
 gcp.bigquery.table	selfLink	output	true	discovery

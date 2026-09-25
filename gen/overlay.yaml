@@ -1325,6 +1325,10 @@ observed:
     - fact: create_url
       value: projects/{{project}}/datasets/{{dataset_id}}/tables
       seen: 2026-09-25 TestLiveBigQueryTable
+    - path: requirePartitionFilter
+      fact: output
+      value: "false"
+      seen: 2026-09-25 TestLiveBigQueryTable
   gcp.bigtableadmin.instance:
     - fact: update_verb
       value: PATCH

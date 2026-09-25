@@ -237,6 +237,9 @@ func TestLiveBigQueryTable(t *testing.T) {
       datasetId: ${ds.datasetReference.datasetId}
       tableId: %[3]s
     description: %[4]s
+    requirePartitionFilter: true
+    timePartitioning:
+      type: DAY
     schema:
       fields:
         - name: a
@@ -246,8 +249,17 @@ func TestLiveBigQueryTable(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, "infrena.yml", cfg("created by the infrena live suite"))
 	applyOK(t, dir, "create")
-	if code, raw, err := g.get(t.Context(), tableURL); err != nil || code != http.StatusOK {
+	code, raw, err := g.get(t.Context(), tableURL)
+	if err != nil || code != http.StatusOK {
 		t.Fatalf("the table is not at its own url after the create: %d %s %v", code, raw, err)
+	}
+	// magic-modules marks requirePartitionFilter output; the ruling makes it
+	// settable, and Google must hold what was sent.
+	var got struct {
+		RequirePartitionFilter bool `json:"requirePartitionFilter"`
+	}
+	if json.Unmarshal(raw, &got) != nil || !got.RequirePartitionFilter {
+		t.Errorf("Google's table does not require a partition filter: %s", raw)
 	}
 	if changes := planIs(t, dir, exitOK); len(changes) != 0 {
 		t.Errorf("the plan after creating the table proposes %v", changes)
