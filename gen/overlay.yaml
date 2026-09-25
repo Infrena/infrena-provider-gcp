@@ -1284,3 +1284,40 @@ observed:
     - fact: create_url
       value: projects/{{project}}/datasets/{{dataset_id}}/tables
       seen: 2026-09-25 TestLiveBigQueryTable
+  gcp.bigtableadmin.instance:
+    - fact: update_verb
+      value: PATCH
+      seen: 2026-09-25 TestLiveBigtableInstanceUpdatesInPlace
+  gcp.trustconfig:
+    - fact: update_mask
+      value: query
+      seen: 2026-09-25 TestLiveTrustConfigUpdates
+  gcp.image:
+    - path: imageEncryptionKey.kmsKeyName
+      fact: equivalence
+      value: kms_key
+      seen: 2026-09-25 TestLiveCMEKImagePlansClean
+    - path: sourceImage
+      fact: equivalence
+      value: image
+      seen: 2026-09-25 TestLiveCMEKImagePlansClean
+  gcp.workflow:
+    - fact: update_verb
+      value: PATCH
+      seen: 2026-09-25 TestLiveWorkflowType
+  gcp.logscope:
+    - fact: update_verb
+      value: PATCH
+      seen: 2026-09-25 TestLiveLogScope
+  gcp.redis.instance:
+    - fact: update_verb
+      value: PATCH
+      seen: 2026-09-25 TestLiveRedisInstance
+  gcp.spanner.instance:
+    - fact: update_mask
+      value: body:fieldMask
+      seen: 2026-09-25 TestLiveSpannerInstanceAndBackupSchedule
+  gcp.spanner.backupschedule:
+    - fact: update_verb
+      value: PATCH
+      seen: 2026-09-25 TestLiveSpannerInstanceAndBackupSchedule

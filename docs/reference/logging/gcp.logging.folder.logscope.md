@@ -20,10 +20,10 @@ Describes a group of resources to read log entries from
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}` needs `folder`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/logScopes/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/logScopes/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/logScopes/{{name}}` |
+| Create | yes | `POST folders/{folder}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}` |
+| Read | yes | `GET folders/{folder}/locations/{{location}}/logScopes/{{name}}` |
+| Update | yes | `PATCH folders/{folder}/locations/{{location}}/logScopes/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE folders/{folder}/locations/{{location}}/logScopes/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -34,12 +34,13 @@ Describes a group of resources to read log entries from
 
 ## Attributes
 
-7 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+8 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation timestamp of the log scope. |
 | `description` | — | `string` | optional | — | Optional. Describes this log scope.The maximum length of the description is 8000 characters. |
+| `folder` | — | `string` | required | force new | The folder this gcp.logging.folder.logscope belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `logScopeId` | — | `string` | optional | force new, create only | Required. A client-assigned identifier such as "log-scope". Identifiers are limited to 100 characters and can include only letters, digits, underscores, hyphens, and periods. First character has to … |
 | `name` | — | `string` | output only | force new | Output only. The resource name of the log scope.Log scopes are only available in the global location. For example:projects/my-project/locations/global/logScopes/my-log-scope |
 | `resourceNames` | `resource_names` | `list` | required | — | Required. Names of one or more parent resources (organizations and folders are not supported.): projects/\[PROJECT_ID\]May alternatively be one or more views … |

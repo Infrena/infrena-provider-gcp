@@ -19,10 +19,10 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` |
-| Read | yes | `GET {{parent}}/capabilityConfigs/{{capability_config_id}}` |
-| Update | yes | `PATCH {{parent}}/capabilityConfigs/{{capability_config_id}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/capabilityConfigs/{{capability_config_id}}` |
+| Create | yes | `POST projects/{project}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` |
+| Read | yes | `GET projects/{project}/capabilityConfigs/{{capability_config_id}}` |
+| Update | yes | `PATCH projects/{project}/capabilityConfigs/{{capability_config_id}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/capabilityConfigs/{{capability_config_id}}` |
 | Import | yes | by id, see below |
 
 ## Import id

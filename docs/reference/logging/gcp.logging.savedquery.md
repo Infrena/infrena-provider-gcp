@@ -19,10 +19,10 @@ Describes a query that has been saved by a user.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/savedQueries/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/savedQueries/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

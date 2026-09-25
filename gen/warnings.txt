@@ -351,8 +351,6 @@ nocreate	gcp.bigtableadmin.backup	{+parent}/backups?backupId={{backupId}}	needs 
 nocreate	gcp.bigtableadmin.cluster	{+parent}/clusters?clusterId={{clusterId}}	needs instance
 nocreate	gcp.bigtableadmin.table	{+parent}/tables	needs instance
 nocreate	gcp.cloudasset.savedquery	{+parent}/savedQueries?savedQueryId={{savedQueryId}}	needs parent
-nocreate	gcp.cloudresourcemanager.folder.capabilityconfig	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	needs folder
-nocreate	gcp.cloudresourcemanager.organization.capabilityconfig	{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}	needs organization
 nocreate	gcp.config	{+parent}/configs	needs api
 nocreate	gcp.credential	{+parent}/credentials	needs oauthClient
 nocreate	gcp.feed	{+parent}/feeds	needs parent
@@ -366,22 +364,17 @@ nocreate	gcp.iam.workloadidentitypool.provider.key	{+parent}/keys	needs provider
 nocreate	gcp.logging.billingaccount.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs billingAccount
 nocreate	gcp.logging.billingaccount.exclusion	{+parent}/exclusions	needs billingAccount
 nocreate	gcp.logging.billingaccount.link	{+parent}/links?linkId={{linkId}}	needs billingAccount, bucket
-nocreate	gcp.logging.billingaccount.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs billingAccount
 nocreate	gcp.logging.billingaccount.sink	{+parent}/sinks	needs billingAccount
 nocreate	gcp.logging.billingaccount.view	{+parent}/views?viewId={{viewId}}	needs billingAccount, bucket
 nocreate	gcp.logging.folder.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs folder
 nocreate	gcp.logging.folder.exclusion	{+parent}/exclusions	needs folder
 nocreate	gcp.logging.folder.link	{+parent}/links?linkId={{linkId}}	needs bucket, folder
-nocreate	gcp.logging.folder.logscope	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	needs folder
-nocreate	gcp.logging.folder.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs folder
 nocreate	gcp.logging.folder.sink	{+parent}/sinks	needs folder
 nocreate	gcp.logging.folder.view	{+parent}/views?viewId={{viewId}}	needs bucket, folder
 nocreate	gcp.logging.link	{+parent}/links?linkId={{linkId}}	needs bucket
 nocreate	gcp.logging.organization.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs organization
 nocreate	gcp.logging.organization.exclusion	{+parent}/exclusions	needs organization
 nocreate	gcp.logging.organization.link	{+parent}/links?linkId={{linkId}}	needs bucket, organization
-nocreate	gcp.logging.organization.logscope	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	needs organization
-nocreate	gcp.logging.organization.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs organization
 nocreate	gcp.logging.organization.sink	{+parent}/sinks	needs organization
 nocreate	gcp.logging.organization.view	{+parent}/views?viewId={{viewId}}	needs bucket, organization
 nocreate	gcp.logging.view	{+parent}/views?viewId={{viewId}}	needs bucket
@@ -389,10 +382,6 @@ nocreate	gcp.logicalview	{+parent}/logicalViews?logicalViewId={{logicalViewId}}	
 nocreate	gcp.managedidentity	{+parent}/managedIdentities	needs namespace, workloadIdentityPool
 nocreate	gcp.materializedview	{+parent}/materializedViews?materializedViewId={{materializedViewId}}	needs instance
 nocreate	gcp.namespace	{+parent}/namespaces	needs workloadIdentityPool
-nocreate	gcp.networksecurity.organization.addressgroup	{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}	needs organization
-nocreate	gcp.networksecurity.organization.firewallendpoint	{{parent}}/locations/{{location}}/firewallEndpoints?firewallEndpointId={{name}}	needs organization
-nocreate	gcp.networksecurity.organization.securityprofile	{{parent}}/locations/{{location}}/securityProfiles?securityProfileId={{name}}	needs organization
-nocreate	gcp.networksecurity.organization.securityprofilegroup	{{parent}}/locations/{{location}}/securityProfileGroups?securityProfileGroupId={{name}}	needs organization
 nocreate	gcp.networksecurity.rule	{+parent}/rules	needs gatewaySecurityPolicy
 nocreate	gcp.osconfig.folder.policyorchestrator	{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}	needs folder
 nocreate	gcp.osconfig.organization.policyorchestrator	{+parent}/policyOrchestrators?policyOrchestratorId={{policyOrchestratorId}}	needs organization

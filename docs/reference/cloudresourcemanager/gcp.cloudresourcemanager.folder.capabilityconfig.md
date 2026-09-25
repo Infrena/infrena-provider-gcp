@@ -19,10 +19,10 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` needs `folder`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/capabilityConfigs/{{capability_config_id}}` |
-| Update | yes | `PATCH {{parent}}/capabilityConfigs/{{capability_config_id}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/capabilityConfigs/{{capability_config_id}}` |
+| Create | yes | `POST folders/{folder}/capabilityConfigs?capabilityConfigId={{capability_config_id}}` |
+| Read | yes | `GET folders/{folder}/capabilityConfigs/{{capability_config_id}}` |
+| Update | yes | `PATCH folders/{folder}/capabilityConfigs/{{capability_config_id}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE folders/{folder}/capabilityConfigs/{{capability_config_id}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 
 ## Attributes
 
-12 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+13 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -43,6 +43,7 @@ Capability configs define the enabled capabilities and their scope of enforcemen
 | `createTime` | `create_time` | `string` | output only | — | Output only. The creation time of the CapabilityConfig. |
 | `displayName` | `display_name` | `string` | optional | — | Optional. Human-readable non-unique display name of the CapabilityConfig. When present it must be between 4 to 30 characters. Allowed characters are: lowercase and uppercase letters, numbers, hyphen … |
 | `etag` | — | `string` | output only | — | This checksum is computed by the server based on the value of other fields, and may be sent on update and delete requests to ensure the client has an up-to-date value before proceeding. |
+| `folder` | — | `string` | required | force new | The folder this gcp.cloudresourcemanager.folder.capabilityconfig belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `managementProject` | `management_project` | `string` | optional | force new | Optional. Immutable. The Management Project associated with this CapabilityConfig. If not provided during creation, a management project will be automatically created. Cannot be modified after … |
 | `name` | — | `string` | output only | — | Identifier. The unique resource name of the CapabilityConfig. Format: `organizations/{organization}/capabilityConfigs/{capabilityConfig}` or, `folders/{folder}/capabilityConfigs/{capabilityConfig}` … |
 | `state` | — | `string` | output only | — | Output only. The lifecycle state of the CapabilityConfig. |

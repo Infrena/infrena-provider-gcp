@@ -20,10 +20,10 @@ Describes a group of resources to read log entries from
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | yes | `POST {{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}` |
-| Read | yes | `GET {{parent}}/locations/{{location}}/logScopes/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/logScopes/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/logScopes/{{name}}` |
+| Create | yes | `POST projects/{project}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}` |
+| Read | yes | `GET projects/{project}/locations/{{location}}/logScopes/{{name}}` |
+| Update | yes | `PATCH projects/{project}/locations/{{location}}/logScopes/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE projects/{project}/locations/{{location}}/logScopes/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id

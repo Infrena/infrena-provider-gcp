@@ -19,10 +19,10 @@ Describes a query that has been saved by a user.
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` needs `billingAccount`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/savedQueries/{{name}}` |
+| Create | yes | `POST billingAccounts/{billingAccount}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}` |
+| Read | yes | `GET billingAccounts/{billingAccount}/locations/{{location}}/savedQueries/{{name}}` |
+| Update | yes | `PATCH billingAccounts/{billingAccount}/locations/{{location}}/savedQueries/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE billingAccounts/{billingAccount}/locations/{{location}}/savedQueries/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,10 +33,11 @@ Describes a query that has been saved by a user.
 
 ## Attributes
 
-210 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+211 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
+| `billingAccount` | — | `string` | required | force new | The billingAccount this gcp.logging.billingaccount.savedquery belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `createTime` | `create_time` | `string` | output only | — | Output only. The timestamp when the saved query was created. |
 | `description` | — | `string` | optional | — | Optional. A human readable description of the saved query. |
 | `displayName` | `display_name` | `string` | required | — | Required. The user specified title for the SavedQuery. |

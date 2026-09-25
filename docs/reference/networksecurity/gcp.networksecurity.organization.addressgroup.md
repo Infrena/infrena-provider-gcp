@@ -19,10 +19,10 @@ AddressGroup is a resource that specifies how a collection of IP/DNS used in Fir
 
 | Operation | Supported | How |
 | --- | --- | --- |
-| Create | **no** | the create url `{{parent}}/locations/{{location}}/addressGroups?addressGroupId={{name}}` needs `organization`, which nothing supplies: no provider setting (project, region, zone, location), no stored binding, and no settable attribute of this type |
-| Read | yes | `GET {{parent}}/locations/{{location}}/addressGroups/{{name}}` |
-| Update | yes | `PATCH {{parent}}/locations/{{location}}/addressGroups/{{name}}`, with an update mask naming the changed fields |
-| Delete | yes | `DELETE {{parent}}/locations/{{location}}/addressGroups/{{name}}` |
+| Create | yes | `POST organizations/{organization}/locations/{{location}}/addressGroups?addressGroupId={{name}}` |
+| Read | yes | `GET organizations/{organization}/locations/{{location}}/addressGroups/{{name}}` |
+| Update | yes | `PATCH organizations/{organization}/locations/{{location}}/addressGroups/{{name}}`, with an update mask naming the changed fields |
+| Delete | yes | `DELETE organizations/{organization}/locations/{{location}}/addressGroups/{{name}}` |
 | Import | yes | by id, see below |
 
 ## Import id
@@ -33,7 +33,7 @@ AddressGroup is a resource that specifies how a collection of IP/DNS used in Fir
 
 ## Attributes
 
-12 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
+13 attribute(s), at every depth. A `.` is a field of an object; `[]` is the element of a list.
 
 | Attribute | Also spelled | Type | Set by | Notes | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -44,6 +44,7 @@ AddressGroup is a resource that specifies how a collection of IP/DNS used in Fir
 | `items[]` | — | `string` | optional | — | — |
 | `labels` | — | `map` | optional | opaque | Optional. Set of label tags associated with the AddressGroup resource. |
 | `name` | — | `string` | required | — | Required. Name of the AddressGroup resource. It matches pattern `projects/*/locations/{location}/addressGroups/`. |
+| `organization` | — | `string` | required | force new | The organization this gcp.networksecurity.organization.addressgroup belongs to. It is part of the resource's name, supplied in the create url rather than in the request body. |
 | `purpose` | — | `list` | optional | — | Optional. List of supported purposes of the Address Group. |
 | `purpose[]` | — | `string` | optional | — | — |
 | `selfLink` | `self_link` | `string` | output only | — | Output only. Server-defined fully-qualified URL for this resource. |
