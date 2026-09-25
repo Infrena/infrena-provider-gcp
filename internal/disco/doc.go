@@ -138,6 +138,10 @@ const (
 // after") that declares nothing. Measured: 5 settable properties in the
 // catalog mention immutability mid-sentence, and none of them is a
 // declaration.
+// deprecatedThenTag skips a leading "[DEPRECATED] ..." notice up to a
+// bracketed behaviour tag within its first 200 characters.
+var deprecatedThenTag = regexp.MustCompile(`(?is)^\s*\[DEPRECATED\][^\[]{0,200}`)
+
 var behaviorTag = regexp.MustCompile(`(?i)^\s*(?:\[(output only|input only)\]|(output only|input only|immutable|identifier|required|optional)\.)\s*`)
 
 // Behaviors reads the leading run of field-behaviour tags from a property's
@@ -149,6 +153,16 @@ func Behaviors(s *Schema) map[Behavior]bool {
 		return out
 	}
 	d := s.Description
+	// A deprecation notice can come before the tags: compute's
+	// CustomerEncryptionKey.sha256 reads "[DEPRECATED] CSEK is no longer
+	// supported. Use CMEK instead. [Output only] The RFC 4648 ...", and read
+	// from the start, every disk, image and snapshot key's sha256 shipped as
+	// settable. Only a bracketed tag close behind the notice counts.
+	if strings.HasPrefix(strings.TrimSpace(d), "[DEPRECATED]") {
+		if i := deprecatedThenTag.FindStringIndex(d); i != nil && behaviorTag.MatchString(d[i[1]:]) {
+			d = d[i[1]:]
+		}
+	}
 	for {
 		m := behaviorTag.FindStringSubmatch(d)
 		if m == nil {
