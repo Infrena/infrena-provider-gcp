@@ -1209,6 +1209,18 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 		setTypeSource(t, "update_verb", SourceDiscovery, lost+SourceMM)
 		setTypeSource(t, "update_mask", SourceDiscovery, lost+SourceMM)
 	}
+	// magic-modules' update_url spelling of the patch's own address gives way
+	// to self_link, as it already does for an update envelope (see
+	// templateAddressesMethod). VPC Access's connector: self_link is
+	// Discovery's {+name}, and update_url's projects/{{project}}/.../{{name}}
+	// could not be filled from the id at all (found by the round trip,
+	// 2026-09-25). Only where the patch is at the get's address, and only a
+	// url with no query of its own to lose.
+	if t.UpdateVerb == http.MethodPatch && t.UpdateURL != "" && !strings.Contains(t.UpdateURL, "?") {
+		if pm := patchMethodOf(col); pm != nil && templateAddressesMethod(t.UpdateURL, pm) && sameAddress(pm, col.Methods["get"]) {
+			t.UpdateURL = ""
+		}
+	}
 	// A mask the API requires is sent whoever declared the verb.
 	// magic-modules declares Certificate Manager's TrustConfig PATCH with no
 	// update_mask, and trustConfigs.patch says of updateMask "Required.":

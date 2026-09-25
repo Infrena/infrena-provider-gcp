@@ -17,10 +17,7 @@ tier3	accesscontextmanager/operations	no insert or create method
 tier3	accesscontextmanager/permissions	no insert or create method
 tier3	accesscontextmanager/projects	no insert or create method
 tier3	accesscontextmanager/services	no insert or create method
-tier2	alloydb/Backup	unruled wire hooks: encoder
 tier2	alloydb/Cluster	unruled wire hooks: pre_create, pre_delete, pre_update
-tier2	alloydb/Instance	unruled wire hooks: custom_import, decoder, pre_create, pre_delete
-tier2	alloydb/User	unruled wire hooks: custom_import, pre_update
 tier3	alloydb/locations	no insert or create method
 tier3	alloydb/operations	no insert or create method
 tier3	alloydb/supportedDatabaseFlags	no insert or create method
@@ -112,7 +109,6 @@ tier3	compute/FutureReservation	min_version is beta, not ga
 tier2	compute/GlobalVmExtensionPolicy	unruled wire hooks: post_delete, pre_delete, pre_update
 tier3	compute/InstanceGroup	magic-modules marks it exclude: true
 tier3	compute/InstanceGroupManager	magic-modules marks it exclude: true
-tier2	compute/InterconnectAttachment	unruled wire hooks: post_create, pre_delete
 tier3	compute/MachineImage	min_version is beta, not ga
 tier3	compute/MachineType	magic-modules marks it exclude: true
 tier2	compute/OrganizationSecurityPolicy	unruled wire hooks: post_create, post_delete, post_update
@@ -127,9 +123,7 @@ tier2	compute/Reservation	unruled wire hooks: decoder, pre_update, update_encode
 tier2	compute/ServiceAttachment	unruled wire hooks: encoder, update_encoder
 tier2	compute/Snapshot	unruled wire hooks: decoder, pre_create
 tier3	compute/StoragePoolType	magic-modules marks it exclude: true
-tier2	compute/VpnTunnel	unruled wire hooks: encoder, post_create
 tier3	compute/Zone	magic-modules marks it exclude: true
-tier2	compute/ZoneVmExtensionPolicy	unruled wire hooks: pre_update
 tier3	compute/acceleratorTypes	no insert or create method
 tier3	compute/advice	no insert or create method
 tier1	compute/gcp.targethttpsproxy.serverTlsPolicy	reference to gcp.servertlspolicy.selfLink dropped: gcp.servertlspolicy has no attribute "selfLink"
@@ -209,9 +203,6 @@ tier3	iam/operations	no insert or create method
 tier3	iam/permissions	no insert or create method
 tier3	iam/roles	no insert or create method
 tier3	iam/subjects	no insert or create method
-tier2	logging/LogScope	unruled wire hooks: encoder
-tier2	logging/LogScope	unruled wire hooks: encoder
-tier2	logging/LogScope	unruled wire hooks: encoder
 tier3	logging/billingAccounts	no insert or create method
 tier1	logging/buckets	legacy alias of gcp.logging.bucket (projects.locations.buckets)
 tier3	logging/entries	no insert or create method
@@ -283,8 +274,6 @@ tier3	osconfig/operations	no insert or create method
 tier3	osconfig/operations	no insert or create method
 tier3	pubsub/Subscription	no insert or create method
 tier3	pubsub/snapshots	no insert or create method
-tier2	redis/Cluster	unruled wire hooks: decoder, encoder
-tier2	redis/Instance	unruled wire hooks: decoder, encoder, pre_delete
 tier3	redis/authTokens	no insert or create method
 tier3	redis/backupCollections	no insert or create method
 tier3	redis/backups	no insert or create method
@@ -312,8 +301,6 @@ tier3	servicenetworking/operations	no insert or create method
 tier2	servicenetworking/peeredDnsDomains	no get method; needs a ruling with read_via
 tier3	servicenetworking/roles	no insert or create method
 tier3	servicenetworking/services	no insert or create method
-tier2	spanner/BackupSchedule	unruled wire hooks: decoder, encoder, pre_update
-tier2	spanner/Instance	unruled wire hooks: decoder, encoder, post_create, pre_delete, pre_update, update_encoder
 tier2	spanner/InstanceConfig	unruled wire hooks: decoder, encoder, update_encoder
 tier2	spanner/InstancePartition	unruled wire hooks: encoder, pre_update
 tier3	spanner/backupOperations	no insert or create method
@@ -344,10 +331,8 @@ tier3	storage/channels	no insert or create method
 tier3	storage/operations	no insert or create method
 tier3	storage/rapidCaches	no delete method
 tier3	storage/serviceAccount	no insert or create method
-tier2	vpcaccess/Connector	unruled wire hooks: decoder, encoder, post_create, pre_update
 tier3	vpcaccess/locations	no insert or create method
 tier3	vpcaccess/operations	no insert or create method
-tier2	workflows/Workflow	unruled wire hooks: encoder, pre_delete
 tier3	workflows/locations	no insert or create method
 tier3	workflows/operations	no insert or create method
 
@@ -387,6 +372,7 @@ nocreate	gcp.logging.billingaccount.view	{+parent}/views?viewId={{viewId}}	needs
 nocreate	gcp.logging.folder.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs folder
 nocreate	gcp.logging.folder.exclusion	{+parent}/exclusions	needs folder
 nocreate	gcp.logging.folder.link	{+parent}/links?linkId={{linkId}}	needs bucket, folder
+nocreate	gcp.logging.folder.logscope	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	needs folder
 nocreate	gcp.logging.folder.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs folder
 nocreate	gcp.logging.folder.sink	{+parent}/sinks	needs folder
 nocreate	gcp.logging.folder.view	{+parent}/views?viewId={{viewId}}	needs bucket, folder
@@ -394,6 +380,7 @@ nocreate	gcp.logging.link	{+parent}/links?linkId={{linkId}}	needs bucket
 nocreate	gcp.logging.organization.bucket	{+parent}/buckets?bucketId={{bucketId}}	needs organization
 nocreate	gcp.logging.organization.exclusion	{+parent}/exclusions	needs organization
 nocreate	gcp.logging.organization.link	{+parent}/links?linkId={{linkId}}	needs bucket, organization
+nocreate	gcp.logging.organization.logscope	{{parent}}/locations/{{location}}/logScopes?logScopeId={{logScopeId}}	needs organization
 nocreate	gcp.logging.organization.savedquery	{{parent}}/locations/{{location}}/savedQueries?savedQueryId={{savedQueryId}}	needs organization
 nocreate	gcp.logging.organization.sink	{+parent}/sinks	needs organization
 nocreate	gcp.logging.organization.view	{+parent}/views?viewId={{viewId}}	needs bucket, organization

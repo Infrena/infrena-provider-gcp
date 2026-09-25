@@ -767,6 +767,243 @@ rulings:
 # convergent, rather than to a patch the API quietly ignores, which is neither.
 # See internal/gen/patchlimits.go. Types left out of this map are named in
 # gen/warnings.txt as `noupdate` rows, each quoting Google's own sentence.
+  # The 2026-09-25 backlog pass. Every template below was read in full at the
+  # pinned magic-modules commit, each claim checked against Discovery, and each
+  # type round-tripped against the fake answering as Discovery says. Types the
+  # pass HELD are listed at the end of this block with the reason, so the next
+  # person starts from the finding rather than from the template.
+
+  compute/VpnTunnel:
+    hooks: [encoder, post_create]
+    note: >
+      encoder (encoders/vpn_tunnel.go.tmpl) parses targetVpnGateway only to
+      d.Set Terraform's project and region when they are unset, and returns the
+      body unchanged. region is a url segment here, filled from configuration
+      or the instance. THE BOUNDED GAP: region is not inferred from the gateway.
+
+      post_create (post_create/labels.tmpl) calls setLabels after the insert,
+      because compute's insert drops labels (observed on addresses,
+      2026-09-25). setLabels is this type's labels setter, and a create whose
+      read-back lacks them calls it (gcprov.setAfterCreate). vpnTunnels publish
+      no patch, so every other change replaces the tunnel.
+
+  compute/InterconnectAttachment:
+    hooks: [post_create, pre_delete]
+    note: >
+      post_create (post_create/interconnect_attachment.go.tmpl) is labels.tmpl's
+      setLabels call, handled by the labels setter as on compute/Address, then
+      a wait that re-reads until state leaves UNPROVISIONED. pre_delete
+      (pre_delete/interconnect_attachment.go.tmpl) is the same wait before the
+      DELETE. Both waits are GETs only.
+
+      THE BOUNDED GAP: create returns once the insert operation is done, not
+      once the attachment is provisioned, so pairingKey and the router
+      addresses may be empty until a later refresh. A delete sent while still
+      UNPROVISIONED is not waited for; if Google refuses it, the error is
+      Google's and a retry converges.
+
+  compute/ZoneVmExtensionPolicy:
+    hooks: [pre_update]
+    note: >
+      pre_update (pre_update/vm_extension_policy_name.go.tmpl) is one line,
+      obj["name"] = d.Get("name"), putting name into the PATCH body. This type
+      ships with no update: zoneVmExtensionPolicies.update's placeholder
+      publishes no pattern, so the generator cannot match it to the get's
+      address and drops magic-modules' verb. Every change replaces, and the hook
+      has nothing to act on. RE-RULE if this type ever derives an update: the
+      patch would then go without name in the body, which Terraform always
+      sends.
+
+  spanner/BackupSchedule:
+    hooks: [decoder, encoder, pre_update]
+    required: [name]
+    note: >
+      encoder (encoders/spanner_schedule_backup.go.tmpl) invents a tfgen- name
+      when none is set, puts the full name in the body, and deletes Terraform's
+      instance and database fields. Here name is the backup_schedule_id query
+      parameter of the create, and Discovery says BackupSchedule.name is
+      "Output only for the CreateBackupSchedule operation", so the body carries
+      none. required: [name] replaces the invented one.
+
+      decoder (decoders/spanner_schedule_backup.go.tmpl) is Terraform's id
+      bookkeeping. pre_update (pre_update/spanner_schedule_backup.go.tmpl)
+      replaces the mask "spec" with "spec.cron_spec.text"; BuildMask masks the
+      changed leaf, spec.cronSpec.text, the same path in JSON spelling.
+
+  spanner/Instance:
+    hooks: [decoder, encoder, post_create, pre_delete, pre_update, update_encoder]
+    required: [instanceId]
+    note: >
+      encoder (encoders/spanner_instance.go.tmpl) wraps the body as
+      CreateInstanceRequest{instanceId, instance}, which the generator builds
+      from Discovery (create_wrapper instance). It also defaults nodeCount to 1
+      when none of nodeCount, processingUnits or autoscalingConfig is set. THE
+      BOUNDED GAP: write one of the three; Google's own error names it
+      otherwise.
+
+      update_encoder (encoders/spanner_instance_update.go.tmpl) builds
+      UpdateInstanceRequest{instance, fieldMask}; the generator detects that
+      envelope and BuildMask emits the same leaf paths. Its one extra, masking
+      processingUnits when autoscalingConfig is removed, is a removal, which
+      this provider never sends.
+
+      decoder is Terraform's id bookkeeping; post_create is a 5 second sleep
+      after an awaited operation; pre_update only skips a change to Terraform's
+      force_destroy. pre_delete deletes every backup first, gated on
+      force_destroy. THE BOUNDED GAP: an instance holding backups is refused by
+      Google, loudly; delete the backups first.
+
+  redis/Cluster:
+    hooks: [decoder, encoder]
+    note: >
+      encoder (encoders/redis_cluster.go.tmpl) re-expands automatedBackupConfig
+      when it is absent, and its expander returns nil for an absent block, so
+      nothing is sent. Configured, the expander derives automatedBackupMode
+      ENABLED. THE BOUNDED GAP: write automatedBackupMode yourself.
+
+      decoder (decoders/redis_cluster.go.tmpl) GETs the cluster's
+      certificateAuthority and copies managedServerCa into Terraform's state.
+      That field is not in the v1 Cluster schema; read the CA through
+      getCertificateAuthority.
+
+  redis/Instance:
+    hooks: [decoder, encoder, pre_delete]
+    note: >
+      encoder (encoders/redis_location_id_for_fallback_zone.go.tmpl) only
+      derives Terraform's region from locationId and returns the body
+      unchanged. decoder (decoders/redis_instance.go.tmpl) GETs authString into
+      Terraform's own auth_string field; here read it with getAuthString.
+      pre_delete (pre_delete/redis_instance.go.tmpl) refuses when Terraform's
+      deletion_protection is set; the v1 Instance has no such field.
+
+      THE BOUNDED GAP, from magic-modules' constants rather than a hook:
+      Terraform suppresses the diff when secondaryIpRange is "auto". Here
+      writing "auto" plans an update on every run; omit it, or write the range
+      Google chose.
+
+  alloydb/Backup:
+    hooks: [encoder]
+    required: [type]
+    note: >
+      encoder (encoders/alloydb_backup.tmpl) sets type to ON_DEMAND, "the only
+      other available type is AUTOMATED which cannot be set manually". type is
+      an ordinary settable enum on the v1 Backup (ON_DEMAND, AUTOMATED,
+      CONTINUOUS), so the user writes it, as with compute/HealthCheck's type.
+      THE BOUNDED GAP: write type: ON_DEMAND.
+
+  alloydb/User:
+    hooks: [custom_import, pre_update]
+    note: >
+      pre_update (pre_update/alloydb_user.go.tmpl) adds password to the body and
+      mask when Terraform's password_wo_version changes, because a write-only
+      attribute never reaches Terraform's diff. Here password is an ordinary
+      input-only, sensitive attribute, carried forward: a changed password is a
+      changed leaf, masked like any other. custom_import only parses
+      `terraform import`'s id.
+
+  alloydb/Instance:
+    hooks: [custom_import, decoder, pre_create, pre_delete]
+    note: >
+      pre_create (pre_create/alloydb_instance.go.tmpl) sends a SECONDARY
+      instance to instances:createsecondary; pre_delete
+      (pre_delete/alloydb_instance.go.tmpl) skips the DELETE for one and reports
+      success. THE BOUNDED GAP: secondary instances are not supported here. A
+      SECONDARY goes to the ordinary create, and deleting one gets Google's
+      refusal rather than Terraform's pretend success. PRIMARY and READ_POOL
+      take Terraform's path.
+
+      decoder (decoders/alloydb_instance.go.tmpl) puts back
+      networkConfig.enablePublicIp and enableOutboundPublicIp when Google omits
+      them, which it does for false. The reconciler now does the same for any
+      configured zero value (gcprov.carryOmittedZero). custom_import only
+      parses `terraform import`'s id.
+
+  workflows/Workflow:
+    hooks: [encoder, pre_delete]
+    required: [name]
+    note: >
+      encoder (encoders/workflow.go.tmpl) picks a name from name, name_prefix or
+      a random id, d.Sets it, and returns the body unchanged; the name travels
+      as the workflowId query parameter. This provider does not invent names,
+      so name is required. pre_delete (pre_delete/workflows_workflow.go.tmpl)
+      refuses when Terraform's deletion_protection is set; the v1 Workflow has
+      no such field.
+
+  vpcaccess/Connector:
+    hooks: [decoder, encoder, post_create, pre_update]
+    note: >
+      encoder (encoders/no_send_name.go.tmpl) deletes name from the create body;
+      name is the connectorId query parameter, so the body never carries it.
+      decoder (decoders/long_name_to_self_link.go.tmpl) is Terraform's
+      self_link bookkeeping. post_create is a 5 second sleep after an awaited
+      operation.
+
+      pre_update (pre_update/vpc_access_connector_instances.go.tmpl) sends
+      minInstances and maxInstances together, in body and mask, whenever either
+      changes. BuildMask sends only the one that changed. THE BOUNDED GAP,
+      unverified: if Google insists on the pair, a change to one is refused
+      with its error; change both. Terraform also REPLACES the connector when
+      either decreases; here that is a patch Google refuses.
+
+  logging/LogScope:
+    hooks: [encoder]
+    note: >
+      encoder (encoders/logging_log_scope.go.tmpl) only derives Terraform's
+      parent, location and short name from a full resource name, and returns
+      the body unchanged. Here the id is logScopeId and the scope comes from
+      the instance and create bindings. The folder and organization variants
+      ship read, import and delete only, like every other folder- and
+      organization-rooted type.
+
+  # HELD by the 2026-09-25 pass, each for a reason no ruling key can fix:
+  #   compute/Disk, compute/RegionDisk: sourceImage is ForceNew with no rule for
+  #     the resolved image url Google answers (Terraform's DiskImageDiffSuppress),
+  #     so a disk would be replaced on every plan; its PATCH-by-paths update
+  #     and detach-before-delete are not modelled either.
+  #   compute/Snapshot: the create url's path token (sourceDisk) is filled by
+  #     pre_create; needs the create taken from Discovery's snapshots.insert.
+  #   compute/Reservation: its update rewrites share settings with per-project
+  #     masks and project numbers; the generic patch would send fields the API
+  #     ignores.
+  #   compute/ServiceAttachment: every patch must carry name and
+  #     enableProxyProtocol (b/198329756); send_with_update takes input-only
+  #     fields only.
+  #   compute/FirewallPolicy, compute/OrganizationSecurityPolicy: organization
+  #     operations (locations/global/operations?parentId=) are not awaited.
+  #   compute/GlobalVmExtensionPolicy: its delete is a POST with a body; the
+  #     runtime sends only DELETE (now refused by the generator).
+  #   spanner/InstanceConfig, spanner/InstancePartition: the full name travels
+  #     in a wrapped create body; unverified against the short-name state.
+  #   alloydb/Cluster: databaseVersion changes go to :upgrade and secondary
+  #     clusters to createsecondary; the generic patch and create would not.
+  #   dataproc/Batch: Google extends runtimeConfig.properties, an opaque map,
+  #     so every plan would re-run the batch.
+  #   cloudscheduler/Job: name must be full in the create body (shortname_to_url).
+  #   cloudkms/CryptoKey: self_link's {{key_ring}} spans several segments, so
+  #     a created key's id does not parse; and delete destroys versions.
+  #   cloudkms/CryptoKeyVersion: no create, and its delete is POST :destroy.
+  #   storage/Folder: the collection "folders" is read as a resource-manager
+  #     folder scope, and names only grow.
+  #   storage/HmacKey: the secret comes only in the create response, and delete
+  #     needs a PUT to INACTIVE first.
+  #   storage/ManagedFolder: re-rule now that its PATCH (named update) derives.
+  #   firestore/Index: no create (collection and database are unbound).
+  #   monitoring/NotificationChannel: obfuscated secret labels drift.
+  #   monitoring/UptimeCheckConfig: Google adds project_id to
+  #     monitoredResource.labels, which is ForceNew; unverified whether that
+  #     replaces the check on every plan.
+  #   networkservices/Gateway: every patch must carry scope, type and
+  #     routingMode, which are not input-only.
+  #   binaryauthorization/Policy: paired with the platform-policy collection,
+  #     not the project singleton.
+  #   iam/OauthClient, iam/WorkforcePool, iam/WorkloadIdentityPool: soft
+  #     delete; a deleted pool reads as present for 30 days.
+  #   cloudresourcemanager/Lien: self_link "liens?parent=" becomes the list url.
+  #   accesscontextmanager (4 types): no create, organization-only, untestable
+  #     here.
+  #   cloudresourcemanager/tagHolds, servicenetworking/peeredDnsDomains: a
+  #     ruling for a type with no magic-modules resource is never read.
+
 patchable:
   gcp.network:
     fields: [routingConfig]
