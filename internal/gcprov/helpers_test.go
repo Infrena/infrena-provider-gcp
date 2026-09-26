@@ -207,10 +207,10 @@ func pointCatalogAt(c *catalog.Catalog, base string) *catalog.Catalog {
 	// off the catalog, so a copy that dropped it would make every fallback
 	// test scan nothing while looking like it had scanned everything.
 	return &catalog.Catalog{
-		Generated:       c.Generated,
-		MMV1Commit:      c.MMV1Commit,
-		Types:           types,
-		DiscoverDefault: c.DiscoverDefault,
+		DiscoveryRevision: c.DiscoveryRevision,
+		MMV1Commit:        c.MMV1Commit,
+		Types:             types,
+		DiscoverDefault:   c.DiscoverDefault,
 	}
 }
 

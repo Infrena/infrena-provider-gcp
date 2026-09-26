@@ -14,8 +14,10 @@ import (
 
 // Document is one API's Discovery document.
 type Document struct {
-	Name        string               `json:"name"`
-	Version     string               `json:"version"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	// Revision is the day Google published this document, as YYYYMMDD.
+	Revision    string               `json:"revision"`
 	RootURL     string               `json:"rootUrl"`
 	ServicePath string               `json:"servicePath"`
 	Schemas     map[string]*Schema   `json:"schemas"`

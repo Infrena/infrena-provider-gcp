@@ -11,8 +11,8 @@ import (
 
 func sample() *Catalog {
 	return &Catalog{
-		Generated:  "2026-09-21",
-		MMV1Commit: "deadbeef",
+		DiscoveryRevision: "2026-09-21",
+		MMV1Commit:        "deadbeef",
 		Types: []*Type{{
 			Name: "gcp.widget", Service: "tiny", Description: "A widget.",
 			Tier: 1, TierReason: "generic-safe",

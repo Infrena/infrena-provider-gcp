@@ -172,7 +172,7 @@ func renderIndex(c *catalog.Catalog, services []string, byService map[string][]*
 	p("%s\n\n# GCP type reference\n\n", banner)
 	p("This plugin serves **%d types** across %d Google Cloud services. ", len(c.Types), len(services))
 	p("Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.\n\n")
-	p("- Catalog generated: %s\n", c.Generated)
+	p("- Newest Discovery revision: %s\n", c.DiscoveryRevision)
 	p("- From magic-modules commit: `%s`\n\n", c.MMV1Commit)
 	p("**[Types that are not served, and why](not-shipped.md)** — %d entries. ", countNotShipped(ws))
 	p("Read that page first if the type you want is missing from this one.\n\n")

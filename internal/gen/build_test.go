@@ -110,6 +110,46 @@ func TestGenerationIsDeterministic(t *testing.T) {
 	}
 }
 
+// TestTheCatalogIsDatedByItsNewestDiscoveryRevision. The catalog used to be
+// stamped with the day it was generated, so `gen-gcp -check` called a
+// committed catalog stale on every day after the one it was built, and no
+// regeneration could reproduce the committed bytes. The date now comes from
+// the inputs: the newest revision among the Discovery documents it was built
+// from.
+func TestTheCatalogIsDatedByItsNewestDiscoveryRevision(t *testing.T) {
+	withRevision := func(doc, rev string) string {
+		return strings.Replace(doc, "{\n", "{\n  \"revision\": \""+rev+"\",\n", 1)
+	}
+	in := writeRefFixture(t, map[string]string{
+		"schemas/older.json":   withRevision(simpleDoc("older", "things", "Thing", ""), "20260101"),
+		"schemas/newer.json":   withRevision(simpleDoc("newer", "gadgets", "Gadget", ""), "20260918"),
+		"schemas/undated.json": simpleDoc("undated", "doodads", "Doodad", ""),
+	})
+	if err := os.MkdirAll(in.MMV1Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Catalog.DiscoveryRevision; got != "2026-09-18" {
+		t.Errorf("catalog dated %q, want the newest Discovery revision, 2026-09-18", got)
+	}
+}
+
+// TestAMalformedDiscoveryRevisionIsRefused. A revision that is not a date
+// would otherwise date the catalog with nothing, silently.
+func TestAMalformedDiscoveryRevisionIsRefused(t *testing.T) {
+	doc := strings.Replace(simpleDoc("odd", "things", "Thing", ""), "{\n", "{\n  \"revision\": \"sometime\",\n", 1)
+	in := writeRefFixture(t, map[string]string{"schemas/odd.json": doc})
+	if err := os.MkdirAll(in.MMV1Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(in); err == nil || !strings.Contains(err.Error(), "sometime") {
+		t.Errorf("Build over a malformed revision: err = %v, want one naming it", err)
+	}
+}
+
 // TestTheLockIsExtendedNotRewritten.
 func TestTheGeneratorExtendsTheLock(t *testing.T) {
 	in := buildFixture(t)

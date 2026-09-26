@@ -221,9 +221,13 @@ func Build(in Inputs) (*Result, error) {
 	// inside buildType. This pass collects exactly what survives that: c.Types
 	// and the build-failure warnings, and — in `succeeded` — enough of each
 	// pending to resolve references against in pass four.
+	revision, err := newestRevision(docs)
+	if err != nil {
+		return nil, err
+	}
 	c := &catalog.Catalog{
-		Generated:  time.Now().UTC().Format("2006-01-02"),
-		MMV1Commit: readPin(filepath.Dir(in.MMV1Dir)),
+		DiscoveryRevision: revision,
+		MMV1Commit:        readPin(filepath.Dir(in.MMV1Dir)),
 		// The overlay is a generator-time input, so the runtime's discovery
 		// fallback has no way to read discover_default except through the
 		// catalog it already loads. Copied verbatim; whether every name in it
@@ -453,6 +457,30 @@ func loadDocs(dir string) ([]*disco.Document, error) {
 		docs = append(docs, d)
 	}
 	return docs, nil
+}
+
+// newestRevision is the latest Discovery revision among docs, as YYYY-MM-DD,
+// or "" when none carries one. A revision that is not a YYYYMMDD date is an
+// error rather than skipped, because skipping it could date the catalog by
+// an older document without anyone noticing.
+func newestRevision(docs []*disco.Document) (string, error) {
+	var newest time.Time
+	for _, d := range docs {
+		if d.Revision == "" {
+			continue
+		}
+		t, err := time.Parse("20060102", d.Revision)
+		if err != nil {
+			return "", fmt.Errorf("%s: revision %q is not a YYYYMMDD date", d.Name, d.Revision)
+		}
+		if t.After(newest) {
+			newest = t
+		}
+	}
+	if newest.IsZero() {
+		return "", nil
+	}
+	return newest.Format("2006-01-02"), nil
 }
 
 // matchResource finds the magic-modules resource behind one Discovery
