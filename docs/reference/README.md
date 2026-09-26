@@ -4,7 +4,7 @@
 
 This plugin serves **289 types** across 40 Google Cloud services. Every page below is generated from the catalog the plugin itself loads, so it says what the plugin does, not what it intends to do.
 
-- Catalog generated: 2026-09-25
+- Newest Discovery revision: 2026-09-18
 - From magic-modules commit: `2d08a4a7b218c0c9d6c3ba236eae45193d386f44`
 
 **[Types that are not served, and why](not-shipped.md)** — 331 entries. Read that page first if the type you want is missing from this one.

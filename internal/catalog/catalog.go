@@ -328,9 +328,13 @@ type Type struct {
 
 // Catalog is the whole generated set.
 type Catalog struct {
-	Generated  string  `json:"generated"`
-	MMV1Commit string  `json:"mmv1_commit"`
-	Types      []*Type `json:"types"`
+	// DiscoveryRevision is the newest revision among the Discovery documents
+	// the catalog was built from, as YYYY-MM-DD. It dates the catalog by its
+	// inputs rather than by the day it was generated, so a regeneration on any
+	// day reproduces the committed bytes and `gen-gcp -check` stays green.
+	DiscoveryRevision string  `json:"discovery_revision"`
+	MMV1Commit        string  `json:"mmv1_commit"`
+	Types             []*Type `json:"types"`
 
 	// DiscoverDefault is the type list discovery's per-type fallback scans
 	// when neither the request nor the instance names any -- gen/overlay.yaml's

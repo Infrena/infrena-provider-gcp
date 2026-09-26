@@ -181,10 +181,10 @@ func redirect(c *catalog.Catalog, host, instance string) (*catalog.Catalog, oaut
 		types[i] = &cp
 	}
 	return &catalog.Catalog{
-		Generated:       c.Generated,
-		MMV1Commit:      c.MMV1Commit,
-		Types:           types,
-		DiscoverDefault: c.DiscoverDefault,
+		DiscoveryRevision: c.DiscoveryRevision,
+		MMV1Commit:        c.MMV1Commit,
+		Types:             types,
+		DiscoverDefault:   c.DiscoverDefault,
 	}, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: overrideToken, TokenType: "Bearer"}), nil
 }
 
