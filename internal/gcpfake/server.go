@@ -878,7 +878,9 @@ func writeNotFound(w http.ResponseWriter, path string) {
 // handleCreateAt is a create addressed to the item's own path rather than to
 // its collection -- Pub/Sub's topics, subscriptions and snapshots.
 func (s *Server) handleCreateAt(w http.ResponseWriter, r *http.Request, bodyBytes []byte) {
-	path := r.URL.Path
+	// Cloud SQL's users.update is a PUT to the collection naming the user in
+	// ?name=: the user it names is the one replaced.
+	path := s.itemAddressed(r)
 	body := map[string]any{}
 	if len(bodyBytes) > 0 {
 		if err := json.Unmarshal(bodyBytes, &body); err != nil {

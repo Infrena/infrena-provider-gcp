@@ -8705,11 +8705,21 @@ gcp.user		lock_field	none	default
 gcp.user		patch_one_field	false	default
 gcp.user		setters	none	default
 gcp.user		timeout	600	default
-gcp.user		update_await	none	default
+gcp.user		update_await	compute_operation	discovery
 gcp.user		update_mask	none	default
-gcp.user		update_verb	none	default
+gcp.user		update_verb	PUT	discovery+ruling
+gcp.user	etag	immutable	true	ruling
+gcp.user	host	immutable	true	ruling
+gcp.user	iamEmail	immutable	true	ruling
+gcp.user	iamStatus	immutable	true	ruling
+gcp.user	instance	immutable	true	ruling
+gcp.user	kind	immutable	true	ruling
+gcp.user	name	immutable	true	ruling
+gcp.user	password	input_only	true	ruling
 gcp.user	password	sensitive	true	ruling
 gcp.user	passwordPolicy.status	output	true	discovery
+gcp.user	project	immutable	true	ruling
+gcp.user	type_value	immutable	true	ruling
 gcp.usercred		clear_before_delete	none	default
 gcp.usercred		create_await	none	discovery
 gcp.usercred		create_url	{+parent}/userCreds	discovery

@@ -64,10 +64,21 @@ type Patchable struct {
 	// two-field patch with "Only one field at a time can be modified in the
 	// request" on 2026-09-24, and nothing in their Discovery text says so.
 	OneFieldPerPatch bool `yaml:"one_field_per_patch"`
+	// InQuery names listed fields a PUT update takes as query parameters
+	// and ignores in its body, each with any further parameters that go
+	// beside it (catalog.Type.UpdateQuery). Checked against the update
+	// method's published query parameters, and refused on a PATCH type.
+	InQuery []InQuery `yaml:"in_query"`
 	// Note must quote or cite what the API says. Required, for the same reason
 	// a ruling's note is: a list of field names with no source behind it is
 	// indistinguishable from a guess.
 	Note string `yaml:"note"`
+}
+
+// InQuery is one entry of a patchable list's in_query.
+type InQuery struct {
+	Field string            `yaml:"field"`
+	With  map[string]string `yaml:"with"`
 }
 
 // Overlay is gen/overlay.yaml: everything a human decided.
@@ -107,7 +118,13 @@ type Overlay struct {
 	// types Terraform writes by hand. Keyed by type name; each path is dotted,
 	// with [] for a list element. A path the type does not have fails the
 	// build.
-	Sensitive map[string]SensitiveFields `yaml:"sensitive"`
+	Sensitive map[string]FieldList `yaml:"sensitive"`
+	// InputOnly marks fields the API accepts and never returns, where no
+	// source says so: a Cloud SQL user's password, on a type Terraform
+	// writes by hand and whose Discovery text has no "Input only.". Keyed by
+	// type name, like Sensitive, because such a type has no magic-modules
+	// resource for a ruling to be keyed by.
+	InputOnly map[string]FieldList `yaml:"input_only"`
 	// Observed is what live tests saw Google do, keyed by infrena type. Each
 	// entry asserts one fact of the closed vocabulary (facts.go), and the
 	// generator refuses to produce a catalog that contradicts it. See
@@ -172,8 +189,9 @@ func LoadOverlay(path, mmv1Dir string) (*Overlay, error) {
 	return &o, nil
 }
 
-// SensitiveFields is one type's entry in the overlay's sensitive list.
-type SensitiveFields struct {
+// FieldList is one type's entry in a type-keyed list of the overlay's:
+// sensitive, input_only.
+type FieldList struct {
 	Fields []string `yaml:"fields"`
 	Note   string   `yaml:"note"`
 }

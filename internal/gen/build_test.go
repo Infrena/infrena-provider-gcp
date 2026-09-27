@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -1856,7 +1857,7 @@ func TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest(t *testing.T) {
 				"key": {Canonical: "key"}, "name": {Canonical: "name"}}}}}}}
 	}
 	types := build()
-	if err := applySensitive(types, map[string]SensitiveFields{
+	if err := applySensitive(types, map[string]FieldList{
 		"gcp.router": {Fields: []string{"md5AuthenticationKeys[].key"}, Note: "a BGP MD5 key"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -1864,12 +1865,47 @@ func TestTheSensitiveOverlayMarksWhatItNamesAndRefusesTheRest(t *testing.T) {
 	if !f["key"].Sensitive || f["name"].Sensitive {
 		t.Errorf("key sensitive %v, name sensitive %v; want only the key", f["key"].Sensitive, f["name"].Sensitive)
 	}
-	for what, entries := range map[string]map[string]SensitiveFields{
+	for what, entries := range map[string]map[string]FieldList{
 		"a missing path":        {"gcp.router": {Fields: []string{"md5AuthenticationKeys[].nope"}, Note: "x"}},
 		"a type that is absent": {"gcp.nope": {Fields: []string{"x"}, Note: "x"}},
 		"no note":               {"gcp.router": {Fields: []string{"md5AuthenticationKeys[].key"}}},
 	} {
 		if err := applySensitive(build(), entries); err == nil {
+			t.Errorf("%s was accepted", what)
+		}
+	}
+}
+
+// TestTheInputOnlyOverlayMarksWhatItNamesAndRefusesTheRest. A Cloud SQL
+// user's password is never returned and nothing says so: Discovery's text
+// has no "Input only." and Terraform writes the resource by hand. Unmarked,
+// every plan read the missing password as drift. An output field is
+// refused: Google returns it, so there is something to compare.
+func TestTheInputOnlyOverlayMarksWhatItNamesAndRefusesTheRest(t *testing.T) {
+	build := func() []*catalog.Type {
+		return []*catalog.Type{{Name: "gcp.user", Attributes: map[string]*catalog.Attr{
+			"password": {Canonical: "password"}, "host": {Canonical: "host"},
+			"iamStatus": {Canonical: "iamStatus", Output: true}}}}
+	}
+	types := build()
+	if err := applyInputOnly(types, map[string]FieldList{
+		"gcp.user": {Fields: []string{"password"}, Note: "never returned"}}); err != nil {
+		t.Fatal(err)
+	}
+	a := types[0].Attributes
+	if !a["password"].InputOnly || a["host"].InputOnly {
+		t.Errorf("password input-only %v, host input-only %v; want only the password", a["password"].InputOnly, a["host"].InputOnly)
+	}
+	if got := a["password"].Sources["input_only"]; !reflect.DeepEqual(got, []string{SourceRuling}) {
+		t.Errorf("password's input_only source is %v, want the ruling", got)
+	}
+	for what, entries := range map[string]map[string]FieldList{
+		"a missing path":        {"gcp.user": {Fields: []string{"nope"}, Note: "x"}},
+		"a type that is absent": {"gcp.nope": {Fields: []string{"password"}, Note: "x"}},
+		"no note":               {"gcp.user": {Fields: []string{"password"}}},
+		"an output field":       {"gcp.user": {Fields: []string{"iamStatus"}, Note: "x"}},
+	} {
+		if err := applyInputOnly(build(), entries); err == nil {
 			t.Errorf("%s was accepted", what)
 		}
 	}

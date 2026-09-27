@@ -344,7 +344,14 @@ func (p *Provider) Update(ctx context.Context, current *resource.ResourceState, 
 		if err != nil {
 			return nil, err
 		}
+		reqURL = withQueryFields(ty, reqURL, body, mask)
 		body = mergeChanged(fresh, body)
+		// Never in the body, changed or not: Discovery says Cloud SQL
+		// ignores the roles there, and live it refused a PUT carrying the
+		// ones a read had just returned (2026-09-27).
+		for _, f := range ty.UpdateQuery {
+			delete(body, f.Field)
+		}
 	} else if ty.LockField != "" {
 		if a, v := lockValue(ty, current.Attributes); v.Known {
 			body[ty.LockField] = wireValue(a, v)
@@ -599,6 +606,45 @@ func (p *Provider) readForPut(ctx context.Context, ty *catalog.Type, id string, 
 		return nil, fmt.Errorf("gcp: %s: reading the resource to update it whole: %w", ty.Name, err)
 	}
 	return fresh, nil
+}
+
+// withQueryFields appends to reqURL each changed field the update reads from
+// its query rather than its body (catalog.Type.UpdateQuery), a list as one
+// parameter per element, with the parameters that go beside it. An emptied
+// list sends only those: revokeExistingRoles=true with no roles revokes them
+// all, which is what configuration asked for. A field that did not change
+// sends nothing, so its roles are left alone.
+func withQueryFields(ty *catalog.Type, reqURL string, changed map[string]any, mask []string) string {
+	inMask := map[string]bool{}
+	for _, f := range topLevelFields(mask) {
+		inMask[f] = true
+	}
+	q := url.Values{}
+	for _, f := range ty.UpdateQuery {
+		if !inMask[f.Field] {
+			continue
+		}
+		switch v := changed[f.Field].(type) {
+		case nil:
+		case []any:
+			for _, e := range v {
+				q.Add(f.Field, fmt.Sprint(e))
+			}
+		default:
+			q.Add(f.Field, fmt.Sprint(v))
+		}
+		for k, v := range f.With {
+			q.Set(k, v)
+		}
+	}
+	if len(q) == 0 {
+		return reqURL
+	}
+	sep := "?"
+	if strings.Contains(reqURL, "?") {
+		sep = "&"
+	}
+	return reqURL + sep + q.Encode()
 }
 
 // mergeChanged writes changed into base, descending through objects both
