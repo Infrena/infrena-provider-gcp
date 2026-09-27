@@ -1439,3 +1439,14 @@ observed:
     - fact: update_verb
       value: PUT
       seen: 2026-09-25 TestLiveLogMetricUpdatesByPut
+  gcp.user:
+    - fact: update_verb
+      value: PUT
+      seen: 2026-09-27 TestLiveSqlUserUpdatesByPut
+    - fact: update_await
+      value: compute_operation
+      seen: 2026-09-27 TestLiveSqlUserUpdatesByPut
+    - path: password
+      fact: input_only
+      value: "true"
+      seen: 2026-09-27 TestLiveSqlUserUpdatesByPut
