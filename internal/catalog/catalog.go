@@ -172,6 +172,16 @@ type Type struct {
 	// not always the same word: six of the eight say "updateMask" and
 	// spanner's instances and instancePartitions say "fieldMask".
 	UpdateMaskField string `json:"update_mask_field,omitempty"`
+	// UpdateQuery names top-level fields a PUT update takes as query
+	// parameters and never in its body: Cloud SQL's users.update grants
+	// databaseRoles from ?databaseRoles=. Discovery says "body.database_roles
+	// will be ignored", but live Google REFUSES a body carrying them
+	// ("Invalid request to update database roles"), so the runtime leaves
+	// them out of every PUT body. A changed one goes on the query with its With parameters
+	// beside it (revokeExistingRoles=true, so the list replaces the user's
+	// roles rather than adding to them). From a human `patchable:` entry,
+	// checked against the method's published query parameters.
+	UpdateQuery []*QueryField `json:"update_query,omitempty"`
 	// LockField names the top-level field the API requires, up to date, in
 	// every update: compute's optimistic-locking fingerprint. "An up-to-date
 	// fingerprint must be provided in order to update the Subnetwork,
@@ -324,6 +334,16 @@ type Type struct {
 	CreateBindings map[string]*CreateBinding `json:"create_bindings,omitempty"`
 
 	Attributes map[string]*Attr `json:"attributes"`
+}
+
+// QueryField is one field a PUT update sends on its query string: see
+// Type.UpdateQuery.
+type QueryField struct {
+	// Field is the top-level field, as the wire spells it, and the query
+	// parameter of the same name.
+	Field string `json:"field"`
+	// With are further query parameters sent beside a change to Field.
+	With map[string]string `json:"with,omitempty"`
 }
 
 // Catalog is the whole generated set.

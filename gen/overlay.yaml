@@ -1138,6 +1138,33 @@ patchable:
       body carries only changed fields, so it never did. catalog.Type.LockField
       now names it and Update copies it from the observation it was handed.
 
+  gcp.user:
+    fields: [password, passwordPolicy, dualPasswordType, sqlserverUserDetails, databaseRoles, serverRoles]
+    in_query:
+      - field: databaseRoles
+        with: {revokeExistingRoles: "true"}
+      - field: serverRoles
+        with: {revokeExistingServerRoles: "true"}
+    note: >
+      sqladmin.users.update is a PUT, so there is no restricted-patch sentence to
+      quote, but the pinned Discovery document rules two things out.
+      User.host: "The host name cannot be updated after insertion." And the
+      update's own query parameters: databaseRoles, "body.database_roles will
+      be ignored for update request", and serverRoles, "body.server_roles will
+      be ignored for update request". The roles therefore go on the query, with
+      revokeExistingRoles / revokeExistingServerRoles true, because without them
+      "the database roles specified in database_roles are added to the user's
+      existing roles" and a role removed from configuration would stay granted.
+      And "ignored" is wrong: on 2026-09-27 Google refused a password-change PUT
+      whose body carried the roles a read had just returned, "Invalid request
+      to update database roles", so the runtime keeps them out of the body.
+
+      Listed: the credentials and the policy around them, and the two role lists.
+      Left out, and so replaced: host (above), type, iamEmail and iamStatus,
+      which say who the user IS rather than what it may do, and which nothing
+      says update in place. passwordPolicy in place was checked live
+      (TestLiveSqlUserUpdatesByPut).
+
 # Curated aliases: the short word people actually say, for attributes they write
 # constantly. The generator already emits a snake_case alias for EVERY camelCase
 # attribute (11,680 of them), so this file is only for the cases where the
@@ -1200,6 +1227,19 @@ sensitive:
   gcp.router:
     fields: ["md5AuthenticationKeys[].key"]
     note: The value of a BGP session's MD5 authentication key, input only.
+
+# input_only: fields Google accepts and never returns, where no source says
+# so. Keyed by type name, like sensitive above, because the types that need it
+# are ones Terraform writes by hand and so have no magic-modules resource for a
+# ruling to be keyed by. Without it the missing field reads as drift on every
+# plan, against a resource that is exactly as configured.
+input_only:
+  gcp.user:
+    fields: [password]
+    note: >
+      A Cloud SQL user's password. users.get and users.list never return it
+      (checked live, TestLiveSqlUserUpdatesByPut); the Discovery text is only
+      "The password for the user.", with no "Input only." to read.
 
 # product_aliases: Discovery API name -> every vendored magic-modules product
 # directory that also carries resources for it. mmv1's directory names
@@ -1399,3 +1439,14 @@ observed:
     - fact: update_verb
       value: PUT
       seen: 2026-09-25 TestLiveLogMetricUpdatesByPut
+  gcp.user:
+    - fact: update_verb
+      value: PUT
+      seen: 2026-09-27 TestLiveSqlUserUpdatesByPut
+    - fact: update_await
+      value: compute_operation
+      seen: 2026-09-27 TestLiveSqlUserUpdatesByPut
+    - path: password
+      fact: input_only
+      value: "true"
+      seen: 2026-09-27 TestLiveSqlUserUpdatesByPut

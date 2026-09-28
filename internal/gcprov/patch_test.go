@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/infrena/infrena-provider-gcp/internal/catalog"
@@ -881,5 +882,136 @@ func TestAPutUpdateCarriesWhatDidNotChange(t *testing.T) {
 	}
 	if got, _ := st.Attributes["sizeGb"].AsInt(); got != 20 {
 		t.Errorf("state after the update has sizeGb %v", st.Attributes["sizeGb"])
+	}
+}
+
+// TestAPutUpdateOnTheCollectionReplacesTheItemItNames is Cloud SQL's
+// users.update: a PUT to the collection with the user in ?name=. It must
+// reach the user it names, carry what did not change, and create nothing at
+// the collection's own path.
+func TestAPutUpdateOnTheCollectionReplacesTheItemItNames(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	s.SetPutReplaces(func(string) bool { return true })
+	collection := "/v1/projects/p/locations/r/widgets"
+	path := collection + "/one"
+	s.Seed(path, map[string]any{
+		"name": "one", "sizeGb": float64(10), "tier": "gold",
+	})
+	ty := widgetType()
+	ty.UpdateVerb = http.MethodPut
+	ty.UpdateMask = false
+	ty.UpdateURL = "projects/{{project}}/locations/{{region}}/widgets?name={{name}}"
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+	current := widgetState()
+	current.Attributes["tier"] = value.String("gold", value.SourceProvider)
+	if _, err := p.Update(context.Background(), current, widgetDesired(map[string]any{
+		"project": "p", "region": "r", "name": "one", "sizeGb": int64(20), "tier": "gold",
+	})); err != nil {
+		t.Fatal(err)
+	}
+	put := requestOf(t, s, http.MethodPut, collection)
+	if got := put.Query.Get("name"); got != "one" {
+		t.Errorf("the PUT names %q in ?name=, want one", got)
+	}
+	held, _ := s.Get(path)
+	if held["sizeGb"] != float64(20) || held["tier"] != "gold" {
+		t.Errorf("the user the PUT names holds %v; want the change with the rest kept", held)
+	}
+	if stray, ok := s.Get(collection); ok {
+		t.Errorf("the PUT created a resource at the collection's own path: %v", stray)
+	}
+}
+
+// TestAFieldTheUpdateReadsFromItsQueryIsSentThere is Cloud SQL's users.update:
+// "body.database_roles will be ignored for update request". A role change
+// sent only in the body would be reported applied and never happen, and
+// without revokeExistingRoles=true the listed roles are ADDED to the user's,
+// so a role removed from configuration would stay granted.
+func TestAFieldTheUpdateReadsFromItsQueryIsSentThere(t *testing.T) {
+	collection := "/v1/projects/p/locations/r/widgets"
+	for _, c := range []struct {
+		name       string
+		roles      value.Value
+		sizeGb     int64
+		wantRoles  []string
+		wantRevoke string
+	}{
+		{"a changed list", listValue("b", "c"), 10, []string{"b", "c"}, "true"},
+		{"an unchanged list", listValue("a"), 20, nil, ""},
+		{"a list emptied", listValue(), 10, nil, "true"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			gcptest.Isolate(t)
+			s := gcpfake.New(t)
+			defer s.Close()
+			s.SetPutReplaces(func(string) bool { return true })
+			s.Seed(collection+"/one", map[string]any{"name": "one", "sizeGb": float64(10), "roles": []any{"a"}})
+			ty := widgetType()
+			ty.UpdateVerb = http.MethodPut
+			ty.UpdateMask = false
+			ty.UpdateURL = "projects/{{project}}/locations/{{region}}/widgets?name={{name}}"
+			ty.Attributes["roles"] = &catalog.Attr{Canonical: "roles", Kind: value.KindList, Elem: &catalog.Attr{Canonical: "roles", Kind: value.KindString}}
+			ty.UpdateQuery = []*catalog.QueryField{{Field: "roles", With: map[string]string{"revokeRoles": "true"}}}
+			p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+
+			current := widgetState()
+			current.Attributes["roles"] = listValue("a")
+			desired := widgetDesired(map[string]any{"project": "p", "region": "r", "name": "one", "sizeGb": c.sizeGb})
+			desired.Attrs["roles"] = c.roles
+			if _, err := p.Update(context.Background(), current, desired); err != nil {
+				t.Fatal(err)
+			}
+			q := requestOf(t, s, http.MethodPut, collection).Query
+			if got := q.Get("name"); got != "one" {
+				t.Errorf("?name=%q, want one", got)
+			}
+			if got := q["roles"]; !reflect.DeepEqual(got, c.wantRoles) {
+				t.Errorf("?roles=%v, want %v", got, c.wantRoles)
+			}
+			if got := q.Get("revokeRoles"); got != c.wantRevoke {
+				t.Errorf("?revokeRoles=%q, want %q", got, c.wantRevoke)
+			}
+			// Google's text says the body's roles are ignored; live, on
+			// 2026-09-27, a PUT whose body carried the roles a fresh read
+			// returned was refused: "Invalid request to update database
+			// roles." So they never go in the body, changed or not.
+			if body := sentBody(t, requestOf(t, s, http.MethodPut, collection)); body["roles"] != nil {
+				t.Errorf("the PUT body carries roles %v; Google refuses them there", body["roles"])
+			}
+		})
+	}
+}
+
+// TestTheShippedSqlUserKeepsItsPasswordAcrossARead. Google never returns a
+// Cloud SQL user's password, so the fake is seeded without one, the way the
+// real answer comes back. Before the overlay's input_only entry the read
+// reported it missing, and every plan proposed setting it again: a replace
+// while the type had no update, a PUT on every plan after.
+func TestTheShippedSqlUserKeepsItsPasswordAcrossARead(t *testing.T) {
+	gcptest.Isolate(t)
+	s := gcpfake.New(t)
+	defer s.Close()
+	ty, ok := mustCatalog(t).Type("gcp.user")
+	if !ok {
+		t.Fatal("gcp.user does not ship")
+	}
+	s.Seed("/v1/projects/p/instances/i/users/bob", map[string]any{
+		"name": "bob", "instance": "i", "project": "p", "kind": "sql#user",
+	})
+	p := testProviderWithCatalog(t, s, &catalog.Catalog{Types: []*catalog.Type{ty}})
+	current := &resource.ResourceState{
+		Type:       "gcp.user",
+		ProviderID: "projects/p/instances/i/users/bob",
+		Attributes: attrsMixed(map[string]any{"project": "p", "instance": "i", "name": "bob", "password": "s3cret"}),
+	}
+	st, err := p.Read(context.Background(), current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Attributes["password"]; !got.Known || got.Raw != "s3cret" {
+		t.Errorf("after a read the password is %v; Google never returns it, so state must keep it", got)
 	}
 }

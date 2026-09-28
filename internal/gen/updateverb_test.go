@@ -2,6 +2,7 @@ package gen
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -30,7 +31,8 @@ func updateVerbDoc() string {
   "schemas": {
     "Thing": {"id": "Thing", "type": "object", "properties": {
       "name": {"type": "string", "description": "The name."},
-      "size": {"type": "integer", "format": "int64", "description": "How big."}
+      "size": {"type": "integer", "format": "int64", "description": "How big."},
+      "roles": {"type": "array", "items": {"type": "string"}, "description": "Roles held."}
     }},
     "UpdateThingRequest": {"id": "UpdateThingRequest", "type": "object", "properties": {
       "thing": {"$ref": "Thing", "description": "The updated thing."},
@@ -58,6 +60,22 @@ func updateVerbDoc() string {
         "insert": {"id": "a.o.insert", "path": "projects/{project}/putonlies", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
         "delete": {"id": "a.o.delete", "path": "projects/{project}/putonlies/{id}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
         "update": {"id": "a.o.update", "path": "projects/{project}/putonlies/{id}", "httpMethod": "PUT", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}
+      }},
+      "queryputs": {"methods": {
+        "get": {"id": "a.q.get", "path": "projects/{project}/queryputs/{name}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.q.insert", "path": "projects/{project}/queryputs", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.q.delete", "path": "projects/{project}/queryputs", "httpMethod": "DELETE", "response": {"$ref": "Operation"},
+          "parameters": {"name": {"type": "string", "location": "query"}}},
+        "update": {"id": "a.q.update", "path": "projects/{project}/queryputs", "httpMethod": "PUT", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"},
+          "parameters": {"name": {"type": "string", "location": "query"},
+            "roles": {"type": "string", "location": "query", "repeated": true, "description": "Roles to grant. body.roles is ignored for update."},
+            "revokeRoles": {"type": "boolean", "location": "query"}}}
+      }},
+      "bareputs": {"methods": {
+        "get": {"id": "a.b.get", "path": "projects/{project}/bareputs/{name}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
+        "insert": {"id": "a.b.insert", "path": "projects/{project}/bareputs", "httpMethod": "POST", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}},
+        "delete": {"id": "a.b.delete", "path": "projects/{project}/bareputs/{name}", "httpMethod": "DELETE", "response": {"$ref": "Operation"}},
+        "update": {"id": "a.b.update", "path": "projects/{project}/bareputs", "httpMethod": "PUT", "request": {"$ref": "Thing"}, "response": {"$ref": "Operation"}}
       }},
       "elsewheres": {"methods": {
         "get": {"id": "a.e.get", "path": "projects/{project}/elsewheres/{id}", "httpMethod": "GET", "response": {"$ref": "Thing"}},
@@ -152,6 +170,45 @@ func TestAPutOnlyCollectionUpdatesWithPut(t *testing.T) {
 	}
 	if ty.UpdateVerb != "PUT" || ty.UpdateMask {
 		t.Errorf("UpdateVerb = %q, UpdateMask = %v; want PUT and no mask: the whole resource is sent", ty.UpdateVerb, ty.UpdateMask)
+	}
+}
+
+// TestAPutOnTheCollectionUpdatesTheItemItNames is Cloud SQL's users.update:
+// published on the COLLECTION, with the user named in a ?name= query
+// parameter, the way its users.delete already is. discoveredPut asked only
+// for a PUT at the get's own address, so a SQL user was replaced on every
+// change: dropped and created again, its grants with it.
+func TestAPutOnTheCollectionUpdatesTheItemItNames(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.queryput")
+	if !ok {
+		t.Fatalf("gcp.queryput missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "PUT" || ty.UpdateMask {
+		t.Errorf("UpdateVerb = %q, UpdateMask = %v; want PUT and no mask", ty.UpdateVerb, ty.UpdateMask)
+	}
+	if want := "projects/{project}/queryputs?name={name}"; ty.UpdateURL != want {
+		t.Errorf("UpdateURL = %q, want %q: the PUT goes to the collection and names the item", ty.UpdateURL, want)
+	}
+}
+
+// TestAPutOnTheCollectionThatNamesNoItemIsNoUpdate. A PUT on the collection
+// with nothing saying which item it replaces is not an update this provider
+// can address, whatever its body is.
+func TestAPutOnTheCollectionThatNamesNoItemIsNoUpdate(t *testing.T) {
+	res, err := Build(writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.bareput")
+	if !ok {
+		t.Fatalf("gcp.bareput missing; catalog has %d types", len(res.Catalog.Types))
+	}
+	if ty.UpdateVerb != "" || ty.UpdateURL != "" {
+		t.Errorf("UpdateVerb = %q, UpdateURL = %q; want neither: the PUT names no item", ty.UpdateVerb, ty.UpdateURL)
 	}
 }
 
@@ -772,6 +829,92 @@ func TestAnUpdateVerbOtherThanPatchIsRefusedFromMagicModulesToo(t *testing.T) {
 		}
 		if verb != "PATCH" && strings.Contains(ty.UpdateURL, "alertPolicies") {
 			t.Errorf("magic-modules' %s update_url %q reached the catalog", verb, ty.UpdateURL)
+		}
+	}
+}
+
+// queryPutOverlay is the fixture with a patchable entry for gcp.queryput.
+func queryPutOverlay(t *testing.T, entry string) Inputs {
+	t.Helper()
+	in := writeRefFixture(t, map[string]string{"schemas/acme.json": updateVerbDoc(), "mmv1/products/.keep": ""})
+	overlay := "rulings: {}\naliases: {}\ndiscover_default: []\npatchable:\n" + entry
+	if err := os.WriteFile(in.OverlayPath, []byte(overlay), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
+// TestAPatchableListLimitsAPutUpdate. Cloud SQL's users.update replaces the
+// user, but a host cannot change after insertion and the role lists in its
+// body are ignored. A `patchable:` list said which fields a PATCH really
+// changes and applied to nothing else; a PUT type sent every change and
+// reported the ignored ones applied.
+func TestAPatchableListLimitsAPutUpdate(t *testing.T) {
+	res, err := Build(queryPutOverlay(t, `  gcp.queryput:
+    fields: [size, roles]
+    in_query:
+      - field: roles
+        with: {revokeRoles: "true"}
+    note: the fixture's update ignores body.roles
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ty, ok := res.Catalog.Type("gcp.queryput")
+	if !ok {
+		t.Fatal("gcp.queryput missing")
+	}
+	if ty.UpdateVerb != "PUT" {
+		t.Fatalf("UpdateVerb = %q, want PUT", ty.UpdateVerb)
+	}
+	for _, f := range []string{"size", "roles"} {
+		if ty.Attributes[f].ForceNew {
+			t.Errorf("%s is ForceNew, but the patchable list names it", f)
+		}
+	}
+	if !ty.Attributes["name"].ForceNew {
+		t.Error("name is not ForceNew, but the patchable list leaves it out")
+	}
+	want := []*catalog.QueryField{{Field: "roles", With: map[string]string{"revokeRoles": "true"}}}
+	if !reflect.DeepEqual(ty.UpdateQuery, want) {
+		t.Errorf("UpdateQuery = %v, want roles with revokeRoles=true", ty.UpdateQuery)
+	}
+}
+
+// TestAnInQueryEntryIsCheckedAgainstTheUpdateMethod. A field or a flag the
+// update method does not publish as a query parameter is a guess, and would
+// go on the wire as one.
+func TestAnInQueryEntryIsCheckedAgainstTheUpdateMethod(t *testing.T) {
+	for _, c := range []struct{ name, entry, says string }{
+		{"a field the update takes in its body", `  gcp.queryput:
+    fields: [size]
+    in_query:
+      - field: size
+    note: size is not a query parameter
+`, `in_query names "size", which a.q.update does not take`},
+		{"a flag the update does not take", `  gcp.queryput:
+    fields: [roles]
+    in_query:
+      - field: roles
+        with: {revokeEverything: "true"}
+    note: no such flag
+`, `in_query sends "revokeEverything"`},
+		{"a field the list leaves out", `  gcp.queryput:
+    fields: [size]
+    in_query:
+      - field: roles
+    note: roles would be ForceNew and never sent
+`, `in_query names "roles", which fields does not`},
+		{"a PATCH type", `  gcp.patchable:
+    fields: [size]
+    in_query:
+      - field: size
+    note: only a PUT update carries fields in its query
+`, "in_query applies only to a PUT update"},
+	} {
+		_, err := Build(queryPutOverlay(t, c.entry))
+		if err == nil || !strings.Contains(err.Error(), c.says) {
+			t.Errorf("%s: Build err = %v, want one saying %q", c.name, err, c.says)
 		}
 	}
 }

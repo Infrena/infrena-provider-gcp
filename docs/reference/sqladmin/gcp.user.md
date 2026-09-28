@@ -20,7 +20,7 @@ A Cloud SQL user resource.
 | --- | --- | --- |
 | Create | yes | `POST projects/{project}/instances/{instance}/users` |
 | Read | yes | `GET projects/{project}/instances/{instance}/users/{name}` |
-| Update | **no** | publishes no update method; every change to it replaces the resource |
+| Update | yes | `PUT projects/{project}/instances/{instance}/users?name={name}`, the whole resource: read first, with the change written in |
 | Delete | yes | `DELETE projects/{project}/instances/{instance}/users?name={name}` |
 | Import | yes | by id, see below |
 
@@ -39,13 +39,13 @@ projects/{project}/instances/{instance}/users/{name}
 | `databaseRoles` | `database_roles` | `list` | optional | — | Optional. Role memberships of the user |
 | `databaseRoles[]` | — | `string` | optional | — | — |
 | `dualPasswordType` | `dual_password_type` | `string` | optional | — | Dual password status for the user. |
-| `etag` | — | `string` | optional | — | This field is deprecated and will be removed from a future version of the API. |
-| `host` | — | `string` | optional | — | Optional. The host from which the user can connect. For `insert` operations, host defaults to an empty string. For `update` operations, host is specified as part of the request URL. The host name … |
-| `iamEmail` | `iam_email` | `string` | optional | — | Optional. The full email for an IAM user. For normal database users, this will not be filled. Only applicable to MySQL database users. |
-| `iamStatus` | `iam_status` | `string` | optional | — | Indicates if a group is active or inactive for IAM database authentication. |
-| `instance` | — | `string` | optional | — | The name of the Cloud SQL instance. This does not include the project ID. Can be omitted for `update` because it is already specified on the URL. |
-| `kind` | — | `string` | optional | — | This is always `sql#user`. |
-| `name` | — | `string` | optional | — | The name of the user in the Cloud SQL instance. Can be omitted for `update` because it is already specified in the URL. |
+| `etag` | — | `string` | optional | force new | This field is deprecated and will be removed from a future version of the API. |
+| `host` | — | `string` | optional | force new | Optional. The host from which the user can connect. For `insert` operations, host defaults to an empty string. For `update` operations, host is specified as part of the request URL. The host name … |
+| `iamEmail` | `iam_email` | `string` | optional | force new | Optional. The full email for an IAM user. For normal database users, this will not be filled. Only applicable to MySQL database users. |
+| `iamStatus` | `iam_status` | `string` | optional | force new | Indicates if a group is active or inactive for IAM database authentication. |
+| `instance` | — | `string` | optional | force new | The name of the Cloud SQL instance. This does not include the project ID. Can be omitted for `update` because it is already specified on the URL. |
+| `kind` | — | `string` | optional | force new | This is always `sql#user`. |
+| `name` | — | `string` | optional | force new | The name of the user in the Cloud SQL instance. Can be omitted for `update` because it is already specified in the URL. |
 | `password` | — | `string` | optional | sensitive | The password for the user. |
 | `passwordPolicy` | `password_policy` | `map` | optional | — | User level password validation policy. |
 | `passwordPolicy.allowedFailedAttempts` | `allowed_failed_attempts` | `integer` | optional | — | Number of failed login attempts allowed before user get locked. |
@@ -55,11 +55,11 @@ projects/{project}/instances/{instance}/users/{name}
 | `passwordPolicy.status` | — | `map` | output only | — | Output only. Read-only password status. |
 | `passwordPolicy.status.locked` | — | `boolean` | optional | — | If true, user does not have login privileges. |
 | `passwordPolicy.status.passwordExpirationTime` | `password_expiration_time` | `string` | optional | — | The expiration time of the current password. |
-| `project` | — | `string` | optional | — | The project ID of the project containing the Cloud SQL database. The Google apps domain is prefixed if applicable. Can be omitted for `update` because it is already specified on the URL. |
+| `project` | — | `string` | optional | force new | The project ID of the project containing the Cloud SQL database. The Google apps domain is prefixed if applicable. Can be omitted for `update` because it is already specified on the URL. |
 | `serverRoles` | `server_roles` | `list` | optional | — | Optional. The server roles for the SQL Server login. |
 | `serverRoles[]` | — | `string` | optional | — | — |
 | `sqlserverUserDetails` | `sqlserver_user_details` | `map` | optional | — | Represents a Sql Server user on the Cloud SQL instance. |
 | `sqlserverUserDetails.disabled` | — | `boolean` | optional | — | Indicates if the user has been disabled. |
 | `sqlserverUserDetails.serverRoles` | `server_roles` | `list` | optional | — | Indicates the server roles for this user. |
 | `sqlserverUserDetails.serverRoles[]` | — | `string` | optional | — | — |
-| `type_value` | wire `type` | `string` | optional | — | The user type. It determines the method to authenticate the user during login. The default is the database's built-in user type. |
+| `type_value` | wire `type` | `string` | optional | force new | The user type. It determines the method to authenticate the user during login. The default is the database's built-in user type. |

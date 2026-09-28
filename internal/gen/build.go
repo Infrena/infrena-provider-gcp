@@ -4,6 +4,7 @@
 package gen
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -243,6 +244,10 @@ func Build(in Inputs) (*Result, error) {
 	var succeeded []built
 	for _, p := range shipping {
 		t, err := buildType(p.doc, p.col, p.mm, names[p.cand], overlay)
+		var bad overlayError
+		if errors.As(err, &bad) {
+			return nil, err
+		}
 		if err != nil {
 			warnings = append(warnings, Warning{p.doc.Name, p.rawName, TierExcluded, err.Error()})
 			continue
@@ -308,6 +313,9 @@ func Build(in Inputs) (*Result, error) {
 	}
 	dropRefsToMissingAttributes(c.Types, &warnings)
 	if err := applySensitive(c.Types, overlay.Sensitive); err != nil {
+		return nil, err
+	}
+	if err := applyInputOnly(c.Types, overlay.InputOnly); err != nil {
 		return nil, err
 	}
 	// Last, so an observation checks the catalog as it will ship.
@@ -1124,13 +1132,29 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// answer. Only a PUT at the resource's own address whose body IS the
 	// resource; never the create method (Pub/Sub creates with a PUT).
 	if t.UpdateVerb == "" {
-		if put := discoveredPut(col, create); put != nil {
+		if put, updateURL := discoveredPut(col, create, selfLink(t)); put != nil {
 			restricted, _ := restrictedPatch(col)
-			if !restricted {
-				t.UpdateVerb, t.UpdateMask, t.UpdateURL = http.MethodPut, false, ""
+			if allow := overlay.Patchable[name]; !restricted || allow != nil {
+				t.UpdateVerb, t.UpdateMask, t.UpdateURL = http.MethodPut, false, updateURL
 				setTypeSource(t, "update_verb", SourceDiscovery)
+				// A PUT replaces the resource, but that does not make every
+				// field in its body changeable: a Cloud SQL user's host is
+				// fixed at insertion, and its role lists are read from the
+				// query. The list is the same human decision a PATCH's is.
+				if allow != nil {
+					applyPatchAllowlist(attrs, allow.Fields, SourceRuling)
+					setTypeSource(t, "update_verb", SourceDiscovery, SourceRuling)
+					q, err := updateQuery(put, allow, attrs)
+					if err != nil {
+						return nil, overlayError{fmt.Errorf("patchable %s: %w", name, err)}
+					}
+					t.UpdateQuery = q
+				}
 			}
 		}
+	}
+	if allow := overlay.Patchable[name]; allow != nil && len(allow.InQuery) > 0 && t.UpdateVerb != http.MethodPut {
+		return nil, overlayError{fmt.Errorf("patchable %s: in_query applies only to a PUT update, and this type's update verb is %q", name, t.UpdateVerb)}
 	}
 
 	// magic-modules' resource-level `immutable:` says the same thing a
@@ -1317,7 +1341,7 @@ func buildType(doc *disco.Document, col disco.Collection, mm *mmv1.Resource, nam
 	// is ever sent (see discoveredUpdate), so that is the method to ask.
 	update := patchMethodOf(col)
 	if t.UpdateVerb == http.MethodPut {
-		update = discoveredPut(col, create)
+		update, _ = discoveredPut(col, create, selfLink(t))
 	}
 	if t.UpdateVerb != "" && update != nil {
 		if updateAwait, _ := AwaitOf(doc, update); updateAwait != await {
@@ -2523,12 +2547,14 @@ func discoveredUpdate(col disco.Collection, updateURL string) (verb string, mask
 	return "PATCH", masked
 }
 
-// discoveredPut is the collection's PUT update: at the get's own address,
-// taking the resource itself as its body, and not the create method.
-func discoveredPut(col disco.Collection, create *disco.Method) *disco.Method {
+// discoveredPut is the collection's PUT update, taking the resource itself as
+// its body, and not the create method: at the get's own address, or on the
+// collection naming the item in a query parameter (Cloud SQL's users.update),
+// in which case updateURL is where to send it. self is t's self_link.
+func discoveredPut(col disco.Collection, create *disco.Method, self string) (put *disco.Method, updateURL string) {
 	get := col.Methods["get"]
 	if get == nil || get.Response == nil || get.Response.Ref == "" {
-		return nil
+		return nil, ""
 	}
 	names := make([]string, 0, len(col.Methods))
 	for n := range col.Methods {
@@ -2540,11 +2566,60 @@ func discoveredPut(col disco.Collection, create *disco.Method) *disco.Method {
 		if m == create || m.HTTPMethod != http.MethodPut || m.Request == nil {
 			continue
 		}
-		if m.Request.Ref == get.Response.Ref && sameAddress(m, get) {
-			return m
+		if m.Request.Ref != get.Response.Ref {
+			continue
+		}
+		if sameAddress(m, get) {
+			return m, ""
+		}
+		if u := queryAddressedURL(self, get, m); u != "" {
+			return m, u
 		}
 	}
-	return nil
+	return nil, ""
+}
+
+// overlayError is a mistake in gen/overlay.yaml found while building one
+// type. Build fails on it rather than refusing the type with a warning: a
+// human decision that does not hold should stop the build, not quietly
+// take a shipping type out of the catalog.
+type overlayError struct{ error }
+
+func (e overlayError) Unwrap() error { return e.error }
+
+// updateQuery is a patchable entry's in_query, checked against the PUT it
+// will be sent with: every field must be on the list (a field left off is
+// ForceNew and never sent) and a top-level attribute, and it and every
+// parameter beside it must be a query parameter put publishes. A name that
+// is not would go on the wire as a guess.
+func updateQuery(put *disco.Method, allow *Patchable, attrs map[string]*catalog.Attr) ([]*catalog.QueryField, error) {
+	listed := make(map[string]bool, len(allow.Fields))
+	for _, f := range allow.Fields {
+		listed[f] = true
+	}
+	published := func(param string) bool {
+		p := put.Parameters[param]
+		return p != nil && p.Location == "query"
+	}
+	var out []*catalog.QueryField
+	for _, q := range allow.InQuery {
+		if !listed[q.Field] {
+			return nil, fmt.Errorf("in_query names %q, which fields does not", q.Field)
+		}
+		if a := attrNamed(attrs, q.Field); a == nil || a.Output {
+			return nil, fmt.Errorf("in_query names %q, which is not a settable attribute", q.Field)
+		}
+		if !published(q.Field) {
+			return nil, fmt.Errorf("in_query names %q, which %s does not take as a query parameter", q.Field, put.ID)
+		}
+		for param := range q.With {
+			if !published(param) {
+				return nil, fmt.Errorf("in_query sends %q with %q, which %s does not take as a query parameter", param, q.Field, put.ID)
+			}
+		}
+		out = append(out, &catalog.QueryField{Field: q.Field, With: q.With})
+	}
+	return out, nil
 }
 
 // isBareCapture reports whether a url template names no literal segment at all
@@ -2777,11 +2852,27 @@ func discoveredDeleteURL(t *catalog.Type, col disco.Collection) string {
 		return ""
 	}
 	if tail := strings.TrimPrefix(ds, gs); tail != ds && strings.HasPrefix(tail, "/") && !strings.Contains(tail, "{") {
-		self, _, _ := strings.Cut(t.SelfLink, "?")
-		return self + tail
+		return selfLink(t) + tail
 	}
+	return queryAddressedURL(selfLink(t), get, del)
+}
+
+// selfLink is t's self_link without any query string.
+func selfLink(t *catalog.Type) string {
+	self, _, _ := strings.Cut(t.SelfLink, "?")
+	return self
+}
+
+// queryAddressedURL is the url of a method published on the COLLECTION that
+// names its item in a query parameter -- Cloud SQL's users.delete and
+// users.update take ?name= -- built from self: the collection, then the
+// item's own placeholder as the query parameter of that name. "" unless m's
+// path is exactly the get's without its last segment and m takes a query
+// parameter named after the get's last placeholder.
+func queryAddressedURL(self string, get, m *disco.Method) string {
+	gs := flatShape(get)
 	i := strings.LastIndex(gs, "/")
-	if i < 0 || ds != gs[:i] {
+	if i < 0 || flatShape(m) != gs[:i] {
 		return ""
 	}
 	// The item's own placeholder, and the query parameter of that name.
@@ -2789,20 +2880,19 @@ func discoveredDeleteURL(t *catalog.Type, col disco.Collection) string {
 	if getPath == "" {
 		getPath = get.Path
 	}
-	m := placeholderRE.FindAllStringSubmatch(getPath, -1)
-	if len(m) == 0 {
+	ph := placeholderRE.FindAllStringSubmatch(getPath, -1)
+	if len(ph) == 0 {
 		return ""
 	}
-	param := del.Parameters[m[len(m)-1][1]]
+	param := m.Parameters[ph[len(ph)-1][1]]
 	if param == nil || param.Location != "query" {
 		return ""
 	}
-	self, _, _ := strings.Cut(t.SelfLink, "?")
 	j := strings.LastIndex(self, "/")
 	if j < 0 {
 		return ""
 	}
-	return self[:j] + "?" + m[len(m)-1][1] + "=" + self[j+1:]
+	return self[:j] + "?" + ph[len(ph)-1][1] + "=" + self[j+1:]
 }
 
 // withoutItemTail drops a create template's trailing id segment when the
@@ -2951,7 +3041,29 @@ func dropUnpublishedCreateQuery(t *catalog.Type, create *disco.Method) {
 // applySensitive marks the overlay's secrets. An entry for a type that does
 // not ship, or a path it does not have, is an error: a secret listed and
 // silently not marked is the leak this exists to stop.
-func applySensitive(types []*catalog.Type, entries map[string]SensitiveFields) error {
+func applySensitive(types []*catalog.Type, entries map[string]FieldList) error {
+	return applyFieldList(types, entries, "sensitive", func(a *catalog.Attr) error {
+		a.Sensitive = true
+		return nil
+	})
+}
+
+// applyInputOnly marks the overlay's input-only fields, refusing the same
+// mistakes applySensitive does, and an output field, which Google returns.
+func applyInputOnly(types []*catalog.Type, entries map[string]FieldList) error {
+	return applyFieldList(types, entries, "input_only", func(a *catalog.Attr) error {
+		if a.Output {
+			return errors.New("is output, which Google returns")
+		}
+		a.InputOnly = true
+		return nil
+	})
+}
+
+// applyFieldList applies mark to every path entries names and records the
+// ruling as the source of fact. A type that does not ship, a path it does
+// not have, an entry with no note, or a field mark refuses is an error.
+func applyFieldList(types []*catalog.Type, entries map[string]FieldList, fact string, mark func(*catalog.Attr) error) error {
 	byName := make(map[string]*catalog.Type, len(types))
 	for _, t := range types {
 		byName[t.Name] = t
@@ -2964,18 +3076,20 @@ func applySensitive(types []*catalog.Type, entries map[string]SensitiveFields) e
 	for _, n := range names {
 		t := byName[n]
 		if t == nil {
-			return fmt.Errorf("overlay sensitive: %s does not ship", n)
+			return fmt.Errorf("overlay %s: %s does not ship", fact, n)
 		}
 		if strings.TrimSpace(entries[n].Note) == "" {
-			return fmt.Errorf("overlay sensitive: %s has no note saying why", n)
+			return fmt.Errorf("overlay %s: %s has no note saying why", fact, n)
 		}
 		for _, path := range entries[n].Fields {
 			a := attrAtPath(t.Attributes, path)
 			if a == nil {
-				return fmt.Errorf("overlay sensitive: %s has no attribute %q", n, path)
+				return fmt.Errorf("overlay %s: %s has no attribute %q", fact, n, path)
 			}
-			a.Sensitive = true
-			addSource(a, "sensitive", SourceRuling)
+			if err := mark(a); err != nil {
+				return fmt.Errorf("overlay %s: %s.%s %w", fact, n, path, err)
+			}
+			addSource(a, fact, SourceRuling)
 		}
 	}
 	return nil
